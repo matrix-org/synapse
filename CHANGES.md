@@ -1,3 +1,12 @@
+Synapse 1.65.0rc2 (2022-08-11)
+==============================
+
+Internal Changes
+----------------
+
+- Revert 'Remove the unspecced `room_id` field in the `/hierarchy` response. ([\#13365](https://github.com/matrix-org/synapse/issues/13365))' to give more time for clients to update. ([\#13501](https://github.com/matrix-org/synapse/issues/13501))
+
+
 Synapse 1.65.0rc1 (2022-08-09)
 ==============================
 
