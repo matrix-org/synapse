@@ -1,0 +1,2 @@
+Refactor ` _send_events_for_new_room` to separate creating and sending events.
+ _send_events_for_new_room
