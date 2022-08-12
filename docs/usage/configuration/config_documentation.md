@@ -759,6 +759,10 @@ allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.
 
+Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to `0`, Synapse may
+still take up to 5 minutes to purge redacted events from the database.
+
 Defaults to `7d`. Set to `null` to disable.
 
 Example configuration:

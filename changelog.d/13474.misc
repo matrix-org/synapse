@@ -1,0 +1,1 @@
+Add some miscellaneous comments to document sync, especially around `compute_state_delta`.
