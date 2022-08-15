@@ -1094,29 +1094,41 @@ class EventsWorkerStore(SQLBaseStore):
         fetched_event_ids: Set[str] = set()
         fetched_events: Dict[str, _EventRow] = {}
 
-        async def _recursively_fetch_redactions(row_map: Dict[str, _EventRow]) -> None:
-            # We use a `while` here instead of recursively calling the function
-            # to avoid stack overflows because Python doesn't reliably catch
-            # them and can crash (eg.
-            # https://nvd.nist.gov/vuln/detail/CVE-2022-31052).
-            while row_map:
-                # we need to recursively fetch any redactions of those events
-                redaction_ids: Set[str] = set()
-                for event_id, row in row_map.items():
-                    fetched_event_ids.add(event_id)
-                    if row:
-                        fetched_events[event_id] = row
-                        redaction_ids.update(row.redactions)
-                events_to_fetch = redaction_ids.difference(fetched_event_ids)
-                if events_to_fetch:
-                    logger.debug("Also fetching redaction events %s", events_to_fetch)
-                    row_map = await self._enqueue_events(events_to_fetch)
+        async def _fetch_event_ids_and_get_outstanding_redactions(
+            event_ids_to_fetch: Collection[str],
+        ) -> Collection[str]:
+            """
+            Fetch all of the given event_ids and return any associated redaction event_ids
+            that we still need to fetch in the next iteration.
+            """
+            row_map = await self._enqueue_events(event_ids_to_fetch)
 
-        events_to_fetch = event_ids
-        row_map = await self._enqueue_events(events_to_fetch)
+            # we need to recursively fetch any redactions of those events
+            redaction_ids: Set[str] = set()
+            for event_id in event_ids_to_fetch:
+                row = row_map.get(event_id)
+                fetched_event_ids.add(event_id)
+                if row:
+                    fetched_events[event_id] = row
+                    redaction_ids.update(row.redactions)
 
+            event_ids_to_fetch = redaction_ids.difference(fetched_event_ids)
+            return event_ids_to_fetch
+
+        # Grab the initial list of events requested
+        event_ids_to_fetch = await _fetch_event_ids_and_get_outstanding_redactions(
+            event_ids
+        )
+        # Then go and recursively find all of the associated redactions
         with start_active_span("recursively fetching redactions"):
-            await _recursively_fetch_redactions(row_map)
+            while event_ids_to_fetch:
+                logger.debug("Also fetching redaction events %s", event_ids_to_fetch)
+
+                event_ids_to_fetch = (
+                    await _fetch_event_ids_and_get_outstanding_redactions(
+                        event_ids_to_fetch
+                    )
+                )
 
         # build a map from event_id to EventBase
         event_map: Dict[str, EventBase] = {}
