@@ -370,7 +370,9 @@ class RoomCreationHandler:
         # required PL above that.
 
         pl_content = copy_and_fixup_power_levels_contents(old_room_pl_state.content)
-        users_default: int = pl_content.get("users_default", 0)  # type: ignore[assignment]
+        users_default: int = pl_content.get(
+            "users_default", 0
+        )  # type: ignore[assignment]
         restricted_level = max(users_default + 1, 50)
 
         updated = False
@@ -979,7 +981,11 @@ class RoomCreationHandler:
                 depth += 1
 
         for invite_3pid in invite_3pid_list:
-            assert has_3pid_invite_keys(invite_3pid)
+            try:
+                assert has_3pid_invite_keys(invite_3pid)
+            except Codes.MISSING_PARAM as e:
+                logger.error(e, invite_3pid)
+                continue
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid["id_access_token"]
             address = invite_3pid["address"]
