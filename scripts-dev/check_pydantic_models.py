@@ -200,6 +200,7 @@ def do_lint() -> Set[str]:
     failures = set()
 
     with monkeypatch_pydantic():
+        logger.debug("Importing synapse")
         try:
             # TODO: make "synapse" an argument so we can target this script at
             # a subpackage
@@ -210,6 +211,7 @@ def do_lint() -> Set[str]:
             return failures
 
         try:
+            logger.debug("Fetching subpackages")
             module_infos = list(
                 pkgutil.walk_packages(module.__path__, f"{module.__name__}.")
             )
@@ -382,7 +384,7 @@ class TestFieldTypeInspection(unittest.TestCase):
             ("TypedDict('D', x=StrictInt)",),
         ]
     )
-    def test_field_holding_accepted_type_raises(self, annotation: str) -> None:
+    def test_field_holding_accepted_type_doesnt_raise(self, annotation: str) -> None:
         with monkeypatch_pydantic():
             run_test_snippet(
                 f"""
@@ -405,7 +407,7 @@ class TestFieldTypeInspection(unittest.TestCase):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("mode", choices=["lint", "test"], default="lint")
+parser.add_argument("mode", choices=["lint", "test"], default="lint", nargs="?")
 parser.add_argument("-v", "--verbose", action="store_true")
 
 
