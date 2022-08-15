@@ -101,7 +101,7 @@ class RoomTestCase(_ShadowBannedBase):
                 "id_server": "test",
                 "medium": "email",
                 "address": "test@test.test",
-                "id_access_token": self.banned_access_token,
+                "id_access_token": "anytoken",
             },
             access_token=self.banned_access_token,
         )

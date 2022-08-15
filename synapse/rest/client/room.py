@@ -908,10 +908,16 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         return 200, return_value
 
     def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
-        for key in {"id_server", "medium", "address", "id_access_token"}:
-            if key not in content:
-                return False
-        return True
+        # if the request has medium and address keys, we should treat it as a 3pid invite.
+        if all(key in content for key in ("medium", "address")):
+            if all(key in content for key in ("id_server", "id_access_token")):
+                return True
+            # if it does not have id_server or id_access_token, we should treat that as an error.
+            raise SynapseError(
+                400,
+                "`id_server` and `id_access_token` are required when doing 3pid invite",
+            )
+        return False
 
     def on_PUT(
         self, request: SynapseRequest, room_id: str, membership_action: str, txn_id: str
