@@ -1095,18 +1095,22 @@ class EventsWorkerStore(SQLBaseStore):
         fetched_events: Dict[str, _EventRow] = {}
 
         async def _recursively_fetch_redactions(row_map: Dict[str, _EventRow]) -> None:
-            # we need to recursively fetch any redactions of those events
-            redaction_ids: Set[str] = set()
-            for event_id, row in row_map.items():
-                fetched_event_ids.add(event_id)
-                if row:
-                    fetched_events[event_id] = row
-                    redaction_ids.update(row.redactions)
-            events_to_fetch = redaction_ids.difference(fetched_event_ids)
-            if events_to_fetch:
-                logger.debug("Also fetching redaction events %s", events_to_fetch)
-                row_map = await self._enqueue_events(events_to_fetch)
-                await _recursively_fetch_redactions(row_map)
+            # We use a `while` here instead of recursively calling the function
+            # to avoid stack overflows because Python doesn't reliably catch
+            # them and can crash (eg.
+            # https://nvd.nist.gov/vuln/detail/CVE-2022-31052).
+            while row_map:
+                # we need to recursively fetch any redactions of those events
+                redaction_ids: Set[str] = set()
+                for event_id, row in row_map.items():
+                    fetched_event_ids.add(event_id)
+                    if row:
+                        fetched_events[event_id] = row
+                        redaction_ids.update(row.redactions)
+                events_to_fetch = redaction_ids.difference(fetched_event_ids)
+                if events_to_fetch:
+                    logger.debug("Also fetching redaction events %s", events_to_fetch)
+                    row_map = await self._enqueue_events(events_to_fetch)
 
         events_to_fetch = event_ids
         row_map = await self._enqueue_events(events_to_fetch)
