@@ -817,7 +817,11 @@ class IdentityHandler:
         except HttpResponseException as e:
             logger.info("Failed to POST %s with JSON: %s", url, e)
 
-        # TODO: Check for success
+        if not (data and data.get("token") and data.get("display_name")):
+            raise SynapseError(
+                500, "No data with token was received from identity server"
+            )
+
         token = data["token"]
         public_keys = data.get("public_keys", [])
         if "public_key" in data:
