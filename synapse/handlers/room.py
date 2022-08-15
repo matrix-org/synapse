@@ -735,6 +735,14 @@ class RoomCreationHandler:
         invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
 
+        # validate each entry
+        for invite_3pid in invite_3pid_list:
+            try:
+                assert has_3pid_invite_keys(invite_3pid)
+            except SynapseError as e:
+                logger.error(e, invite_3pid)
+                invite_3pid_list.remove(invite_list)
+
         if not is_requester_admin:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
             if spam_check != NOT_SPAM:
@@ -981,11 +989,6 @@ class RoomCreationHandler:
                 depth += 1
 
         for invite_3pid in invite_3pid_list:
-            try:
-                assert has_3pid_invite_keys(invite_3pid)
-            except SynapseError as e:
-                logger.error(e, invite_3pid)
-                continue
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid["id_access_token"]
             address = invite_3pid["address"]
