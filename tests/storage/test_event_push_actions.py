@@ -267,14 +267,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _rotate() -> None:
             self.get_success(self.store._rotate_notifs())
 
-        def _mark_read(event_id: str) -> None:
+        def _mark_read(event_id: str, thread_id: Optional[str] = None) -> None:
             self.get_success(
                 self.store.insert_receipt(
                     room_id,
                     "m.read",
                     user_id=user_id,
                     event_ids=[event_id],
-                    thread_id=None,
+                    thread_id=thread_id,
                     data={},
                 )
             )
@@ -303,9 +303,12 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _create_event()
         _create_event(thread_id=thread_id)
         _mark_read(event_id)
+        _assert_counts(1, 1, 0, 3, 3, 0)
+        _mark_read(event_id, thread_id)
         _assert_counts(1, 1, 0, 1, 1, 0)
 
         _mark_read(last_event_id)
+        _mark_read(last_event_id, thread_id)
         _assert_counts(0, 0, 0, 0, 0, 0)
 
         _create_event()
@@ -319,6 +322,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(1, 1, 0, 1, 1, 0)
 
         _mark_read(last_event_id)
+        _mark_read(last_event_id, thread_id)
         _assert_counts(0, 0, 0, 0, 0, 0)
 
         _create_event(True)
@@ -344,14 +348,19 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         # Check that sending read receipts at different points results in the
         # right counts.
         _mark_read(event_id)
+        _assert_counts(1, 1, 0, 2, 2, 1)
+        _mark_read(event_id, thread_id)
         _assert_counts(1, 1, 0, 1, 1, 0)
         _mark_read(last_event_id)
+        _assert_counts(0, 0, 0, 1, 1, 0)
+        _mark_read(last_event_id, thread_id)
         _assert_counts(0, 0, 0, 0, 0, 0)
 
         _create_event(True)
         _create_event(True, thread_id)
         _assert_counts(1, 1, 1, 1, 1, 1)
         _mark_read(last_event_id)
+        _mark_read(last_event_id, thread_id)
         _assert_counts(0, 0, 0, 0, 0, 0)
         _rotate()
         _assert_counts(0, 0, 0, 0, 0, 0)

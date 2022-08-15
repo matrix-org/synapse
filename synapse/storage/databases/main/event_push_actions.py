@@ -275,33 +275,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         room_id: str,
         user_id: str,
     ) -> Tuple[NotifCounts, Dict[str, NotifCounts]]:
-        # Get the stream ordering of the user's latest receipt in the room.
-        result = self.get_last_receipt_for_user_txn(
-            txn,
-            user_id,
-            room_id,
-            receipt_types=(
-                ReceiptTypes.READ,
-                ReceiptTypes.READ_PRIVATE,
-                ReceiptTypes.UNSTABLE_READ_PRIVATE,
-            ),
+        # Retrieve the stream ordering for the latest membership event from this user
+        # in this room (which we assume is a join).
+        event_id = self.db_pool.simple_select_one_onecol_txn(
+            txn=txn,
+            table="local_current_membership",
+            keyvalues={"room_id": room_id, "user_id": user_id},
+            retcol="event_id",
         )
 
-        if result:
-            _, stream_ordering = result
-
-        else:
-            # If the user has no receipts in the room, retrieve the stream ordering for
-            # the latest membership event from this user in this room (which we assume is
-            # a join).
-            event_id = self.db_pool.simple_select_one_onecol_txn(
-                txn=txn,
-                table="local_current_membership",
-                keyvalues={"room_id": room_id, "user_id": user_id},
-                retcol="event_id",
-            )
-
-            stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)
+        stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)
 
         return self._get_unread_counts_by_pos_txn(
             txn, room_id, user_id, stream_ordering
@@ -349,20 +332,42 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # date (as the row was written by an older version of Synapse that
         # updated `event_push_summary` synchronously when persisting a new read
         # receipt).
-        txn.execute(
-            """
-                SELECT stream_ordering, notif_count, COALESCE(unread_count, 0), thread_id
-                FROM event_push_summary
-                WHERE room_id = ? AND user_id = ?
-                AND (
-                    (last_receipt_stream_ordering IS NULL AND stream_ordering > ?)
-                    OR last_receipt_stream_ordering = ?
-                )
-            """,
-            (room_id, user_id, receipt_stream_ordering, receipt_stream_ordering),
+        receipt_types_clause, args = make_in_list_sql_clause(
+            self.database_engine,
+            "receipt_type",
+            (
+                ReceiptTypes.READ,
+                ReceiptTypes.READ_PRIVATE,
+                ReceiptTypes.UNSTABLE_READ_PRIVATE,
+            ),
         )
-        max_summary_stream_ordering = 0
-        for summary_stream_ordering, notif_count, unread_count, thread_id in txn:
+
+        txn.execute(
+            f"""
+                SELECT notif_count, COALESCE(unread_count, 0), thread_id, MAX(events.stream_ordering)
+                FROM event_push_summary
+                LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
+                LEFT JOIN events ON (
+                    events.room_id = receipts_linearized.room_id AND
+                    events.event_id = receipts_linearized.event_id
+                )
+                WHERE event_push_summary.room_id = ? AND user_id = ?
+                AND (
+                    (
+                        last_receipt_stream_ordering IS NULL
+                        AND event_push_summary.stream_ordering > COALESCE(events.stream_ordering, ?)
+                    )
+                    OR last_receipt_stream_ordering = COALESCE(events.stream_ordering, ?)
+                )
+                AND {receipt_types_clause}
+            """,
+            [room_id, user_id, receipt_stream_ordering, receipt_stream_ordering] + args,
+        )
+        for notif_count, unread_count, thread_id, _ in txn:
+            # XXX Why are these returned? Related to MAX(...) aggregation.
+            if notif_count is None:
+                continue
+
             if not thread_id:
                 counts = NotifCounts(
                     notify_count=notif_count, unread_count=unread_count
@@ -373,22 +378,22 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     notify_count=notif_count, unread_count=unread_count
                 )
 
-            # XXX All threads should have the same stream ordering?
-            max_summary_stream_ordering = max(
-                summary_stream_ordering, max_summary_stream_ordering
-            )
-
         # Next we need to count highlights, which aren't summarised
         sql = """
-            SELECT COUNT(*), thread_id FROM event_push_actions
+            SELECT COUNT(*), thread_id, MAX(events.stream_ordering) FROM event_push_actions
+            LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
+            LEFT JOIN events ON (
+                events.room_id = receipts_linearized.room_id AND
+                events.event_id = receipts_linearized.event_id
+            )
             WHERE user_id = ?
-                AND room_id = ?
-                AND stream_ordering > ?
+                AND event_push_actions.room_id = ?
+                AND event_push_actions.stream_ordering > COALESCE(events.stream_ordering, ?)
                 AND highlight = 1
             GROUP BY thread_id
         """
         txn.execute(sql, (user_id, room_id, receipt_stream_ordering))
-        for highlight_count, thread_id in txn:
+        for highlight_count, thread_id, _ in txn:
             if not thread_id:
                 counts.highlight_count += highlight_count
             elif highlight_count:
@@ -403,11 +408,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # summary returned above. This might be due to recent events that haven't
         # been summarised yet or the summary is out of date due to a recent read
         # receipt.
-        start_unread_stream_ordering = max(
-            receipt_stream_ordering, max_summary_stream_ordering
-        )
         unread_counts = self._get_notif_unread_count_for_user_room(
-            txn, room_id, user_id, start_unread_stream_ordering
+            txn, room_id, user_id, receipt_stream_ordering
         )
 
         for notif_count, unread_count, thread_id in unread_counts:
@@ -454,8 +456,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         # If there have been no events in the room since the stream ordering,
         # there can't be any push actions either.
-        if not self._events_stream_cache.has_entity_changed(room_id, stream_ordering):
-            return []
+        #
+        # XXX
+        # if not self._events_stream_cache.has_entity_changed(room_id, stream_ordering):
+        #     return []
 
         clause = ""
         args = [user_id, room_id, stream_ordering]
@@ -463,26 +467,29 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             clause = "AND ea.stream_ordering <= ?"
             args.append(max_stream_ordering)
 
-            # If the max stream ordering is less than the min stream ordering,
-            # then obviously there are zero push actions in that range.
-            if max_stream_ordering <= stream_ordering:
-                return []
-
         sql = f"""
             SELECT
                COUNT(CASE WHEN notif = 1 THEN 1 END),
                COUNT(CASE WHEN unread = 1 THEN 1 END),
-               thread_id
+               thread_id,
+               MAX(events.stream_ordering)
             FROM event_push_actions ea
+            LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
+            LEFT JOIN events ON (
+                events.room_id = receipts_linearized.room_id AND
+                events.event_id = receipts_linearized.event_id
+            )
             WHERE user_id = ?
-               AND room_id = ?
-               AND ea.stream_ordering > ?
+               AND ea.room_id = ?
+               AND ea.stream_ordering > COALESCE(events.stream_ordering, ?)
                {clause}
             GROUP BY thread_id
         """
 
         txn.execute(sql, args)
-        return cast(List[Tuple[int, int, str]], txn.fetchall())
+        # The max stream ordering is simply there to select the latest receipt,
+        # it doesn't need to be returned.
+        return [cast(Tuple[int, int, str], row[:3]) for row in txn.fetchall()]
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering: int, max_stream_ordering: int
