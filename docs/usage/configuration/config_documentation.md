@@ -759,6 +759,10 @@ allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.
 
+Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to `0`, Synapse may
+still take up to 5 minutes to purge redacted events from the database.
+
 Defaults to `7d`. Set to `null` to disable.
 
 Example configuration:
@@ -1056,26 +1060,26 @@ allow_device_name_lookup_over_federation: true
 ---
 ## Caching ##
 
-Options related to caching
+Options related to caching.
 
 ---
 ### `event_cache_size`
 
 The number of events to cache in memory. Not affected by
-`caches.global_factor`. Defaults to 10K.
+`caches.global_factor` and is not part of the `caches` section. Defaults to 10K.
 
 Example configuration:
 ```yaml
 event_cache_size: 15K
 ```
 ---
-### `cache` and associated values
+### `caches` and associated values
 
 A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.
 
-Caching can be configured through the following sub-options:
+`caches` can be configured through the following sub-options:
 
 * `global_factor`: Controls the global cache factor, which is the default cache factor
   for all caches if a specific factor for that cache is not otherwise
@@ -1137,6 +1141,7 @@ Caching can be configured through the following sub-options:
 
 Example configuration:
 ```yaml
+event_cache_size: 15K
 caches:
   global_factor: 1.0
   per_cache_factors:

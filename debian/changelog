@@ -1,3 +1,15 @@
+matrix-synapse-py3 (1.65.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.65.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 11 Aug 2022 11:38:18 +0100
+
+matrix-synapse-py3 (1.65.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.65.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 09 Aug 2022 11:39:29 +0100
+
 matrix-synapse-py3 (1.64.0) stable; urgency=medium
 
   * New Synapse release 1.64.0.

@@ -1,1 +1,0 @@
-Fix a bug in the experimental faster-room-joins support which could cause it to get stuck in an infinite loop.
