@@ -983,7 +983,7 @@ class RoomCreationHandler:
         for invite_3pid in invite_3pid_list:
             try:
                 assert has_3pid_invite_keys(invite_3pid)
-            except Codes.MISSING_PARAM as e:
+            except SynapseError as e:
                 logger.error(e, invite_3pid)
                 continue
             id_server = invite_3pid["id_server"]
