@@ -61,6 +61,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def has_3pid_invite_keys(content: JsonDict) -> bool:
+    # if the request has medium and address keys, we should treat it as a 3pid invite.
+    if all(key in content for key in ("medium", "address")):
+        if all(key in content for key in ("id_server", "id_access_token")):
+            return True
+        # if it does not have id_server or id_access_token, we should treat that as an error.
+        raise SynapseError(
+            400,
+            "`id_server` and `id_access_token` are required when doing 3pid invite",
+            Codes.MISSING_PARAM,
+        )
+    return False
+
+
 class TransactionRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -860,7 +874,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if membership_action == "invite" and self._has_3pid_invite_keys(content):
+        if membership_action == "invite" and has_3pid_invite_keys(content):
             try:
                 await self.room_member_handler.do_3pid_invite(
                     room_id,
@@ -906,18 +920,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             return_value["room_id"] = room_id
 
         return 200, return_value
-
-    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
-        # if the request has medium and address keys, we should treat it as a 3pid invite.
-        if all(key in content for key in ("medium", "address")):
-            if all(key in content for key in ("id_server", "id_access_token")):
-                return True
-            # if it does not have id_server or id_access_token, we should treat that as an error.
-            raise SynapseError(
-                400,
-                "`id_server` and `id_access_token` are required when doing 3pid invite",
-            )
-        return False
 
     def on_PUT(
         self, request: SynapseRequest, room_id: str, membership_action: str, txn_id: str

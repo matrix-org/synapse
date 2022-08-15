@@ -64,6 +64,7 @@ from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
+from synapse.rest.client.room import has_3pid_invite_keys
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
 from synapse.types import (
@@ -978,6 +979,7 @@ class RoomCreationHandler:
                 depth += 1
 
         for invite_3pid in invite_3pid_list:
+            assert has_3pid_invite_keys(invite_3pid)
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid["id_access_token"]
             address = invite_3pid["address"]
