@@ -36,7 +36,7 @@ import textwrap
 import traceback
 import unittest.mock
 from contextlib import contextmanager
-from typing import Any, Callable, Generator, Set, Type, TypeVar, List, Dict
+from typing import Any, Callable, Dict, Generator, List, Set, Type, TypeVar
 
 from parameterized import parameterized
 from pydantic import BaseModel as PydanticBaseModel, conbytes, confloat, conint, constr
@@ -179,6 +179,8 @@ def format_model_checker_exception(e: ModelCheckerException) -> str:
             f"Missing `strict=True` from {e.factory_name}() call \n"
             + traceback.format_list([frame_summary])[0].lstrip()
         )
+    else:
+        raise ValueError(f"Unknown exception {e}") from e
 
 
 def lint() -> int:
@@ -208,7 +210,7 @@ def do_lint() -> Set[str]:
             return failures
 
         try:
-            modules = list(
+            module_infos = list(
                 pkgutil.walk_packages(module.__path__, f"{module.__name__}.")
             )
         except ModelCheckerException as e:
@@ -216,12 +218,14 @@ def do_lint() -> Set[str]:
             failures.add(format_model_checker_exception(e))
             return failures
 
-        for module in modules:
-            logger.debug("Importing %s", module.name)
+        for module_info in module_infos:
+            logger.debug("Importing %s", module_info.name)
             try:
-                importlib.import_module(module.name)
+                importlib.import_module(module_info.name)
             except ModelCheckerException as e:
-                logger.warning(f"Bad annotation found when importing {module.name}")
+                logger.warning(
+                    f"Bad annotation found when importing {module_info.name}"
+                )
                 failures.add(format_model_checker_exception(e))
 
     return failures
