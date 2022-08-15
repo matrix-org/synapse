@@ -3836,7 +3836,11 @@ the <code>allowed_lifetime_min</code> and <code>allowed_lifetime_max</code> conf
 which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.</p>
-<p>The message retention policies feature is disabled by default.</p>
+<p>The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk. There are known bugs with the implementation
+which can cause database corruption. Setting retention to delete older history
+is less risky than deleting newer history but in general caution is advised when enabling this
+experimental feature. You can read more about this feature <a href="usage/configuration/../../message_retention_policies.html">here</a>.</p>
 <p>This setting has the following sub-options:</p>
 <ul>
 <li>
@@ -8271,7 +8275,8 @@ and allow server and room admins to configure how long messages should
 be kept in a homeserver's database before being purged from it.
 <strong>Please note that, as this feature isn't part of the Matrix
 specification yet, this implementation is to be considered as
-experimental.</strong> </p>
+experimental. There are known bugs which may cause database corruption.
+Proceed with caution.</strong> </p>
 <p>A message retention policy is mainly defined by its <code>max_lifetime</code>
 parameter, which defines how long a message can be kept around after
 it was sent to the room. If a room doesn't have a message retention
