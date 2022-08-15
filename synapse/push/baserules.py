@@ -14,6 +14,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Push rules is the system used to determine which events trigger a push (and a
+bump in notification counts).
+
+This consists of a list of "push rules" for each user, where a push rule is a
+pair of "conditions" and "actions". When a user receives an event Synapse
+iterates over the list of push rules until it finds one where all the conditions
+match the event, at which point "actions" describe the outcome (e.g. notify,
+highlight, etc).
+
+Push rules are split up into 5 different "kinds" (aka "priority classes"), which
+are run in order:
+    1. Override — highest priority rules, e.g. always ignore notices
+    2. Content — content specific rules, e.g. @ notifications
+    3. Room — per room rules, e.g. enable/disable notifications for all messages
+       in a room
+    4. Sender — per sender rules, e.g. never notify for messages from a given
+       user
+    5. Underride — the lowest priority "default" rules, e.g. notify for every
+       message.
+
+The set of "base rules" are the list of rules that every user has by default. A
+user can modify their copy of the push rules in one of three ways:
+
+    1. Adding a new push rule of a certain kind
+    2. Changing the actions of a base rule
+    3. Enabling/disabling a base rule.
+
+The base rules are split into whether they come before or after a particular
+kind, so the order of push rule evaluation would be: base rules for before
+"override" kind, user defined "override" rules, base rules after "override"
+kind, etc, etc.
+"""
+
 import itertools
 from typing import Dict, Iterator, List, Mapping, Sequence, Tuple, Union
 
@@ -25,6 +59,18 @@ from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
 class PushRule:
+    """A push rule
+
+    Attributes:
+        rule_id: a unique ID for this rule
+        priority_class: what "kind" of push rule this is (see
+            `PRIORITY_CLASS_MAP` for mapping between int and kind)
+        conditions: the sequence of conditions that all need to match
+        actions: the actions to apply if all conditions are met
+        default: is this a base rule?
+        default_enabled: is this enabled by default?
+    """
+
     rule_id: str
     priority_class: int
     conditions: Sequence[Mapping[str, str]]
