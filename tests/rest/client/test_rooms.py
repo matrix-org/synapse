@@ -3464,7 +3464,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
     def test_400_missing_param_without_id_access_token(self) -> None:
         """
-        Test checking that invite returns 400 missing param
+        Test that a 3pid invite request returns 400 M_MISSING_PARAM
         if we do not include id_access_token.
         """
         channel = self.make_request(
