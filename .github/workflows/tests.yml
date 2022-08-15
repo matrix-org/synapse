@@ -62,8 +62,7 @@ jobs:
           fetch-depth: 0
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: ${{ matrix.python-version }}
-          extras: ${{ matrix.extras }}
+          extras: "all"
       - run: poetry run scripts-dev/check_pydantic_models.py
 
   # Dummy step to gate other tests on without repeating the whole list
