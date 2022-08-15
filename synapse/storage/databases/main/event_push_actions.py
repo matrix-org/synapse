@@ -1087,7 +1087,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
         sql = """
-            SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
+            SELECT r.stream_id, r.room_id, r.user_id, r.thread_id, e.stream_ordering
             FROM receipts_linearized AS r
             INNER JOIN events AS e USING (event_id)
             WHERE ? < r.stream_id AND r.stream_id <= ? AND user_id LIKE ?
@@ -1110,53 +1110,77 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
         rows = txn.fetchall()
 
-        # For each new read receipt we delete push actions from before it and
-        # recalculate the summary.
-        for _, room_id, user_id, stream_ordering in rows:
+        for _, room_id, user_id, thread_id, stream_ordering in rows:
             # Only handle our own read receipts.
             if not self.hs.is_mine_id(user_id):
                 continue
 
+            # For each new read receipt we delete push actions from before it and
+            # recalculate the summary.
             txn.execute(
                 """
                 DELETE FROM event_push_actions
                 WHERE room_id = ?
                     AND user_id = ?
+                    AND thread_id = ?
                     AND stream_ordering <= ?
                     AND highlight = 0
                 """,
-                (room_id, user_id, stream_ordering),
+                (room_id, user_id, thread_id, stream_ordering),
             )
 
             # Fetch the notification counts between the stream ordering of the
             # latest receipt and what was previously summarised.
-            unread_counts = self._get_notif_unread_count_for_user_room(
-                txn, room_id, user_id, stream_ordering, old_rotate_stream_ordering
+            sql = """
+                SELECT
+                    COUNT(CASE WHEN notif = 1 THEN 1 END),
+                    COUNT(CASE WHEN unread = 1 THEN 1 END)
+                FROM event_push_actions ea
+                WHERE user_id = ?
+                    AND room_id = ?
+                    AND thread_id = ?
+                    AND ea.stream_ordering > ?
+                    AND ea.stream_ordering <= ?
+            """
+            txn.execute(
+                sql,
+                (
+                    user_id,
+                    room_id,
+                    thread_id,
+                    stream_ordering,
+                    old_rotate_stream_ordering,
+                ),
             )
-
-            # First mark the summary for all threads in the room as cleared.
-            self.db_pool.simple_update_txn(
-                txn,
-                table="event_push_summary",
-                keyvalues={"user_id": user_id, "room_id": room_id},
-                updatevalues={
-                    "notif_count": 0,
-                    "unread_count": 0,
-                    "stream_ordering": old_rotate_stream_ordering,
-                    "last_receipt_stream_ordering": stream_ordering,
-                },
-            )
-
-            # Then any updated threads get their notification count and unread
-            # count updated.
-            self.db_pool.simple_upsert_many_txn(
-                txn,
-                table="event_push_summary",
-                key_names=("room_id", "user_id", "thread_id"),
-                key_values=[(room_id, user_id, row[2]) for row in unread_counts],
-                value_names=("notif_count", "unread_count"),
-                value_values=[(row[0], row[1]) for row in unread_counts],
-            )
+            row = txn.fetchone()
+            if row:
+                # Replace the previous summary with the new counts.
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="event_push_summary",
+                    keyvalues={
+                        "room_id": room_id,
+                        "user_id": user_id,
+                        "thread_id": thread_id,
+                    },
+                    values={
+                        "notif_count": row[0],
+                        "unread_count": row[1],
+                        "stream_ordering": old_rotate_stream_ordering,
+                        "last_receipt_stream_ordering": stream_ordering,
+                    },
+                )
+            else:
+                # There's no new data, remove the row.
+                self.db_pool.simple_delete_one_txn(
+                    txn,
+                    table="event_push_summary",
+                    keyvalues={
+                        "room_id": room_id,
+                        "user_id": user_id,
+                        "thread_id": thread_id,
+                    },
+                )
 
         # We always update `event_push_summary_last_receipt_stream_id` to
         # ensure that we don't rescan the same receipts for remote users.
