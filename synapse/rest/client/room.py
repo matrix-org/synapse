@@ -17,7 +17,7 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple, Type, TypeVar
 from urllib import parse as urlparse
 
 from prometheus_client.core import Histogram
@@ -64,6 +64,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+T_RoomSize = TypeVar("T_RoomSize", bound="_RoomSize")
+
+
 class _RoomSize(Enum):
     """
     Enum to differentiate sizes of rooms. This is a pretty good aproximation
@@ -78,7 +81,8 @@ class _RoomSize(Enum):
     SUBSTANTIAL = "substantial"
     LARGE = "large"
 
-    def get_room_size_label_for_member_count(member_count: int):
+    @classmethod
+    def from_member_count(cls: Type[T_RoomSize], member_count: int) -> "_RoomSize":
         if member_count <= 2:
             return _RoomSize.DM_SIZE
         elif member_count < 100:
@@ -618,6 +622,7 @@ class RoomMessageListRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._hs = hs
+        self.clock = hs.get_clock()
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
@@ -662,7 +667,7 @@ class RoomMessageListRestServlet(RestServlet):
         processing_end_time = self.clock.time_msec()
         room_member_count = await room_member_count_co
         messsages_response_timer.labels(
-            room_size=_RoomSize.get_room_size_label_for_member_count(room_member_count)
+            room_size=_RoomSize.from_member_count(room_member_count)
         ).observe((processing_start_time - processing_end_time) / 1000)
 
         return 200, msgs
