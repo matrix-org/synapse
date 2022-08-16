@@ -71,16 +71,15 @@ def _load_rules(
     `FilteredPushRules` object.
     """
 
-    ruleslist = []
-    for rawrule in rawrules:
-        ruleslist.append(
-            PushRule(
-                rule_id=rawrule["rule_id"],
-                priority_class=rawrule["priority_class"],
-                conditions=db_to_json(rawrule["conditions"]),
-                actions=db_to_json(rawrule["actions"]),
-            )
+    ruleslist = [
+        PushRule(
+            rule_id=rawrule["rule_id"],
+            priority_class=rawrule["priority_class"],
+            conditions=db_to_json(rawrule["conditions"]),
+            actions=db_to_json(rawrule["actions"]),
         )
+        for rawrule in rawrules
+    ]
 
     push_rules = compile_push_rules(ruleslist)
 
