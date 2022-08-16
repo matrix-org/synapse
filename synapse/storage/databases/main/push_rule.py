@@ -824,7 +824,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 new_condition = dict(condition)
                 new_condition["pattern"] = new_room_id
 
-            new_conditions.append(condition)
+            new_conditions.append(new_condition)
 
         # Add the rule for the new room
         await self.add_push_rule(

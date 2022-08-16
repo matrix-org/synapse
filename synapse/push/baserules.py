@@ -207,7 +207,7 @@ def compile_push_rules(rawrules: List[PushRule]) -> PushRules:
 def _is_experimental_rule_enabled(
     rule_id: str, experimental_config: ExperimentalConfig
 ) -> bool:
-    """Used by `_load_rules` to filter out experimental rules when they
+    """Used by `FilteredPushRules` to filter out experimental rules when they
     have not been enabled.
     """
     if (
