@@ -353,34 +353,35 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         txn.execute(
             f"""
-                SELECT notif_count, COALESCE(unread_count, 0), thread_id, MAX(events.stream_ordering)
+                SELECT notif_count, COALESCE(unread_count, 0), thread_id
                 FROM event_push_summary
-                LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
-                LEFT JOIN events ON (
-                    events.room_id = receipts_linearized.room_id AND
-                    events.event_id = receipts_linearized.event_id
-                )
-                WHERE event_push_summary.room_id = ? AND user_id = ?
+                LEFT JOIN (
+                    SELECT thread_id, MAX(stream_ordering) AS stream_ordering
+                    FROM receipts_linearized
+                    LEFT JOIN events USING (room_id, event_id)
+                    WHERE
+                        user_id = ?
+                        AND room_id = ?
+                        AND {receipt_types_clause}
+                    GROUP BY thread_id
+                ) AS receipts USING (thread_id)
+                WHERE room_id = ? AND user_id = ?
                 AND (
                     -- Legacy, synchronously updated summary.
                     (
                         last_receipt_stream_ordering IS NULL
-                        AND event_push_summary.stream_ordering > COALESCE(events.stream_ordering, ?)
+                        AND event_push_summary.stream_ordering > COALESCE(receipts.stream_ordering, ?)
                     )
                     -- Up-to-date summary.
-                    OR last_receipt_stream_ordering = COALESCE(events.stream_ordering, ?)
+                    OR last_receipt_stream_ordering = COALESCE(receipts.stream_ordering, ?)
                 )
-                AND {receipt_types_clause}
             """,
-            [room_id, user_id, join_stream_ordering, join_stream_ordering]
-            + receipts_args,
+            [user_id, room_id]
+            + receipts_args
+            + [room_id, user_id, join_stream_ordering, join_stream_ordering],  # type: ignore[list-item]
         )
         summarised_threads = set()
-        for notif_count, unread_count, thread_id, _ in txn:
-            # XXX Why are these returned? Related to MAX(...) aggregation.
-            if notif_count is None:
-                continue
-
+        for notif_count, unread_count, thread_id in txn:
             summarised_threads.add(thread_id)
 
             if not thread_id:
