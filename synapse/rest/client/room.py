@@ -15,6 +15,7 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
+from enum import Enum
 import re
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
@@ -62,6 +63,32 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+class _RoomSize(Enum):
+    """
+    Enum to differentiate sizes of rooms. This is a pretty good aproximation
+    about how hard it will be to get events in the room. We could also look at
+    room "complexity".
+    """
+
+    # This doesn't necessarily mean the room is a DM, just that there is a DM
+    # amount of people there.
+    DM_SIZE = "direct_message_size"
+    SMALL = "small"
+    SUBSTANTIAL = "substantial"
+    LARGE = "large"
+
+    def get_room_size_label_for_member_count(member_count: int):
+        if member_count <= 2:
+            return _RoomSize.DM_SIZE
+        elif member_count < 100:
+            return _RoomSize.SMALL
+        elif member_count < 1000:
+            return _RoomSize.SUBSTANTIAL
+        else:
+            return _RoomSize.LARGE
+
+
 # This is an extra metric on top of `synapse_http_server_response_time_seconds`
 # which times the same sort of thing but this one allows us to see values
 # greater than 10s. We use a separate dedicated histogram with its own buckets
@@ -70,7 +97,11 @@ logger = logging.getLogger(__name__)
 messsages_response_timer = Histogram(
     "synapse_room_message_list_rest_servlet_response_time_seconds",
     "sec",
-    [],
+    # We have a label for room size so we can try to see a more realistic
+    # picture of /messages response time for bigger rooms. We don't want the
+    # tiny rooms that can always respond fast skewing our results when we're trying
+    # to optimize the bigger cases.
+    ["room_size"],
     buckets=(
         0.005,
         0.01,
@@ -591,10 +622,13 @@ class RoomMessageListRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
-    @messsages_response_timer.time()
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        processing_start_time = self.clock.time_msec()
+        # Fire and forget and hope that we get a result by the end.
+        room_member_count_co = self.store.get_number_joined_users_in_room(room_id)
+
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = await PaginationConfig.from_request(
             self.store, request, default_limit=10
@@ -624,6 +658,12 @@ class RoomMessageListRestServlet(RestServlet):
             as_client_event=as_client_event,
             event_filter=event_filter,
         )
+
+        processing_end_time = self.clock.time_msec()
+        room_member_count = await room_member_count_co
+        messsages_response_timer.labels(
+            room_size=_RoomSize.get_room_size_label_for_member_count(room_member_count)
+        ).observe((processing_start_time - processing_end_time) / 1000)
 
         return 200, msgs
 
