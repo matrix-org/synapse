@@ -511,7 +511,11 @@ class StateStorageController:
     async def get_users_in_room_with_profiles(
         self, room_id: str
     ) -> Dict[str, ProfileInfo]:
-        """Get the current users in the room with their profiles."""
+        """
+        Get the current users in the room with their profiles.
+        If the room is currently partial-stated, this will block until the room has
+        full state.
+        """
         await self._partial_state_room_tracker.await_full_state(room_id)
 
         return await self.stores.main.get_users_in_room_with_profiles(room_id)
