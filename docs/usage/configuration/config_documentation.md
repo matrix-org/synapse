@@ -3352,7 +3352,7 @@ user_directory:
 For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
-`listeners`, in particular `template_dir` and `version`. # TODO: link `listeners`
+[`listeners`](#listeners), in particular `template_dir` and `version`.
 
 * `template_dir`: gives the location of the templates for the HTML forms.
   This directory should contain one subdirectory per language (eg, `en`, `fr`),
