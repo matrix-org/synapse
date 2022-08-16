@@ -1,0 +1,1 @@
+Faster room joins: make `/joined_members` block whilst the room is partial stated.
