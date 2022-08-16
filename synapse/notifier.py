@@ -40,7 +40,7 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.logging import issue9533_logger
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.opentracing import log_kv, start_active_span
-from synapse.metrics import LaterGauge
+from synapse.metrics import count, LaterGauge
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
@@ -66,16 +66,6 @@ users_woken_by_stream_counter = Counter(
 )
 
 T = TypeVar("T")
-
-
-# TODO(paul): Should be shared somewhere
-def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
-    """Return the number of items in it for which func returns true."""
-    n = 0
-    for x in it:
-        if func(x):
-            n += 1
-    return n
 
 
 class _NotificationListener:
