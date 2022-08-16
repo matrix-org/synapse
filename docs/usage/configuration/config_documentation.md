@@ -759,6 +759,10 @@ allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.
 
+Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to `0`, Synapse may
+still take up to 5 minutes to purge redacted events from the database.
+
 Defaults to `7d`. Set to `null` to disable.
 
 Example configuration:
@@ -845,7 +849,11 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default.
+The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk. There are known bugs with the implementation
+which can cause database corruption. Setting retention to delete older history
+is less risky than deleting newer history but in general caution is advised when enabling this
+experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
