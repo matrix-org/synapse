@@ -366,16 +366,6 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
                 "`enable_registration_without_verification` config option to `true`."
             )
 
-    if (
-        config.experimental.faster_joins_enabled
-        and config.worker.worker_app is not None
-    ):
-        raise ConfigError(
-            "You have enabled the experimental `faster_joins` config option, but it is "
-            "not compatible with worker deployments yet. Please disable `faster_joins` "
-            "or run Synapse as a single process deployment instead."
-        )
-
     hs = SynapseHomeServer(
         config.server.server_name,
         config=config,
