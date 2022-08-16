@@ -62,6 +62,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# This is an extra metric on top of `synapse_http_server_response_time_seconds`
+# which times the same sort of thing but this one allows us to see values
+# greater than 10s. We use a separate dedicated histogram with its own buckets
+# so that we don't increase the cardinality of the general one because it's
+# multiplied across hundreds of servlets.
 messsages_response_timer = Histogram(
     "synapse_room_message_list_rest_servlet_response_time_seconds",
     "sec",
