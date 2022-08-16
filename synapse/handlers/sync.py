@@ -16,6 +16,7 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
+    Collection,
     Dict,
     FrozenSet,
     List,
@@ -918,12 +919,12 @@ class SyncHandler:
 
         with Measure(self.clock, "compute_state_delta"):
             # The memberships needed for events in the timeline.
-            # A dictionary with user IDs as keys and the first event in the timeline
-            # requiring each member as values.
-            # The syncing user's own membership is always implicitly required for
-            # `full_state` syncs and may not be present in the dictionary.
             # Only calculated when `lazy_load_members` is on.
-            members_to_fetch: Optional[Dict[str, EventBase]] = None
+            members_to_fetch: Optional[Set[str]] = None
+
+            # A dictionary mapping user IDs to the first event in the timeline sent by
+            # them. Only calculated when `lazy_load_members` is on.
+            first_event_by_sender_map: Optional[Dict[str, EventBase]] = None
 
             # The contribution to the room state from state events in the timeline.
             # Only contains the last event for any given state key.
@@ -940,15 +941,17 @@ class SyncHandler:
 
                 timeline_state = {}
 
-                members_to_fetch = {}
+                members_to_fetch = set()
+                first_event_by_sender_map = {}
                 for event in batch.events:
+                    # Build the map from user IDs to the first timeline event they sent.
+                    if event.sender not in first_event_by_sender_map:
+                        first_event_by_sender_map[event.sender] = event
+
                     # We need the event's sender, unless their membership was in a
                     # previous timeline event.
-                    if (
-                        EventTypes.Member,
-                        event.sender,
-                    ) not in timeline_state and event.sender not in members_to_fetch:
-                        members_to_fetch[event.sender] = event
+                    if (EventTypes.Member, event.sender) not in timeline_state:
+                        members_to_fetch.add(event.sender)
                     # FIXME: we also care about invite targets etc.
 
                     if event.is_state():
@@ -959,15 +962,9 @@ class SyncHandler:
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
                     # LL for incr syncs in #3840.
-                    state_filter = StateFilter.from_lazy_load_member_list(
-                        itertools.chain(
-                            members_to_fetch.keys(), [sync_config.user.to_string()]
-                        )
-                    )
-                else:
-                    state_filter = StateFilter.from_lazy_load_member_list(
-                        members_to_fetch
-                    )
+                    members_to_fetch.add(sync_config.user.to_string())
+
+                state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
 
                 # We are happy to use partial state to compute the `/sync` response.
                 # Since partial state may not include the lazy-loaded memberships we
@@ -1122,10 +1119,11 @@ class SyncHandler:
             # events of timeline events.
             if lazy_load_members and await self.store.is_partial_state_room(room_id):
                 assert members_to_fetch is not None
+                assert first_event_by_sender_map is not None
 
                 additional_state_ids = (
                     await self._find_missing_partial_state_memberships(
-                        room_id, members_to_fetch, state_ids
+                        room_id, members_to_fetch, first_event_by_sender_map, state_ids
                     )
                 )
                 state_ids = {**state_ids, **additional_state_ids}
@@ -1181,7 +1179,8 @@ class SyncHandler:
     async def _find_missing_partial_state_memberships(
         self,
         room_id: str,
-        members_to_fetch: Mapping[str, EventBase],
+        members_to_fetch: Collection[str],
+        events_with_membership_auth: Mapping[str, EventBase],
         found_state_ids: StateMap[str],
     ) -> StateMap[str]:
         """Finds missing memberships from a set of auth events and returns them as a
@@ -1189,9 +1188,9 @@ class SyncHandler:
 
         Args:
             room_id: The partial state room to find the remaining memberships for.
-            members_to_fetch: The memberships to find. A dictionary whose keys are
-                user IDs and whose values are events whose auth events are known to
-                contain the desired memberships.
+            members_to_fetch: The memberships to find.
+            events_with_membership_auth: A mapping from user IDs to events whose auth
+                events are known to contain their membership.
             found_state_ids: A dict from (type, state_key) -> state_event_id, containing
                 memberships that have been previously found. Entries in
                 `members_to_fetch` that have a membership in `found_state_ids` are
@@ -1200,29 +1199,37 @@ class SyncHandler:
         Returns:
             A dict from ("m.room.member", state_key) -> state_event_id, containing the
             memberships missing from `found_state_ids`.
+
+        Raises:
+            KeyError: if `events_with_membership_auth` does not have an entry for a
+                missing membership. Memberships in `found_state_ids` do not need an
+                entry in `events_with_membership_auth`.
         """
         additional_state_ids: MutableStateMap[str] = {}
 
         # Tracks the missing members for logging purposes.
-        missing_members = {}
+        missing_members = set()
 
         # Identify memberships missing from `found_state_ids` and pick out the auth
         # events in which to look for them.
         auth_event_ids: Set[str] = set()
-        for member, event_with_membership_auth in members_to_fetch.items():
+        for member in members_to_fetch:
             if (EventTypes.Member, member) in found_state_ids:
                 continue
 
-            missing_members[member] = event_with_membership_auth
+            missing_members.add(member)
+            event_with_membership_auth = events_with_membership_auth[member]
             auth_event_ids.update(event_with_membership_auth.auth_event_ids())
 
         auth_events = await self.store.get_events(auth_event_ids)
 
         # Run through the missing memberships once more, picking out the memberships
         # from the pile of auth events we have just fetched.
-        for member, event_with_membership_auth in members_to_fetch.items():
+        for member in members_to_fetch:
             if (EventTypes.Member, member) in found_state_ids:
                 continue
+
+            event_with_membership_auth = events_with_membership_auth[member]
 
             # Dig through the auth events to find the desired membership.
             for auth_event_id in event_with_membership_auth.auth_event_ids():
@@ -1235,7 +1242,7 @@ class SyncHandler:
                     auth_event.type == EventTypes.Member
                     and auth_event.state_key == member
                 ):
-                    missing_members.pop(member)
+                    missing_members.remove(member)
                     additional_state_ids[
                         (EventTypes.Member, member)
                     ] = auth_event.event_id
@@ -1252,9 +1259,12 @@ class SyncHandler:
             logger.error(
                 "Failed to find memberships for %s in partial state room "
                 "%s in the auth events of %s.",
-                list(missing_members.keys()),
+                missing_members,
                 room_id,
-                list(missing_members.values()),
+                [
+                    events_with_membership_auth[member].event_id
+                    for member in missing_members
+                ],
             )
 
         return additional_state_ids
