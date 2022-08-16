@@ -98,7 +98,9 @@ def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) 
         func: Function to be called when sent a SIGHUP signal.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    _sighup_callbacks.append((func, args, kwargs))
+    # This type-ignore should be redundant once we use a mypy release with
+    # https://github.com/python/mypy/pull/12668.
+    _sighup_callbacks.append((func, args, kwargs))  # type: ignore[arg-type]
 
 
 def start_worker_reactor(
