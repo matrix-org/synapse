@@ -20,6 +20,8 @@ from typing import Any, DefaultDict, Iterator, List, Set
 
 from twisted.internet import defer
 
+from prometheus_client.core import Counter
+
 from synapse.api.errors import LimitExceededError
 from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.logging.context import (
@@ -33,6 +35,11 @@ if typing.TYPE_CHECKING:
     from contextlib import _GeneratorContextManager
 
 logger = logging.getLogger(__name__)
+
+
+rate_limit_sleep_counter = Counter("synapse_rate_limit_sleep", "", ["host"])
+
+rate_limit_reject_counter = Counter("synapse_rate_limit_reject", "", ["host"])
 
 
 class FederationRateLimiter:
@@ -59,7 +66,7 @@ class FederationRateLimiter:
         Returns:
             context manager which returns a deferred.
         """
-        return self.ratelimiters[host].ratelimit()
+        return self.ratelimiters[host].ratelimit(host)
 
 
 class _PerHostRatelimiter:
@@ -94,11 +101,13 @@ class _PerHostRatelimiter:
         self.request_times: List[int] = []
 
     @contextlib.contextmanager
-    def ratelimit(self) -> "Iterator[defer.Deferred[None]]":
+    def ratelimit(self, host: str) -> "Iterator[defer.Deferred[None]]":
         # `contextlib.contextmanager` takes a generator and turns it into a
         # context manager. The generator should only yield once with a value
         # to be returned by manager.
         # Exceptions will be reraised at the yield.
+
+        self.host = host
 
         request_id = object()
         ret = self._on_enter(request_id)
@@ -119,6 +128,7 @@ class _PerHostRatelimiter:
         # sleeping or in the ready queue).
         queue_size = len(self.ready_request_queue) + len(self.sleeping_requests)
         if queue_size > self.reject_limit:
+            rate_limit_reject_counter.labels(self.host).inc()
             raise LimitExceededError(
                 retry_after_ms=int(self.window_size / self.sleep_limit)
             )
@@ -146,6 +156,7 @@ class _PerHostRatelimiter:
 
         if len(self.request_times) > self.sleep_limit:
             logger.debug("Ratelimiter: sleeping request for %f sec", self.sleep_sec)
+            rate_limit_sleep_counter.labels(self.host).inc()
             ret_defer = run_in_background(self.clock.sleep, self.sleep_sec)
 
             self.sleeping_requests.add(request_id)
