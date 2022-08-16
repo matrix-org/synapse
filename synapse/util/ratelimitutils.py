@@ -18,7 +18,7 @@ import logging
 import typing
 from typing import Any, DefaultDict, Iterator, List, Set
 
-from prometheus_client.core import Counter, Gauge
+from prometheus_client.core import Counter
 
 from twisted.internet import defer
 
@@ -29,7 +29,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
-from synapse.metrics import count, LaterGauge
+from synapse.metrics import LaterGauge, count
 from synapse.util import Clock
 
 if typing.TYPE_CHECKING:
@@ -145,15 +145,19 @@ class _PerHostRatelimiter:
         finally:
             self._on_exit(request_id)
 
-    def should_reject(self):
+    def should_reject(self) -> bool:
         """
-        Reject the request if we already have too many queued up (either
-        sleeping or in the ready queue).
+        Whether to reject the request if we already have too many queued up
+        (either sleeping or in the ready queue).
         """
         queue_size = len(self.ready_request_queue) + len(self.sleeping_requests)
         return queue_size > self.reject_limit
 
-    def should_sleep(self):
+    def should_sleep(self) -> bool:
+        """
+        Whether to sleep the request if we already have too many requests coming
+        through within the window.
+        """
         return len(self.request_times) > self.sleep_limit
 
     def _on_enter(self, request_id: object) -> "defer.Deferred[None]":

@@ -486,7 +486,7 @@ __all__ = [
     "MetricsResource",
     "generate_latest",
     "start_http_server",
-    count,
+    "count",
     "LaterGauge",
     "InFlightGauge",
     "GaugeBucketCollector",
