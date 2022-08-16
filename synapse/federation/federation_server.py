@@ -61,7 +61,12 @@ from synapse.logging.context import (
     nested_logging_context,
     run_in_background,
 )
-from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
+from synapse.logging.opentracing import (
+    log_kv,
+    start_active_span_from_edu,
+    tag_args,
+    trace,
+)
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
@@ -547,6 +552,8 @@ class FederationServer(FederationBase):
 
         return 200, resp
 
+    @trace
+    @tag_args
     async def on_state_ids_request(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
@@ -569,6 +576,8 @@ class FederationServer(FederationBase):
 
         return 200, resp
 
+    @trace
+    @tag_args
     async def _on_state_ids_request_compute(
         self, room_id: str, event_id: str
     ) -> JsonDict:
