@@ -3214,28 +3214,6 @@ In addition, each setting has an example of its usage, with the proper indentati
 shown.</p>
 </li>
 </ul>
-<h2 id="contents"><a class="header" href="#contents">Contents</a></h2>
-<p><a href="usage/configuration/config_documentation.html#modules">Modules</a></p>
-<p><a href="usage/configuration/config_documentation.html#server">Server</a></p>
-<p><a href="usage/configuration/config_documentation.html#homeserver-blocking">Homeserver Blocking</a></p>
-<p><a href="usage/configuration/config_documentation.html#tls">TLS</a></p>
-<p><a href="usage/configuration/config_documentation.html#federation">Federation</a></p>
-<p><a href="usage/configuration/config_documentation.html#caching">Caching</a></p>
-<p><a href="usage/configuration/config_documentation.html#database">Database</a></p>
-<p><a href="usage/configuration/config_documentation.html#logging">Logging</a></p>
-<p><a href="usage/configuration/config_documentation.html#ratelimiting">Ratelimiting</a></p>
-<p><a href="usage/configuration/config_documentation.html#media-store">Media Store</a></p>
-<p><a href="usage/configuration/config_documentation.html#captcha">Captcha</a></p>
-<p><a href="usage/configuration/config_documentation.html#turn">TURN</a></p>
-<p><a href="usage/configuration/config_documentation.html#registration">Registration</a></p>
-<p><a href="usage/configuration/config_documentation.html#api-configuration">API Configuration</a></p>
-<p><a href="usage/configuration/config_documentation.html#signing-keys">Signing Keys</a></p>
-<p><a href="usage/configuration/config_documentation.html#single-sign-on-integration">Single Sign On Integration</a></p>
-<p><a href="usage/configuration/config_documentation.html#push">Push</a></p>
-<p><a href="usage/configuration/config_documentation.html#rooms">Rooms</a></p>
-<p><a href="usage/configuration/config_documentation.html#opentracing">Opentracing</a></p>
-<p><a href="usage/configuration/config_documentation.html#workers">Workers</a></p>
-<p><a href="usage/configuration/config_documentation.html#background-updates">Background Updates</a></p>
 <h2 id="modules"><a class="header" href="#modules">Modules</a></h2>
 <p>Server admins can expand Synapse's functionality with external modules.</p>
 <p>See <a href="usage/configuration/../../modules/index.html">here</a> for more
@@ -3524,7 +3502,8 @@ on this port. Sub-options for each resource are:</p>
 <p><code>names</code>: a list of names of HTTP resources. See below for a list of valid resource names.</p>
 </li>
 <li>
-<p><code>compress</code>: set to true to enable HTTP compression for this resource.</p>
+<p><code>compress</code>: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
+<code>client</code>, <code>consent</code> and <code>metrics</code> resources.</p>
 </li>
 </ul>
 </li>
@@ -4022,20 +4001,20 @@ on this homeserver.</p>
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
-<p>Options related to caching</p>
+<p>Options related to caching.</p>
 <hr />
 <h3 id="event_cache_size"><a class="header" href="#event_cache_size"><code>event_cache_size</code></a></h3>
 <p>The number of events to cache in memory. Not affected by
-<code>caches.global_factor</code>. Defaults to 10K.</p>
+<code>caches.global_factor</code> and is not part of the <code>caches</code> section. Defaults to 10K.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">event_cache_size: 15K
 </code></pre>
 <hr />
-<h3 id="cache-and-associated-values"><a class="header" href="#cache-and-associated-values"><code>cache</code> and associated values</a></h3>
+<h3 id="caches-and-associated-values"><a class="header" href="#caches-and-associated-values"><code>caches</code> and associated values</a></h3>
 <p>A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.</p>
-<p>Caching can be configured through the following sub-options:</p>
+<p><code>caches</code> can be configured through the following sub-options:</p>
 <ul>
 <li>
 <p><code>global_factor</code>: Controls the global cache factor, which is the default cache factor
@@ -4100,7 +4079,8 @@ from being emptied while Synapse is evicting due to memory. There is no default 
 </li>
 </ul>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">caches:
+<pre><code class="language-yaml">event_cache_size: 15K
+caches:
   global_factor: 1.0
   per_cache_factors:
     get_users_who_share_room_with_user: 2.0
@@ -4691,7 +4671,7 @@ blacklisted.</p>
 <pre><code class="language-yaml">max_spider_size: 8M
 </code></pre>
 <hr />
-<h3 id="url_preview_language"><a class="header" href="#url_preview_language"><code>url_preview_language</code></a></h3>
+<h3 id="url_preview_accept_language"><a class="header" href="#url_preview_accept_language"><code>url_preview_accept_language</code></a></h3>
 <p>A list of values for the Accept-Language HTTP header used when
 downloading webpages during URL preview generation. This allows
 Synapse to specify the preferred languages that URL previews should
@@ -5189,9 +5169,14 @@ Implicitly enables MAU tracking for application service users.</p>
 </code></pre>
 <hr />
 <h3 id="macaroon_secret_key"><a class="header" href="#macaroon_secret_key"><code>macaroon_secret_key</code></a></h3>
-<p>A secret which is used to sign access tokens. If none is specified,
-the <code>registration_shared_secret</code> is used, if one is given; otherwise,
-a secret key is derived from the signing key.</p>
+<p>A secret which is used to sign</p>
+<ul>
+<li>access token for guest users,</li>
+<li>short-term login token used during SSO logins (OIDC or SAML2) and</li>
+<li>token used for unsubscribing from email notifications.</li>
+</ul>
+<p>If none is specified, the <code>registration_shared_secret</code> is used, if one is given;
+otherwise, a secret key is derived from the signing key.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">macaroon_secret_key: &lt;PRIVATE STRING&gt;
 </code></pre>
@@ -7388,7 +7373,7 @@ Matrix ID based on the SSO attributes, or if the user should be allowed to
 choose their own username.</p>
 <p>In the first case - where users are automatically allocated a Matrix ID - it is
 the responsibility of the mapping provider to normalise the SSO attributes and
-map them to a valid Matrix ID. The <a href="https://matrix.org/docs/spec/appendices#user-identifiers">specification for Matrix
+map them to a valid Matrix ID. The <a href="https://spec.matrix.org/latest/appendices/#user-identifiers">specification for Matrix
 IDs</a> has some
 information about what is considered valid.</p>
 <p>If the mapping provider does not assign a Matrix ID, then Synapse will
@@ -7400,8 +7385,9 @@ as Synapse). The Synapse config is then modified to point to the mapping provide
 (and optionally provide additional configuration for it).</p>
 <h2 id="openid-mapping-providers"><a class="header" href="#openid-mapping-providers">OpenID Mapping Providers</a></h2>
 <p>The OpenID mapping provider can be customized by editing the
-<code>oidc_config.user_mapping_provider.module</code> config option.</p>
-<p><code>oidc_config.user_mapping_provider.config</code> allows you to provide custom
+<a href="usage/configuration/config_documentation.html#oidc_providers"><code>oidc_providers.user_mapping_provider.module</code></a>
+config option.</p>
+<p><code>oidc_providers.user_mapping_provider.config</code> allows you to provide custom
 configuration options to the module. Check with the module's documentation for
 what options it provides (if any). The options listed by default are for the
 user mapping provider built in to Synapse. If using a custom module, you should
@@ -7426,7 +7412,7 @@ the module here.</li>
 <li>Arguments:
 <ul>
 <li><code>config</code> - A <code>dict</code> representing the parsed content of the
-<code>oidc_config.user_mapping_provider.config</code> homeserver config option.
+<code>oidc_providers.user_mapping_provider.config</code> homeserver config option.
 Runs on homeserver startup. Providers should extract and validate
 any option values they need here.</li>
 </ul>
@@ -7496,7 +7482,7 @@ further requests to the OpenID provider.</li>
 <p>Returns a dictionary that is suitable to be serialized to JSON. This
 will be returned as part of the response during a successful login.</p>
 <p>Note that care should be taken to not overwrite any of the parameters
-usually returned as part of the <a href="https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-login">login response</a>.</p>
+usually returned as part of the <a href="https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login">login response</a>.</p>
 </li>
 </ul>
 </li>
@@ -7507,7 +7493,8 @@ specified in the config. It is located at
 <a href="https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/oidc.py"><code>synapse.handlers.oidc.JinjaOidcMappingProvider</code></a>.</p>
 <h2 id="saml-mapping-providers"><a class="header" href="#saml-mapping-providers">SAML Mapping Providers</a></h2>
 <p>The SAML mapping provider can be customized by editing the
-<code>saml2_config.user_mapping_provider.module</code> config option.</p>
+<a href="docs/usage/configuration/config_documentation.html#saml2_config"><code>saml2_config.user_mapping_provider.module</code></a>
+config option.</p>
 <p><code>saml2_config.user_mapping_provider.config</code> allows you to provide custom
 configuration options to the module. Check with the module's documentation for
 what options it provides (if any). The options listed by default are for the
@@ -9430,7 +9417,7 @@ class MyAuthProvider:
             return None
 
         if self.credentials.get(username) == login_dict.get(&quot;my_field&quot;):
-            return self.api.get_qualified_user_id(username)
+            return (self.api.get_qualified_user_id(username), None)
 
     async def check_pass(
         self,
@@ -9447,7 +9434,7 @@ class MyAuthProvider:
             return None
 
         if self.credentials.get(username) == login_dict.get(&quot;password&quot;):
-            return self.api.get_qualified_user_id(username)
+            return (self.api.get_qualified_user_id(username), None)
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="background-update-controller-callbacks"><a class="header" href="#background-update-controller-callbacks">Background update controller callbacks</a></h1>
 <p>Background update controller callbacks allow module developers to control (e.g. rate-limit)
@@ -10282,7 +10269,8 @@ the changes being applied at a glance.</p>
 <h2 id="authenticate-as-a-server-admin"><a class="header" href="#authenticate-as-a-server-admin">Authenticate as a server admin</a></h2>
 <p>Many of the API calls in the admin api will require an <code>access_token</code> for a
 server admin. (Note that a server admin is distinct from a room admin.)</p>
-<p>A user can be marked as a server admin by updating the database directly, e.g.:</p>
+<p>An existing user can be marked as a server admin by updating the database directly.</p>
+<p>Check your <a href="usage/administration/admin_api/config_documentation.html#database">database settings</a> in the configuration file, connect to the correct database using either <code>psql [database name]</code> (if using PostgreSQL) or <code>sqlite3 path/to/your/database.db</code> (if using SQLite) and elevate the user <code>@foo:bar.com</code> to administrator.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <p>A new server admin user can also be created using the <code>register_new_matrix_user</code>
@@ -10887,11 +10875,11 @@ def generate_mac(nonce, user, password, admin=False, user_type=None):
 <div style="break-before: page; page-break-before: always;"></div><h1 id="registration-tokens"><a class="header" href="#registration-tokens">Registration Tokens</a></h1>
 <p>This API allows you to manage tokens which can be used to authenticate
 registration requests, as proposed in
-<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>
+and stabilised in version 1.2 of the Matrix specification.
 To use it, you will need to enable the <code>registration_requires_token</code> config
 option, and authenticate by providing an <code>access_token</code> for a server admin:
-see <a href="usage/administration/admin_api/../../usage/administration/admin_api">Admin API</a>.
-Note that this API is still experimental; not all clients may support it yet.</p>
+see <a href="usage/administration/admin_api/../admin_api">Admin API</a>.</p>
 <h2 id="registration-token-objects"><a class="header" href="#registration-token-objects">Registration token objects</a></h2>
 <p>Most endpoints make use of JSON objects that contain details about tokens.
 These objects have the following fields:</p>

@@ -213,28 +213,6 @@ In addition, each setting has an example of its usage, with the proper indentati
 shown.</p>
 </li>
 </ul>
-<h2 id="contents"><a class="header" href="#contents">Contents</a></h2>
-<p><a href="#modules">Modules</a></p>
-<p><a href="#server">Server</a></p>
-<p><a href="#homeserver-blocking">Homeserver Blocking</a></p>
-<p><a href="#tls">TLS</a></p>
-<p><a href="#federation">Federation</a></p>
-<p><a href="#caching">Caching</a></p>
-<p><a href="#database">Database</a></p>
-<p><a href="#logging">Logging</a></p>
-<p><a href="#ratelimiting">Ratelimiting</a></p>
-<p><a href="#media-store">Media Store</a></p>
-<p><a href="#captcha">Captcha</a></p>
-<p><a href="#turn">TURN</a></p>
-<p><a href="#registration">Registration</a></p>
-<p><a href="#api-configuration">API Configuration</a></p>
-<p><a href="#signing-keys">Signing Keys</a></p>
-<p><a href="#single-sign-on-integration">Single Sign On Integration</a></p>
-<p><a href="#push">Push</a></p>
-<p><a href="#rooms">Rooms</a></p>
-<p><a href="#opentracing">Opentracing</a></p>
-<p><a href="#workers">Workers</a></p>
-<p><a href="#background-updates">Background Updates</a></p>
 <h2 id="modules"><a class="header" href="#modules">Modules</a></h2>
 <p>Server admins can expand Synapse's functionality with external modules.</p>
 <p>See <a href="../../modules/index.html">here</a> for more
@@ -523,7 +501,8 @@ on this port. Sub-options for each resource are:</p>
 <p><code>names</code>: a list of names of HTTP resources. See below for a list of valid resource names.</p>
 </li>
 <li>
-<p><code>compress</code>: set to true to enable HTTP compression for this resource.</p>
+<p><code>compress</code>: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
+<code>client</code>, <code>consent</code> and <code>metrics</code> resources.</p>
 </li>
 </ul>
 </li>
@@ -1021,20 +1000,20 @@ on this homeserver.</p>
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
-<p>Options related to caching</p>
+<p>Options related to caching.</p>
 <hr />
 <h3 id="event_cache_size"><a class="header" href="#event_cache_size"><code>event_cache_size</code></a></h3>
 <p>The number of events to cache in memory. Not affected by
-<code>caches.global_factor</code>. Defaults to 10K.</p>
+<code>caches.global_factor</code> and is not part of the <code>caches</code> section. Defaults to 10K.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">event_cache_size: 15K
 </code></pre>
 <hr />
-<h3 id="cache-and-associated-values"><a class="header" href="#cache-and-associated-values"><code>cache</code> and associated values</a></h3>
+<h3 id="caches-and-associated-values"><a class="header" href="#caches-and-associated-values"><code>caches</code> and associated values</a></h3>
 <p>A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.</p>
-<p>Caching can be configured through the following sub-options:</p>
+<p><code>caches</code> can be configured through the following sub-options:</p>
 <ul>
 <li>
 <p><code>global_factor</code>: Controls the global cache factor, which is the default cache factor
@@ -1099,7 +1078,8 @@ from being emptied while Synapse is evicting due to memory. There is no default 
 </li>
 </ul>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">caches:
+<pre><code class="language-yaml">event_cache_size: 15K
+caches:
   global_factor: 1.0
   per_cache_factors:
     get_users_who_share_room_with_user: 2.0
@@ -1690,7 +1670,7 @@ blacklisted.</p>
 <pre><code class="language-yaml">max_spider_size: 8M
 </code></pre>
 <hr />
-<h3 id="url_preview_language"><a class="header" href="#url_preview_language"><code>url_preview_language</code></a></h3>
+<h3 id="url_preview_accept_language"><a class="header" href="#url_preview_accept_language"><code>url_preview_accept_language</code></a></h3>
 <p>A list of values for the Accept-Language HTTP header used when
 downloading webpages during URL preview generation. This allows
 Synapse to specify the preferred languages that URL previews should
@@ -2188,9 +2168,14 @@ Implicitly enables MAU tracking for application service users.</p>
 </code></pre>
 <hr />
 <h3 id="macaroon_secret_key"><a class="header" href="#macaroon_secret_key"><code>macaroon_secret_key</code></a></h3>
-<p>A secret which is used to sign access tokens. If none is specified,
-the <code>registration_shared_secret</code> is used, if one is given; otherwise,
-a secret key is derived from the signing key.</p>
+<p>A secret which is used to sign</p>
+<ul>
+<li>access token for guest users,</li>
+<li>short-term login token used during SSO logins (OIDC or SAML2) and</li>
+<li>token used for unsubscribing from email notifications.</li>
+</ul>
+<p>If none is specified, the <code>registration_shared_secret</code> is used, if one is given;
+otherwise, a secret key is derived from the signing key.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">macaroon_secret_key: &lt;PRIVATE STRING&gt;
 </code></pre>

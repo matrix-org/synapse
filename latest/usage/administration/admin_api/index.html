@@ -150,7 +150,8 @@
 <h2 id="authenticate-as-a-server-admin"><a class="header" href="#authenticate-as-a-server-admin">Authenticate as a server admin</a></h2>
 <p>Many of the API calls in the admin api will require an <code>access_token</code> for a
 server admin. (Note that a server admin is distinct from a room admin.)</p>
-<p>A user can be marked as a server admin by updating the database directly, e.g.:</p>
+<p>An existing user can be marked as a server admin by updating the database directly.</p>
+<p>Check your <a href="config_documentation.html#database">database settings</a> in the configuration file, connect to the correct database using either <code>psql [database name]</code> (if using PostgreSQL) or <code>sqlite3 path/to/your/database.db</code> (if using SQLite) and elevate the user <code>@foo:bar.com</code> to administrator.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <p>A new server admin user can also be created using the <code>register_new_matrix_user</code>
