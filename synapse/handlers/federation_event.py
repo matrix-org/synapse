@@ -92,6 +92,7 @@ soft_failed_event_counter = Counter(
     "Events received over federation that we marked as soft_failed",
 )
 
+# Added to debug performance and track progress on optimizations
 backfill_processing_after_timer = Histogram(
     "synapse_federation_backfill_processing_after_time_seconds",
     "sec",

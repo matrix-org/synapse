@@ -80,7 +80,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
+# Added to debug performance and track progress on optimizations
 backfill_processing_before_timer = Histogram(
     "synapse_federation_backfill_processing_before_time_seconds",
     "sec",
@@ -217,7 +217,10 @@ class FederationHandler:
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
         """
+        # Starting the processing time here so we can include the room backfill
+        # linearizer lock queue in the timing
         processing_start_time = self.clock.time_msec()
+
         async with self._room_backfill.queue(room_id):
             return await self._maybe_backfill_inner(
                 room_id,
