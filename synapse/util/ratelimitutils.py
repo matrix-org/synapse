@@ -18,9 +18,9 @@ import logging
 import typing
 from typing import Any, DefaultDict, Iterator, List, Set
 
-from twisted.internet import defer
-
 from prometheus_client.core import Counter
+
+from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError
 from synapse.config.ratelimiting import FederationRatelimitSettings
