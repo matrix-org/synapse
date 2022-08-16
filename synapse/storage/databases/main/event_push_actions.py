@@ -295,7 +295,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         txn: LoggingTransaction,
         room_id: str,
         user_id: str,
-        receipt_stream_ordering: int,
+        join_stream_ordering: int,
     ) -> Tuple[NotifCounts, Dict[str, NotifCounts]]:
         """Get the number of unread messages for a user/room that have happened
         since the given stream ordering.
@@ -304,7 +304,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn: The database transaction.
             room_id: The room ID to get unread counts for.
             user_id: The user ID to get unread counts for.
-            receipt_stream_ordering: The stream ordering of the user's latest
+            join_stream_ordering: The stream ordering of the user's latest
                 receipt in the room. If there are no receipts, the stream ordering
                 of the user's join event.
 
@@ -372,7 +372,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
                 AND {receipt_types_clause}
             """,
-            [room_id, user_id, receipt_stream_ordering, receipt_stream_ordering]
+            [room_id, user_id, join_stream_ordering, join_stream_ordering]
             + receipts_args,
         )
         summarised_threads = set()
@@ -394,22 +394,32 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
 
         # Next we need to count highlights, which aren't summarised
-        sql = """
-            SELECT COUNT(*), thread_id, MAX(events.stream_ordering)
+        sql = f"""
+            SELECT COUNT(*), thread_id
             FROM event_push_actions
-            LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
-            LEFT JOIN events ON (
-                events.room_id = receipts_linearized.room_id AND
-                events.event_id = receipts_linearized.event_id
-            )
+            LEFT JOIN (
+                SELECT thread_id, MAX(stream_ordering) AS stream_ordering
+                FROM receipts_linearized
+                LEFT JOIN events USING (room_id, event_id)
+                WHERE
+                    user_id = ?
+                    AND room_id = ?
+                    AND {receipt_types_clause}
+                GROUP BY thread_id
+            ) AS receipts USING (thread_id)
             WHERE user_id = ?
                 AND event_push_actions.room_id = ?
-                AND event_push_actions.stream_ordering > COALESCE(events.stream_ordering, ?)
+                AND event_push_actions.stream_ordering > COALESCE(receipts.stream_ordering, ?)
                 AND highlight = 1
             GROUP BY thread_id
         """
-        txn.execute(sql, (user_id, room_id, receipt_stream_ordering))
-        for highlight_count, thread_id, _ in txn:
+        txn.execute(
+            sql,
+            [user_id, room_id]
+            + receipts_args
+            + [user_id, room_id, join_stream_ordering],  # type: ignore[list-item]
+        )
+        for highlight_count, thread_id in txn:
             if not thread_id:
                 counts.highlight_count += highlight_count
             elif highlight_count:
@@ -465,22 +475,32 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             SELECT
                 COUNT(CASE WHEN notif = 1 THEN 1 END),
                 COUNT(CASE WHEN unread = 1 THEN 1 END),
-                thread_id,
-                MAX(events.stream_ordering)
+                thread_id
             FROM event_push_actions
-            LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
-            LEFT JOIN events ON (
-                events.room_id = receipts_linearized.room_id AND
-                events.event_id = receipts_linearized.event_id
-            )
+            LEFT JOIN (
+                SELECT thread_id, MAX(stream_ordering) AS stream_ordering
+                FROM receipts_linearized
+                LEFT JOIN events USING (room_id, event_id)
+                WHERE
+                    user_id = ?
+                    AND room_id = ?
+                    AND {receipt_types_clause}
+                GROUP BY thread_id
+            ) AS receipts USING (thread_id)
             WHERE user_id = ?
                 AND event_push_actions.room_id = ?
-                AND event_push_actions.stream_ordering > COALESCE(events.stream_ordering, ?)
+                AND event_push_actions.stream_ordering > COALESCE(receipts.stream_ordering, ?)
                 AND NOT {thread_id_clause}
             GROUP BY thread_id
         """
-        txn.execute(sql, [user_id, room_id, receipt_stream_ordering] + thread_id_args)
-        for notif_count, unread_count, thread_id, _ in txn.fetchall():
+        txn.execute(
+            sql,
+            [user_id, room_id]
+            + receipts_args
+            + [user_id, room_id, join_stream_ordering]  # type: ignore[list-item]
+            + thread_id_args,
+        )
+        for notif_count, unread_count, thread_id in txn.fetchall():
             if not thread_id:
                 counts.notify_count += notif_count
                 counts.unread_count += unread_count
