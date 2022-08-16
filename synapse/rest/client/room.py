@@ -15,8 +15,8 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
-from enum import Enum
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
 
