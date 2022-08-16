@@ -30,7 +30,6 @@ from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
-from tests.utils import USE_POSTGRES_FOR_TESTS
 
 
 class ModuleApiTestCase(HomeserverTestCase):
