@@ -248,7 +248,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         super().setUp()
 
         # build a replication server
-        self.server_factory = ReplicationStreamProtocolFactory(self.hs)
         self.streamer = self.hs.get_replication_streamer()
 
         # Fake in memory Redis server that servers can connect to.
