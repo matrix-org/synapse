@@ -1,0 +1,1 @@
+Instrument the federation/backfill part of `/messages` for understandable traces in Jaeger.
