@@ -319,6 +319,15 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         counts = NotifCounts()
         thread_counts = {}
 
+        # Combine available information:
+        #
+        # 1.  If the summary is valid (up-to-date with receipt or no receipt),
+        #     calculate summary + actions since summary.
+        # 2a. If the summary is invalid (due to a more recent receipt), calculate
+        #     actions since last receipt (or join).
+        # 2b. If there is no summary, calculate actions since last receipt (or
+        #     join).
+
         # First we pull the counts from the summary table.
         #
         # We check that `last_receipt_stream_ordering` matches the stream
