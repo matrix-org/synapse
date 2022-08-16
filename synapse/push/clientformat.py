@@ -48,6 +48,11 @@ def format_push_rules_for_user(
         template_rule["enabled"] = enabled
 
         if "conditions" not in template_rule:
+            # Not all formatted rules have explicit conditions, e.g. "room"
+            # rules omit them as they can be derived from the kind and rule ID.
+            #
+            # If the formatted rule has no conditions then we can skip the
+            # formatting of conditions.
             continue
 
         # Remove internal stuff.

@@ -123,6 +123,9 @@ class PushRules:
                 yield rule
 
     def __len__(self) -> int:
+        # The length is mostly used by caches to get a sense of "size" / amount
+        # of memory this object is using, so we only count the number of custom
+        # rules.
         return (
             len(self.overriden_base_rules)
             + len(self.override)
