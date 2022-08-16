@@ -34,10 +34,10 @@ TRACK_MEMORY_USAGE = False
 caches_by_name: Dict[str, Sized] = {}
 collectors_by_name: Dict[str, "CacheMetric"] = {}
 
-cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
-cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
-cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name", "reason"])
-cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
+cache_size = Gauge("synapse_util_caches_cache_size", "", ["name"])
+cache_hits = Gauge("synapse_util_caches_cache_hits", "", ["name"])
+cache_evicted = Gauge("synapse_util_caches_cache_evicted_size", "", ["name", "reason"])
+cache_total = Gauge("synapse_util_caches_cache_total", "", ["name"])
 cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
 cache_memory_usage = Gauge(
     "synapse_util_caches_cache_size_bytes",
@@ -45,12 +45,12 @@ cache_memory_usage = Gauge(
     ["name"],
 )
 
-response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
-response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
+response_cache_size = Gauge("synapse_util_caches_response_cache_size", "", ["name"])
+response_cache_hits = Gauge("synapse_util_caches_response_cache_hits", "", ["name"])
 response_cache_evicted = Gauge(
-    "synapse_util_caches_response_cache:evicted_size", "", ["name", "reason"]
+    "synapse_util_caches_response_cache_evicted_size", "", ["name", "reason"]
 )
-response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
+response_cache_total = Gauge("synapse_util_caches_response_cache_total", "", ["name"])
 
 
 class EvictionReason(Enum):
