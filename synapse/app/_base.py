@@ -284,6 +284,11 @@ def listen_metrics(
         if enable_legacy_metric_names:
             start_http_server_legacy(port, addr=host, registry=RegistryProxy)
         else:
+            # Without this environment variable, the prometheus-client library
+            # will create `..._created` metrics for all counters, histograms
+            # and summaries with the timestamp of their creation.
+            # This is very bulky and not very useful.
+            os.environ["PROMETHEUS_DISABLE_CREATED_SERIES"] = "True"
             start_http_server_prometheus(port, addr=host, registry=RegistryProxy)
 
 
