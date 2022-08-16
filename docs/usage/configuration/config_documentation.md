@@ -3352,7 +3352,7 @@ user_directory:
 For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
-`listeners`, in particular `template_dir` and `version`. # TODO: link `listeners`
+[`listeners`](#listeners), in particular `template_dir` and `version`.
 
 * `template_dir`: gives the location of the templates for the HTML forms.
   This directory should contain one subdirectory per language (eg, `en`, `fr`),
@@ -3364,7 +3364,7 @@ Parts of this section are required if enabling the `consent` resource under
    parameter.
 
 * `server_notice_content`: if enabled, will send a user a "Server Notice"
-   asking them to consent to the privacy policy. The `server_notices` section ##TODO: link
+   asking them to consent to the privacy policy. The [`server_notices` section](#server_notices)
    must also be configured for this to work. Notices will *not* be sent to
    guest users unless `send_server_notice_to_guests` is set to true.
 
