@@ -1,0 +1,1 @@
+Fix bug that user cannot `/forget` rooms after the last member has left the room.
