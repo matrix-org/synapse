@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.65.0rc2"
+version = "1.65.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -158,6 +158,9 @@ packaging = ">=16.1"
 # At the time of writing, we only use functions from the version `importlib.metadata`
 # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
 importlib_metadata = { version = ">=1.4", python = "<3.8" }
+# This is the most recent version of Pydantic with available on common distros.
+pydantic = ">=1.7.4"
+
 
 
 # Optional Dependencies
