@@ -133,12 +133,20 @@ Registering a new user from a client
 ------------------------------------
 
 By default, registration of new users via Matrix clients is disabled. To enable
-it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also `set up a CAPTCHA
-<https://matrix-org.github.io/synapse/latest/CAPTCHA_SETUP.html>`_.)
+it:
 
-Once ``enable_registration`` is set to ``true``, it is possible to register a
-user via a Matrix client.
+1. In the
+   `registration config section <https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration>`_
+   set ``enable_registration: true`` in ``homeserver.yaml``.
+
+2. Then **either**:
+    a. set up a `CAPTCHA <https://matrix-org.github.io/synapse/latest/CAPTCHA_SETUP.html>`_, or
+    b. set ``enable_registration_without_verification: true`` in ``homeserver.yaml``.
+
+We **strongly** recommend using a CAPTCHA, particularly if your homeserver is exposed to
+the public internet. Without it, anyone can freely register accounts on your homeserver.
+This can be exploited by attackers to create spambots targetting the rest of the Matrix
+federation.
 
 Your new user name will be formed partly from the ``server_name``, and partly
 from a localpart you specify when you create the account. Your name will take
