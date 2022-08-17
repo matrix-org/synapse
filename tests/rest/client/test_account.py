@@ -488,7 +488,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
 
 class WhoamiTestCase(unittest.HomeserverTestCase):
@@ -641,21 +641,21 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_add_email_no_at(self) -> None:
         self._request_token_invalid_email(
             "address-without-at.bar",
-            expected_errcode=Codes.UNKNOWN,
+            expected_errcode=Codes.BAD_JSON,
             expected_error="Unable to parse email address",
         )
 
     def test_add_email_two_at(self) -> None:
         self._request_token_invalid_email(
             "foo@foo@test.bar",
-            expected_errcode=Codes.UNKNOWN,
+            expected_errcode=Codes.BAD_JSON,
             expected_error="Unable to parse email address",
         )
 
     def test_add_email_bad_format(self) -> None:
         self._request_token_invalid_email(
             "user@bad.example.net@good.example.com",
-            expected_errcode=Codes.UNKNOWN,
+            expected_errcode=Codes.BAD_JSON,
             expected_error="Unable to parse email address",
         )
 
@@ -1001,7 +1001,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
         )
         self.assertEqual(expected_errcode, channel.json_body["errcode"])
-        self.assertEqual(expected_error, channel.json_body["error"])
+        self.assertIn(expected_error, channel.json_body["error"])
 
     def _validate_token(self, link: str) -> None:
         # Remove the host

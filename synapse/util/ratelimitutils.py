@@ -27,6 +27,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.logging.opentracing import start_active_span
 from synapse.util import Clock
 
 if typing.TYPE_CHECKING:
@@ -176,8 +177,11 @@ class _PerHostRatelimiter:
             # Ensure that we've properly cleaned up.
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)
+            wait_span_scope.__exit__(None, None, None)
             return r
 
+        wait_span_scope = start_active_span("ratelimit wait")
+        wait_span_scope.__enter__()
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
         return make_deferred_yieldable(ret_defer)
