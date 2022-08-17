@@ -444,7 +444,7 @@ Sub-options for each listener include:
    * `names`: a list of names of HTTP resources. See below for a list of valid resource names.
 
    * `compress`: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
-     `client`, `consent` and `metrics` resources.
+     `client`, `consent`, `metrics` and `federation` resources.
 
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
