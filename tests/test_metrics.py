@@ -12,7 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+try:
+    from importlib import metadata
+except ImportError:
+    import importlib_metadata as metadata  # type: ignore[no-redef]
 from unittest.mock import Mock, patch
+
+from pkg_resources import parse_version
 
 from synapse.app._base import _set_prometheus_client_use_created_metrics
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
@@ -167,6 +173,9 @@ class CacheMetricsTests(unittest.HomeserverTestCase):
 
 
 class PrometheusMetricsHackTestCase(unittest.HomeserverTestCase):
+    if parse_version(metadata.version("prometheus_client")) < parse_version("0.14.0"):
+        skip = "prometheus-client too old"
+
     def test_created_metrics_disabled(self) -> None:
         """
         Tests that a brittle hack, to disable `_created` metrics, works.
