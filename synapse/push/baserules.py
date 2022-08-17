@@ -49,12 +49,15 @@ kind, etc, etc.
 """
 
 import itertools
+import logging
 from typing import Dict, Iterator, List, Mapping, Sequence, Tuple, Union
 
 import attr
 
 from synapse.config.experimental import ExperimentalConfig
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
@@ -199,8 +202,16 @@ def compile_push_rules(rawrules: List[PushRule]) -> PushRules:
             collection = rules.sender
         elif rule.priority_class == 1:
             collection = rules.underride
+        elif rule.priority_class <= 0:
+            logger.info(
+                "Got rule with priority class less than zero, but doesn't override a base rule: %s",
+                rule,
+            )
+            continue
         else:
-            raise Exception(f"Unknown priority class: {rule.priority_class}")
+            # We log and continue here so as not to break event sending
+            logger.error("Unknown priority class: %", rule.priority_class)
+            continue
 
         collection.append(rule)
 
