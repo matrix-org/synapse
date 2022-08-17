@@ -41,7 +41,7 @@ from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
 
-from .baserules import FilteredPushRules, PushRule
+from .baserules import FilteredPushRules, PushRule, PushRules
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 if TYPE_CHECKING:
@@ -301,11 +301,39 @@ class BulkPushRuleEvaluator:
             self.store, users, event, context
         )
 
+        actions_by_user = {}
+
+        default_rules = FilteredPushRules(PushRules(), {}, self.hs.config.experimental)
+
+        matching_default_rule = None
+        for rule, _ in default_rules:
+            if not rule.default_enabled:
+                continue
+
+            matches = evaluator.check_conditions(rule.conditions, "uid", None)
+            if matches:
+                matching_default_rule = rule
+                break
+
+        logger.info("ACTIONS found matching rule %s", rule)
+
+        joining_user = None
+        if event.type == EventTypes.Member:
+            joining_user = event.state_key
+
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
+                try:
+                    actions_by_user.pop(uid)
+                except KeyError:
+                    pass
                 continue
 
             if uid not in uids_with_visibility:
+                try:
+                    actions_by_user.pop(uid)
+                except KeyError:
+                    pass
                 continue
 
             display_name = None
@@ -313,10 +341,10 @@ class BulkPushRuleEvaluator:
             if profile:
                 display_name = profile.display_name
 
-            if not display_name:
+            if not display_name and joining_user:
                 # Handle the case where we are pushing a membership event to
                 # that user, as they might not be already joined.
-                if event.type == EventTypes.Member and event.state_key == uid:
+                if joining_user == uid:
                     display_name = event.content.get("displayname", None)
                     if not isinstance(display_name, str):
                         display_name = None
@@ -328,9 +356,35 @@ class BulkPushRuleEvaluator:
                 # current user, it'll be added to the dict later.
                 actions_by_user[uid] = []
 
-            for rule, enabled in rules:
+            matched_default = False
+            if matching_default_rule:
+                if not rules.enabled_map.get(matching_default_rule.rule_id, True):
+                    continue
+
+                matched_default = True
+
+                override = rules.push_rules.overriden_base_rules.get(
+                    matching_default_rule.rule_id
+                )
+                if override:
+                    actions = override.actions
+                else:
+                    actions = matching_default_rule.actions
+
+                actions = [x for x in actions if x != "dont_notify"]
+
+                if actions and "notify" in actions:
+                    actions_by_user[uid] = matching_default_rule.actions
+
+            for rule, enabled in rules.user_specific_rules():
                 if not enabled:
                     continue
+
+                if (
+                    matched_default
+                    and rule.priority_class < matching_default_rule.priority_class
+                ):
+                    break
 
                 matches = evaluator.check_conditions(rule.conditions, uid, display_name)
                 if matches:
@@ -338,7 +392,14 @@ class BulkPushRuleEvaluator:
                     if actions and "notify" in actions:
                         # Push rules say we should notify the user of this event
                         actions_by_user[uid] = actions
+                    else:
+                        try:
+                            actions_by_user.pop(uid)
+                        except KeyError:
+                            pass
                     break
+
+        logger.info("ACTIONS %s", actions_by_user)
 
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist

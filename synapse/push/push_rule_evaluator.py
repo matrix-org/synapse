@@ -144,6 +144,8 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
+        self._body_split = re.split(r"\b", self._value_cache.get("content.body", ""))
+
         # Maps cache keys to final values.
         self._condition_cache: Dict[str, bool] = {}
 
@@ -233,7 +235,7 @@ class PushRuleEvaluatorForEvent:
             if pattern_type == "user_id":
                 pattern = user_id
             elif pattern_type == "user_localpart":
-                pattern = UserID.from_string(user_id).localpart
+                pattern = user_id[1:].split(":", 1)[0]
 
         if not pattern:
             logger.warning("event_match condition with no pattern")
@@ -241,11 +243,7 @@ class PushRuleEvaluatorForEvent:
 
         # XXX: optimisation: cache our pattern regexps
         if condition["key"] == "content.body":
-            body = self._event.content.get("body", None)
-            if not body or not isinstance(body, str):
-                return False
-
-            return _glob_matches(pattern, body, word_boundary=True)
+            return any(pattern == b for b in self._body_split)
         else:
             haystack = self._value_cache.get(condition["key"], None)
             if haystack is None:
@@ -270,15 +268,7 @@ class PushRuleEvaluatorForEvent:
         if not body or not isinstance(body, str):
             return False
 
-        # Similar to _glob_matches, but do not treat display_name as a glob.
-        r = regex_cache.get((display_name, False, True), None)
-        if not r:
-            r1 = re.escape(display_name)
-            r1 = to_word_pattern(r1)
-            r = re.compile(r1, flags=re.IGNORECASE)
-            regex_cache[(display_name, False, True)] = r
-
-        return bool(r.search(body))
+        return display_name in self._body_split
 
     def _relation_match(self, condition: Mapping, user_id: str) -> bool:
         """
@@ -331,6 +321,9 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
         word_boundary: Whether to match against word boundaries or entire
             string. Defaults to False.
     """
+
+    if not IS_GLOB.search(glob):
+        return glob == value
 
     try:
         r = regex_cache.get((glob, True, word_boundary), None)

@@ -109,9 +109,10 @@ class PushRules:
         for rule in itertools.chain(
             BASE_PREPEND_OVERRIDE_RULES,
             self.override,
+            BASE_APPEND_OVERRIDE_RULES_USER_SPECIFIC,
             BASE_APPEND_OVERRIDE_RULES,
             self.content,
-            BASE_APPEND_CONTENT_RULES,
+            BASE_APPEND_CONTENT_RULES_USER_SPECIFIC,
             self.room,
             self.sender,
             self.underride,
@@ -124,6 +125,24 @@ class PushRules:
                 yield override_rule
             else:
                 yield rule
+
+    def user_specific_rules(self) -> Iterator[PushRule]:
+        for rule in itertools.chain(
+            self.override,
+            BASE_APPEND_OVERRIDE_RULES_USER_SPECIFIC,
+            self.content,
+            BASE_APPEND_CONTENT_RULES_USER_SPECIFIC,
+            self.room,
+            self.sender,
+            self.underride,
+        ):
+            if rule.default:
+                override_rule = self.overriden_base_rules.get(rule.rule_id)
+                if override_rule:
+                    yield override_rule
+                    continue
+
+            yield rule
 
     def __len__(self) -> int:
         # The length is mostly used by caches to get a sense of "size" / amount
@@ -152,6 +171,17 @@ class FilteredPushRules:
     def __iter__(self) -> Iterator[Tuple[PushRule, bool]]:
         for rule in self.push_rules:
             if not _is_experimental_rule_enabled(
+                rule.rule_id, self.experimental_config
+            ):
+                continue
+
+            enabled = self.enabled_map.get(rule.rule_id, rule.default_enabled)
+
+            yield rule, enabled
+
+    def user_specific_rules(self) -> Iterator[PushRule]:
+        for rule in self.push_rules.user_specific_rules():
+            if rule.default and not _is_experimental_rule_enabled(
                 rule.rule_id, self.experimental_config
             ):
                 continue
@@ -237,7 +267,7 @@ def _is_experimental_rule_enabled(
     return True
 
 
-BASE_APPEND_CONTENT_RULES = [
+BASE_APPEND_CONTENT_RULES_USER_SPECIFIC = [
     PushRule(
         default=True,
         priority_class=PRIORITY_CLASS_MAP["content"],
@@ -271,21 +301,7 @@ BASE_PREPEND_OVERRIDE_RULES = [
 ]
 
 
-BASE_APPEND_OVERRIDE_RULES = [
-    PushRule(
-        default=True,
-        priority_class=PRIORITY_CLASS_MAP["override"],
-        rule_id="global/override/.m.rule.suppress_notices",
-        conditions=[
-            {
-                "kind": "event_match",
-                "key": "content.msgtype",
-                "pattern": "m.notice",
-                "_cache_key": "_suppress_notices",
-            }
-        ],
-        actions=["dont_notify"],
-    ),
+BASE_APPEND_OVERRIDE_RULES_USER_SPECIFIC = [
     # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
     # otherwise invites will be matched by .m.rule.member_event
     PushRule(
@@ -314,6 +330,38 @@ BASE_APPEND_OVERRIDE_RULES = [
             {"set_tweak": "highlight", "value": False},
         ],
     ),
+    # This was changed from underride to override so it's closer in priority
+    # to the content rules where the user name highlight rule lives. This
+    # way a room rule is lower priority than both but a custom override rule
+    # is higher priority than both.
+    PushRule(
+        default=True,
+        priority_class=PRIORITY_CLASS_MAP["override"],
+        rule_id="global/override/.m.rule.contains_display_name",
+        conditions=[{"kind": "contains_display_name"}],
+        actions=[
+            "notify",
+            {"set_tweak": "sound", "value": "default"},
+            {"set_tweak": "highlight"},
+        ],
+    ),
+]
+
+BASE_APPEND_OVERRIDE_RULES = [
+    PushRule(
+        default=True,
+        priority_class=PRIORITY_CLASS_MAP["override"],
+        rule_id="global/override/.m.rule.suppress_notices",
+        conditions=[
+            {
+                "kind": "event_match",
+                "key": "content.msgtype",
+                "pattern": "m.notice",
+                "_cache_key": "_suppress_notices",
+            }
+        ],
+        actions=["dont_notify"],
+    ),
     # Will we sometimes want to know about people joining and leaving?
     # Perhaps: if so, this could be expanded upon. Seems the most usual case
     # is that we don't though. We add this override rule so that even if
@@ -333,21 +381,6 @@ BASE_APPEND_OVERRIDE_RULES = [
             }
         ],
         actions=["dont_notify"],
-    ),
-    # This was changed from underride to override so it's closer in priority
-    # to the content rules where the user name highlight rule lives. This
-    # way a room rule is lower priority than both but a custom override rule
-    # is higher priority than both.
-    PushRule(
-        default=True,
-        priority_class=PRIORITY_CLASS_MAP["override"],
-        rule_id="global/override/.m.rule.contains_display_name",
-        conditions=[{"kind": "contains_display_name"}],
-        actions=[
-            "notify",
-            {"set_tweak": "sound", "value": "default"},
-            {"set_tweak": "highlight"},
-        ],
     ),
     PushRule(
         default=True,
@@ -566,18 +599,11 @@ BASE_RULE_IDS = set()
 
 BASE_RULES_BY_ID: Dict[str, PushRule] = {}
 
-for r in BASE_APPEND_CONTENT_RULES:
-    BASE_RULE_IDS.add(r.rule_id)
-    BASE_RULES_BY_ID[r.rule_id] = r
-
-for r in BASE_PREPEND_OVERRIDE_RULES:
-    BASE_RULE_IDS.add(r.rule_id)
-    BASE_RULES_BY_ID[r.rule_id] = r
-
-for r in BASE_APPEND_OVERRIDE_RULES:
-    BASE_RULE_IDS.add(r.rule_id)
-    BASE_RULES_BY_ID[r.rule_id] = r
-
-for r in BASE_APPEND_UNDERRIDE_RULES:
+for r in itertools.chain(
+    BASE_APPEND_OVERRIDE_RULES_USER_SPECIFIC,
+    BASE_PREPEND_OVERRIDE_RULES,
+    BASE_APPEND_CONTENT_RULES_USER_SPECIFIC,
+    BASE_APPEND_UNDERRIDE_RULES,
+):
     BASE_RULE_IDS.add(r.rule_id)
     BASE_RULES_BY_ID[r.rule_id] = r
