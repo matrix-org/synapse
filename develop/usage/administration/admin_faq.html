@@ -148,8 +148,8 @@
 
                         <h2 id="admin-faq"><a class="header" href="#admin-faq">Admin FAQ</a></h2>
 <h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
-<p>If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See <a href="../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a></p>
-<p>If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.</p>
+<p>If your server already has an admin account you should use the <a href="../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a> to promote other accounts to become admins.</p>
+<p>If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <h2 id="what-servers-are-my-server-talking-to"><a class="header" href="#what-servers-are-my-server-talking-to">What servers are my server talking to?</a></h2>
@@ -166,8 +166,9 @@
 <h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
 <pre><code class="language-sql">SELECT NAME from users;
 </code></pre>
-<h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords:</a></h2>
-<p>See https://github.com/matrix-org/synapse/blob/master/README.rst#password-reset</p>
+<h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords</a></h2>
+<p>Users can reset their password through their client. Alternatively, a server admin
+can reset a user's password using the <a href="../../admin_api/user_admin_api.html#reset-password">admin API</a>.</p>
 <h2 id="i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again"><a class="header" href="#i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again">I have a problem with my server. Can I just delete my database and start again?</a></h2>
 <p>Deleting your database is unlikely to make anything better. </p>
 <p>It's easy to make the mistake of thinking that you can start again from a clean slate by dropping your database, but things don't work like that in a federated network: lots of other servers have information about your server.</p>
@@ -208,6 +209,66 @@ LIMIT 10;
 </code></pre>
 <p>You can also use the <a href="../../admin_api/rooms.html#list-room-api">List Room API</a>
 and <code>order_by</code> <code>state_events</code>.</p>
+<h2 id="people-cant-accept-room-invitations-from-me"><a class="header" href="#people-cant-accept-room-invitations-from-me">People can't accept room invitations from me</a></h2>
+<p>The typical failure mode here is that you send an invitation to someone
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of &quot;Invalid signature&quot;). They might see
+something like the following in their logs:</p>
+<pre><code>2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server &lt;server&gt; with key ed25519:a_EqML: Unable to verify signature for &lt;server&gt;
+</code></pre>
+<p>This is normally caused by a misconfiguration in your reverse-proxy. See <a href="docs/reverse_proxy.html">the reverse proxy docs</a> and double-check that your settings are correct.</p>
+<h2 id="help-synapse-is-slow-and-eats-all-my-ramcpu"><a class="header" href="#help-synapse-is-slow-and-eats-all-my-ramcpu">Help!! Synapse is slow and eats all my RAM/CPU!</a></h2>
+<p>First, ensure you are running the latest version of Synapse, using Python 3
+with a <a href="../../postgres.html">PostgreSQL database</a>.</p>
+<p>Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests. We'll improve this in the future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented <code>SYNAPSE_CACHE_FACTOR</code> environment
+variable. The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained environments, or increased if performance starts to
+degrade.</p>
+<p>However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.</p>
+<p>Using <a href="https://jemalloc.net">libjemalloc</a> can also yield a significant
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the <code>libjemalloc1</code> package and adding this
+line to <code>/etc/default/matrix-synapse</code>:</p>
+<pre><code>LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+</code></pre>
+<p>This made a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.</p>
+<p>If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see <a href="https://github.com/matrix-org/synapse/issues/3971">discussion</a>). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by disabling presence
+in the Synapse config file: <a href="../configuration/config_documentation.html#presence">see here</a>.</p>
+<h2 id="running-out-of-file-handles"><a class="header" href="#running-out-of-file-handles">Running out of File Handles</a></h2>
+<p>If Synapse runs out of file handles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like <code>#matrix:matrix.org</code> containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries &amp; HTTPS sockets, especially if DNS is slow
+to respond. (We need to improve the routing algorithm used to be better than
+full mesh, but as of March 2019 this hasn't happened yet).</p>
+<p>If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing <code>/etc/security/limits.conf</code></p>
+<p>Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute. Please let us know at <a href="https://matrix.to/#/#synapse-dev:matrix.org"><code>#synapse:matrix.org</code></a> if
+you see this failure mode so we can help debug it, however.</p>
 
                     </main>
 
