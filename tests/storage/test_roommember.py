@@ -22,6 +22,7 @@ from synapse.types import UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
+from tests.test_utils import event_injection
 from tests.server import TestHomeServer
 
 
@@ -161,15 +162,27 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         """Test that when the last local user has forgotten a room it is known as forgotten."""
         # join two local and one remote user
         self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
-        self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
-        self.inject_room_member(self.room, self.u_charlie.to_string(), Membership.JOIN)
+        self.get_success(
+            event_injection.inject_member_event(self.hs, self.room, self.u_bob, "join")
+        )
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_charlie.to_string(), "join"
+            )
+        )
         self.assertFalse(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
 
         # local users leave the room and the room is not forgotten
-        self.inject_room_member(self.room, self.u_alice, Membership.LEAVE)
-        self.inject_room_member(self.room, self.u_bob, Membership.LEAVE)
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_alice, "leave"
+            )
+        )
+        self.get_success(
+            event_injection.inject_member_event(self.hs, self.room, self.u_bob, "leave")
+        )
         self.assertFalse(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
@@ -194,14 +207,22 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
 
         # after leaving and forget the room, it is forgotten
-        self.inject_room_member(self.room, self.u_alice, Membership.LEAVE)
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_alice, "leave"
+            )
+        )
         self.get_success(self.store.forget(self.u_alice, self.room))
         self.assertTrue(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
 
         # after rejoin the room is not forgotten anymore
-        self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_alice, "join"
+            )
+        )
         self.assertFalse(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
