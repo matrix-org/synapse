@@ -17,7 +17,6 @@ import hmac
 import os
 import urllib.parse
 from binascii import unhexlify
-from http import HTTPStatus
 from typing import List, Optional
 from unittest.mock import Mock, patch
 
@@ -79,7 +78,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(
             "Shared secret registration is not enabled", channel.json_body["error"]
         )
@@ -111,7 +110,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         body = {"nonce": nonce}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("username must be specified", channel.json_body["error"])
 
         # 61 seconds
@@ -119,7 +118,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("unrecognised nonce", channel.json_body["error"])
 
     def test_register_incorrect_nonce(self) -> None:
@@ -142,7 +141,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("HMAC incorrect", channel.json_body["error"])
 
     def test_register_correct_nonce(self) -> None:
@@ -198,7 +197,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         # Now, try and reuse it
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("unrecognised nonce", channel.json_body["error"])
 
     def test_missing_parts(self) -> None:
@@ -219,7 +218,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         # Must be an empty body present
         channel = self.make_request("POST", self.url, {})
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("nonce must be specified", channel.json_body["error"])
 
         #
@@ -229,28 +228,28 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         # Must be present
         channel = self.make_request("POST", self.url, {"nonce": nonce()})
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("username must be specified", channel.json_body["error"])
 
         # Must be a string
         body = {"nonce": nonce(), "username": 1234}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid username", channel.json_body["error"])
 
         # Must not have null bytes
         body = {"nonce": nonce(), "username": "abcd\u0000"}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid username", channel.json_body["error"])
 
         # Must not have null bytes
         body = {"nonce": nonce(), "username": "a" * 1000}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid username", channel.json_body["error"])
 
         #
@@ -261,28 +260,28 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         body = {"nonce": nonce(), "username": "a"}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("password must be specified", channel.json_body["error"])
 
         # Must be a string
         body = {"nonce": nonce(), "username": "a", "password": 1234}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid password", channel.json_body["error"])
 
         # Must not have null bytes
         body = {"nonce": nonce(), "username": "a", "password": "abcd\u0000"}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid password", channel.json_body["error"])
 
         # Super long
         body = {"nonce": nonce(), "username": "a", "password": "A" * 1000}
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid password", channel.json_body["error"])
 
         #
@@ -298,7 +297,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Invalid user type", channel.json_body["error"])
 
     def test_displayname(self) -> None:
@@ -375,7 +374,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob3:test", channel.json_body["user_id"])
 
         channel = self.make_request("GET", "/profile/@bob3:test/displayname")
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
 
         # set displayname
         channel = self.make_request("GET", self.url)
@@ -466,7 +465,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("GET", self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
@@ -478,7 +477,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("GET", self.url, access_token=other_user_token)
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_all_users(self) -> None:
@@ -591,7 +590,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative from
@@ -601,7 +600,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid guests
@@ -611,7 +610,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid deactivated
@@ -621,7 +620,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # unkown order_by
@@ -631,7 +630,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
@@ -641,7 +640,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def test_limit(self) -> None:
@@ -941,7 +940,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("POST", self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_not_admin(self) -> None:
@@ -952,7 +951,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", url, access_token=self.other_user_token)
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         channel = self.make_request(
@@ -962,12 +961,12 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content=b"{}",
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that deactivation for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that deactivation for a user that does not exist returns a 404
         """
 
         channel = self.make_request(
@@ -976,7 +975,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_erase_is_not_bool(self) -> None:
@@ -991,18 +990,18 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that deactivation for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that deactivation for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v1/deactivate/@unknown_person:unknown_domain"
 
         channel = self.make_request("POST", url, access_token=self.admin_user_tok)
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only deactivate local users", channel.json_body["error"])
 
     def test_deactivate_user_erase_true(self) -> None:
@@ -1220,7 +1219,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         channel = self.make_request(
@@ -1230,12 +1229,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=b"{}",
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
 
         channel = self.make_request(
@@ -1244,7 +1243,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
 
     def test_invalid_parameter(self) -> None:
@@ -1259,7 +1258,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"admin": "not_bool"},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
         # deactivated not bool
@@ -1269,7 +1268,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": "not_bool"},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
         # password not str
@@ -1279,7 +1278,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"password": True},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
         # password not length
@@ -1289,7 +1288,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"password": "x" * 513},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
         # user_type not valid
@@ -1299,7 +1298,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"user_type": "new type"},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
         # external_ids not valid
@@ -1311,7 +1310,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 "external_ids": {"auth_provider": "prov", "wrong_external_id": "id"}
             },
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
         channel = self.make_request(
@@ -1320,7 +1319,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"external_ids": {"external_id": "id"}},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
         # threepids not valid
@@ -1330,7 +1329,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"threepids": {"medium": "email", "wrong_address": "id"}},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
         channel = self.make_request(
@@ -1339,7 +1338,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"threepids": {"address": "value"}},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
     def test_get_user(self) -> None:
@@ -1379,7 +1378,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1434,7 +1433,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1512,7 +1511,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123", "admin": False},
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1550,7 +1549,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Admin user is not blocked by mau anymore
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1585,7 +1584,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1626,7 +1625,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1666,7 +1665,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("msisdn", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("1234567890", channel.json_body["threepids"][0]["address"])
@@ -2064,7 +2063,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # must fail
-        self.assertEqual(HTTPStatus.CONFLICT, channel.code, msg=channel.json_body)
+        self.assertEqual(409, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual("External id is already in use.", channel.json_body["error"])
 
@@ -2228,7 +2227,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False},
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
 
         # Reactivate the user.
         channel = self.make_request(
@@ -2261,7 +2260,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
         )
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Reactivate the user without a password.
@@ -2295,7 +2294,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
         )
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Reactivate the user without a password.
@@ -2407,7 +2406,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123"},
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
 
@@ -2431,7 +2430,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123", "deactivated": "false"},
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
 
         # Check user is not deactivated
         channel = self.make_request(
@@ -2520,7 +2519,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("GET", self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
@@ -2535,7 +2534,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             access_token=other_user_token,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_user_does_not_exist(self) -> None:
@@ -2678,7 +2677,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("GET", self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
@@ -2693,12 +2692,12 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             access_token=other_user_token,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = "/_synapse/admin/v1/users/@unknown_person:test/pushers"
         channel = self.make_request(
@@ -2707,12 +2706,12 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/pushers"
 
@@ -2722,7 +2721,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only look up local users", channel.json_body["error"])
 
     def test_get_pushers(self) -> None:
@@ -2808,7 +2807,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         """Try to list media of an user without authentication."""
         channel = self.make_request(method, self.url, {})
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "DELETE"])
@@ -2822,12 +2821,12 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=other_user_token,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "DELETE"])
     def test_user_does_not_exist(self, method: str) -> None:
-        """Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND"""
+        """Tests that a lookup for a user that does not exist returns a 404"""
         url = "/_synapse/admin/v1/users/@unknown_person:test/media"
         channel = self.make_request(
             method,
@@ -2835,12 +2834,12 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "DELETE"])
     def test_user_is_not_local(self, method: str) -> None:
-        """Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST"""
+        """Tests that a lookup for a user that is not a local returns a 400"""
         url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/media"
 
         channel = self.make_request(
@@ -2849,7 +2848,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only look up local users", channel.json_body["error"])
 
     def test_limit_GET(self) -> None:
@@ -2970,7 +2969,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
@@ -2980,7 +2979,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative limit
@@ -2990,7 +2989,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative from
@@ -3000,7 +2999,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def test_next_token(self) -> None:
@@ -3393,7 +3392,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         """Try to login as a user without authentication."""
         channel = self.make_request("POST", self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_not_admin(self) -> None:
@@ -3402,7 +3401,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
             "POST", self.url, b"{}", access_token=self.other_user_tok
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
 
     def test_send_event(self) -> None:
         """Test that sending event as a user works."""
@@ -3447,7 +3446,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
         # The puppet token should no longer work
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
 
         # .. but the real user's tokens should still work
         channel = self.make_request(
@@ -3480,7 +3479,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
 
     def test_admin_logout_all(self) -> None:
         """Tests that the admin user calling `/logout/all` does expire the
@@ -3501,7 +3500,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
         # The puppet token should no longer work
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
 
         # .. but the real user's tokens should still work
         channel = self.make_request(
@@ -3538,7 +3537,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
             room_id,
             "com.example.test",
             tok=self.other_user_tok,
-            expect_code=HTTPStatus.FORBIDDEN,
+            expect_code=403,
         )
 
         # Login in as the user
@@ -3559,7 +3558,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
             room_id,
             user=self.other_user,
             tok=self.other_user_tok,
-            expect_code=HTTPStatus.FORBIDDEN,
+            expect_code=403,
         )
 
         # Logging in as the other user and joining a room should work, even
@@ -3594,7 +3593,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
         Try to get information of an user without authentication.
         """
         channel = self.make_request("GET", self.url, b"{}")
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_not_admin(self) -> None:
@@ -3609,12 +3608,12 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=other_user2_token,
         )
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = self.url_prefix % "@unknown_person:unknown_domain"  # type: ignore[attr-defined]
 
@@ -3623,7 +3622,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
             url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only whois a local user", channel.json_body["error"])
 
     def test_get_whois_admin(self) -> None:
@@ -3680,7 +3679,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         Try to get information of an user without authentication.
         """
         channel = self.make_request(method, self.url)
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["POST", "DELETE"])
@@ -3691,18 +3690,18 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         other_user_token = self.login("user", "pass")
 
         channel = self.make_request(method, self.url, access_token=other_user_token)
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @parameterized.expand(["POST", "DELETE"])
     def test_user_is_not_local(self, method: str) -> None:
         """
-        Tests that shadow-banning for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that shadow-banning for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v1/whois/@unknown_person:unknown_domain"
 
         channel = self.make_request(method, url, access_token=self.admin_user_tok)
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
 
     def test_success(self) -> None:
         """
@@ -3762,7 +3761,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request(method, self.url, b"{}")
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "POST", "DELETE"])
@@ -3778,13 +3777,13 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=other_user_token,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "POST", "DELETE"])
     def test_user_does_not_exist(self, method: str) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = "/_synapse/admin/v1/users/@unknown_person:test/override_ratelimit"
 
@@ -3794,7 +3793,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @parameterized.expand(
@@ -3806,7 +3805,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
     )
     def test_user_is_not_local(self, method: str, error_msg: str) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = (
             "/_synapse/admin/v1/users/@unknown_person:unknown_domain/override_ratelimit"
@@ -3818,7 +3817,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(error_msg, channel.json_body["error"])
 
     def test_invalid_parameter(self) -> None:
@@ -3833,7 +3832,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             content={"messages_per_second": "string"},
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # messages_per_second is negative
@@ -3844,7 +3843,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             content={"messages_per_second": -1},
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # burst_count is a string
@@ -3855,7 +3854,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             content={"burst_count": "string"},
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # burst_count is negative
@@ -3866,7 +3865,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             content={"burst_count": -1},
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def test_return_zero_when_null(self) -> None:
@@ -3982,7 +3981,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         """Try to get information of a user without authentication."""
         channel = self.make_request("GET", self.url, {})
 
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
@@ -3995,7 +3994,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
             access_token=other_user_token,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_user_does_not_exist(self) -> None:
@@ -4008,7 +4007,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
@@ -4021,7 +4020,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only look up local users", channel.json_body["error"])
 
     def test_success(self) -> None:

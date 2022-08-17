@@ -1,0 +1,1 @@
+Faster room joins: Refuse to start when faster joins is enabled on a deployment with workers, since worker configurations are not currently supported.

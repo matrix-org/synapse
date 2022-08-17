@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import urllib.parse
-from http import HTTPStatus
 
 from parameterized import parameterized
 
@@ -79,10 +78,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Should be quarantined
         self.assertEqual(
-            HTTPStatus.NOT_FOUND,
+            404,
             channel.code,
             msg=(
-                "Expected to receive a HTTPStatus.NOT_FOUND on accessing quarantined media: %s"
+                "Expected to receive a 404 on accessing quarantined media: %s"
                 % server_and_media_id
             ),
         )
@@ -107,7 +106,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Expect a forbidden error
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg="Expected forbidden on quarantining media as a non-admin",
         )

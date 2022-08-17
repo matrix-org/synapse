@@ -135,7 +135,22 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(1, 1, 0)
 
         # Delete old event push actions, this should not affect the (summarised) count.
+        #
+        # All event push actions are kept for 24 hours, so need to move forward
+        # in time.
+        self.pump(60 * 60 * 24)
         self.get_success(self.store._remove_old_push_actions_that_have_rotated())
+        # Double check that the event push actions have been cleared (i.e. that
+        # any results *must* come from the summary).
+        result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="event_push_actions",
+                keyvalues={"1": 1},
+                retcols=("event_id",),
+                desc="",
+            )
+        )
+        self.assertEqual(result, [])
         _assert_counts(1, 1, 0)
 
         _mark_read(last_event_id)

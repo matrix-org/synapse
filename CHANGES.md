@@ -1,3 +1,9 @@
+Synapse 1.65.0 (2022-08-16)
+===========================
+
+No significant changes since 1.65.0rc2.
+
+
 Synapse 1.65.0rc2 (2022-08-11)
 ==============================
 
@@ -25,7 +31,7 @@ Bugfixes
 --------
 
 - Update the version of the LDAP3 auth provider module included in the `matrixdotorg/synapse` DockerHub images and the Debian packages hosted on packages.matrix.org to 0.2.2. This version fixes a regression in the module. ([\#13470](https://github.com/matrix-org/synapse/issues/13470))
-- Fix a bug introduced in Synapse v1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`). ([\#13365](https://github.com/matrix-org/synapse/issues/13365))
+- Fix a bug introduced in Synapse v1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`) (this was reverted in v1.65.0rc2, see changelog notes above). ([\#13365](https://github.com/matrix-org/synapse/issues/13365))
 - Fix a bug introduced in Synapse 0.24.0 that would respond with the wrong error status code to `/joined_members` requests when the requester is not a current member of the room. Contributed by @andrewdoh. ([\#13374](https://github.com/matrix-org/synapse/issues/13374))
 - Fix bug in handling of typing events for appservices. Contributed by Nick @ Beeper (@fizzadar). ([\#13392](https://github.com/matrix-org/synapse/issues/13392))
 - Fix a bug introduced in Synapse 1.57.0 where rooms listed in `exclude_rooms_from_sync` in the configuration file would not be properly excluded from incremental syncs. ([\#13408](https://github.com/matrix-org/synapse/issues/13408))
