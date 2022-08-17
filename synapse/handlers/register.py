@@ -185,7 +185,7 @@ class RegistrationHandler:
                     400, "User ID already taken.", errcode=Codes.USER_IN_USE
                 )
             if guest_access_token:
-                user_data = await self.store.get_user_by_access_token(
+                user_data = await self.auth.get_user_by_access_token(
                     guest_access_token
                 )
                 if not user_data.is_guest or user_data.user.localpart != localpart:

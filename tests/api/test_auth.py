@@ -290,6 +290,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
         self.store.insert_client_ip = simple_async_mock(None)
+        self.store.mark_access_token_as_used = simple_async_mock(None)
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
@@ -309,6 +310,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
         self.store.insert_client_ip = simple_async_mock(None)
+        self.store.mark_access_token_as_used = simple_async_mock(None)
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
