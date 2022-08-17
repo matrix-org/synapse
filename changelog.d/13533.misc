@@ -1,0 +1,1 @@
+Track HTTP response times over 10 seconds from `/messages` (`synapse_room_message_list_rest_servlet_response_time_seconds`).

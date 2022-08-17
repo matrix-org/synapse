@@ -1,0 +1,1 @@
+Add a linter script which will reject non-strict types in Pydantic models.

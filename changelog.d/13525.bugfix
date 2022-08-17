@@ -1,0 +1,1 @@
+Fix a bug in the `/event_reports` Admin API which meant that the total count could be larger than the number of results you can actually query for.
