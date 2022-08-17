@@ -12,7 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest.mock import Mock, patch
 
+from synapse.app._base import _set_prometheus_client_use_created_metrics
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
 from synapse.util.caches.deferred_cache import DeferredCache
 
@@ -162,3 +164,25 @@ class CacheMetricsTests(unittest.HomeserverTestCase):
 
         self.assertEqual(items["synapse_util_caches_cache_size"], "1.0")
         self.assertEqual(items["synapse_util_caches_cache_max_size"], "777.0")
+
+
+class PrometheusMetricsHackTestCase(unittest.HomeserverTestCase):
+    def test_created_metrics_disabled(self) -> None:
+        """
+        Tests that a brittle hack, to disable `_created` metrics, works.
+        This involves poking at the internals of prometheus-client.
+        It's not the end of the world if this doesn't work.
+        """
+        import prometheus_client.metrics
+
+        PRIVATE_FLAG_NAME = "_use_created"
+
+        # By default, the pesky `_created` metrics are enabled.
+        # Check this assumption is still valid.
+        self.assertTrue(getattr(prometheus_client.metrics, PRIVATE_FLAG_NAME))
+
+        mock = Mock()
+        with patch("prometheus_client.metrics", mock):
+            setattr(mock, PRIVATE_FLAG_NAME, True)
+            _set_prometheus_client_use_created_metrics(False)
+            self.assertFalse(getattr(mock, PRIVATE_FLAG_NAME, False))
