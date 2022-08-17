@@ -78,17 +78,6 @@ class _RegistryProxy:
 # TODO Do something nicer about this.
 RegistryProxy = cast(CollectorRegistry, _RegistryProxy)
 
-T = TypeVar("T")
-
-
-def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
-    """Return the number of items in it for which func returns true."""
-    n = 0
-    for x in it:
-        if func(x):
-            n += 1
-    return n
-
 
 @attr.s(slots=True, hash=True, auto_attribs=True)
 class LaterGauge(Collector):
@@ -486,7 +475,6 @@ __all__ = [
     "MetricsResource",
     "generate_latest",
     "start_http_server",
-    "count",
     "LaterGauge",
     "InFlightGauge",
     "GaugeBucketCollector",

@@ -30,7 +30,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import start_active_span
-from synapse.metrics import LaterGauge, count
+from synapse.metrics import LaterGauge
 from synapse.util import Clock
 
 if typing.TYPE_CHECKING:
@@ -60,24 +60,17 @@ class FederationRateLimiter:
             "synapse_rate_limit_sleep_affected_hosts",
             "Number of hosts that had requests put to sleep",
             [],
-            lambda: count(
-                bool,
-                [
-                    ratelimiter.should_sleep()
-                    for ratelimiter in self.ratelimiters.values()
-                ],
+            lambda: sum(
+                ratelimiter.should_sleep() for ratelimiter in self.ratelimiters.values()
             ),
         )
         LaterGauge(
             "synapse_rate_limit_reject_affected_hosts",
             "Number of hosts that had requests rejected",
             [],
-            lambda: count(
-                bool,
-                [
-                    ratelimiter.should_reject()
-                    for ratelimiter in self.ratelimiters.values()
-                ],
+            lambda: sum(
+                ratelimiter.should_reject()
+                for ratelimiter in self.ratelimiters.values()
             ),
         )
 
