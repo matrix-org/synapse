@@ -6,7 +6,7 @@ import synapse.rest.admin
 import synapse.rest.client.login
 import synapse.rest.client.room
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import LimitExceededError
+from synapse.api.errors import LimitExceededError, SynapseError
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import FrozenEventV3
 from synapse.federation.federation_client import SendJoinResult
@@ -16,8 +16,12 @@ from synapse.util import Clock
 
 from tests.replication._base import RedisMultiWorkerStreamTestCase
 from tests.server import make_request
-from tests.test_utils import make_awaitable
-from tests.unittest import FederatingHomeserverTestCase, override_config
+from tests.test_utils import event_injection, make_awaitable
+from tests.unittest import (
+    FederatingHomeserverTestCase,
+    HomeserverTestCase,
+    override_config,
+)
 
 
 class TestJoinsLimitedByPerRoomRateLimiter(FederatingHomeserverTestCase):
@@ -286,4 +290,120 @@ class TestReplicatedJoinsLimitedByPerRoomRateLimiter(RedisMultiWorkerStreamTestC
                 action=Membership.JOIN,
             ),
             LimitExceededError,
+        )
+
+
+class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        synapse.rest.client.login.register_servlets,
+        synapse.rest.client.room.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.handler = hs.get_room_member_handler()
+        self.store = hs.get_datastores().main
+
+        # Create two users.
+        self.alice = self.register_user("alice", "pass")
+        self.alice_ID = UserID.from_string(self.alice)
+        self.alice_token = self.login("alice", "pass")
+        self.bob = self.register_user("bob", "pass")
+        self.bob_ID = UserID.from_string(self.bob)
+        self.bob_token = self.login("bob", "pass")
+
+        # Create a room on this homeserver.
+        self.room_id = self.helper.create_room_as(self.alice, tok=self.alice_token)
+
+    def test_leave_and_forget(self) -> None:
+        """Tests that forget a room is successfully. The test is performed with two users,
+        as forgetting by the last user respectively after all users had left the
+        is a special edge case."""
+        self.helper.join(self.room_id, user=self.bob, tok=self.bob_token)
+
+        # alice is not the last room member that leaves and forgets the room
+        self.helper.leave(self.room_id, user=self.alice, tok=self.alice_token)
+        self.get_success(self.handler.forget(self.alice_ID, self.room_id))
+        self.assertTrue(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        # TODO: server has not forgotten the room
+        # self.assertFalse(
+        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        # )
+
+    def test_leave_and_forget_last_user(self) -> None:
+        """Tests that forget a room is successfully when the last user has left the room."""
+
+        # alice is the last room member that leaves and forgets the room
+        self.helper.leave(self.room_id, user=self.alice, tok=self.alice_token)
+        self.get_success(self.handler.forget(self.alice_ID, self.room_id))
+        self.assertTrue(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        # TODO: server has forgotten the room
+        # self.assertTrue(
+        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        # )
+
+    def test_forget_when_not_left(self) -> None:
+        """Tests that a user cannot not forgets a room that has not left."""
+        self.get_failure(self.handler.forget(self.alice_ID, self.room_id), SynapseError)
+
+    def test_rejoin_forgotten_by_server(self) -> None:
+        """Test that a user that has forgotten a room can do a re-join.
+        The room was also forgotten from the local server and only
+        remote users are in the room."""
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room_id, "@charlie:elsewhere", "join"
+            )
+        )
+
+        self.helper.leave(self.room_id, user=self.alice, tok=self.alice_token)
+        self.get_success(self.handler.forget(self.alice_ID, self.room_id))
+        self.assertTrue(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        # TODO: server has forgotten the room
+        # self.assertTrue(
+        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        # )
+
+        self.helper.join(self.room_id, user=self.alice, tok=self.alice_token)
+        self.assertFalse(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        # TODO: server has not forgotten the room
+        # self.assertFalse(
+        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        # )
+
+    def test_rejoin_forgotten_by_user(self) -> None:
+        """Test that a user that has forgotten a room can do a re-join.
+        The room was not forgotten from the local server.
+        One local user is still member of the room."""
+        self.helper.join(self.room_id, user=self.bob, tok=self.bob_token)
+
+        self.helper.leave(self.room_id, user=self.alice, tok=self.alice_token)
+        self.get_success(self.handler.forget(self.alice_ID, self.room_id))
+        self.assertTrue(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        # TODO: server has forgotten the room
+        # self.assertFalse(
+        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        # )
+
+        self.helper.join(self.room_id, user=self.alice, tok=self.alice_token)
+        # TODO: A join to a room does not invalidate the forgotten cache
+        # see https://github.com/matrix-org/synapse/issues/13262
+        self.store.did_forget.invalidate_all()
+        self.assertFalse(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
         )
