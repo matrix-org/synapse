@@ -46,7 +46,24 @@ As an example:
 The MAC is the hex digest output of the HMAC-SHA1 algorithm, with the key being
 the shared secret and the content being the nonce, user, password, either the
 string "admin" or "notadmin", and optionally the user_type
-each separated by NULs. For an example of generation in Python:
+each separated by NULs.
+
+Here is an easy way to generate the HMAC digest if you have Bash and OpenSSL:
+
+```bash
+# Update these values and then paste this code block into a bash terminal
+nonce='thisisanonce'
+username='pepper_roni'
+password='pizza'
+admin='admin'
+secret='shared_secret'
+
+printf '%s\0%s\0%s\0%s' "$nonce" "$username" "$password" "$admin" |
+  openssl sha1 -hmac "$secret" |
+  awk '{print $2}'
+```
+
+For an example of generation in Python:
 
 ```python
 import hmac, hashlib
