@@ -187,7 +187,7 @@ class Auth:
             if not requester:
                 # If not, it should be from a regular user
                 requester = await self.get_user_by_access_token(
-                    access_token, allow_expired=allow_expired, mark_as_used=True
+                    access_token, allow_expired=allow_expired
                 )
 
                 # Deny the request if the user account has expired.
@@ -350,7 +350,6 @@ class Auth:
         self,
         token: str,
         allow_expired: bool = False,
-        mark_as_used: bool = False,
     ) -> Requester:
         """Validate access token and get user_id from it
 
@@ -358,8 +357,6 @@ class Auth:
             token: The access token to get the user by
             allow_expired: If False, raises an InvalidClientTokenError
                 if the token is expired
-            mark_as_used: Mark the token as used, if it was used to
-                authenticate a regular C-S API request
 
         Raises:
             InvalidClientTokenError if a user by that token exists, but the token is
@@ -386,8 +383,7 @@ class Auth:
 
             # Mark the token as used. This is used to invalidate old refresh
             # tokens after some time.
-            if mark_as_used and not user_info.token_used:
-                await self.store.mark_access_token_as_used(user_info.token_id)
+            await self.store.mark_access_token_as_used(user_info.token_id)
 
             requester = create_requester(
                 user_id=user_info.user_id,
