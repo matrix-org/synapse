@@ -328,10 +328,10 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
             self.get_success(self.store.did_forget(self.alice, self.room_id))
         )
 
-        # TODO: server has not forgotten the room
-        # self.assertFalse(
-        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        # )
+        # the server has not forgotten the room
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        )
 
     def test_leave_and_forget_last_user(self) -> None:
         """Tests that forget a room is successfully when the last user has left the room."""
@@ -343,10 +343,10 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
             self.get_success(self.store.did_forget(self.alice, self.room_id))
         )
 
-        # TODO: server has forgotten the room
-        # self.assertTrue(
-        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        # )
+        # the server has forgotten the room
+        self.assertTrue(
+            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        )
 
     def test_forget_when_not_left(self) -> None:
         """Tests that a user cannot not forgets a room that has not left."""
@@ -356,6 +356,8 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
         """Test that a user that has forgotten a room can do a re-join.
         The room was also forgotten from the local server and only
         remote users are in the room."""
+
+        # add remote user
         self.get_success(
             event_injection.inject_member_event(
                 self.hs, self.room_id, "@charlie:elsewhere", "join"
@@ -368,20 +370,20 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
             self.get_success(self.store.did_forget(self.alice, self.room_id))
         )
 
-        # TODO: server has forgotten the room
-        # self.assertTrue(
-        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        # )
+        # the server has forgotten the room
+        self.assertTrue(
+            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        )
 
         self.helper.join(self.room_id, user=self.alice, tok=self.alice_token)
         self.assertFalse(
             self.get_success(self.store.did_forget(self.alice, self.room_id))
         )
 
-        # TODO: server has not forgotten the room
-        # self.assertFalse(
-        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        # )
+        # the server has not forgotten the room anymore
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        )
 
     def test_rejoin_forgotten_by_user(self) -> None:
         """Test that a user that has forgotten a room can do a re-join.
@@ -395,10 +397,10 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
             self.get_success(self.store.did_forget(self.alice, self.room_id))
         )
 
-        # TODO: server has forgotten the room
-        # self.assertFalse(
-        #     self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        # )
+        # the server has not forgotten the room
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        )
 
         self.helper.join(self.room_id, user=self.alice, tok=self.alice_token)
         # TODO: A join to a room does not invalidate the forgotten cache
