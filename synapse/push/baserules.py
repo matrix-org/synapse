@@ -209,7 +209,9 @@ def compile_push_rules(rawrules: List[PushRule]) -> PushRules:
             )
             continue
         else:
-            raise Exception(f"Unknown priority class: {rule.priority_class}")
+            # We log and continue here so as not to break event sending
+            logger.error("Unknown priority class: %", rule.priority_class)
+            continue
 
         collection.append(rule)
 
