@@ -77,7 +77,7 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 # Otherwise, just create an empty requirements file so that the Dockerfile can
 # proceed.
 RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
-    /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}; \
+    /root/.local/bin/poetry export --verbose --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}; \
   else \
     touch /synapse/requirements.txt; \
   fi
