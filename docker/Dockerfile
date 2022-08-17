@@ -159,6 +159,10 @@ RUN \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
+
+# Copy requirements.txt for traceability
+COPY --from=requirements /synapse/requirements.txt /
+
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 
