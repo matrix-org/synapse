@@ -22,8 +22,8 @@ from synapse.types import UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import event_injection
 from tests.server import TestHomeServer
+from tests.test_utils import event_injection
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
