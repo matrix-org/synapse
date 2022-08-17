@@ -412,9 +412,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_count_correct_despite_table_deletions(self) -> None:
         """
-        Tests that the issue fixed by https://github.com/matrix-org/synapse/pull/13525
-        does not recur:
-        the count should match the number of rows, even if rows in joined tables
+        Tests that the count matches the number of rows, even if rows in joined tables
         are missing.
         """
 
