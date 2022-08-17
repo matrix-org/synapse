@@ -436,6 +436,8 @@ end of the list.</p>
 <li><code>state_events</code> - Total number of state_events of a room. Complexity of the room.</li>
 <li><code>room_type</code> - The type of the room taken from the room's creation event; for example &quot;m.space&quot; if the room is a space.
 If the room does not define a type, the value will be <code>null</code>.</li>
+<li><code>forgotten</code> - Whether all local users have
+<a href="https://spec.matrix.org/latest/client-server-api/#leaving-rooms">forgotten</a> the room.</li>
 </ul>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;
@@ -459,7 +461,8 @@ If the room does not define a type, the value will be <code>null</code>.</li>
   &quot;guest_access&quot;: null,
   &quot;history_visibility&quot;: &quot;shared&quot;,
   &quot;state_events&quot;: 93534,
-  &quot;room_type&quot;: &quot;m.space&quot;
+  &quot;room_type&quot;: &quot;m.space&quot;,
+  &quot;forgotten&quot;: false
 }
 </code></pre>
 <h1 id="room-members-api"><a class="header" href="#room-members-api">Room Members API</a></h1>
