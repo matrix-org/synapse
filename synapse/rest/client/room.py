@@ -22,6 +22,7 @@ from urllib import parse as urlparse
 
 from prometheus_client.core import Histogram
 
+from twisted.internet import defer
 from twisted.web.server import Request
 
 from synapse import event_auth
@@ -624,13 +625,17 @@ class RoomMessageListRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
-    @messsages_response_timer.time()
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         processing_start_time = self.clock.time_msec()
         # Fire and forget and hope that we get a result by the end.
-        room_member_count_co = self.store.get_number_joined_users_in_room(room_id)
+        #
+        # Ideally we'd use `Deferred.fromCoroutine()` here, to save on redundant
+        # type-checking, but we'd need Twisted >= 21.2.
+        room_member_count_deferred = defer.ensureDeferred(
+            self.store.get_number_joined_users_in_room(room_id)
+        )
 
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = await PaginationConfig.from_request(
@@ -663,7 +668,7 @@ class RoomMessageListRestServlet(RestServlet):
         )
 
         processing_end_time = self.clock.time_msec()
-        room_member_count = await room_member_count_co
+        room_member_count = await room_member_count_deferred
         messsages_response_timer.labels(
             room_size=_RoomSize.from_member_count(room_member_count)
         ).observe((processing_start_time - processing_end_time) / 1000)
