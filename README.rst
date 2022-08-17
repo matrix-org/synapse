@@ -138,10 +138,10 @@ it:
 1. In the
    `registration config section <https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration>`_
    set ``enable_registration: true`` in ``homeserver.yaml``.
-
 2. Then **either**:
-    a. set up a `CAPTCHA <https://matrix-org.github.io/synapse/latest/CAPTCHA_SETUP.html>`_, or
-    b. set ``enable_registration_without_verification: true`` in ``homeserver.yaml``.
+
+   a. set up a `CAPTCHA <https://matrix-org.github.io/synapse/latest/CAPTCHA_SETUP.html>`_, or
+   b. set ``enable_registration_without_verification: true`` in ``homeserver.yaml``.
 
 We **strongly** recommend using a CAPTCHA, particularly if your homeserver is exposed to
 the public internet. Without it, anyone can freely register accounts on your homeserver.
