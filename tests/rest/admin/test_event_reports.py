@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
 from typing import List
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -81,16 +80,12 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("GET", self.url, b"{}")
 
-        self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -99,11 +94,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.FORBIDDEN,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_default_success(self) -> None:
@@ -117,7 +108,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
@@ -134,7 +125,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 5)
         self.assertEqual(channel.json_body["next_token"], 5)
@@ -151,7 +142,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 15)
         self.assertNotIn("next_token", channel.json_body)
@@ -168,7 +159,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(channel.json_body["next_token"], 15)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
@@ -185,7 +176,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 10)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
         self.assertNotIn("next_token", channel.json_body)
@@ -205,7 +196,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 10)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
         self.assertNotIn("next_token", channel.json_body)
@@ -225,7 +216,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 5)
         self.assertEqual(len(channel.json_body["event_reports"]), 5)
         self.assertNotIn("next_token", channel.json_body)
@@ -247,7 +238,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         report = 1
@@ -265,7 +256,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         report = 1
@@ -278,7 +269,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_invalid_search_order(self) -> None:
         """
-        Testing that a invalid search order returns a HTTPStatus.BAD_REQUEST
+        Testing that a invalid search order returns a 400
         """
 
         channel = self.make_request(
@@ -287,17 +278,13 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual("Unknown direction: bar", channel.json_body["error"])
 
     def test_limit_is_negative(self) -> None:
         """
-        Testing that a negative limit parameter returns a HTTPStatus.BAD_REQUEST
+        Testing that a negative limit parameter returns a 400
         """
 
         channel = self.make_request(
@@ -306,16 +293,12 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def test_from_is_negative(self) -> None:
         """
-        Testing that a negative from parameter returns a HTTPStatus.BAD_REQUEST
+        Testing that a negative from parameter returns a 400
         """
 
         channel = self.make_request(
@@ -324,11 +307,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def test_next_token(self) -> None:
@@ -344,7 +323,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
@@ -357,7 +336,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
@@ -370,7 +349,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 19)
         self.assertEqual(channel.json_body["next_token"], 19)
@@ -384,7 +363,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -400,7 +379,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def _create_event_and_report_without_parameters(
         self, room_id: str, user_tok: str
@@ -415,7 +394,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             {},
             access_token=user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def _check_fields(self, content: List[JsonDict]) -> None:
         """Checks that all attributes are present in an event report"""
@@ -466,16 +445,12 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("GET", self.url, b"{}")
 
-        self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -484,11 +459,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.FORBIDDEN,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_default_success(self) -> None:
@@ -502,12 +473,12 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self._check_fields(channel.json_body)
 
     def test_invalid_report_id(self) -> None:
         """
-        Testing that an invalid `report_id` returns a HTTPStatus.BAD_REQUEST.
+        Testing that an invalid `report_id` returns a 400.
         """
 
         # `report_id` is negative
@@ -517,11 +488,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "The report_id parameter must be a string representing a positive integer.",
@@ -535,11 +502,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "The report_id parameter must be a string representing a positive integer.",
@@ -553,11 +516,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "The report_id parameter must be a string representing a positive integer.",
@@ -566,7 +525,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
 
     def test_report_id_not_found(self) -> None:
         """
-        Testing that a not existing `report_id` returns a HTTPStatus.NOT_FOUND.
+        Testing that a not existing `report_id` returns a 404.
         """
 
         channel = self.make_request(
@@ -575,11 +534,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            HTTPStatus.NOT_FOUND,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
         self.assertEqual("Event report not found", channel.json_body["error"])
 
@@ -594,7 +549,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def _check_fields(self, content: JsonDict) -> None:
         """Checks that all attributes are present in a event report"""

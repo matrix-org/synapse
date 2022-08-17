@@ -303,6 +303,7 @@ class RoomRestServlet(RestServlet):
 
         members = await self.store.get_users_in_room(room_id)
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
+        ret["forgotten"] = await self.store.is_locally_forgotten_room(room_id)
 
         return HTTPStatus.OK, ret
 

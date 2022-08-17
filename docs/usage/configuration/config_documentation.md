@@ -759,6 +759,10 @@ allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.
 
+Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to `0`, Synapse may
+still take up to 5 minutes to purge redacted events from the database.
+
 Defaults to `7d`. Set to `null` to disable.
 
 Example configuration:
@@ -845,7 +849,11 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default.
+The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk. There are known bugs with the implementation
+which can cause database corruption. Setting retention to delete older history
+is less risky than deleting newer history but in general caution is advised when enabling this
+experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -1056,26 +1064,26 @@ allow_device_name_lookup_over_federation: true
 ---
 ## Caching ##
 
-Options related to caching
+Options related to caching.
 
 ---
 ### `event_cache_size`
 
 The number of events to cache in memory. Not affected by
-`caches.global_factor`. Defaults to 10K.
+`caches.global_factor` and is not part of the `caches` section. Defaults to 10K.
 
 Example configuration:
 ```yaml
 event_cache_size: 15K
 ```
 ---
-### `cache` and associated values
+### `caches` and associated values
 
 A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.
 
-Caching can be configured through the following sub-options:
+`caches` can be configured through the following sub-options:
 
 * `global_factor`: Controls the global cache factor, which is the default cache factor
   for all caches if a specific factor for that cache is not otherwise
@@ -1137,6 +1145,7 @@ Caching can be configured through the following sub-options:
 
 Example configuration:
 ```yaml
+event_cache_size: 15K
 caches:
   global_factor: 1.0
   per_cache_factors:
@@ -3343,7 +3352,7 @@ user_directory:
 For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
-`listeners`, in particular `template_dir` and `version`. # TODO: link `listeners`
+[`listeners`](#listeners), in particular `template_dir` and `version`.
 
 * `template_dir`: gives the location of the templates for the HTML forms.
   This directory should contain one subdirectory per language (eg, `en`, `fr`),
@@ -3355,7 +3364,7 @@ Parts of this section are required if enabling the `consent` resource under
    parameter.
 
 * `server_notice_content`: if enabled, will send a user a "Server Notice"
-   asking them to consent to the privacy policy. The `server_notices` section ##TODO: link
+   asking them to consent to the privacy policy. The [`server_notices` section](#server_notices)
    must also be configured for this to work. Notices will *not* be sent to
    guest users unless `send_server_notice_to_guests` is set to true.
 
