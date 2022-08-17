@@ -28,12 +28,36 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import start_active_span
+from synapse.metrics import Histogram
 from synapse.util import Clock
 
 if typing.TYPE_CHECKING:
     from contextlib import _GeneratorContextManager
 
 logger = logging.getLogger(__name__)
+
+
+queue_wait_timer = Histogram(
+    "synapse_rate_limit_queue_wait_time_seconds",
+    "sec",
+    [],
+    buckets=(
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        2.5,
+        5.0,
+        10.0,
+        20.0,
+        "+Inf",
+    ),
+)
 
 
 class FederationRateLimiter:
@@ -178,10 +202,16 @@ class _PerHostRatelimiter:
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)
             wait_span_scope.__exit__(None, None, None)
+            wait_timer_cm.__exit__(None, None, None)
             return r
 
+        # Tracing
         wait_span_scope = start_active_span("ratelimit wait")
         wait_span_scope.__enter__()
+        # Metrics
+        wait_timer_cm = queue_wait_timer.time()
+        wait_timer_cm.__enter__()
+
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
         return make_deferred_yieldable(ret_defer)
