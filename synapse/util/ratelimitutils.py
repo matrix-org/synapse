@@ -30,7 +30,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import start_active_span
-from synapse.metrics import Histogram
+from synapse.metrics import Histogram, LaterGauge
 from synapse.util import Clock
 
 if typing.TYPE_CHECKING:
@@ -73,6 +73,27 @@ class FederationRateLimiter:
         self.ratelimiters: DefaultDict[
             str, "_PerHostRatelimiter"
         ] = collections.defaultdict(new_limiter)
+
+        # We track the number of affected hosts per time-period so we can
+        # differentiate one really noisy homeserver from a general
+        # ratelimit tuning problem across the federation.
+        LaterGauge(
+            "synapse_rate_limit_sleep_affected_hosts",
+            "Number of hosts that had requests put to sleep",
+            [],
+            lambda: sum(
+                ratelimiter.should_sleep() for ratelimiter in self.ratelimiters.values()
+            ),
+        )
+        LaterGauge(
+            "synapse_rate_limit_reject_affected_hosts",
+            "Number of hosts that had requests rejected",
+            [],
+            lambda: sum(
+                ratelimiter.should_reject()
+                for ratelimiter in self.ratelimiters.values()
+            ),
+        )
 
     def ratelimit(self, host: str) -> "_GeneratorContextManager[defer.Deferred[None]]":
         """Used to ratelimit an incoming request from a given host
@@ -139,6 +160,21 @@ class _PerHostRatelimiter:
         finally:
             self._on_exit(request_id)
 
+    def should_reject(self) -> bool:
+        """
+        Whether to reject the request if we already have too many queued up
+        (either sleeping or in the ready queue).
+        """
+        queue_size = len(self.ready_request_queue) + len(self.sleeping_requests)
+        return queue_size > self.reject_limit
+
+    def should_sleep(self) -> bool:
+        """
+        Whether to sleep the request if we already have too many requests coming
+        through within the window.
+        """
+        return len(self.request_times) > self.sleep_limit
+
     async def _on_enter_with_tracing(self, request_id: object) -> None:
         with start_active_span("ratelimit wait"), queue_wait_timer.time():
             await self._on_enter(request_id)
@@ -153,8 +189,7 @@ class _PerHostRatelimiter:
 
         # reject the request if we already have too many queued up (either
         # sleeping or in the ready queue).
-        queue_size = len(self.ready_request_queue) + len(self.sleeping_requests)
-        if queue_size > self.reject_limit:
+        if self.should_reject():
             logger.debug("Ratelimiter(%s): rejecting request", self.host)
             rate_limit_reject_counter.inc()
             raise LimitExceededError(
@@ -184,7 +219,7 @@ class _PerHostRatelimiter:
             len(self.request_times),
         )
 
-        if len(self.request_times) > self.sleep_limit:
+        if self.should_sleep():
             logger.debug(
                 "Ratelimiter(%s) [%s]: sleeping request for %f sec",
                 self.host,
