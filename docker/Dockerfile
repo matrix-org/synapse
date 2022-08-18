@@ -104,6 +104,7 @@ RUN \
     rustc \
     zlib1g-dev \
     git \
+    rustc cargo \
     && rm -rf /var/lib/apt/lists/*
 
 # To speed up rebuilds, install all of the dependencies before we copy over
