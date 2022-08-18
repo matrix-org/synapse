@@ -222,20 +222,29 @@ class _PerHostRatelimiter:
             # Ensure that we've properly cleaned up.
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)
-            wait_span_scope.__exit__(None, None, None)
-            wait_timer_cm.__exit__(None, None, None)
             return r
+
+        ret_defer.addCallbacks(on_start, on_err)
+        ret_defer.addBoth(on_both)
 
         # Tracing
         wait_span_scope = start_active_span("ratelimit wait")
         wait_span_scope.__enter__()
+
         # Metrics
         wait_timer_cm = queue_wait_timer.time()
         wait_timer_cm.__enter__()
 
-        ret_defer.addCallbacks(on_start, on_err)
-        ret_defer.addBoth(on_both)
-        return make_deferred_yieldable(ret_defer)
+        # The current logcontext is now one created by `wait_span_scope`.
+        # We must only `__exit__` it once it has been restored by `make_deferred_yieldable`.
+        def on_after_logcontext_restored(r: object) -> object:
+            wait_timer_cm.__exit__(None, None, None)
+            wait_span_scope.__exit__(None, None, None)
+            return r
+
+        d = make_deferred_yieldable(ret_defer)
+        d.addBoth(on_after_logcontext_restored)
+        return d
 
     def _on_exit(self, request_id: object) -> None:
         logger.debug("Ratelimit(%s) [%s]: Processed req", self.host, id(request_id))
