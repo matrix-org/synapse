@@ -32,7 +32,6 @@ import attr
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
-from synapse.logging.opentracing import trace
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
@@ -397,7 +396,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached()
-    @trace
     async def get_number_joined_users_in_room(self, room_id: str) -> int:
         return await self.db_pool.simple_select_one_onecol(
             table="current_state_events",
