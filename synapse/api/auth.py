@@ -210,7 +210,7 @@ class Auth:
             ):
                 # XXX(quenting): I'm 95% confident that we could skip setting the
                 # device_id to "dummy-device" for appservices, and that the only impact
-                # would be that some rows which whould not deduplicate in the 'user_ips'
+                # would be some rows which whould not deduplicate in the 'user_ips'
                 # table during the transition
                 recorded_device_id = (
                     "dummy-device"
