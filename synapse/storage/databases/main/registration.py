@@ -181,6 +181,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "user_type",
                 "deactivated",
                 "shadow_banned",
+                "approved",
             ],
             allow_none=True,
             desc="get_user_by_id",
@@ -1778,6 +1779,26 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return res if res else False
 
+    @cached()
+    async def is_user_approved(self, user_id: str) -> bool:
+        """Checks if a user is approved and therefore can be allowed to log in.
+
+        Args:
+            user_id: the user to check the approval status of.
+
+        Returns:
+            A boolean that is True if the user is approved, False otherwise.
+        """
+        ret = await self.db_pool.simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="approved",
+            allow_none=True,
+            desc="is_user_pending_approval",
+        )
+
+        return bool(ret)
+
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
     def __init__(
@@ -1815,6 +1836,10 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             table="user_external_ids",
             columns=["user_id"],
             unique=False,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            "users_set_approved_flag", self._background_update_set_approved_flag
         )
 
     async def _background_update_set_deactivated_flag(
@@ -1915,6 +1940,75 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
+    async def _background_update_set_approved_flag(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Set the 'approved' flag for all already existing users. We want to set it to
+        true systematically because we don't want to suddenly prevent already existing
+        users from logging in if the option to block registration on approval is turned
+        on.
+        """
+        last_user = progress.get("user_id", "")
+
+        def _background_update_set_approved_flag_txn(txn: LoggingTransaction) -> int:
+            txn.execute(
+                """
+                SELECT name
+                FROM users
+                WHERE
+                    approved IS NULL
+                    AND name > ?
+                ORDER BY name ASC
+                LIMIT ?
+                """,
+                (last_user, batch_size),
+            )
+            rows = self.db_pool.cursor_to_dict(txn)
+
+            if len(rows) == 0:
+                return 0
+
+            for user in rows:
+                self.update_user_approval_status_txn(txn, user["name"], True)
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "users_set_approved_flag", {"user_id": rows[-1]["name"]}
+            )
+
+            return len(rows)
+
+        nb_processed = await self.db_pool.runInteraction(
+            "users_set_approved_flag", _background_update_set_approved_flag_txn
+        )
+
+        if nb_processed < batch_size:
+            await self.db_pool.updates._end_background_update("users_set_approved_flag")
+
+        return nb_processed
+
+    def update_user_approval_status_txn(
+        self, txn: LoggingTransaction, user_id: str, approved: bool
+    ) -> None:
+        """Set the user's 'approved' flag to the given value.
+
+        The boolean is turned into an int because the column is a smallint.
+
+        Args:
+            txn: the current database transaction.
+            user_id: the user to update the flag for.
+            approved: the value to set the flag to.
+        """
+        self.db_pool.simple_update_one_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            updatevalues={"approved": int(approved)},
+        )
+
+        # Invalidate the caches of methods that read the value of the 'approved' flag.
+        self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+        self._invalidate_cache_and_stream(txn, self.is_user_approved, (user_id,))
+
 
 class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
     def __init__(
@@ -1931,6 +2025,13 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
+
+        # If support for MSC3866 is enabled and configured to require approval for new
+        # account, we will create new users with an 'approved' flag set to false.
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        )
 
     async def add_access_token_to_user(
         self,
@@ -2064,6 +2165,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         admin: bool = False,
         user_type: Optional[str] = None,
         shadow_banned: bool = False,
+        approved: bool = False,
     ) -> None:
         """Attempts to register an account.
 
@@ -2082,6 +2184,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 or None for a normal user.
             shadow_banned: Whether the user is shadow-banned, i.e. they may be
                 told their requests succeeded but we ignore them.
+            approved: Whether to consider the user has already been approved by an
+                administrator.
 
         Raises:
             StoreError if the user_id could not be registered.
@@ -2098,6 +2202,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             admin,
             user_type,
             shadow_banned,
+            approved,
         )
 
     def _register_user(
@@ -2112,10 +2217,13 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         admin: bool,
         user_type: Optional[str],
         shadow_banned: bool,
+        approved: bool,
     ) -> None:
         user_id_obj = UserID.from_string(user_id)
 
         now = int(self._clock.time())
+
+        pending_approval = self._require_approval and not approved
 
         try:
             if was_guest:
@@ -2142,6 +2250,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
+                        "approved": 0 if pending_approval else 1,
                     },
                 )
             else:
@@ -2157,6 +2266,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
+                        "approved": 0 if pending_approval else 1,
                     },
                 )
 
@@ -2497,6 +2607,25 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         await self.db_pool.runInteraction(
             "start_or_continue_validation_session",
             start_or_continue_validation_session_txn,
+        )
+
+    async def update_user_approval_status(
+        self, user_id: UserID, approved: bool
+    ) -> None:
+        """Set the user's 'approved' flag to the given value.
+
+        The boolean will be turned into an int (in update_user_approval_status_txn)
+        because the column is a smallint.
+
+        Args:
+            user_id: the user to update the flag for.
+            approved: the value to set the flag to.
+        """
+        await self.db_pool.runInteraction(
+            "update_user_approval_status",
+            self.update_user_approval_status_txn,
+            user_id.to_string(),
+            approved,
         )
 
 
