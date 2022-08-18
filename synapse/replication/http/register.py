@@ -51,6 +51,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         user_type: Optional[str],
         address: Optional[str],
         shadow_banned: bool,
+        approved: bool,
     ) -> JsonDict:
         """
         Args:
@@ -68,6 +69,8 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
                 or None for a normal user.
             address: the IP address used to perform the regitration.
             shadow_banned: Whether to shadow-ban the user
+            approved: Whether the user should be considered already approved by an
+                administrator.
         """
         return {
             "password_hash": password_hash,
@@ -79,6 +82,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "user_type": user_type,
             "address": address,
             "shadow_banned": shadow_banned,
+            "approved": approved,
         }
 
     async def _handle_request(  # type: ignore[override]
@@ -99,6 +103,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type=content["user_type"],
             address=content["address"],
             shadow_banned=content["shadow_banned"],
+            approved=content["approved"],
         )
 
         return 200, {}

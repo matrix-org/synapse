@@ -578,6 +578,16 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         _search_test(None, "foo", "user_id")
         _search_test(None, "bar", "user_id")
 
+    @override_config(
+        {
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            }
+        }
+    )
     def test_invalid_parameter(self) -> None:
         """
         If parameters are invalid, an error is returned.
@@ -617,6 +627,16 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             self.url + "?deactivated=not_bool",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+
+        # invalid approved
+        channel = self.make_request(
+            "GET",
+            self.url + "?approved=not_bool",
             access_token=self.admin_user_tok,
         )
 
@@ -840,6 +860,69 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self._order_test([self.admin_user, user1, user2], "creation_ts")
         self._order_test([self.admin_user, user1, user2], "creation_ts", "f")
         self._order_test([user2, user1, self.admin_user], "creation_ts", "b")
+
+    @override_config(
+        {
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            }
+        }
+    )
+    def test_filter_out_approved(self) -> None:
+        """Tests that the endpoint can filter out approved users."""
+        # Create our users.
+        self._create_users(2)
+
+        # Get the list of users.
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+
+        # Exclude the admin, because we don't want to accidentally un-approve the admin.
+        non_admin_user_ids = [
+            user["name"]
+            for user in channel.json_body["users"]
+            if user["name"] != self.admin_user
+        ]
+
+        self.assertEqual(2, len(non_admin_user_ids), non_admin_user_ids)
+
+        # Select a user and un-approve them. We do this rather than the other way around
+        # because, since these users are created by an admin, we consider them already
+        # approved.
+        not_approved_user = non_admin_user_ids[0]
+
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{not_approved_user}",
+            {"approved": False},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+
+        # Now get the list of users again, this time filtering out approved users.
+        channel = self.make_request(
+            "GET",
+            self.url + "?approved=false",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+
+        non_admin_user_ids = [
+            user["name"]
+            for user in channel.json_body["users"]
+            if user["name"] != self.admin_user
+        ]
+
+        # We should only have our unapproved user now.
+        self.assertEqual(1, len(non_admin_user_ids), non_admin_user_ids)
+        self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
     def _order_test(
         self,
@@ -2535,6 +2618,98 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure they're still alive
         self.assertEqual(0, channel.json_body["deactivated"])
+
+    @override_config(
+        {
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            }
+        }
+    )
+    def test_approve_account(self) -> None:
+        """Tests that approving an account correctly sets the approved flag for the user."""
+        url = self.url_prefix % "@bob:test"
+
+        # Create user
+        channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content={"password": "abc123"},
+        )
+
+        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["approved"])
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(0, channel.json_body["approved"])
+
+        # Approve user
+        channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content={"approved": True},
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(1, channel.json_body["approved"])
+
+        # Check that the user is now approved
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(1, channel.json_body["approved"])
+
+    @override_config(
+        {
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            }
+        }
+    )
+    def test_register_approved(self) -> None:
+        url = self.url_prefix % "@bob:test"
+
+        # Create user
+        channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content={"password": "abc123", "approved": True},
+        )
+
+        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual(1, channel.json_body["approved"])
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual(1, channel.json_body["approved"])
 
     def _is_erased(self, user_id: str, expect: bool) -> None:
         """Assert that the user is erased or not"""
