@@ -154,6 +154,8 @@ class _PerHostRatelimiter:
         self.host = host
 
         request_id = object()
+        # Ideally we'd use `Deferred.fromCoroutine()` here, to save on redundant
+        # type-checking, but we'd need Twisted >= 21.2.
         ret = defer.ensureDeferred(self._on_enter_with_tracing(request_id))
         try:
             yield ret
