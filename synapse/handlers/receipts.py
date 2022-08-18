@@ -91,13 +91,22 @@ class ReceiptsHandler:
                         )
                         continue
 
+                    # Check if these receipts apply to a thread.
+                    thread_id = None
+                    data = user_values.get("data", {})
+                    if isinstance(data, dict):
+                        thread_id = data.get("thread_id")
+                        # If the thread ID is invalid, conider it missing.
+                        if not thread_id or not isinstance(thread_id, str):
+                            thread_id = None
+
                     receipts.append(
                         ReadReceipt(
                             room_id=room_id,
                             receipt_type=receipt_type,
                             user_id=user_id,
                             event_ids=user_values["event_ids"],
-                            thread_id=None,  # TODO
+                            thread_id=thread_id,
                             data=user_values.get("data", {}),
                         )
                     )
