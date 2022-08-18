@@ -1,4 +1,4 @@
-# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2018-2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -902,6 +902,96 @@ class UsersListTestCase(unittest.HomeserverTestCase):
                 admin=False,
                 displayname="Name %d" % i,
             )
+
+
+class UserDevicesTestCase(unittest.HomeserverTestCase):
+    """
+    Tests user device management-related Admin APIs.
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
+        # Set up an Admin user to query the Admin API with.
+        self.admin_user_id = self.register_user("admin", "pass", admin=True)
+        self.admin_user_token = self.login("admin", "pass")
+
+        # Set up a test user to query the devices of.
+        self.other_user_device_id = "TESTDEVICEID"
+        self.other_user_device_display_name = "My Test Device"
+        self.other_user_client_ip = "1.2.3.4"
+        self.other_user_user_agent = "EquestriaTechnology/123.0"
+
+        self.other_user_id = self.register_user("user", "pass", displayname="User1")
+        self.other_user_token = self.login(
+            "user",
+            "pass",
+            device_id=self.other_user_device_id,
+            additional_request_fields={
+                "initial_device_display_name": self.other_user_device_display_name,
+            },
+        )
+
+        # Have ther "other user" make a request so that the "last_seen_*" fields are
+        # populated in the tests below.
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+            client_ip=self.other_user_client_ip,
+            custom_headers=[
+                ("User-Agent", self.other_user_user_agent),
+            ],
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+    def test_list_user_devices(self) -> None:
+        """
+        Tests that a user's devices and attributes are listed correctly via the Admin API.
+        """
+        # Request all devices of "other user"
+        channel = self.make_request(
+            "GET",
+            f"/_synapse/admin/v2/users/{self.other_user_id}/devices",
+            access_token=self.admin_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # Double-check we got the single device expected
+        user_devices = channel.json_body["devices"]
+        self.assertEqual(len(user_devices), 1)
+        self.assertEqual(channel.json_body["total"], 1)
+
+        # Check that all the attributes of the device reported are as expected.
+        self._validate_attributes_of_device_response(user_devices[0])
+
+        # Request just a single device for "other user" by its ID
+        channel = self.make_request(
+            "GET",
+            f"/_synapse/admin/v2/users/{self.other_user_id}/devices/"
+            f"{self.other_user_device_id}",
+            access_token=self.admin_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # Check that all the attributes of the device reported are as expected.
+        self._validate_attributes_of_device_response(channel.json_body)
+
+    def _validate_attributes_of_device_response(self, response: JsonDict) -> None:
+        # Check that all device expected attributes are present
+        self.assertEqual(response["user_id"], self.other_user_id)
+        self.assertEqual(response["device_id"], self.other_user_device_id)
+        self.assertEqual(response["display_name"], self.other_user_device_display_name)
+        self.assertEqual(response["last_seen_ip"], self.other_user_client_ip)
+        self.assertEqual(response["last_seen_user_agent"], self.other_user_user_agent)
+        self.assertTrue(isinstance(response["last_seen_ts"], int))
+        self.assertGreater(response["last_seen_ts"], 0)
 
 
 class DeactivateAccountTestCase(unittest.HomeserverTestCase):
