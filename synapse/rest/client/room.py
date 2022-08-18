@@ -631,9 +631,10 @@ class RoomMessageListRestServlet(RestServlet):
         processing_start_time = self.clock.time_msec()
         # Fire off and hope that we get a result by the end.
         #
-        # We're using the mypy type ignore comment because the `@cached` decorator on
-        # `get_number_joined_users_in_room` doesn't play well with the type system. Maybe in the
-        # future, it can use some ParamSpec wizardry to fix it up.
+        # We're using the mypy type ignore comment because the `@cached`
+        # decorator on `get_number_joined_users_in_room` doesn't play well with
+        # the type system. Maybe in the future, it can use some ParamSpec
+        # wizardry to fix it up.
         room_member_count_deferred = run_in_background(  # type: ignore[call-arg]
             self.store.get_number_joined_users_in_room,
             room_id,  # type: ignore[arg-type]
