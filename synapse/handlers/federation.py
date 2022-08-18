@@ -494,6 +494,10 @@ class FederationHandler:
             return False
 
         processing_end_time = self.clock.time_msec()
+        logger.info(
+            "backfill_processing_before_timer asfd=%s",
+            (processing_start_time - processing_end_time) / 1000,
+        )
         backfill_processing_before_timer.observe(
             (processing_start_time - processing_end_time) / 1000
         )

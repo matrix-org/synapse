@@ -263,11 +263,8 @@ class _PerHostRatelimiter:
             # Ensure that we've properly cleaned up.
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)
-            wait_span_cm.__exit__(None, None, None)
             return r
 
-        wait_span_cm = start_active_span("ratelimit wait")
-        wait_span_cm.__enter__()
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
         return make_deferred_yieldable(ret_defer)

@@ -910,7 +910,9 @@ def trace_with_opname(
 def trace(func: Callable[P, R]) -> Callable[P, R]:
     """
     Decorator to trace a function.
+
     Sets the operation name to that of the function's name.
+
     See the module's doc string for usage examples.
     """
     return trace_with_opname(func.__name__)(func)
