@@ -154,7 +154,9 @@ class _PerHostRatelimiter:
         self.host = host
 
         request_id = object()
-        ret = self._on_enter(request_id)
+        # Ideally we'd use `Deferred.fromCoroutine()` here, to save on redundant
+        # type-checking, but we'd need Twisted >= 21.2.
+        ret = defer.ensureDeferred(self._on_enter_with_tracing(request_id))
         try:
             yield ret
         finally:
@@ -174,6 +176,10 @@ class _PerHostRatelimiter:
         through within the window.
         """
         return len(self.request_times) > self.sleep_limit
+
+    async def _on_enter_with_tracing(self, request_id: object) -> None:
+        with start_active_span("ratelimit wait"), queue_wait_timer.time():
+            await self._on_enter(request_id)
 
     def _on_enter(self, request_id: object) -> "defer.Deferred[None]":
         time_now = self.clock.time_msec()
@@ -257,16 +263,7 @@ class _PerHostRatelimiter:
             # Ensure that we've properly cleaned up.
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)
-            wait_span_scope.__exit__(None, None, None)
-            wait_timer_cm.__exit__(None, None, None)
             return r
-
-        # Tracing
-        wait_span_scope = start_active_span("ratelimit wait")
-        wait_span_scope.__enter__()
-        # Metrics
-        wait_timer_cm = queue_wait_timer.time()
-        wait_timer_cm.__enter__()
 
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
