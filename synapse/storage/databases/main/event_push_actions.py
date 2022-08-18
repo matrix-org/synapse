@@ -241,6 +241,15 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             replaces_index="event_push_summary_unique_index",
         )
 
+        self.db_pool.updates.register_background_index_update(
+            "event_push_summary_unique_index_null",
+            index_name="event_push_summary_unique_index_null",
+            table="event_push_summary",
+            columns=["user_id", "room_id", "thread_id IS NULL"],
+            where_clause="thread_id IS NULL",
+            unique=True,
+        )
+
     @cached(tree=True, max_entries=5000, iterable=True)
     async def get_unread_event_push_actions_by_room_for_user(
         self,
@@ -433,7 +442,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         user_id: str,
         stream_ordering: int,
         max_stream_ordering: Optional[int] = None,
-    ) -> List[Tuple[int, int, str]]:
+    ) -> List[Tuple[int, int, Optional[str]]]:
         """Returns the notify and unread counts from `event_push_actions` for
         the given user/room in the given range.
 
@@ -449,7 +458,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 If this is not given, then no maximum is applied.
 
         Return:
-            A tuple of the notif count and unread count in the given range.
+            A tuple of the notif count and unread count in the given range for
+            each thread. A thread ID of None corresponds to the main timeline.
         """
 
         # If there have been no events in the room since the stream ordering,
@@ -482,7 +492,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         """
 
         txn.execute(sql, args)
-        return cast(List[Tuple[int, int, str]], txn.fetchall())
+        return cast(List[Tuple[int, int, Optional[str]]], txn.fetchall())
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering: int, max_stream_ordering: int
@@ -830,7 +840,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 notif,  # notif column
                 is_highlight,  # highlight column
                 int(count_as_unread),  # unread column
-                thread_id or "",  # thread_id column
+                thread_id,  # thread_id column
             )
 
         def _add_push_actions_to_staging_txn(txn: LoggingTransaction) -> None:
@@ -1236,7 +1246,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         # Calculate the new counts that should be upserted into event_push_summary
         sql = """
-            SELECT user_id, room_id, thread_id,
+            SELECT upd.user_id, upd.room_id, upd.thread_id,
                 coalesce(old.%s, 0) + upd.cnt,
                 upd.stream_ordering
             FROM (
@@ -1252,7 +1262,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     AND %s = 1
                 GROUP BY user_id, room_id, thread_id
             ) AS upd
-            LEFT JOIN event_push_summary AS old USING (user_id, room_id, thread_id)
+            LEFT JOIN event_push_summary AS old ON (
+                upd.user_id = old.user_id
+                AND upd.room_id = old.room_id
+                AND (
+                    upd.thread_id = old.thread_id
+                    OR (
+                        upd.thread_id IS NULL AND old.thread_id IS NULL
+                    )
+                )
+            )
         """
 
         # First get the count of unread messages.
@@ -1266,7 +1285,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # object because we might not have the same amount of rows in each of them. To do
         # this, we use a dict indexed on the user ID and room ID to make it easier to
         # populate.
-        summaries: Dict[Tuple[str, str, str], _EventPushSummary] = {}
+        summaries: Dict[Tuple[str, str, Optional[str]], _EventPushSummary] = {}
         for row in txn:
             summaries[(row[0], row[1], row[2])] = _EventPushSummary(
                 unread_count=row[3],

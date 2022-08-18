@@ -13,15 +13,14 @@
  * limitations under the License.
  */
 
-ALTER TABLE event_push_actions_staging
-  ADD COLUMN thread_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE event_push_actions_staging ADD COLUMN thread_id TEXT;
 
-ALTER TABLE event_push_actions
-  ADD COLUMN thread_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE event_push_actions ADD COLUMN thread_id TEXT;
 
-ALTER TABLE event_push_summary
-  ADD COLUMN thread_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE event_push_summary ADD COLUMN thread_id TEXT;
 
--- Update the unique index for `event_push_summary`
+-- Update the unique index for `event_push_summary`.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (7003, 'event_push_summary_unique_index2', '{}');
+INSERT INTO background_updates (ordering, update_name, depends_on, progress_json) VALUES
+  (7003, 'event_push_summary_unique_index_null', 'event_push_summary_unique_index2', '{}');
