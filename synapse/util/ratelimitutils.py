@@ -133,20 +133,17 @@ class _PerHostRatelimiter:
         self.host = host
 
         request_id = object()
-        ret = self._on_enter(request_id)
-        ret = defer.ensureDeferred(self._trace_wait(ret))
+        ret = defer.ensureDeferred(self._on_enter_with_tracing(request_id))
         try:
             yield ret
         finally:
             self._on_exit(request_id)
 
+    async def _on_enter_with_tracing(self, request_id: object) -> None:
+        with start_active_span("ratelimit wait"), queue_wait_timer.time():
+            await self._on_enter(request_id)
+
     def _on_enter(self, request_id: object) -> "defer.Deferred[None]":
-        """
-        Returns:
-            A `Deferred` that resolves once the request is allowed by the rate limiter.
-            The returned `Deferred` does not follow the Synapse logging context rules
-            and must be wrapped with `make_deferred_yieldable` before awaiting it.
-        """
         time_now = self.clock.time_msec()
 
         # remove any entries from request_times which aren't within the window
@@ -233,17 +230,7 @@ class _PerHostRatelimiter:
 
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
-        return ret_defer
-
-    async def _trace_wait(self, d: "defer.Deferred[None]") -> None:
-        """Waits for a given `Deferred` to resolve, while timing it for metrics.
-
-        Args:
-            d: The `Deferred` to wait for. Must not follow the Synapse logging context
-                rules.
-        """
-        with start_active_span("ratelimit wait"), queue_wait_timer.time():
-            await make_deferred_yieldable(d)
+        return make_deferred_yieldable(ret_defer)
 
     def _on_exit(self, request_id: object) -> None:
         logger.debug("Ratelimit(%s) [%s]: Processed req", self.host, id(request_id))
