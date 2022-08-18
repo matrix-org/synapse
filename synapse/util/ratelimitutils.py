@@ -242,9 +242,8 @@ class _PerHostRatelimiter:
             d: The `Deferred` to wait for. Must not follow the Synapse logging context
                 rules.
         """
-        with start_active_span("ratelimit wait"):
-            with queue_wait_timer.time():
-                await make_deferred_yieldable(d)
+        with start_active_span("ratelimit wait"), queue_wait_timer.time():
+            await make_deferred_yieldable(d)
 
     def _on_exit(self, request_id: object) -> None:
         logger.debug("Ratelimit(%s) [%s]: Processed req", self.host, id(request_id))
