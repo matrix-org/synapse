@@ -28,12 +28,12 @@ FROM ${distro} as builder
 
 RUN apt-get update -qq -o Acquire::Languages=none
 RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
-        -yqq --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        devscripts \
-        equivs \
-        wget
+    -yqq --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    devscripts \
+    equivs \
+    wget
 
 # fetch and unpack the package
 RUN mkdir /dh-virtualenv
@@ -70,20 +70,21 @@ ENV LANG C.UTF-8
 # TODO: it would be nice to do that automatically.
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
-        -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-        build-essential \
-        debhelper \
-        devscripts \
-        libsystemd-dev \
-        lsb-release \
-        pkg-config \
-        python3-dev \
-        python3-pip \
-        python3-setuptools \
-        python3-venv \
-        sqlite3 \
-        libpq-dev \
-        xmlsec1
+    -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
+    build-essential \
+    debhelper \
+    devscripts \
+    libsystemd-dev \
+    lsb-release \
+    pkg-config \
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-venv \
+    sqlite3 \
+    libpq-dev \
+    xmlsec1 \
+    rustc cargo
 
 COPY --from=builder /dh-virtualenv_1.2.2-1_all.deb /
 
