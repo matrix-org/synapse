@@ -433,6 +433,11 @@ class RegisterRestServlet(RestServlet):
             hs.config.registration.inhibit_user_in_use_error
         )
 
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        )
+
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
         )
@@ -755,6 +760,13 @@ class RegisterRestServlet(RestServlet):
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
             )
+
+            if self._require_approval:
+                raise SynapseError(
+                    code=403,
+                    errcode=Codes.USER_AWAITING_APPROVAL,
+                    msg="This account needs to be approved by an administrator before it can be used.",
+                )
 
         return 200, return_dict
 
