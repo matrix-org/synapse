@@ -631,6 +631,9 @@ class RoomMessageListRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         processing_start_time = self.clock.time_msec()
         # Fire and forget and hope that we get a result by the end.
+        #
+        # `get_number_joined_users_in_room(...)` returns an int so we can type
+        # this as a `Deferred[int]` instead of an optional.
         room_member_count_deferred: defer.Deferred[int] = run_as_background_process(
             "get_number_joined_users_in_room",
             self.store.get_number_joined_users_in_room,
