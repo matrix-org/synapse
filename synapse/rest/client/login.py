@@ -92,6 +92,12 @@ class LoginRestServlet(RestServlet):
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
+        # Whether we need to check if the user has been approved or not.
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        )
+
         self.auth = hs.get_auth()
 
         self.clock = hs.get_clock()
@@ -219,6 +225,15 @@ class LoginRestServlet(RestServlet):
                 )
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(result["user_id"])
+            if not approved:
+                raise SynapseError(
+                    code=403,
+                    errcode=Codes.USER_AWAITING_APPROVAL,
+                    msg="This account is pending approval by a server administrator.",
+                )
 
         well_known_data = self._well_known_builder.get_well_known()
         if well_known_data:

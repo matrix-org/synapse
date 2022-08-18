@@ -1010,6 +1010,17 @@ class AuthHandler:
             return res[0]
         return None
 
+    async def is_user_approved(self, user_id: str) -> bool:
+        """Checks if a user is approved and therefore can be allowed to log in.
+
+        Args:
+            user_id: the user to check the approval status of.
+
+        Returns:
+            A boolean that is True if the user is approved, False otherwise.
+        """
+        return await self.store.is_user_approved(user_id)
+
     async def _find_user_id_and_pwd_hash(
         self, user_id: str
     ) -> Optional[Tuple[str, str]]:
