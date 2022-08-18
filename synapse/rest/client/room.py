@@ -22,7 +22,6 @@ from urllib import parse as urlparse
 
 from prometheus_client.core import Histogram
 
-from twisted.internet import defer
 from twisted.web.server import Request
 
 from synapse import event_auth
@@ -50,8 +49,8 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
@@ -68,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 class _RoomSize(Enum):
     """
-    Enum to differentiate sizes of rooms. This is a pretty good aproximation
+    Enum to differentiate sizes of rooms. This is a pretty good approximation
     about how hard it will be to get events in the room. We could also look at
     room "complexity".
     """
@@ -630,12 +629,8 @@ class RoomMessageListRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         processing_start_time = self.clock.time_msec()
-        # Fire and forget and hope that we get a result by the end.
-        #
-        # `get_number_joined_users_in_room(...)` returns an int so we can type
-        # this as a `Deferred[int]` instead of an optional.
-        room_member_count_deferred: defer.Deferred[int] = run_as_background_process(
-            "get_number_joined_users_in_room",
+        # Fire off and hope that we get a result by the end.
+        room_member_count_deferred = run_in_background(
             self.store.get_number_joined_users_in_room,
             room_id,
         )
@@ -671,7 +666,7 @@ class RoomMessageListRestServlet(RestServlet):
         )
 
         processing_end_time = self.clock.time_msec()
-        room_member_count = await room_member_count_deferred
+        room_member_count = await make_deferred_yieldable(room_member_count_deferred)
         messsages_response_timer.labels(
             room_size=_RoomSize.from_member_count(room_member_count)
         ).observe((processing_start_time - processing_end_time) / 1000)
