@@ -16,7 +16,6 @@ def _check_for_status(result):
     # Similar to raise_for_status, but prints the error.
     if 400 <= result.status_code:
         error_msg = result.json()
-        result.raise_for_status()
         print(error_msg)
         exit(0)
 
@@ -177,9 +176,9 @@ def main():
     # User 1 sends another read receipt.
     print("@test reads thread")
     result = requests.post(
-        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[-4]}/{root_message_id}",
+        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[-4]}",
         headers=USER_1_HEADERS,
-        json={},
+        json={"thread_id": root_message_id},
     )
     _check_for_status(result)
 

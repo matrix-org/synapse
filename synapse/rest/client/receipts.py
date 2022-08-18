@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import ReceiptTypes
-from synapse.api.errors import SynapseError, UnrecognizedRequestError
+from synapse.api.errors import SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -34,8 +34,7 @@ class ReceiptRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)"
         "/receipt/(?P<receipt_type>[^/]*)"
-        "/(?P<event_id>[^/]*)"
-        "(/(?P<thread_id>[^/]*))?$"
+        "/(?P<event_id>[^/]*)$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -56,12 +55,7 @@ class ReceiptRestServlet(RestServlet):
         self._msc3771_enabled = hs.config.experimental.msc3771_enabled
 
     async def on_POST(
-        self,
-        request: SynapseRequest,
-        room_id: str,
-        receipt_type: str,
-        event_id: str,
-        thread_id: Optional[str],
+        self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -71,10 +65,17 @@ class ReceiptRestServlet(RestServlet):
                 f"Receipt type must be {', '.join(self._known_receipt_types)}",
             )
 
-        if thread_id and not self._msc3771_enabled:
-            raise UnrecognizedRequestError()
+        body = parse_json_object_from_request(request)
 
-        parse_json_object_from_request(request, allow_empty_body=False)
+        # Pull the thread ID, if one exists.
+        thread_id = None
+        if self._msc3771_enabled:
+            if "thread_id" in body:
+                thread_id = body.get("thread_id")
+                if not thread_id or not isinstance(thread_id, str):
+                    raise SynapseError(
+                        400, "thread_id field must be a non-empty string"
+                    )
 
         await self.presence_handler.bump_presence_active_time(requester.user)
 
