@@ -18,11 +18,13 @@ from typing import TYPE_CHECKING, Tuple
 
 from synapse.api import errors
 from synapse.api.errors import NotFoundError
-from synapse.http.server import HttpServer
+from synapse.http.server import HttpServer, cancellable
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_integer,
     parse_json_object_from_request,
+    parse_string,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
@@ -194,6 +196,8 @@ class DeviceRestServlet(RestServlet):
 class DehydratedDeviceServlet(RestServlet):
     """Retrieve or store a dehydrated device.
 
+    Implements both MSC2697 and MSC3814.
+
     GET /org.matrix.msc2697.v2/dehydrated_device
 
     HTTP/1.1 200 OK
@@ -226,13 +230,18 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
-
-    def __init__(self, hs: "HomeServer"):
+    def __init__(self, hs: "HomeServer", msc2697: bool = True):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
+
+        self.PATTERNS = client_patterns(
+            "/org.matrix.msc2697.v2/dehydrated_device"
+            if msc2697
+            else "/org.matrix.msc3814.v1/dehydrated_device$",
+            releases=(),
+        )
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -327,10 +336,44 @@ class ClaimDehydratedDeviceServlet(RestServlet):
         return 200, result
 
 
+class DehydratedDeviceEventsServlet(RestServlet):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3814.v1/dehydrated_device/(?P<device_id>[^/]*)/events$",
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.message_handler = hs.get_device_message_handler()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
+
+    @cancellable
+    async def on_GET(
+        self, request: SynapseRequest, device_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+
+        from_tok = parse_string(request, "from")
+        limit = parse_integer(request, "limit", 100)
+
+        msgs = await self.message_handler.get_events_for_dehydrated_device(
+            requester=requester,
+            device_id=device_id,
+            since_token=from_tok,
+            limit=limit,
+        )
+
+        return 200, msgs
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)
     if hs.config.experimental.msc2697_enabled:
-        DehydratedDeviceServlet(hs).register(http_server)
+        DehydratedDeviceServlet(hs, msc2697=True).register(http_server)
         ClaimDehydratedDeviceServlet(hs).register(http_server)
+    if hs.config.experimental.msc3814_enabled:
+        DehydratedDeviceServlet(hs, msc2697=False).register(http_server)
+        DehydratedDeviceEventsServlet(hs).register(http_server)
