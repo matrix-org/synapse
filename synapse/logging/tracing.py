@@ -283,14 +283,15 @@ class SynapseTags:
     # Used to tag function arguments
     #
     # Tag a named arg. The name of the argument should be appended to this
-    # prefix
+    # prefix.
     FUNC_ARG_PREFIX = "ARG."
     # Tag extra variadic number of positional arguments (`def foo(first, second, *extras)`)
     FUNC_ARGS = "args"
     # Tag keyword args
     FUNC_KWARGS = "kwargs"
 
-    # Some intermediate result that's interesting to the function
+    # Some intermediate result that's interesting to the function. The label for
+    # the result should be appended to this prefix.
     RESULT_PREFIX = "RESULT."
 
 
@@ -936,9 +937,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         #   first argument only if it's named `self` or `cls`. This isn't fool-proof
         #   but handles the idiomatic cases.
         for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
-            set_attribute("ARG_" + argspec.args[i], str(arg))
-        set_attribute("args", str(args[len(argspec.args) :]))  # type: ignore[index]
-        set_attribute("kwargs", str(kwargs))
+            set_attribute(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i], str(arg))
+        set_attribute(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))  # type: ignore[index]
+        set_attribute(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
     return _custom_sync_async_decorator(func, _wrapping_logic)

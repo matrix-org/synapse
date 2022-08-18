@@ -29,7 +29,7 @@ from typing import (
     Tuple,
 )
 
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -96,6 +96,26 @@ logger = logging.getLogger(__name__)
 soft_failed_event_counter = Counter(
     "synapse_federation_soft_failed_events_total",
     "Events received over federation that we marked as soft_failed",
+)
+
+# Added to debug performance and track progress on optimizations
+backfill_processing_after_timer = Histogram(
+    "synapse_federation_backfill_processing_after_time_seconds",
+    "sec",
+    [],
+    buckets=(
+        1.0,
+        5.0,
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        60.0,
+        80.0,
+        120.0,
+        180.0,
+        "+Inf",
+    ),
 )
 
 
@@ -604,20 +624,21 @@ class FederationEventHandler:
         if not events:
             return
 
-        # if there are any events in the wrong room, the remote server is buggy and
-        # should not be trusted.
-        for ev in events:
-            if ev.room_id != room_id:
-                raise InvalidResponseError(
-                    f"Remote server {dest} returned event {ev.event_id} which is in "
-                    f"room {ev.room_id}, when we were backfilling in {room_id}"
-                )
+        with backfill_processing_after_timer.time():
+            # if there are any events in the wrong room, the remote server is buggy and
+            # should not be trusted.
+            for ev in events:
+                if ev.room_id != room_id:
+                    raise InvalidResponseError(
+                        f"Remote server {dest} returned event {ev.event_id} which is in "
+                        f"room {ev.room_id}, when we were backfilling in {room_id}"
+                    )
 
-        await self._process_pulled_events(
-            dest,
-            events,
-            backfilled=True,
-        )
+            await self._process_pulled_events(
+                dest,
+                events,
+                backfilled=True,
+            )
 
     @trace
     async def _get_missing_events_for_pdu(
@@ -722,7 +743,7 @@ class FederationEventHandler:
 
     @trace
     async def _process_pulled_events(
-        self, origin: str, events: List[EventBase], backfilled: bool
+        self, origin: str, events: Collection[EventBase], backfilled: bool
     ) -> None:
         """Process a batch of events we have pulled from a remote server
 
@@ -738,8 +759,12 @@ class FederationEventHandler:
                 notification to clients, and validation of device keys.)
         """
         set_attribute(
-            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events)})",
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
             str([event.event_id for event in events]),
+        )
+        set_attribute(
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids.length",
+            str(len(events)),
         )
         set_attribute(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
         logger.debug(
@@ -1049,14 +1074,20 @@ class FederationEventHandler:
         missing_event_ids = missing_desired_event_ids | missing_auth_event_ids
 
         set_attribute(
-            SynapseTags.RESULT_PREFIX
-            + f"missing_auth_event_ids ({len(missing_auth_event_ids)})",
+            SynapseTags.RESULT_PREFIX + "missing_auth_event_ids",
             str(missing_auth_event_ids),
         )
         set_attribute(
-            SynapseTags.RESULT_PREFIX
-            + f"missing_desired_event_ids ({len(missing_desired_event_ids)})",
+            SynapseTags.RESULT_PREFIX + "missing_auth_event_ids.length",
+            str(len(missing_auth_event_ids)),
+        )
+        set_attribute(
+            SynapseTags.RESULT_PREFIX + "missing_desired_event_ids",
             str(missing_desired_event_ids),
+        )
+        set_attribute(
+            SynapseTags.RESULT_PREFIX + "missing_desired_event_ids.length",
+            str(len(missing_desired_event_ids)),
         )
 
         # Making an individual request for each of 1000s of events has a lot of
@@ -1130,6 +1161,14 @@ class FederationEventHandler:
                 "Failed to fetch missing state events for %s %s",
                 event_id,
                 failed_to_fetch,
+            )
+            set_attribute(
+                SynapseTags.RESULT_PREFIX + "failed_to_fetch",
+                str(failed_to_fetch),
+            )
+            set_attribute(
+                SynapseTags.RESULT_PREFIX + "failed_to_fetch.length",
+                str(len(failed_to_fetch)),
             )
 
         set_attribute(
@@ -1518,8 +1557,12 @@ class FederationEventHandler:
 
         event_ids = event_map.keys()
         set_attribute(
-            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(event_ids)})",
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
             str(event_ids),
+        )
+        set_attribute(
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids.length",
+            str(len(event_ids)),
         )
 
         # filter out any events we have already seen. This might happen because
@@ -1678,9 +1721,12 @@ class FederationEventHandler:
             origin, event
         )
         set_attribute(
-            SynapseTags.RESULT_PREFIX
-            + f"claimed_auth_events ({len(claimed_auth_events)})",
+            SynapseTags.RESULT_PREFIX + "claimed_auth_events",
             str([ev.event_id for ev in claimed_auth_events]),
+        )
+        set_attribute(
+            SynapseTags.RESULT_PREFIX + "claimed_auth_events.length",
+            str(len(claimed_auth_events)),
         )
 
         # ... and check that the event passes auth at those auth events.
@@ -2128,8 +2174,12 @@ class FederationEventHandler:
             if not backfilled:  # Never notify for backfilled events
                 with start_active_span("notify_persisted_events"):
                     set_attribute(
-                        SynapseTags.RESULT_PREFIX + f"event_ids ({len(events)})",
+                        SynapseTags.RESULT_PREFIX + "event_ids",
                         str([ev.event_id for ev in events]),
+                    )
+                    set_attribute(
+                        SynapseTags.RESULT_PREFIX + "event_ids.length",
+                        str(len(events)),
                     )
                     for event in events:
                         await self._notify_persisted_event(event, max_stream_token)
