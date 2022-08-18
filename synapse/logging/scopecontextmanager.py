@@ -156,7 +156,7 @@ class _LogContextScope(Scope):
     def close(self) -> None:
         active_scope = self.manager.active
         if active_scope is not self:
-            logger.error(
+            logger.warning(
                 "Closing scope %s which is not the currently-active one %s",
                 self,
                 active_scope,
