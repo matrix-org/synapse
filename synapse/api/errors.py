@@ -100,6 +100,8 @@ class Codes(str, Enum):
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
 
+    USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
