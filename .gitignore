@@ -62,7 +62,7 @@ book/
 /master.tar.gz
 
 # rust
-/rust/target/
+/target/
 /synapse/*.so
 
 # Poetry will create a setup.py, which we don't want to include.
