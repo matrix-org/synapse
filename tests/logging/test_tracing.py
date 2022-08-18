@@ -16,7 +16,7 @@ from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.tracing import start_active_span, trace_with_opname, tag_args
+from synapse.logging.tracing import start_active_span, tag_args, trace_with_opname
 from synapse.util import Clock
 
 from tests.unittest import TestCase

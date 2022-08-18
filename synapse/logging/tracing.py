@@ -280,6 +280,19 @@ class SynapseTags:
     # The name of the external cache
     CACHE_NAME = "cache.name"
 
+    # Used to tag function arguments
+    #
+    # Tag a named arg. The name of the argument should be appended to this prefix.
+    FUNC_ARG_PREFIX = "ARG."
+    # Tag extra variadic number of positional arguments (`def foo(first, second, *extras)`)
+    FUNC_ARGS = "args"
+    # Tag keyword args
+    FUNC_KWARGS = "kwargs"
+
+    # Some intermediate result that's interesting to the function. The label for
+    # the result should be appended to this prefix.
+    RESULT_PREFIX = "RESULT."
+
 
 class SynapseBaggage:
     FORCE_TRACING = "synapse-force-tracing"
@@ -796,7 +809,6 @@ def _custom_sync_async_decorator(
     """
     Decorates a function that is sync or async (coroutines), or that returns a Twisted
     `Deferred`. The custom business logic of the decorator goes in `wrapping_logic`.
-
     Example usage:
     ```py
     # Decorator to time the function and log it out
@@ -812,7 +824,6 @@ def _custom_sync_async_decorator(
                 logger.info("%s took %s seconds", func.__name__, duration)
         return _custom_sync_async_decorator(func, _wrapping_logic)
     ```
-
     Args:
         func: The function to be decorated
         wrapping_logic: The business logic of your custom decorator.
@@ -928,9 +939,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         #   first argument only if it's named `self` or `cls`. This isn't fool-proof
         #   but handles the idiomatic cases.
         for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
-            set_attribute("ARG_" + argspec.args[i], str(arg))
-        set_attribute("args", str(args[len(argspec.args) :]))  # type: ignore[index]
-        set_attribute("kwargs", str(kwargs))
+            set_attribute(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i], str(arg))
+        set_attribute(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))  # type: ignore[index]
+        set_attribute(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
     return _custom_sync_async_decorator(func, _wrapping_logic)
