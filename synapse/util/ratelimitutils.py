@@ -140,8 +140,11 @@ class _PerHostRatelimiter:
             self._on_exit(request_id)
 
     async def _on_enter_with_tracing(self, request_id: object) -> None:
+        # We may raise a `LimitExceededError`, in which case we avoid tracing.
+        d = self._on_enter(request_id)
+
         with start_active_span("ratelimit wait"), queue_wait_timer.time():
-            await self._on_enter(request_id)
+            await d
 
     def _on_enter(self, request_id: object) -> "defer.Deferred[None]":
         time_now = self.clock.time_msec()
