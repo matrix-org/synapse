@@ -15,7 +15,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 permissions:
   contents: write
 
@@ -91,7 +91,34 @@ jobs:
 
   build-sdist:
     name: "Build pypi distribution files"
-    uses: "matrix-org/backend-meta/.github/workflows/packaging.yml@v1"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+
+      - name: Install tools
+        run: python -m pip install build twine
+
+      - name: Build wheel and sdist
+        run: poetry build
+
+      # This checks that the "long description" fields renders correctly on PyPI.
+      # We don't upload to PyPI, but the two steps below only upload artifacts to GitHub.
+      - name: Run twine check
+        run: python -m twine check dist/*
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Wheel
+          path: dist/*.whl
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Sdist
+          path: dist/*.tar.gz
+
 
   # if it's a tag, create a release and attach the artifacts to it
   attach-assets:
