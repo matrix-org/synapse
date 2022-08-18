@@ -51,6 +51,7 @@ from synapse.http.servlet import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
@@ -630,11 +631,10 @@ class RoomMessageListRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         processing_start_time = self.clock.time_msec()
         # Fire and forget and hope that we get a result by the end.
-        #
-        # Ideally we'd use `Deferred.fromCoroutine()` here, to save on redundant
-        # type-checking, but we'd need Twisted >= 21.2.
-        room_member_count_deferred = defer.ensureDeferred(
-            self.store.get_number_joined_users_in_room(room_id)
+        room_member_count_deferred: defer.Deferred[int] = run_as_background_process(
+            "get_number_joined_users_in_room",
+            self.store.get_number_joined_users_in_room,
+            room_id,
         )
 
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
