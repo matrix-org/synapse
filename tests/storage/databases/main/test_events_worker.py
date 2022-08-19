@@ -94,6 +94,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             )
             self.event_ids.append(event_id)
 
+    # TODO: Remove me before mergin
     def test_benchmark(self):
         import time
 
@@ -130,17 +131,30 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
         )
 
         with LoggingContext(name="test") as ctx:
-            benchmark_start_time = time.time()
-            remaining_event_ids = self.get_success(
-                self.store.have_seen_events(room_id, event_ids)
-            )
-            benchmark_end_time = time.time()
-            logger.info("afewewf %s %s", benchmark_start_time, benchmark_end_time)
-            logger.info(
-                "Benchmark time: %s",
-                (benchmark_end_time - benchmark_start_time),
-            )
-            # self.assertEqual(remaining_event_ids, set())
+
+            def time_have_seen_events(test_index: int, event_ids):
+                benchmark_start_time = time.time()
+                remaining_event_ids = self.get_success(
+                    self.store.have_seen_events(room_id, event_ids)
+                )
+                benchmark_end_time = time.time()
+                logger.info(
+                    "Benchmark time%s: %s",
+                    test_index,
+                    (benchmark_end_time - benchmark_start_time),
+                )
+                self.assertIsNotNone(remaining_event_ids)
+
+            event_ids_odd = event_ids[::2]
+            event_ids_even = event_ids[1::2]
+
+            time_have_seen_events(1, event_ids)
+            time_have_seen_events(2, event_ids)
+            time_have_seen_events(3, event_ids)
+            time_have_seen_events(4, event_ids_odd)
+            time_have_seen_events(5, event_ids_odd)
+            time_have_seen_events(6, event_ids_even)
+            time_have_seen_events(7, event_ids_even)
 
             # that should result in a many db queries
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)

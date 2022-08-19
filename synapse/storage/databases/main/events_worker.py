@@ -1480,7 +1480,7 @@ class EventsWorkerStore(SQLBaseStore):
         # the batches as big as possible.
 
         remaining_event_ids: Set[str] = set()
-        for chunk in batch_iter(event_ids, 500):
+        for chunk in batch_iter(event_ids, 1000):
             remaining_event_ids_from_chunk = await self._have_seen_events_dict(chunk)
             remaining_event_ids.update(remaining_event_ids_from_chunk)
 
@@ -1495,8 +1495,8 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         # if the event cache contains the event, obviously we've seen it.
-        event_entry_map = self._get_events_from_local_cache(event_ids)
-        event_ids_in_cache = event_entry_map.keys()
+        event_cache_entry_map = self._get_events_from_local_cache(event_ids)
+        event_ids_in_cache = event_cache_entry_map.keys()
         remaining_event_ids = {
             event_id for event_id in event_ids if event_id not in event_ids_in_cache
         }
