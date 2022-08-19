@@ -30,7 +30,6 @@ from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
-from tests.utils import USE_POSTGRES_FOR_TESTS
 
 
 class ModuleApiTestCase(HomeserverTestCase):
@@ -738,11 +737,6 @@ class ModuleApiTestCase(HomeserverTestCase):
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
 
-    # Testing stream ID replication from the main to worker processes requires postgres
-    # (due to needing `MultiWriterIdGenerator`).
-    if not USE_POSTGRES_FOR_TESTS:
-        skip = "Requires Postgres"
-
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -752,7 +746,6 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
 
     def default_config(self):
         conf = super().default_config()
-        conf["redis"] = {"enabled": "true"}
         conf["stream_writers"] = {"presence": ["presence_writer"]}
         conf["instance_map"] = {
             "presence_writer": {"host": "testserv", "port": 1001},
