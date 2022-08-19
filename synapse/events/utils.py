@@ -161,7 +161,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
     elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_BATCH:
         add_fields(EventContentFields.MSC2716_BATCH_ID)
     elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
-        add_fields(EventContentFields.MSC2716_MARKER_INSERTION)
+        add_fields(EventContentFields.MSC2716_INSERTION_EVENT_REFERENCE)
 
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 
