@@ -847,21 +847,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         assert state_group is not None
         with Measure(self._clock, "get_joined_users_from_state"):
-            return await self._get_joined_users_from_context(
-                room_id,
-                state_group,
-                state,
-            )
+            return await self._get_joined_users_from_context(state_group, state)
 
     async def _get_joined_users_from_context(
         self,
-        room_id: str,
         state_group: Union[object, int],
         current_state_ids: StateMap[str],
     ) -> Dict[str, ProfileInfo]:
         """
-        For a given (room_id, state_group), get a map of user ID to profile information
-        for user in the room.
+        For a given state_group, get a map of user ID to profile information for users in the room.
 
         This method doesn't do any fetching of data itself and instead checks various
         caches for the relevant data before passing any remaining missing event IDs to
