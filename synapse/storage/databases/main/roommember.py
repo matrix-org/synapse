@@ -852,7 +852,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 room_id, state_group, state, context=state_entry
             )
 
-    @cached(num_args=2, iterable=True, max_entries=100000)
     async def _get_joined_users_from_context(
         self,
         room_id: str,
@@ -861,6 +860,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         event: Optional[EventBase] = None,
         context: Optional["_StateCacheEntry"] = None,
     ) -> Dict[str, ProfileInfo]:
+        """
+        For a given (room_id, state_group), get a map of user ID to profile information
+        for user in the room.
+
+        This method doesn't do any fetching of data itself and instead checks various
+        caches for the relevant data before passing any remaining missing event IDs to
+        `_get_joined_profiles_from_event_ids` which does the actual data fetching.
+        """
+
         # We don't use `state_group`, it's there so that we can cache based
         # on it. However, it's important that it's never None, since two current_states
         # with a state_group of None are likely to be different.
