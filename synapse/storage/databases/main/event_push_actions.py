@@ -461,13 +461,22 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         txn.execute(
             sql, [user_id, room_id, rotated_upto_stream_ordering] + thread_id_args
         )
-        for notif_count, unread_count, thread_id in txn.fetchall():
+        for notif_count, unread_count, thread_id in txn:
             if not thread_id:
                 counts.notify_count += notif_count
                 counts.unread_count += unread_count
-            else:
+            elif thread_id in thread_counts:
                 thread_counts[thread_id].notify_count += notif_count
                 thread_counts[thread_id].unread_count += unread_count
+            else:
+                # Previous thread summaries of 0 are discarded above.
+                #
+                # TODO If empty summaries are deleted this can be removed.
+                thread_counts[thread_id] = NotifCounts(
+                    notify_count=notif_count,
+                    unread_count=unread_count,
+                    highlight_count=0,
+                )
 
         # For threads that do not have an up-to-date summary we need to count from
         # the latest receipt (or join) for that thread.
@@ -501,7 +510,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             + [user_id, room_id, join_stream_ordering]  # type: ignore[list-item]
             + thread_id_args,
         )
-        for notif_count, unread_count, thread_id in txn.fetchall():
+        for notif_count, unread_count, thread_id in txn:
             if not thread_id:
                 counts.notify_count += notif_count
                 counts.unread_count += unread_count
