@@ -91,6 +91,16 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             )
             self.event_ids.append(event_id)
 
+    # def test_benchmark(self):
+    #     with LoggingContext(name="test") as ctx:
+    #         res = self.get_success(
+    #             self.store.have_seen_events("room1", [self.event_ids[0], "event19"])
+    #         )
+    #         self.assertEqual(res, {self.event_ids[0]})
+
+    #         # that should result in a single db query
+    #         self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
+
     def test_simple(self):
         with LoggingContext(name="test") as ctx:
             res = self.get_success(
