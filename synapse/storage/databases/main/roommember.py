@@ -958,10 +958,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             desc="_get_user_ids_from_membership_event_ids",
         )
 
-        return {
-            row["event_id"]: row["user_id"]
-            for row in rows
-        }
+        return {row["event_id"]: row["user_id"] for row in rows}
 
     @cached(max_entries=10000)
     async def is_host_joined(self, room_id: str, host: str) -> bool:
