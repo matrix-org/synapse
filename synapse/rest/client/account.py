@@ -196,7 +196,7 @@ class PasswordRestServlet(RestServlet):
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
-                    body.dict(),
+                    body.dict(exclude_unset=True),
                     "modify your account password",
                 )
             except InteractiveAuthIncompleteError as e:
