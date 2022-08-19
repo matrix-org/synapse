@@ -1,13 +1,8 @@
 # Setting up Synapse with Workers and Systemd
 
-This is a setup for managing synapse with systemd, including support for
-managing workers. It provides a `matrix-synapse` service for the master, as
-well as a `matrix-synapse-worker@` service template for any workers you
-require. Additionally, to group the required services, it sets up a
-`matrix-synapse.target`.
-
-See the folder [system](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/)
-for the systemd unit files.
+The necessary service files are included in the Debian packaging, see
+[debian](https://github.com/matrix-org/synapse/tree/develop/debian/) for the
+systemd unit files.
 
 The folder [workers](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/)
 contains an example configuration for the `generic_worker` worker.
@@ -33,18 +28,11 @@ There is no need for a separate configuration file for the master process.
 ## Set up
 
 1. Adjust synapse configuration files as above.
-1. Copy the `*.service` and `*.target` files in [system](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/)
-to `/etc/systemd/system`.
-1. Run `systemctl daemon-reload` to tell systemd to load the new unit files.
-1. Run `systemctl enable matrix-synapse.service`. This will configure the
-synapse master process to be started as part of the `matrix-synapse.target`
-target.
 1. For each worker process to be enabled, run `systemctl enable
 matrix-synapse-worker@<worker_name>.service`. For each `<worker_name>`, there
 should be a corresponding configuration file.
 `/etc/matrix-synapse/workers/<worker_name>.yaml`.
 1. Start all the synapse processes with `systemctl start matrix-synapse.target`.
-1. Tell systemd to start synapse on boot with `systemctl enable matrix-synapse.target`.
 
 ## Usage
 

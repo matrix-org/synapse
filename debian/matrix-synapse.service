@@ -1,8 +1,13 @@
 [Unit]
 Description=Synapse Matrix homeserver
 
+# This service should be restarted when the synapse target is restarted.
+PartOf=matrix-synapse.target
+ReloadPropagatedFrom=matrix-synapse.target
+
 [Service]
 Type=notify
+NotifyAccess=main
 User=matrix-synapse
 WorkingDirectory=/var/lib/matrix-synapse
 EnvironmentFile=-/etc/default/matrix-synapse
@@ -14,4 +19,4 @@ RestartSec=3
 SyslogIdentifier=matrix-synapse
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=matrix-synapse.target
