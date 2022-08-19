@@ -6,6 +6,7 @@
 CONFIGFILE_SERVERNAME="/etc/matrix-synapse/conf.d/server_name.yaml"
 CONFIGFILE_REPORTSTATS="/etc/matrix-synapse/conf.d/report_stats.yaml"
 USER="matrix-synapse"
+GROUP="matrix-synapse"
 
 case "$1" in
   configure|reconfigure)
@@ -40,12 +41,12 @@ EOF
     /opt/venvs/matrix-synapse/lib/manage_debconf.pl update
 
     if ! getent passwd $USER >/dev/null; then
-      adduser --quiet --system --no-create-home --home /var/lib/matrix-synapse $USER
+      adduser --quiet --system --group --no-create-home --home /var/lib/matrix-synapse $USER
     fi
 
     for DIR in /var/lib/matrix-synapse /var/log/matrix-synapse /etc/matrix-synapse; do
       if ! dpkg-statoverride --list --quiet $DIR >/dev/null; then
-        dpkg-statoverride --force --quiet --update --add $USER nogroup 0755 $DIR
+        dpkg-statoverride --force --quiet --update --add $USER $GROUP 0755 $DIR
       fi
     done
 
