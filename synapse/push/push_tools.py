@@ -26,15 +26,15 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
     badge = len(invites)
 
     for room_id in joins:
-        notifs, thread_notifs = await (
+        notifs = await (
             store.get_unread_event_push_actions_by_room_for_user(
                 room_id,
                 user_id,
             )
         )
         # Combine the counts from all the threads.
-        notify_count = notifs.notify_count + sum(
-            n.notify_count for n in thread_notifs.values()
+        notify_count = notifs.main_timeline.notify_count + sum(
+            n.notify_count for n in notifs.threads.values()
         )
 
         if notify_count == 0:

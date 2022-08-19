@@ -73,7 +73,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _assert_counts(
             noitf_count: int, unread_count: int, highlight_count: int
         ) -> None:
-            counts, thread_counts = self.get_success(
+            counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
                     self.store._get_unread_counts_by_receipt_txn,
@@ -82,14 +82,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
             self.assertEqual(
-                counts,
+                counts.main_timeline,
                 NotifCounts(
                     notify_count=noitf_count,
                     unread_count=unread_count,
                     highlight_count=highlight_count,
                 ),
             )
-            self.assertEqual(thread_counts, {})
+            self.assertEqual(counts.threads, {})
 
         def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
@@ -210,7 +210,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             thread_unread_count: int,
             thread_highlight_count: int,
         ) -> None:
-            counts, thread_counts = self.get_success(
+            counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
                     self.store._get_unread_counts_by_receipt_txn,
@@ -219,7 +219,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
             self.assertEqual(
-                counts,
+                counts.main_timeline,
                 NotifCounts(
                     notify_count=noitf_count,
                     unread_count=unread_count,
@@ -228,7 +228,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
             if thread_notif_count or thread_unread_count or thread_highlight_count:
                 self.assertEqual(
-                    thread_counts,
+                    counts.threads,
                     {
                         thread_id: NotifCounts(
                             notify_count=thread_notif_count,
@@ -238,7 +238,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     },
                 )
             else:
-                self.assertEqual(thread_counts, {})
+                self.assertEqual(counts.threads, {})
 
         def _create_event(
             highlight: bool = False, thread_id: Optional[str] = None

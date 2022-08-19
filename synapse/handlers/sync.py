@@ -37,7 +37,7 @@ from synapse.handlers.relations import BundledAggregations
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
-from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.storage.databases.main.event_push_actions import RoomNotifCounts
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -1091,7 +1091,7 @@ class SyncHandler:
 
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
-    ) -> Tuple[NotifCounts, Dict[str, NotifCounts]]:
+    ) -> RoomNotifCounts:
         with Measure(self.clock, "unread_notifs_for_room_id"):
 
             return await self.store.get_unread_event_push_actions_by_room_for_user(
@@ -2159,14 +2159,12 @@ class SyncHandler:
                 )
 
                 if room_sync or always_include:
-                    notifs, thread_notifs = await self.unread_notifs_for_room_id(
-                        room_id, sync_config
-                    )
+                    notifs = await self.unread_notifs_for_room_id(room_id, sync_config)
 
                     # Notifications for the main timeline.
-                    notify_count = notifs.notify_count
-                    highlight_count = notifs.highlight_count
-                    unread_count = notifs.unread_count
+                    notify_count = notifs.main_timeline.notify_count
+                    highlight_count = notifs.main_timeline.highlight_count
+                    unread_count = notifs.main_timeline.unread_count
 
                     # Check the sync configuration.
                     if (
@@ -2176,19 +2174,19 @@ class SyncHandler:
                         # And add info for each thread.
                         room_sync.unread_thread_notifications = {
                             thread_id: {
-                                "notification_count": tnotifs.notify_count,
-                                "highlight_count": tnotifs.highlight_count,
+                                "notification_count": thread_notifs.notify_count,
+                                "highlight_count": thread_notifs.highlight_count,
                             }
-                            for thread_id, tnotifs in thread_notifs.items()
+                            for thread_id, thread_notifs in notifs.threads.items()
                             if thread_id is not None
                         }
 
                     else:
                         # Combine the unread counts for all threads and main timeline.
-                        for tnotifs in thread_notifs.values():
-                            notify_count += tnotifs.notify_count
-                            highlight_count += tnotifs.highlight_count
-                            unread_count += tnotifs.unread_count
+                        for thread_notifs in notifs.threads.values():
+                            notify_count += thread_notifs.notify_count
+                            highlight_count += thread_notifs.highlight_count
+                            unread_count += thread_notifs.unread_count
 
                     unread_notifications["notification_count"] = notify_count
                     unread_notifications["highlight_count"] = highlight_count

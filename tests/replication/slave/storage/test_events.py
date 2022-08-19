@@ -22,7 +22,10 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.storage.databases.main.event_push_actions import (
+    NotifCounts,
+    RoomNotifCounts,
+)
 from synapse.storage.roommember import GetRoomsForUserWithStreamOrdering, RoomsForUser
 from synapse.types import PersistedEventPosition
 
@@ -178,7 +181,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2],
-            (NotifCounts(highlight_count=0, unread_count=0, notify_count=0), {}),
+            RoomNotifCounts(
+                NotifCounts(highlight_count=0, unread_count=0, notify_count=0), {}
+            ),
         )
 
         self.persist(
@@ -191,7 +196,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2],
-            (NotifCounts(highlight_count=0, unread_count=0, notify_count=1), {}),
+            RoomNotifCounts(
+                NotifCounts(highlight_count=0, unread_count=0, notify_count=1), {}
+            ),
         )
 
         self.persist(
@@ -206,7 +213,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2],
-            (NotifCounts(highlight_count=1, unread_count=0, notify_count=2), {}),
+            RoomNotifCounts(
+                NotifCounts(highlight_count=1, unread_count=0, notify_count=2), {}
+            ),
         )
 
     def test_get_rooms_for_user_with_stream_ordering(self):
