@@ -171,7 +171,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
     def test_invalid_avatar_url(self) -> None:
         """If avatar url in homeserver.yaml is invalid and
         "check avatar size and mime type" is set, an error is returned.
-        TODO: validate when reading config"""
+        TODO: Should be checked when reading the configuration."""
         channel = self.make_request(
             "POST",
             self.url,
@@ -195,7 +195,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             "max_avatar_size": "10M",
         }
     )
-    def test_displayname_is_set_avatar_ist_none(self) -> None:
+    def test_displayname_is_set_avatar_is_none(self) -> None:
         """
         Tests that sending a server notices is successfully,
         if a display_name is set, avatar_url is `None` and
