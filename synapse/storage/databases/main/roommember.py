@@ -848,7 +848,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         assert state_group is not None
         with Measure(self._clock, "get_joined_users_from_state"):
             return await self._get_joined_users_from_context(
-                room_id, state_group, state,
+                room_id,
+                state_group,
+                state,
             )
 
     async def _get_joined_users_from_context(
