@@ -322,3 +322,18 @@ class DeactivateAccountTestCase(HomeserverTestCase):
                 )
             ),
         )
+
+    def test_deactivate_account_needs_auth(self) -> None:
+        """
+        Tests that making a request to /deactivate with an empty body
+        succeeds in starting the user-interactive auth flow.
+        """
+        req = self.make_request(
+            "POST",
+            "account/deactivate",
+            {},
+            access_token=self.token,
+        )
+
+        self.assertEqual(req.code, 401, req)
+        self.assertEqual(req.json_body["flows"], [{"stages": ["m.login.password"]}])

@@ -53,10 +53,22 @@ jobs:
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
+  lint-pydantic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          extras: "all"
+      - run: poetry run scripts-dev/check_pydantic_models.py
+
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig, check-schema-delta]
+    needs: [lint, lint-crlf, lint-newsfile, lint-pydantic, check-sampleconfig, check-schema-delta]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
