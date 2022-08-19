@@ -938,7 +938,7 @@ class UserDevicesTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        # Have ther "other user" make a request so that the "last_seen_*" fields are
+        # Have the "other user" make a request so that the "last_seen_*" fields are
         # populated in the tests below.
         channel = self.make_request(
             "GET",
