@@ -6,14 +6,15 @@
 # assume we only have one package
 PACKAGE_NAME:=`dh_listpackages`
 
-override_dh_systemd_enable:
-	dh_systemd_enable --name=matrix-synapse
-
-override_dh_installinit:
-	dh_installinit --name=matrix-synapse
+override_dh_installsystemd:
+	dh_installsystemd --name=matrix-synapse
 
 # we don't really want to strip the symbols from our object files.
 override_dh_strip:
+
+# we also don't need to optimise the size of the debug information, this also
+# avoids a crash
+override_dh_dwz:
 
 # dh_shlibdeps calls dpkg-shlibdeps, which finds all the binary files
 # (executables and shared libs) in the package, and looks for the shared
