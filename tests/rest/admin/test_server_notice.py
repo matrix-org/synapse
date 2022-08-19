@@ -213,8 +213,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # user has one invite
-        invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
-        room_id = invited_rooms[0].room_id
+        self._check_invite_and_join_status(self.other_user, 1, 0)
 
     def test_server_notice_disabled(self) -> None:
         """Tests that server returns error if server notice is disabled"""
