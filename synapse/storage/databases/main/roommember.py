@@ -31,7 +31,6 @@ from typing import (
 import attr
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.events import EventBase
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
@@ -857,7 +856,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         room_id: str,
         state_group: Union[object, int],
         current_state_ids: StateMap[str],
-        event: Optional[EventBase] = None,
     ) -> Dict[str, ProfileInfo]:
         """
         For a given (room_id, state_group), get a map of user ID to profile information
@@ -907,14 +905,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 missing_member_event_ids
             )
             users_in_room.update(row for row in event_to_memberships.values() if row)
-
-        if event is not None and event.type == EventTypes.Member:
-            if event.membership == Membership.JOIN:
-                if event.event_id in member_event_ids:
-                    users_in_room[event.state_key] = ProfileInfo(
-                        display_name=event.content.get("displayname", None),
-                        avatar_url=event.content.get("avatar_url", None),
-                    )
 
         return users_in_room
 
