@@ -1455,7 +1455,7 @@ class EventsWorkerStore(SQLBaseStore):
     @trace
     @tag_args
     async def have_seen_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> Set[str]:
         """Given a list of event ids, check if we have already processed them.
 
@@ -1480,14 +1480,14 @@ class EventsWorkerStore(SQLBaseStore):
         # the batches as big as possible.
 
         remaining_event_ids: Set[str] = set()
-        for chunk in batch_iter(event_ids, 1000):
+        for chunk in batch_iter(event_ids, 500):
             remaining_event_ids_from_chunk = await self._have_seen_events_dict(chunk)
             remaining_event_ids.update(remaining_event_ids_from_chunk)
 
         return remaining_event_ids
 
-    @cachedList(cached_method_name="have_seen_event", list_name="event_ids")
-    async def _have_seen_events_dict(self, event_ids: Iterable[str]) -> Set[str]:
+    # @cachedList(cached_method_name="have_seen_event", list_name="event_ids")
+    async def _have_seen_events_dict(self, event_ids: Collection[str]) -> set[str]:
         """Helper for have_seen_events
 
         Returns:
@@ -1501,10 +1501,10 @@ class EventsWorkerStore(SQLBaseStore):
             event_id for event_id in event_ids if event_id not in event_ids_in_cache
         }
         if not remaining_event_ids:
-            return []
+            return set()
 
         def have_seen_events_txn(txn: LoggingTransaction) -> None:
-            global remaining_event_ids
+            nonlocal remaining_event_ids
             # we deliberately do *not* query the database for room_id, to make the
             # query an index-only lookup on `events_event_id_key`.
             #

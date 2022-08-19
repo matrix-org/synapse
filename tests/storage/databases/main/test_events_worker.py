@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import json
 from contextlib import contextmanager
 from typing import Generator, List, Tuple
@@ -35,6 +36,8 @@ from synapse.util import Clock
 from synapse.util.async_helpers import yieldable_gather_results
 
 from tests import unittest
+
+logger = logging.getLogger(__name__)
 
 
 class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
@@ -91,15 +94,56 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             )
             self.event_ids.append(event_id)
 
-    # def test_benchmark(self):
-    #     with LoggingContext(name="test") as ctx:
-    #         res = self.get_success(
-    #             self.store.have_seen_events("room1", [self.event_ids[0], "event19"])
-    #         )
-    #         self.assertEqual(res, {self.event_ids[0]})
+    def test_benchmark(self):
+        import time
 
-    #         # that should result in a single db query
-    #         self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
+        room_id = "room123"
+        event_ids = []
+        setup_start_time = time.time()
+        with LoggingContext(name="test-setup") as ctx:
+            for i in range(50000):
+                event_json = {"type": f"test {i}", "room_id": room_id}
+                event = make_event_from_dict(event_json, room_version=RoomVersions.V4)
+                event_id = event.event_id
+
+                event_ids.append(event_id)
+
+                self.get_success(
+                    self.store.db_pool.simple_insert(
+                        "events",
+                        {
+                            "event_id": event_id,
+                            "room_id": room_id,
+                            "topological_ordering": i,
+                            "stream_ordering": 123 + i,
+                            "type": event.type,
+                            "processed": True,
+                            "outlier": False,
+                        },
+                    )
+                )
+
+        setup_end_time = time.time()
+        logger.info(
+            "Setup time: %s",
+            (setup_end_time - setup_start_time),
+        )
+
+        with LoggingContext(name="test") as ctx:
+            benchmark_start_time = time.time()
+            remaining_event_ids = self.get_success(
+                self.store.have_seen_events(room_id, event_ids)
+            )
+            benchmark_end_time = time.time()
+            logger.info("afewewf %s %s", benchmark_start_time, benchmark_end_time)
+            logger.info(
+                "Benchmark time: %s",
+                (benchmark_end_time - benchmark_start_time),
+            )
+            # self.assertEqual(remaining_event_ids, set())
+
+            # that should result in a many db queries
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
     def test_simple(self):
         with LoggingContext(name="test") as ctx:
