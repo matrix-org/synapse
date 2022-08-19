@@ -849,7 +849,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         assert state_group is not None
         with Measure(self._clock, "get_joined_users_from_state"):
             return await self._get_joined_users_from_context(
-                room_id, state_group, state, context=state_entry
+                room_id, state_group, state,
             )
 
     async def _get_joined_users_from_context(
@@ -858,7 +858,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         state_group: Union[object, int],
         current_state_ids: StateMap[str],
         event: Optional[EventBase] = None,
-        context: Optional["_StateCacheEntry"] = None,
     ) -> Dict[str, ProfileInfo]:
         """
         For a given (room_id, state_group), get a map of user ID to profile information
@@ -880,26 +879,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             for key, e_id in current_state_ids.items()
             if key[0] == EventTypes.Member
         ]
-
-        if context is not None:
-            # If we have a context with a delta from a previous state group,
-            # check if we also have the result from the previous group in cache.
-            # If we do then we can reuse that result and simply update it with
-            # any membership changes in `delta_ids`
-            if context.prev_group and context.delta_ids:
-                prev_res = self._get_joined_users_from_context.cache.get_immediate(
-                    (room_id, context.prev_group), None
-                )
-                if prev_res and isinstance(prev_res, dict):
-                    users_in_room = dict(prev_res)
-                    member_event_ids = [
-                        e_id
-                        for key, e_id in context.delta_ids.items()
-                        if key[0] == EventTypes.Member
-                    ]
-                    for etype, state_key in context.delta_ids:
-                        if etype == EventTypes.Member:
-                            users_in_room.pop(state_key, None)
 
         # We check if we have any of the member event ids in the event cache
         # before we ask the DB
