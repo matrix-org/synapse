@@ -174,7 +174,9 @@ oidc_providers:
 
 1. Create a regular web application for Synapse
 2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/client/oidc/callback`
-3. Add a rule to add the `preferred_username` claim.
+3. Add a rule with any name to add the `preferred_username` claim. 
+(check https://auth0.com/docs/customize/rules/create-rules for further informations on how to create rules)
+   
    <details>
     <summary>Code sample</summary>
 
