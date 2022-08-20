@@ -1038,15 +1038,25 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # For PostgreSQL we can use a regex to pull out the domains from the
         # joined users in `current_state_events` via regex.
 
-        # TODO: Trying to remember what to do: group by host, order by depth
         def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
             sql = """
-                SELECT DISTINCT substring(state_key FROM '@[^:]*:(.*)$')
-                FROM current_state_events
+                SELECT
+                    /* Only use the row with the least depth from each domain group */
+                    min(e.depth) as min_depth,
+                    /* Match the domain part of the MXID */
+                    substring(c.state_key FROM '@[^:]*:(.*)$') as domain
+                FROM current_state_events c
+                /* Get the depth of the event from the events table */
+                INNER JOIN events AS e USING (event_id)
                 WHERE
-                    type = 'm.room.member'
-                    AND membership = 'join'
-                    AND room_id = ?
+                    /* Find any join state events in the room */
+                    c.type = 'm.room.member'
+                    AND c.membership = 'join'
+                    AND c.room_id = ?
+                /* Group all state events from the same domain into their own buckets (groups) */
+                GROUP BY domain
+                /* Sorted by lowest depth first */
+                ORDER BY min_depth ASC;
             """
             txn.execute(sql, (room_id,))
             return {d for d, in txn}
