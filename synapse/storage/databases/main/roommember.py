@@ -1039,12 +1039,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # joined users in `current_state_events` via regex.
 
         def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
+            # Returns a list of servers currently joined in the room sorted by
+            # longest in the room first (aka. with the lowest depth).
             sql = """
                 SELECT
-                    /* Only use the row with the least depth from each domain group */
-                    min(e.depth) as min_depth,
                     /* Match the domain part of the MXID */
-                    substring(c.state_key FROM '@[^:]*:(.*)$') as domain
+                    substring(c.state_key FROM '@[^:]*:(.*)$') as server_domain
                 FROM current_state_events c
                 /* Get the depth of the event from the events table */
                 INNER JOIN events AS e USING (event_id)
@@ -1054,9 +1054,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     AND c.membership = 'join'
                     AND c.room_id = ?
                 /* Group all state events from the same domain into their own buckets (groups) */
-                GROUP BY domain
+                GROUP BY server_domain
                 /* Sorted by lowest depth first */
-                ORDER BY min_depth ASC;
+                ORDER BY min(e.depth) ASC;
             """
             txn.execute(sql, (room_id,))
             return {d for d, in txn}
