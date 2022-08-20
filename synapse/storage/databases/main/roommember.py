@@ -1019,7 +1019,17 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(iterable=True, max_entries=10000)
     async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
-        """Get current hosts in room based on current state."""
+        """
+        Get current hosts in room based on current state.
+
+        The heuristic of sorting by servers who have been in the room the
+        longest is good because they're most likely to have anything we ask
+        about.
+
+        Returns:
+            Returns a list of servers sorted by longest in the room first. (aka.
+            sorted by join with the lowest depth first).
+        """
 
         # First we check if we already have `get_users_in_room` in the cache, as
         # we can just calculate result from that
@@ -1040,7 +1050,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
             # Returns a list of servers currently joined in the room sorted by
-            # longest in the room first (aka. with the lowest depth).
+            # longest in the room first (aka. with the lowest depth). The
+            # heuristic of sorting by servers who have been in the room the
+            # longest is good because they're most likely to have anything we
+            # ask about.
             sql = """
                 SELECT
                     /* Match the domain part of the MXID */
