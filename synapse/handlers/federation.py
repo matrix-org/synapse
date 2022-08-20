@@ -406,7 +406,7 @@ class FederationHandler:
             # TODO: Should we try multiple of these at a time?
             for dom in domains:
                 # We don't want to ask our own server for information we don't have
-                if dom != self.server_name:
+                if dom == self.server_name:
                     continue
 
                 try:
