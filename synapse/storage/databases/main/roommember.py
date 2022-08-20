@@ -1038,6 +1038,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # For PostgreSQL we can use a regex to pull out the domains from the
         # joined users in `current_state_events` via regex.
 
+        # TODO: Trying to remember what to do: group by host, order by depth
         def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
             sql = """
                 SELECT DISTINCT substring(state_key FROM '@[^:]*:(.*)$')
