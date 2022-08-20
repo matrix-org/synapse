@@ -1,0 +1,1 @@
+Optimize how Synapse calculates domains to fetch from during backfill.
