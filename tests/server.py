@@ -35,6 +35,7 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
+from twisted.web.iweb import IRequest
 from typing_extensions import Deque
 from zope.interface import implementer
 
@@ -277,7 +278,7 @@ class FakeSite:
         self._resource = resource
         self.reactor = reactor
 
-    def getResourceFor(self, request):
+    def getResourceFor(self, request: IRequest) -> IResource:
         return self._resource
 
 
