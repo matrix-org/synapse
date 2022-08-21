@@ -32,7 +32,9 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
+    cast,
 )
 from unittest.mock import Mock
 
@@ -67,6 +69,7 @@ from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
 from synapse.config.database import DatabaseConnectionConfig
+from synapse.config.homeserver import HomeServerConfig
 from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
@@ -76,7 +79,7 @@ from synapse.logging.context import ContextResourceUsage
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import PostgresEngine, create_engine
-from synapse.types import JsonDict
+from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
 
 from tests.utils import (
@@ -768,14 +771,17 @@ class TestHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 
 
+HS = TypeVar("HS", bound=HomeServer)
+
+
 def setup_test_homeserver(
-    cleanup_func,
-    name="test",
-    config=None,
-    reactor=None,
-    homeserver_to_use: Type[HomeServer] = TestHomeServer,
-    **kwargs,
-):
+    cleanup_func: Callable[[Callable[[], None]], Any],
+    name: str = "test",
+    config: Union[HomeServerConfig, None] = None,
+    reactor: Optional[ISynapseReactor] = None,
+    homeserver_to_use: Type[HS] = TestHomeServer,
+    **kwargs: object,
+) -> HS:
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
     are passed to the Homeserver constructor.
@@ -790,7 +796,7 @@ def setup_test_homeserver(
     HomeserverTestCase.
     """
     if reactor is None:
-        from twisted.internet import reactor
+        from twisted.internet import reactor  # type: ignore[no-redef]
 
     if config is None:
         config = default_config(name, parse=True)
@@ -839,20 +845,25 @@ def setup_test_homeserver(
     if "db_txn_limit" in kwargs:
         database_config["txn_limit"] = kwargs["db_txn_limit"]
 
-    database = DatabaseConnectionConfig("master", database_config)
-    config.database.databases = [database]
+    database_conn_config = DatabaseConnectionConfig("master", database_config)
+    config.database.databases = [database_conn_config]
 
-    db_engine = create_engine(database.config)
+    db_engine = create_engine(database_conn_config.config)
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
     if isinstance(db_engine, PostgresEngine):
-        db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB,
-            user=POSTGRES_USER,
-            host=POSTGRES_HOST,
-            port=POSTGRES_PORT,
-            password=POSTGRES_PASSWORD,
+        import psycopg2
+
+        db_conn = cast(
+            psycopg2.connection,
+            db_engine.module.connect(
+                database=POSTGRES_BASE_DB,
+                user=POSTGRES_USER,
+                host=POSTGRES_HOST,
+                port=POSTGRES_PORT,
+                password=POSTGRES_PASSWORD,
+            ),
         )
         db_conn.autocommit = True
         cur = db_conn.cursor()
@@ -885,7 +896,7 @@ def setup_test_homeserver(
         database = hs.get_datastores().databases[0]
 
         # We need to do cleanup on PostgreSQL
-        def cleanup():
+        def cleanup() -> None:
             import psycopg2
 
             # Close all the db pools
@@ -894,12 +905,15 @@ def setup_test_homeserver(
             dropped = False
 
             # Drop the test database
-            db_conn = db_engine.module.connect(
-                database=POSTGRES_BASE_DB,
-                user=POSTGRES_USER,
-                host=POSTGRES_HOST,
-                port=POSTGRES_PORT,
-                password=POSTGRES_PASSWORD,
+            db_conn = cast(
+                psycopg2.connection,
+                db_engine.module.connect(
+                    database=POSTGRES_BASE_DB,
+                    user=POSTGRES_USER,
+                    host=POSTGRES_HOST,
+                    port=POSTGRES_PORT,
+                    password=POSTGRES_PASSWORD,
+                ),
             )
             db_conn.autocommit = True
             cur = db_conn.cursor()
@@ -933,12 +947,12 @@ def setup_test_homeserver(
     # Need to let the HS build an auth handler and then mess with it
     # because AuthHandler's constructor requires the HS, so we can't make one
     # beforehand and pass it in to the HS's constructor (chicken / egg)
-    async def hash(p):
+    async def hash(p: str) -> str:
         return hashlib.md5(p.encode("utf8")).hexdigest()
 
     hs.get_auth_handler().hash = hash
 
-    async def validate_hash(p, h):
+    async def validate_hash(p: str, h: str) -> bool:
         return hashlib.md5(p.encode("utf8")).hexdigest() == h
 
     hs.get_auth_handler().validate_hash = validate_hash
