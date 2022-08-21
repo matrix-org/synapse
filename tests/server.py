@@ -165,7 +165,9 @@ class FakeChannel:
             h.addRawHeader(*i)
         return h
 
-    def writeHeaders(self, version, code, reason, headers):
+    def writeHeaders(
+        self, version: bytes, code: bytes, reason: bytes, headers: Headers
+    ) -> None:
         self.result["version"] = version
         self.result["code"] = code
         self.result["reason"] = reason
