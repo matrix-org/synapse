@@ -802,7 +802,6 @@ def setup_test_homeserver(
         config = default_config(name, parse=True)
 
     config.caches.resize_all_caches()
-    config.ldap_enabled = False
 
     if "clock" not in kwargs:
         kwargs["clock"] = MockClock()
