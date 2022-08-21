@@ -514,26 +514,32 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
 class ThreadPool:
     """
-    Threadless thread pool.
+    Threadless thread pool. A stand-in for twisted.python.threadpool.ThreadPool.
     """
 
-    def __init__(self, reactor):
+    def __init__(self, reactor: IReactorTime):
         self._reactor = reactor
 
-    def start(self):
+    def start(self) -> None:
         pass
 
-    def stop(self):
+    def stop(self) -> None:
         pass
 
-    def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
-        def _(res):
+    def callInThreadWithCallback(
+        self,
+        onResult: Callable[[bool, object], Any],
+        function: Callable[P, Any],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> "Deferred[bool]":
+        def _(res: object) -> None:
             if isinstance(res, Failure):
                 onResult(False, res)
             else:
                 onResult(True, res)
 
-        d = Deferred()
+        d: "Deferred[bool]" = Deferred()
         d.addCallback(lambda x: function(*args, **kwargs))
         d.addBoth(_)
         self._reactor.callLater(0, d.callback, True)
