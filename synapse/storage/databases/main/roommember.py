@@ -952,7 +952,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             table="room_memberships",
             column="event_id",
             iterable=event_ids,
-            retcols=("user_id", "display_name", "avatar_url", "event_id"),
+            retcols=("user_id", "event_id"),
             keyvalues={"membership": Membership.JOIN},
             batch_size=1000,
             desc="_get_user_ids_from_membership_event_ids",
