@@ -1,16 +1,9 @@
-<html lang="en">
-<head>
-    <title>Registration</title>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-    <p>You have asked us to register this email with a new Matrix account. If this was you, please click the link below to confirm your email address:</p>
+{% include "fragments/header.html" without context %}
 
-    <a href="{{ link }}">Verify Your Email Address</a>
+<!-- Registration -->
+<p>You have asked us to register this email with a new Matrix account. If this was you, please click the link below to confirm your email address:</p>
+<a href="{{ link }}">Verify Your Email Address</a>
+<p>If this was not you, you can safely disregard this email.</p>
+<p>Thank you.</p>
 
-    <p>If this was not you, you can safely disregard this email.</p>
-
-    <p>Thank you.</p>
-</body>
-</html>
+{% include "fragments/footer.html" without context %}

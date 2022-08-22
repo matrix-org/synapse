@@ -1,11 +1,6 @@
-<html lang="en">
-<head>
-<title>Authentication</title>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-</head>
-<body>
+{% include "fragments/header.html" without context %}
+
+<!-- Authentication -->
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
         {% if error is defined %}
@@ -19,5 +14,5 @@
         <input type="submit" value="Authenticate" />
     </div>
 </form>
-</body>
-</html>
+
+{% include "fragments/footer.html" without context %}

@@ -1,19 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Authentication failed</title>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style type="text/css">
-            {% include "sso.css" without context %}
+{% include "fragments/header.html" without context %}
 
-            #error_code {
-                margin-top: 56px;
-            }
-        </style>
-    </head>
-    <body class="error_page">
+<!-- Authentication failed -->
+    <div class="error_page">
 {# If an error of unauthorised is returned it means we have actively rejected their login #}
 {% if error == "unauthorised" %}
         <header>
@@ -40,7 +28,15 @@
             </div>
         </header>
         {% include "sso_footer.html" without context %}
+   
 
+        <style type="text/css">
+            {% include "sso.css" without context %}
+
+            #error_code {
+                margin-top: 56px;
+            }
+        </style>
         <script type="text/javascript">
             // Error handling to support Auth0 errors that we might get through a GET request
             // to the validation endpoint. If an error is provided, it's either going to be
@@ -57,14 +53,15 @@
                 // doesn't parse the first parameter incorrectly.
                 searchStr = window.location.hash.replace("#", "?");
             }
-
+            
             // We might end up with no error in the URL, so we need to check if we have one
             // to print one.
             let errorDesc = new URLSearchParams(searchStr).get("error_description")
             if (errorDesc) {
                 document.getElementById("errormsg").innerText = errorDesc;
             }
-        </script>
+            </script>
 {% endif %}
-</body>
-</html>
+</div>
+
+{% include "fragments/footer.html" without context %}
