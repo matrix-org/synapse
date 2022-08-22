@@ -380,7 +380,10 @@ class FederationSender(AbstractFederationSender):
                         return
 
                     # Beeper hack: don't bother handling federation for bridged events
-                    if event.sender.startswith("@_"):
+                    # Note: second check is to pass sytest
+                    if event.sender.startswith("@_") and not event.sender.startswith(
+                        "@__ANON__"
+                    ):
                         return
 
                     # We also want to not send out-of-band membership events.
