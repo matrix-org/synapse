@@ -7,6 +7,10 @@ echo -e "+++ \033[32mChecking newsfragment\033[m"
 
 set -e
 
+echo "-------- environment ----------"
+env
+echo "-------------------------------"
+
 # make sure that origin/develop is up to date
 git remote set-branches --add origin develop
 git fetch -q origin develop
@@ -58,5 +62,6 @@ done
 if [[ -n "$pr" && "$matched" -eq 0 ]]; then
     echo -e "\e[31mERROR: Did not find a news fragment with the right number: expected changelog.d/$pr.*.\e[39m" >&2
     echo -e "$CONTRIBUTING_GUIDE_TEXT" >&2
+    echo "summary" > $GITHUB_STEP_SUMMARY
     exit 1
 fi
