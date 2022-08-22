@@ -35,9 +35,9 @@
     </tr>
 </table>
 <style type="text/css">
-    {% include 'mail.css' without context %}
-    {% include "mail-%s.css" % app_name ignore missing without context %}
-    {% include 'mail-expiry.css' without context %}
+    {% include 'static/css/mail.css' without context %}
+    {% include "static/css/mail-%s.css" % app_name ignore missing without context %}
+    {% include 'static/css/mail-expiry.css' without context %}
 </style>
 
 {% include "fragments/footer.html" without context %}
