@@ -674,7 +674,7 @@ class RoomMessageListRestServlet(RestServlet):
         room_member_count = await make_deferred_yieldable(room_member_count_deferred)
         messsages_response_timer.labels(
             room_size=_RoomSize.from_member_count(room_member_count)
-        ).observe((processing_start_time - processing_end_time) / 1000)
+        ).observe((processing_end_time - processing_start_time) / 1000)
 
         return 200, msgs
 
