@@ -69,9 +69,9 @@ class TokenLookupResult:
     """
 
     user_id: str
+    token_id: int
     is_guest: bool = False
     shadow_banned: bool = False
-    token_id: Optional[int] = None
     device_id: Optional[str] = None
     valid_until_ms: Optional[int] = None
     token_owner: str = attr.ib()

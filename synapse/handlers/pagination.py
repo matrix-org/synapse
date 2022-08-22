@@ -464,7 +464,7 @@ class PaginationHandler:
                 membership,
                 member_event_id,
             ) = await self.auth.check_user_in_room_or_world_readable(
-                room_id, user_id, allow_departed_users=True
+                room_id, requester, allow_departed_users=True
             )
 
             if pagin_config.direction == "b":
