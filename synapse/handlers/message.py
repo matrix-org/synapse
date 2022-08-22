@@ -1430,6 +1430,11 @@ class EventCreationHandler:
         if not self._external_cache.is_enabled():
             return
 
+        # Beeper hack: we don't need joined hosts for bridged events because
+        # we don't federate them.
+        if event.sender.startswith("@_"):
+            return
+
         # If external cache is enabled we should always have this.
         assert self._external_cache_joined_hosts_updates is not None
 

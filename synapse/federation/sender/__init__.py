@@ -379,6 +379,10 @@ class FederationSender(AbstractFederationSender):
                         logger.debug("Not sending remote-origin event %s", event)
                         return
 
+                    # Beeper hack: don't bother handling federation for bridged events
+                    if event.sender.startswith("@_"):
+                        return
+
                     # We also want to not send out-of-band membership events.
                     #
                     # OOB memberships are used in three (and a half) situations:
