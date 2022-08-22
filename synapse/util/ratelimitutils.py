@@ -168,11 +168,6 @@ class _PerHostRatelimiter:
         (either sleeping or in the ready queue).
         """
         queue_size = len(self.ready_request_queue) + len(self.sleeping_requests)
-        logger.info(
-            "should_reject queue_size=%s self.reject_limit=%s",
-            queue_size,
-            self.reject_limit,
-        )
         return queue_size > self.reject_limit
 
     def should_sleep(self) -> bool:
