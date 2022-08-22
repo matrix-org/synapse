@@ -32,7 +32,7 @@ from typing_extensions import Literal
 
 import synapse
 from synapse.api.errors import Codes
-from synapse.logging.tracing import trace
+from synapse.logging.opentracing import trace
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
