@@ -4,6 +4,6 @@
     You've been invited, join at {{ room.link }}
 {%- else %}
     {%- for notif in room.notifs %}
-        {%- include 'notif.txt' with context %}
+        {%- include 'fragments/notif.txt' with context %}
     {%- endfor %}
 {%- endif %}

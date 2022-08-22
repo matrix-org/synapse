@@ -5,7 +5,7 @@
     <h1>Continue to your account</h1>
 </header>
 <main>
-    {% include "sso_partial_profile.html" %}
+    {% include "fragments/sso_partial_profile.html" %}
     <p class="confirm-trust">Continuing will grant <strong>{{ display_url }}</strong> access to your account.</p>
     <a href="{{ redirect_url }}" class="primary-button">Continue</a>
 </main>

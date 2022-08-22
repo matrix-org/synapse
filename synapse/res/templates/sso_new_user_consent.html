@@ -6,7 +6,7 @@
     <p>Agree to the terms to create your account.</p>
 </header>
 <main>
-    {% include "sso_partial_profile.html" %}
+    {% include "fragments/sso_partial_profile.html" %}
     <form method="post" action="{{my_url}}" id="consent_form">
         <p>
             <input id="accepted_version" type="checkbox" name="accepted_version" value="{{ consent_version }}" required>
