@@ -39,7 +39,11 @@ CONTRIBUTING_GUIDE_TEXT="!! Please see the contributing guide for help writing y
 https://matrix-org.github.io/synapse/latest/development/contributing_guide.html#changelog"
 
 # If check-newsfragment returns a non-zero exit code, print the contributing guide and exit
-python -m towncrier.check --compare-with=origin/develop || (echo -e "$CONTRIBUTING_GUIDE_TEXT" >&2 && exit 1)
+python -m towncrier.check --compare-with=origin/develop || (
+    echo -e "$CONTRIBUTING_GUIDE_TEXT" >&2
+    echo "summary" > $GITHUB_STEP_SUMMARY
+    exit 1
+)
 
 echo
 echo "--------------------------"
@@ -62,6 +66,5 @@ done
 if [[ -n "$pr" && "$matched" -eq 0 ]]; then
     echo -e "\e[31mERROR: Did not find a news fragment with the right number: expected changelog.d/$pr.*.\e[39m" >&2
     echo -e "$CONTRIBUTING_GUIDE_TEXT" >&2
-    echo "summary" > $GITHUB_STEP_SUMMARY
     exit 1
 fi
