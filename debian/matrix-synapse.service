@@ -8,8 +8,12 @@ ReloadPropagatedFrom=matrix-synapse.target
 [Service]
 Type=notify
 NotifyAccess=main
+
 User=matrix-synapse
 WorkingDirectory=/var/lib/matrix-synapse
+RuntimeDirectory=matrix-synapse
+StateDirectory=matrix-synapse
+LogsDirectory=matrix-synapse
 EnvironmentFile=-/etc/default/matrix-synapse
 ExecStartPre=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/ --generate-keys
 ExecStart=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/
@@ -17,6 +21,65 @@ ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=3
 SyslogIdentifier=matrix-synapse
+
+## Hardening
+# Make sure that the service has its own unshared tmpfs at /tmp and that it
+# cannot see or change any real devices
+PrivateTmp=true
+PrivateDevices=true
+
+# We give no capabilities to a service by default
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Protect the following from modification:
+# - The entire filesystem
+# - sysctl settings and loaded kernel modules
+# - No modifications allowed to Control Groups
+# - Hostname
+# - System Clock
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+
+# Prevent access to the following:
+# - /home directory
+# - Kernel logs
+ProtectHome=tmpfs
+ProtectKernelLogs=true
+
+# Make sure that the process can only see PIDs and process details of itself,
+# and the second option disables seeing details of things like system load and
+# I/O etc
+ProtectProc=invisible
+ProcSubset=pid
+
+# While not needed, we set these options explicitly
+# - This process has been given access to the host network
+# - It can also communicate with any IP Address
+PrivateNetwork=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressAllow=any
+
+# Restrict system calls to a sane bunch
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+
+# Misc restrictions
+# - Since the process is a python process it needs to be able to write and
+#   execute memory regions, so we set MemoryDenyWriteExecute to false
+RestrictSUIDSGID=true
+RemoveIPC=true
+NoNewPrivileges=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+PrivateUsers=true
+MemoryDenyWriteExecute=false
 
 [Install]
 WantedBy=matrix-synapse.target
