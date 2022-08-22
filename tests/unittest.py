@@ -677,14 +677,29 @@ class HomeserverTestCase(TestCase):
         username: str,
         password: str,
         device_id: Optional[str] = None,
+        additional_request_fields: Optional[Dict[str, str]] = None,
         custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     ) -> str:
         """
         Log in a user, and get an access token. Requires the Login API be registered.
+
+        Args:
+            username: The localpart to assign to the new user.
+            password: The password to assign to the new user.
+            device_id: An optional device ID to assign to the new device created during
+                login.
+            additional_request_fields: A dictionary containing any additional /login
+                request fields and their values.
+            custom_headers: Custom HTTP headers and values to add to the /login request.
+
+        Returns:
+            The newly registered user's Matrix ID.
         """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
             body["device_id"] = device_id
+        if additional_request_fields:
+            body.update(additional_request_fields)
 
         channel = self.make_request(
             "POST",

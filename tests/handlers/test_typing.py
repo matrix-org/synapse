@@ -25,7 +25,7 @@ from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -117,8 +117,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.room_members = []
 
-        async def check_user_in_room(room_id: str, user_id: str) -> None:
-            if user_id not in [u.to_string() for u in self.room_members]:
+        async def check_user_in_room(room_id: str, requester: Requester) -> None:
+            if requester.user.to_string() not in [
+                u.to_string() for u in self.room_members
+            ]:
                 raise AuthError(401, "User is not in the room")
             return None
 
