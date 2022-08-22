@@ -145,7 +145,7 @@ class FederationEventHandler:
         self._event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
-        self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
+        self.bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
         self._state_resolution_handler = hs.get_state_resolution_handler()
         # avoid a circular dependency by deferring execution here
         self._get_room_member_handler = hs.get_room_member_handler
@@ -2110,7 +2110,7 @@ class FederationEventHandler:
                     min_depth,
                 )
             else:
-                await self._bulk_push_rule_evaluator.action_for_event_by_user(
+                await self.bulk_push_rule_evaluator.action_for_event_by_user(
                     event, context
                 )
 
@@ -2153,6 +2153,7 @@ class FederationEventHandler:
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
             # here as that is what we default to in `max_request_body_size(..)`
+            result = {}
             try:
                 for batch in batch_iter(event_and_contexts, 200):
                     result = await self._send_events(
@@ -2173,14 +2174,14 @@ class FederationEventHandler:
             # Note that this returns the events that were persisted, which may not be
             # the same as were passed in if some were deduplicated due to transaction IDs.
             (
-                events,
+                output_events,
                 max_stream_token,
             ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
             if self._ephemeral_messages_enabled:
-                for event in events:
+                for event in output_events:
                     # If there's an expiry timestamp on the event, schedule its expiry.
                     self._message_handler.maybe_schedule_expiry(event)
 
@@ -2188,13 +2189,13 @@ class FederationEventHandler:
                 with start_active_span("notify_persisted_events"):
                     set_tag(
                         SynapseTags.RESULT_PREFIX + "event_ids",
-                        str([ev.event_id for ev in events]),
+                        str([ev.event_id for ev in output_events]),
                     )
                     set_tag(
                         SynapseTags.RESULT_PREFIX + "event_ids.length",
-                        str(len(events)),
+                        str(len(output_events)),
                     )
-                    for event in events:
+                    for event in output_events:
                         await self._notify_persisted_event(event, max_stream_token)
 
             return max_stream_token.stream

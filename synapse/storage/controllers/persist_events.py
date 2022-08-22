@@ -423,16 +423,18 @@ class EventsPersistenceStorageController:
         for d in ret_vals:
             replaced_events.update(d)
 
-        events = []
+        persisted_events = []
         for event, _ in events_and_contexts:
             existing_event_id = replaced_events.get(event.event_id)
             if existing_event_id:
-                events.append(await self.main_store.get_event(existing_event_id))
+                persisted_events.append(
+                    await self.main_store.get_event(existing_event_id)
+                )
             else:
-                events.append(event)
+                persisted_events.append(event)
 
         return (
-            events,
+            persisted_events,
             self.main_store.get_room_max_token(),
         )
 

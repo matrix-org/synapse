@@ -946,6 +946,12 @@ class FederationHandler:
         )
 
         context = EventContext.for_outlier(self._storage_controllers)
+
+        if event.is_notifiable:
+            await self._federation_event_handler.bulk_push_rule_evaluator.action_for_event_by_user(
+                event, context
+            )
+
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )

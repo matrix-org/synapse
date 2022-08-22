@@ -42,18 +42,18 @@ IS_GLOB = re.compile(r"[\?\*\[\]]")
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
-def _room_member_count(
-    ev: EventBase, condition: Mapping[str, Any], room_member_count: int
-) -> bool:
+def _room_member_count(condition: Mapping[str, Any], room_member_count: int) -> bool:
     return _test_ineq_condition(condition, room_member_count)
 
 
 def _sender_notification_permission(
-    ev: EventBase,
     condition: Mapping[str, Any],
-    sender_power_level: int,
+    sender_power_level: Optional[int],
     power_levels: Dict[str, Union[int, Dict[str, int]]],
 ) -> bool:
+    if sender_power_level is None:
+        return False
+
     notif_level_key = condition.get("key")
     if notif_level_key is None:
         return False
@@ -129,7 +129,7 @@ class PushRuleEvaluatorForEvent:
         self,
         event: EventBase,
         room_member_count: int,
-        sender_power_level: int,
+        sender_power_level: Optional[int],
         power_levels: Dict[str, Union[int, Dict[str, int]]],
         relations: Dict[str, Set[Tuple[str, str]]],
         relations_match_enabled: bool,
@@ -198,10 +198,10 @@ class PushRuleEvaluatorForEvent:
         elif condition["kind"] == "contains_display_name":
             return self._contains_display_name(display_name)
         elif condition["kind"] == "room_member_count":
-            return _room_member_count(self._event, condition, self._room_member_count)
+            return _room_member_count(condition, self._room_member_count)
         elif condition["kind"] == "sender_notification_permission":
             return _sender_notification_permission(
-                self._event, condition, self._sender_power_level, self._power_levels
+                condition, self._sender_power_level, self._power_levels
             )
         elif (
             condition["kind"] == "org.matrix.msc3772.relation_match"

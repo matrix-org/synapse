@@ -2180,13 +2180,11 @@ class PersistEventsStore:
                 appear in events_and_context.
         """
 
-        # Only non outlier events will have push actions associated with them,
+        # Only notifiable events will have push actions associated with them,
         # so let's filter them out. (This makes joining large rooms faster, as
         # these queries took seconds to process all the state events).
-        non_outlier_events = [
-            event
-            for event, _ in events_and_contexts
-            if not event.internal_metadata.is_outlier()
+        notifiable_events = [
+            event for event, _ in events_and_contexts if event.is_notifiable
         ]
 
         sql = """
@@ -2199,7 +2197,7 @@ class PersistEventsStore:
             WHERE event_id = ?
         """
 
-        if non_outlier_events:
+        if notifiable_events:
             txn.execute_batch(
                 sql,
                 (
@@ -2209,12 +2207,12 @@ class PersistEventsStore:
                         event.depth,
                         event.event_id,
                     )
-                    for event in non_outlier_events
+                    for event in notifiable_events
                 ),
             )
 
             room_to_event_ids: Dict[str, List[str]] = {}
-            for e in non_outlier_events:
+            for e in notifiable_events:
                 room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
 
             for room_id, event_ids in room_to_event_ids.items():
