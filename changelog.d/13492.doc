@@ -1,1 +1,0 @@
-Document that event purging related to the `redaction_retention_period` config option is executed only every 5 minutes.
