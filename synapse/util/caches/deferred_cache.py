@@ -322,7 +322,7 @@ class DeferredCache(Generic[KT, VT]):
         """
 
         entry = CacheMultipleEntries[KT, VT]()
-        entry.add_global_callback(callback)
+        entry.add_global_invalidation_callback(callback)
 
         for key in keys:
             self._pending_deferred_cache[key] = entry
@@ -483,7 +483,9 @@ class CacheMultipleEntries(CacheEntry[KT, VT]):
     def get_invalidation_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
         return self._callbacks.get(key, set()) | self._global_callbacks
 
-    def add_global_callback(self, callback: Optional[Callable[[], None]]) -> None:
+    def add_global_invalidation_callback(
+        self, callback: Optional[Callable[[], None]]
+    ) -> None:
         """Add a callback for when any keys get invalidated."""
         if callback is None:
             return
