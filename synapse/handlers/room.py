@@ -64,7 +64,6 @@ from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
-from synapse.rest.client.room import has_3pid_invite_keys
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
 from synapse.types import (
@@ -681,6 +680,12 @@ class RoomCreationHandler:
             # we returned the new room to the client at this point.
             logger.error("Unable to send updated alias events in new room: %s", e)
 
+    def has_all_3pid_keys(self, invite_3pid: dict) -> bool:
+        return all(
+            key in invite_3pid
+            for key in ("medium", "address", "id_server", "id_access_token")
+        )
+
     async def create_room(
         self,
         requester: Requester,
@@ -735,13 +740,14 @@ class RoomCreationHandler:
         invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
 
-        # validate each entry
+        # validate each entry for correctness
         for invite_3pid in invite_3pid_list:
-            try:
-                assert has_3pid_invite_keys(invite_3pid)
-            except SynapseError as e:
-                logger.error(e, invite_3pid)
-                invite_3pid_list.remove(invite_list)
+            if not self.has_all_3pid_keys(invite_3pid):
+                raise SynapseError(
+                    400,
+                    f"`id_server` and `id_access_token` are required when doing 3pid invite, caused by {invite_3pid}",
+                    Codes.MISSING_PARAM,
+                )
 
         if not is_requester_admin:
             spam_check = await self.spam_checker.user_may_create_room(user_id)

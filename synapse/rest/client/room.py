@@ -65,20 +65,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def has_3pid_invite_keys(content: JsonDict) -> bool:
-    # if the request has medium and address keys, we should treat it as a 3pid invite.
-    if all(key in content for key in ("medium", "address")):
-        if all(key in content for key in ("id_server", "id_access_token")):
-            return True
-        # if it does not have id_server or id_access_token, we should treat that as an error.
-        raise SynapseError(
-            400,
-            "`id_server` and `id_access_token` are required when doing 3pid invite",
-            Codes.MISSING_PARAM,
-        )
-    return False
-
-
 class _RoomSize(Enum):
     """
     Enum to differentiate sizes of rooms. This is a pretty good approximation
@@ -930,6 +916,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
+    def has_3pid_invite_keys(self, content: JsonDict) -> bool:
+        return all(key in content for key in ("medium", "address"))
+
     def register(self, http_server: HttpServer) -> None:
         # /rooms/$roomid/[invite|join|leave]
         PATTERNS = (
@@ -960,22 +949,29 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if membership_action == "invite" and has_3pid_invite_keys(content):
-            try:
-                await self.room_member_handler.do_3pid_invite(
-                    room_id,
-                    requester.user,
-                    content["medium"],
-                    content["address"],
-                    content["id_server"],
-                    requester,
-                    txn_id,
-                    content["id_access_token"],
+        if self.has_3pid_invite_keys(content):
+            if not all(key in content for key in ("id_server", "id_access_token")):
+                raise SynapseError(
+                    400,
+                    "`id_server` and `id_access_token` are required when doing 3pid invite",
+                    Codes.MISSING_PARAM,
                 )
-            except ShadowBanError:
-                # Pretend the request succeeded.
-                pass
-            return 200, {}
+            if membership_action == "invite":
+                try:
+                    await self.room_member_handler.do_3pid_invite(
+                        room_id,
+                        requester.user,
+                        content["medium"],
+                        content["address"],
+                        content["id_server"],
+                        requester,
+                        txn_id,
+                        content["id_access_token"],
+                    )
+                except ShadowBanError:
+                    # Pretend the request succeeded.
+                    pass
+                return 200, {}
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -1128,12 +1124,11 @@ class RoomTypingRestServlet(RestServlet):
 
 class RoomAliasListServlet(RestServlet):
     PATTERNS = [
-                   re.compile(
-                       r"^/_matrix/client/unstable/org\.matrix\.msc2432"
-                       r"/rooms/(?P<room_id>[^/]*)/aliases"
-                   ),
-               ] + list(
-        client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
+        re.compile(
+            r"^/_matrix/client/unstable/org\.matrix\.msc2432"
+            r"/rooms/(?P<room_id>[^/]*)/aliases"
+        ),
+    ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
