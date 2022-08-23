@@ -1057,20 +1057,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         users = self.get_users_in_room.cache.get_immediate(
             (room_id,), None, update_metrics=False
         )
-        domains: List[str] = []
-        if users is not None:
-            # Because `users` is sorted from lowest -> highest depth, the list of
-            # domains will also be sorted that way.
-            for u in users:
-                domain = get_domain_from_id(u)
-                if domain not in domains:
-                    domains.append(domain)
-            return domains
-
-        if isinstance(self.database_engine, Sqlite3Engine):
+        if users is None and isinstance(self.database_engine, Sqlite3Engine):
             # If we're using SQLite then let's just always use
             # `get_users_in_room` rather than funky SQL.
             users = await self.get_users_in_room(room_id)
+
+        if users is not None:
+            # Because `users` is sorted from lowest -> highest depth, the list
+            # of domains will also be sorted that way.
+            domains: List[str] = []
             for u in users:
                 domain = get_domain_from_id(u)
                 if domain not in domains:
