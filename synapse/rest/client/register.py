@@ -484,9 +484,6 @@ class RegisterRestServlet(RestServlet):
                     "Appservice token must be provided when using a type of m.login.application_service",
                 )
 
-            # Verify the AS
-            self.auth.get_appservice_by_req(request)
-
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.

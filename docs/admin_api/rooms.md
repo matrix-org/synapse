@@ -302,6 +302,8 @@ The following fields are possible in the JSON response body:
 * `state_events` - Total number of state_events of a room. Complexity of the room.
 * `room_type` - The type of the room taken from the room's creation event; for example "m.space" if the room is a space.
   If the room does not define a type, the value will be `null`.
+* `forgotten` - Whether all local users have
+  [forgotten](https://spec.matrix.org/latest/client-server-api/#leaving-rooms) the room.
 
 The API is:
 
@@ -330,7 +332,8 @@ A response body like the following is returned:
   "guest_access": null,
   "history_visibility": "shared",
   "state_events": 93534,
-  "room_type": "m.space"
+  "room_type": "m.space",
+  "forgotten": false
 }
 ```
 

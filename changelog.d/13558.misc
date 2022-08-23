@@ -1,0 +1,1 @@
+Make `HomeServerTestCase` load any configured homeserver modules automatically.

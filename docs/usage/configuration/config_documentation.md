@@ -444,7 +444,7 @@ Sub-options for each listener include:
    * `names`: a list of names of HTTP resources. See below for a list of valid resource names.
 
    * `compress`: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
-     `client`, `consent` and `metrics` resources.
+     `client`, `consent`, `metrics` and `federation` resources.
 
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
@@ -849,7 +849,11 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default.
+The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk. There are known bugs with the implementation
+which can cause database corruption. Setting retention to delete older history
+is less risky than deleting newer history but in general caution is advised when enabling this
+experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -3348,7 +3352,7 @@ user_directory:
 For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
-`listeners`, in particular `template_dir` and `version`. # TODO: link `listeners`
+[`listeners`](#listeners), in particular `template_dir` and `version`.
 
 * `template_dir`: gives the location of the templates for the HTML forms.
   This directory should contain one subdirectory per language (eg, `en`, `fr`),
@@ -3360,7 +3364,7 @@ Parts of this section are required if enabling the `consent` resource under
    parameter.
 
 * `server_notice_content`: if enabled, will send a user a "Server Notice"
-   asking them to consent to the privacy policy. The `server_notices` section ##TODO: link
+   asking them to consent to the privacy policy. The [`server_notices` section](#server_notices)
    must also be configured for this to work. Notices will *not* be sent to
    guest users unless `send_server_notice_to_guests` is set to true.
 
