@@ -42,11 +42,12 @@ events.
 
 Instead, we break down the graph into *chains*. A chain is a subset of a DAG
 with the following property: for any pair of events `E` and `F` in the chain,
-the chain contains a path `E -> F` or a path `F -> E`. Each event in the chain
+the chain contains a path `E -> F` or a path `F -> E`. This forces a chain to be
+linear (without forks) e.g. `E -> F -> G -> ... -> H`. Each event in the chain
 is given a *sequence number* local to that chain. The oldest event `E` in the
-chain has sequence number 1. If `E` has a child in the chain, the child has
-sequence number 2; if `E` has a grandchild, the grandchild has sequence number
-3; and so on.
+chain has sequence number 1. If `E` has a child `F` in the chain, then `F` has
+sequence number 2. If `E` has a grandchild `G` in the chain, then `G` has
+sequence number 3; and so on.
 
 Synapse ensures that each persisted event belongs to exactly one chain, and
 tracks how the chains are connected to one another. This allows us to
