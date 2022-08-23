@@ -2185,7 +2185,7 @@ by the Matrix Identity Service API
 *Deprecated in Synapse 1.64.0*: The `email` option is deprecated.
 
 *Removed in Synapse 1.66.0*: The `email` option has been removed.
-If present, Synapse will report a configuration errorwill now cause an error on startup.
+If present, Synapse will report a configuration error on startup.
 
 Example configuration:
 ```yaml
