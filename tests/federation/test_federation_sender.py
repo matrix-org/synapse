@@ -174,6 +174,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         test_room_id = "!room:host1"
+
         # stub out `get_rooms_for_user` and `get_current_hosts_in_room` so that the
         # server thinks the user shares a room with `@user2:host2`
         def get_rooms_for_user(user_id):
@@ -185,8 +186,8 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             if room_id == test_room_id:
                 return ["host2"]
 
-            assert f"We only expect our stubbed `get_current_hosts_in_room` to be called with "
-            "test_room_id={test_room_id} but it was called with room_id={room_id}"
+            assert "We only expect our stubbed `get_current_hosts_in_room` to be called with "
+            f"test_room_id={test_room_id} but it was called with room_id={room_id}"
 
         hs.get_datastores().main.get_current_hosts_in_room = get_current_hosts_in_room
 
