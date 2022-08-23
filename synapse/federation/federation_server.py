@@ -766,7 +766,8 @@ class FederationServer(FederationBase):
 
         if self.store.is_partial_state_room(room_id):
             # Before we do anything: check if the room is partial-stated.
-            # Note that checking the ACL (below) requires full state, for example.
+            # Note that at the time this check was added, `on_make_knock_request` would
+            # block due to https://github.com/matrix-org/synapse/issues/12997.
             raise SynapseError(
                 404,
                 "Unable to handle /make_knock right now; this server is not fully joined.",
