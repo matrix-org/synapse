@@ -339,9 +339,7 @@ class MessageHandler:
         # This can either be because the AS user is in the room or because there
         # is a user in the room that the AS is "interested in"
         if (
-            False  # See https://github.com/matrix-org/matrix-appservice-irc/issues/506
-                   # and https://github.com/matrix-org/synapse/issues/4826#issuecomment-1028105662
-            and requester.app_service
+            requester.app_service
             and requester.user.to_string() not in users_with_profile
         ):
             for uid in users_with_profile:
