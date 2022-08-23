@@ -164,7 +164,7 @@ class DeferredCache(Generic[KT, VT]):
         """
         val = self._pending_deferred_cache.get(key, _Sentinel.sentinel)
         if val is not _Sentinel.sentinel:
-            val.add_callback(key, callback)
+            val.add_invalidation_callback(key, callback)
             if update_metrics:
                 m = self.cache.metrics
                 assert m  # we always have a name, so should always have metrics
@@ -224,7 +224,7 @@ class DeferredCache(Generic[KT, VT]):
             # Check if its in the pending cache
             pending_value = self._pending_deferred_cache.get(key, _Sentinel.sentinel)
             if pending_value is not _Sentinel.sentinel:
-                pending_value.add_callback(key, callback)
+                pending_value.add_invalidation_callback(key, callback)
 
                 def completed_cb(value: VT, key: KT) -> VT:
                     pending_results[key] = value
@@ -298,7 +298,7 @@ class DeferredCache(Generic[KT, VT]):
         # otherwise, we'll add an entry to the _pending_deferred_cache for now,
         # and add callbacks to add it to the cache properly later.
         entry = CacheEntrySingle[KT, VT](value)
-        entry.add_callback(key, callback)
+        entry.add_invalidation_callback(key, callback)
         self._pending_deferred_cache[key] = entry
         deferred = entry.deferred(key).addCallbacks(
             self._set_completed_callback,
@@ -341,7 +341,7 @@ class DeferredCache(Generic[KT, VT]):
                 self._pending_deferred_cache[key] = current_entry
             return value
 
-        self.cache.set(key, value, entry.get_callbacks(key))
+        self.cache.set(key, value, entry.get_invalidation_callbacks(key))
 
         return value
 
@@ -361,7 +361,7 @@ class DeferredCache(Generic[KT, VT]):
                 self._pending_deferred_cache[key] = current_entry
             return failure
 
-        for cb in entry.get_callbacks(key):
+        for cb in entry.get_invalidation_callbacks(key):
             cb()
 
         return failure
@@ -403,7 +403,7 @@ class DeferredCache(Generic[KT, VT]):
         self.check_thread()
         self.cache.clear()
         for key, entry in self._pending_deferred_cache.items():
-            for cb in entry.get_callbacks(key):
+            for cb in entry.get_invalidation_callbacks(key):
                 cb()
 
         self._pending_deferred_cache.clear()
@@ -419,12 +419,14 @@ class CacheEntry(Generic[KT, VT], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def add_callback(self, key: KT, callback: Optional[Callable[[], None]]) -> None:
+    def add_invalidation_callback(
+        self, key: KT, callback: Optional[Callable[[], None]]
+    ) -> None:
         """Add an invalidation callback"""
         ...
 
     @abc.abstractmethod
-    def get_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
+    def get_invalidation_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
         """Get all invalidation callbacks"""
         ...
 
@@ -443,13 +445,15 @@ class CacheEntrySingle(CacheEntry[KT, VT]):
     def deferred(self, key: KT) -> "defer.Deferred[VT]":
         return self._deferred.observe()
 
-    def add_callback(self, key: KT, callback: Optional[Callable[[], None]]) -> None:
+    def add_invalidation_callback(
+        self, key: KT, callback: Optional[Callable[[], None]]
+    ) -> None:
         if callback is None:
             return
 
         self._callbacks.add(callback)
 
-    def get_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
+    def get_invalidation_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
         return self._callbacks
 
 
@@ -468,13 +472,15 @@ class CacheMultipleEntries(CacheEntry[KT, VT]):
             self._deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
         return self._deferred.observe().addCallback(lambda res: res.get(key))
 
-    def add_callback(self, key: KT, callback: Optional[Callable[[], None]]) -> None:
+    def add_invalidation_callback(
+        self, key: KT, callback: Optional[Callable[[], None]]
+    ) -> None:
         if callback is None:
             return
 
         self._callbacks.setdefault(key, set()).add(callback)
 
-    def get_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
+    def get_invalidation_callbacks(self, key: KT) -> Collection[Callable[[], None]]:
         return self._callbacks.get(key, set()) | self._global_callbacks
 
     def add_global_callback(self, callback: Optional[Callable[[], None]]) -> None:
