@@ -42,9 +42,10 @@ events.
 
 Instead, we break down the graph into *chains*. A chain is a subset of a DAG
 with the following property: for any pair of events `E` and `F` in the chain,
-the chain contains a path `E -> F` or a path `F -> E`. If we ensure that each
-persisted event belongs to exactly one chain, we can keep answer reachability
-queries by tracking of how the chains are connected to one another. Doing so
+the chain contains a path `E -> F` or a path `F -> E`. Synapse ensures that each
+persisted event belongs to exactly one chain, and tracks how the chains are
+connected to one another. This allows us to efficiently answer reachability
+queries. Doing so
 uses less storage than tracking this on an event-by-event basis, particularly
 when we have fewer and longer chains. See
 
@@ -62,8 +63,8 @@ for a more modern take.
 
 In practical terms, the chain cover assigns every event a
 *chain ID* and *sequence number* (e.g. `(5,3)`), and maintains a map of *links*
-between chains (e.g. `(5,3) -> (2,4)`) such that `A` is reachable by `B` (i.e. `A`
-is in the auth chain of `B`) if and only if either:
+between events in chains (e.g. `(5,3) -> (2,4)`) such that `A` is reachable by `B`
+(i.e. `A` is in the auth chain of `B`) if and only if either:
 
 1. `A` and `B` have the same chain ID and `A`'s sequence number is less than `B`'s
    sequence number; or
@@ -75,7 +76,7 @@ each chain to every other reachable chain (the transitive closure of the links
 graph), and one where we remove redundant links (the transitive reduction of the
 links graph) e.g. if we have chains `C3 -> C2 -> C1` then the link `C3 -> C1`
 would not be stored. Synapse uses the former implementation so that it doesn't
-need to recurse to test reachability between chains. This trade-offs extra storage
+need to recurse to test reachability between chains. This trades-off extra storage
 in order to save CPU cycles and DB queries.
 
 ### Example
