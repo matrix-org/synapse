@@ -301,7 +301,7 @@ class DeferredCache(Generic[KT, VT]):
         entry.add_invalidation_callback(key, callback)
         self._pending_deferred_cache[key] = entry
         deferred = entry.deferred(key).addCallbacks(
-            self._set_completed_callback,
+            self._completed_callback,
             self._error_callback,
             callbackArgs=(entry, key),
             errbackArgs=(entry, key),
@@ -329,7 +329,7 @@ class DeferredCache(Generic[KT, VT]):
 
         return entry
 
-    def _set_completed_callback(
+    def _completed_callback(
         self, value: VT, entry: "CacheEntry[KT, VT]", key: KT
     ) -> VT:
         """Called when a deferred is completed."""
@@ -497,7 +497,7 @@ class CacheMultipleEntries(CacheEntry[KT, VT]):
     ) -> None:
         """Called when there is a result"""
         for key, value in result.items():
-            cache._set_completed_callback(value, self, key)
+            cache._completed_callback(value, self, key)
 
         if self._deferred:
             self._deferred.callback(result)
