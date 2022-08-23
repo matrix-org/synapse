@@ -66,7 +66,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user = UserID.from_string(user_id)
-        is_admin = await self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester)
 
         content = parse_json_object_from_request(request)
 
@@ -123,7 +123,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
-        is_admin = await self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester)
 
         content = parse_json_object_from_request(request)
         try:

@@ -54,7 +54,7 @@ class QuarantineMediaInRoom(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         logging.info("Quarantining room: %s", room_id)
 
@@ -81,7 +81,7 @@ class QuarantineMediaByUser(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         logging.info("Quarantining media by user: %s", user_id)
 
@@ -110,7 +110,7 @@ class QuarantineMediaByID(RestServlet):
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         logging.info("Quarantining media by ID: %s/%s", server_name, media_id)
 

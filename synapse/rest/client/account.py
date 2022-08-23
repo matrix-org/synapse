@@ -196,7 +196,7 @@ class PasswordRestServlet(RestServlet):
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
-                    body.dict(),
+                    body.dict(exclude_unset=True),
                     "modify your account password",
                 )
             except InteractiveAuthIncompleteError as e:
@@ -219,7 +219,7 @@ class PasswordRestServlet(RestServlet):
                 result, params, session_id = await self.auth_handler.check_ui_auth(
                     [[LoginType.EMAIL_IDENTITY]],
                     request,
-                    body.dict(),
+                    body.dict(exclude_unset=True),
                     "modify your account password",
                 )
             except InteractiveAuthIncompleteError as e:
@@ -316,7 +316,7 @@ class DeactivateAccountRestServlet(RestServlet):
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body.dict(),
+            body.dict(exclude_unset=True),
             "deactivate your account",
         )
         result = await self._deactivate_account_handler.deactivate_account(
