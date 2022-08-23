@@ -1,3 +1,72 @@
+Synapse 1.66.0rc1 (2022-08-23)
+==============================
+
+Features
+--------
+
+- Improve validation of request bodies for the following client-server API endpoints: [`/account/password`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3accountpassword), [`/account/password/email/requestToken`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3accountpasswordemailrequesttoken), [`/account/deactivate`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3accountdeactivate) and [`/account/3pid/email/requestToken`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidemailrequesttoken). ([\#13188](https://github.com/matrix-org/synapse/issues/13188), [\#13563](https://github.com/matrix-org/synapse/issues/13563))
+- Add forgotten status to [Room Details Admin API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#room-details-api). ([\#13503](https://github.com/matrix-org/synapse/issues/13503))
+- Add an experimental implementation for [MSC3852 (Expose user agents on `Device`)](https://github.com/matrix-org/matrix-spec-proposals/pull/3852). ([\#13549](https://github.com/matrix-org/synapse/issues/13549))
+- Add `org.matrix.msc2716v4` experimental room version with updated content fields. Part of [MSC2716 (Importing history)](https://github.com/matrix-org/matrix-spec-proposals/pull/2716).  ([\#13551](https://github.com/matrix-org/synapse/issues/13551))
+- Add support for compression to federation responses. ([\#13537](https://github.com/matrix-org/synapse/issues/13537))
+- Improve performance of sending messages in rooms with thousands of local users. ([\#13522](https://github.com/matrix-org/synapse/issues/13522), [\#13547](https://github.com/matrix-org/synapse/issues/13547))
+
+
+Bugfixes
+--------
+
+- Faster room joins: make `/joined_members` block whilst the room is partial stated. ([\#13514](https://github.com/matrix-org/synapse/issues/13514))
+- Fix a bug introduced in Synapse 1.21 where the [`/event_reports` Admin API](https://matrix-org.github.io/synapse/develop/admin_api/event_reports.html) could return a total count which was larger than the number of results you can actually query for. ([\#13525](https://github.com/matrix-org/synapse/issues/13525))
+- Fix a bug introduced in Synapse 1.52.0 where sending server notices fails if `max_avatar_size` or `allowed_avatar_mimetypes` is set and not `system_mxid_avatar_url`. ([\#13566](https://github.com/matrix-org/synapse/issues/13566))
+- Fix a bug where the `opentracing.force_tracing_for_users` config option not applying to [`/sendToDevice`](https://spec.matrix.org/v1.3/client-server-api/#put_matrixclientv3sendtodeviceeventtypetxnid) and [`/keys/upload`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3keysupload) requests. ([\#13574](https://github.com/matrix-org/synapse/issues/13574))
+
+
+Improved Documentation
+----------------------
+
+- Add `openssl` example for generating registration HMAC digest. ([\#13472](https://github.com/matrix-org/synapse/issues/13472))
+- Tidy up Synapse's README. ([\#13491](https://github.com/matrix-org/synapse/issues/13491))
+- Document that event purging related to the `redaction_retention_period` config option is executed only every 5 minutes. ([\#13492](https://github.com/matrix-org/synapse/issues/13492))
+- Add a warning to retention documentation regarding the possibility of database corruption. ([\#13497](https://github.com/matrix-org/synapse/issues/13497))
+- Document that the `DOCKER_BUILDKIT=1` flag is needed to build the docker image. ([\#13515](https://github.com/matrix-org/synapse/issues/13515))
+- Add missing links in `user_consent` section of configuration manual. ([\#13536](https://github.com/matrix-org/synapse/issues/13536))
+- Fix the doc and some warnings that were referring to the nonexistent `custom_templates_directory` setting (instead of `custom_template_directory`). ([\#13538](https://github.com/matrix-org/synapse/issues/13538))
+
+
+Internal Changes
+----------------
+
+### Faster room joins
+
+- Faster room joins: update the rejected state of events during de-partial-stating. ([\#13459](https://github.com/matrix-org/synapse/issues/13459))
+- Faster room joins: Avoid blocking lazy-loading `/sync`s during partial joins due to remote memberships. Pull remote memberships from auth events instead of the room state. ([\#13477](https://github.com/matrix-org/synapse/issues/13477))
+- Faster room joins: Refuse to start when faster joins is enabled on a deployment with workers, since worker configurations are not currently supported. ([\#13531](https://github.com/matrix-org/synapse/issues/13531))
+
+### Metrics and tracing
+
+- Allow use of both `@trace` and `@tag_args` stacked on the same function. ([\#13453](https://github.com/matrix-org/synapse/issues/13453))
+- Instrument the federation/backfill part of `/messages` for understandable traces in Jaeger. ([\#13489](https://github.com/matrix-org/synapse/issues/13489))
+- Instrument `FederationStateIdsServlet` (`/state_ids`) for understandable traces in Jaeger. ([\#13499](https://github.com/matrix-org/synapse/issues/13499), [\#13554](https://github.com/matrix-org/synapse/issues/13554))
+- Track HTTP response times over 10 seconds from `/messages` (`synapse_room_message_list_rest_servlet_response_time_seconds`). ([\#13533](https://github.com/matrix-org/synapse/issues/13533))
+- Add metrics to track how the rate limiter is affecting requests (sleep/reject). ([\#13534](https://github.com/matrix-org/synapse/issues/13534), [\#13541](https://github.com/matrix-org/synapse/issues/13541))
+- Add metrics to time how long it takes us to do backfill processing (`synapse_federation_backfill_processing_before_time_seconds`, `synapse_federation_backfill_processing_after_time_seconds`). ([\#13535](https://github.com/matrix-org/synapse/issues/13535), [\#13584](https://github.com/matrix-org/synapse/issues/13584))
+- Add metrics to track rate limiter queue timing (`synapse_rate_limit_queue_wait_time_seconds`). ([\#13544](https://github.com/matrix-org/synapse/issues/13544))
+- Update metrics to track `/messages` response time by room size. ([\#13545](https://github.com/matrix-org/synapse/issues/13545))
+
+### Everything else
+
+- Refactor methods in `synapse.api.auth.Auth` to use `Requester` objects everywhere instead of user IDs. ([\#13024](https://github.com/matrix-org/synapse/issues/13024))
+- Clean-up tests for notifications. ([\#13471](https://github.com/matrix-org/synapse/issues/13471))
+- Add some miscellaneous comments to document sync, especially around `compute_state_delta`. ([\#13474](https://github.com/matrix-org/synapse/issues/13474))
+- Use literals in place of `HTTPStatus` constants in tests. ([\#13479](https://github.com/matrix-org/synapse/issues/13479), [\#13488](https://github.com/matrix-org/synapse/issues/13488))
+- Add comments about how event push actions are rotated. ([\#13485](https://github.com/matrix-org/synapse/issues/13485))
+- Modify HTML template content to better support mobile devices' screen sizes. ([\#13493](https://github.com/matrix-org/synapse/issues/13493))
+- Add a linter script which will reject non-strict types in Pydantic models. ([\#13502](https://github.com/matrix-org/synapse/issues/13502))
+- Reduce the number of tests using legacy TCP replication. ([\#13543](https://github.com/matrix-org/synapse/issues/13543))
+- Allow specifying additional request fields when using the `HomeServerTestCase.login` helper method. ([\#13549](https://github.com/matrix-org/synapse/issues/13549))
+- Make `HomeServerTestCase` load any configured homeserver modules automatically. ([\#13558](https://github.com/matrix-org/synapse/issues/13558))
+
+
 Synapse 1.65.0 (2022-08-16)
 ===========================
 

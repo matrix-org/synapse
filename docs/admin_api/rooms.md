@@ -337,6 +337,8 @@ A response body like the following is returned:
 }
 ```
 
+_Changed in Synapse 1.66:_ Added the `forgotten` key to the response body.
+
 # Room Members API
 
 The Room Members admin API allows server admins to get a list of all members of a room.
