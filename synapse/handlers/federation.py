@@ -86,9 +86,14 @@ backfill_processing_before_timer = Histogram(
     "sec",
     [],
     buckets=(
+        0.1,
+        0.5,
         1.0,
+        2.5,
         5.0,
+        7.5,
         10.0,
+        15.0,
         20.0,
         30.0,
         40.0,
@@ -482,7 +487,7 @@ class FederationHandler:
 
         processing_end_time = self.clock.time_msec()
         backfill_processing_before_timer.observe(
-            (processing_start_time - processing_end_time) / 1000
+            (processing_end_time - processing_start_time) / 1000
         )
 
         success = await try_backfill(likely_domains)
