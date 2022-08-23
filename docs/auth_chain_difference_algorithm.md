@@ -36,17 +36,23 @@ the process of indexing it).
 Synapse computes auth chain differences by pre-computing a "chain cover" index
 for the auth chain in a room, allowing us to efficiently make reachability queries
 like "is event `A` in the auth chain of event `B`?". We could do this with an index
-that tracks all pairs `(A, B)` such that `A` is in the auth chain of `B`. However this
+that tracks all pairs `(A, B)` such that `A` is in the auth chain of `B`. However, this
 would be prohibitively large, scaling poorly as the room accumulates more state
 events.
 
 Instead, we break down the graph into *chains*. A chain is a subset of a DAG
 with the following property: for any pair of events `E` and `F` in the chain,
-the chain contains a path `E -> F` or a path `F -> E`. Synapse ensures that each
-persisted event belongs to exactly one chain, and tracks how the chains are
-connected to one another. This allows us to efficiently answer reachability
-queries. Doing so uses less storage than tracking this on an event-by-event
-basis, particularly when we have fewer and longer chains. See
+the chain contains a path `E -> F` or a path `F -> E`. Each event in the chain
+is given a *sequence number* local to that chain. The oldest event `E` in the
+chain has sequence number 1. If `E` has a child in the chain, the child has
+sequence number 2; if `E` has a grandchild, the grandchild has sequence number
+3; and so on.
+
+Synapse ensures that each persisted event belongs to exactly one chain, and
+tracks how the chains are connected to one another. This allows us to
+efficiently answer reachability queries. Doing so uses less storage than
+tracking reachability on an event-by-event basis, particularly when we have
+fewer and longer chains. See
 
 > Jagadish, H. (1990). [A compression technique to materialize transitive closure](https://doi.org/10.1145/99935.99944).
 > *ACM Transactions on Database Systems (TODS)*, 15*(4)*, 558-598.
