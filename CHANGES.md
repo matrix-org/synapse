@@ -16,9 +16,9 @@ Bugfixes
 --------
 
 - Faster room joins: make `/joined_members` block whilst the room is partial stated. ([\#13514](https://github.com/matrix-org/synapse/issues/13514))
-- Fix a bug introduced in Synapse 1.21 where the [`/event_reports` Admin API](https://matrix-org.github.io/synapse/develop/admin_api/event_reports.html) could return a total count which was larger than the number of results you can actually query for. ([\#13525](https://github.com/matrix-org/synapse/issues/13525))
+- Fix a bug introduced in Synapse 1.21.0 where the [`/event_reports` Admin API](https://matrix-org.github.io/synapse/develop/admin_api/event_reports.html) could return a total count which was larger than the number of results you can actually query for. ([\#13525](https://github.com/matrix-org/synapse/issues/13525))
 - Fix a bug introduced in Synapse 1.52.0 where sending server notices fails if `max_avatar_size` or `allowed_avatar_mimetypes` is set and not `system_mxid_avatar_url`. ([\#13566](https://github.com/matrix-org/synapse/issues/13566))
-- Fix a bug where the `opentracing.force_tracing_for_users` config option not applying to [`/sendToDevice`](https://spec.matrix.org/v1.3/client-server-api/#put_matrixclientv3sendtodeviceeventtypetxnid) and [`/keys/upload`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3keysupload) requests. ([\#13574](https://github.com/matrix-org/synapse/issues/13574))
+- Fix a bug where the `opentracing.force_tracing_for_users` config option would not apply to [`/sendToDevice`](https://spec.matrix.org/v1.3/client-server-api/#put_matrixclientv3sendtodeviceeventtypetxnid) and [`/keys/upload`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3keysupload) requests. ([\#13574](https://github.com/matrix-org/synapse/issues/13574))
 
 
 Improved Documentation
@@ -38,9 +38,9 @@ Internal Changes
 
 ### Faster room joins
 
-- Faster room joins: update the rejected state of events during de-partial-stating. ([\#13459](https://github.com/matrix-org/synapse/issues/13459))
-- Faster room joins: Avoid blocking lazy-loading `/sync`s during partial joins due to remote memberships. Pull remote memberships from auth events instead of the room state. ([\#13477](https://github.com/matrix-org/synapse/issues/13477))
-- Faster room joins: Refuse to start when faster joins is enabled on a deployment with workers, since worker configurations are not currently supported. ([\#13531](https://github.com/matrix-org/synapse/issues/13531))
+- Update the rejected state of events during de-partial-stating. ([\#13459](https://github.com/matrix-org/synapse/issues/13459))
+- Avoid blocking lazy-loading `/sync`s during partial joins due to remote memberships. Pull remote memberships from auth events instead of the room state. ([\#13477](https://github.com/matrix-org/synapse/issues/13477))
+- Refuse to start when faster joins is enabled on a deployment with workers, since worker configurations are not currently supported. ([\#13531](https://github.com/matrix-org/synapse/issues/13531))
 
 ### Metrics and tracing
 
