@@ -396,7 +396,7 @@ class DeferredCache(Generic[KT, VT]):
             # case of a TreeCache, a dict of keys to cache entries. Either way calling
             # iterate_tree_cache_entry on it will do the right thing.
             for entry in iterate_tree_cache_entry(entry):
-                for cb in entry.get_callbacks(key):
+                for cb in entry.get_invalidation_callbacks(key):
                     cb()
 
     def invalidate_all(self) -> None:
