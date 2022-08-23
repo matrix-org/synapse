@@ -1,1 +1,1 @@
-Use dedicated `get_local_users_in_room` to find local users when calculating `join_authorised_via_users_server` of a `/make_join` request.
+Use dedicated `get_local_users_in_room(room_id)` function to find local users when calculating `join_authorised_via_users_server` of a `/make_join` request.
