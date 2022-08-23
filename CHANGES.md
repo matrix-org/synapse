@@ -1,6 +1,12 @@
 Synapse 1.66.0rc1 (2022-08-23)
 ==============================
 
+This release removes the ability for homeservers to delegate email ownership
+verification and password reset confirmation to identity servers. This removal
+was originally planned for Synapse 1.64, but was later deferred until now.
+
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
+
 Features
 --------
 
@@ -32,6 +38,12 @@ Improved Documentation
 - Add missing links in `user_consent` section of configuration manual. ([\#13536](https://github.com/matrix-org/synapse/issues/13536))
 - Fix the doc and some warnings that were referring to the nonexistent `custom_templates_directory` setting (instead of `custom_template_directory`). ([\#13538](https://github.com/matrix-org/synapse/issues/13538))
 
+
+Deprecations and Removals
+-------------------------
+
+- Remove the ability for homeservers to delegate email ownership verification
+  and password reset confirmation to identity servers. See [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
 
 Internal Changes
 ----------------
