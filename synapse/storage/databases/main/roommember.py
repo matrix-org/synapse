@@ -925,7 +925,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return users_in_room
 
-    @cached(max_entries=10000)
+    @cached(
+        max_entries=10000,
+        # This name matches the old function that has been replaced - the cache name
+        # is kept here to maintain backwards compatibility.
+        name="_get_joined_profile_from_event_id",
+    )
     def _get_user_id_from_membership_event_id(
         self, event_id: str
     ) -> Optional[Tuple[str, ProfileInfo]]:
