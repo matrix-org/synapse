@@ -16371,13 +16371,42 @@ used if we don't have a chain cover index for the room (e.g. because we're in
 the process of indexing it).</p>
 <h2 id="chain-cover-index"><a class="header" href="#chain-cover-index">Chain Cover Index</a></h2>
 <p>Synapse computes auth chain differences by pre-computing a &quot;chain cover&quot; index
-for the auth chain in a room, allowing efficient reachability queries like &quot;is
-event A in the auth chain of event B&quot;. This is done by assigning every event a
-<em>chain ID</em> and <em>sequence number</em> (e.g. <code>(5,3)</code>), and having a map of <em>links</em>
-between chains (e.g. <code>(5,3) -&gt; (2,4)</code>) such that A is reachable by B (i.e. <code>A</code>
-is in the auth chain of <code>B</code>) if and only if either:</p>
+for the auth chain in a room, allowing us to efficiently make reachability queries
+like &quot;is event <code>A</code> in the auth chain of event <code>B</code>?&quot;. We could do this with an index
+that tracks all pairs <code>(A, B)</code> such that <code>A</code> is in the auth chain of <code>B</code>. However, this
+would be prohibitively large, scaling poorly as the room accumulates more state
+events.</p>
+<p>Instead, we break down the graph into <em>chains</em>. A chain is a subset of a DAG
+with the following property: for any pair of events <code>E</code> and <code>F</code> in the chain,
+the chain contains a path <code>E -&gt; F</code> or a path <code>F -&gt; E</code>. This forces a chain to be
+linear (without forks), e.g. <code>E -&gt; F -&gt; G -&gt; ... -&gt; H</code>. Each event in the chain
+is given a <em>sequence number</em> local to that chain. The oldest event <code>E</code> in the
+chain has sequence number 1. If <code>E</code> has a child <code>F</code> in the chain, then <code>F</code> has
+sequence number 2. If <code>E</code> has a grandchild <code>G</code> in the chain, then <code>G</code> has
+sequence number 3; and so on.</p>
+<p>Synapse ensures that each persisted event belongs to exactly one chain, and
+tracks how the chains are connected to one another. This allows us to
+efficiently answer reachability queries. Doing so uses less storage than
+tracking reachability on an event-by-event basis, particularly when we have
+fewer and longer chains. See</p>
+<blockquote>
+<p>Jagadish, H. (1990). <a href="https://doi.org/10.1145/99935.99944">A compression technique to materialize transitive closure</a>.
+<em>ACM Transactions on Database Systems (TODS)</em>, 15*(4)*, 558-598.</p>
+</blockquote>
+<p>for the original idea or</p>
+<blockquote>
+<p>Y. Chen, Y. Chen, <a href="https://doi.org/10.1109/ICDE.2008.4497498">An efficient algorithm for answering graph
+reachability queries</a>,
+in: 2008 IEEE 24th International Conference on Data Engineering, April 2008,
+pp. 893–902. (PDF available via <a href="https://scholar.google.com/scholar?q=Y.%20Chen,%20Y.%20Chen,%20An%20efficient%20algorithm%20for%20answering%20graph%20reachability%20queries,%20in:%202008%20IEEE%2024th%20International%20Conference%20on%20Data%20Engineering,%20April%202008,%20pp.%20893902.">Google Scholar</a>.)</p>
+</blockquote>
+<p>for a more modern take.</p>
+<p>In practical terms, the chain cover assigns every event a
+<em>chain ID</em> and <em>sequence number</em> (e.g. <code>(5,3)</code>), and maintains a map of <em>links</em>
+between events in chains (e.g. <code>(5,3) -&gt; (2,4)</code>) such that <code>A</code> is reachable by <code>B</code>
+(i.e. <code>A</code> is in the auth chain of <code>B</code>) if and only if either:</p>
 <ol>
-<li>A and B have the same chain ID and <code>A</code>'s sequence number is less than <code>B</code>'s
+<li><code>A</code> and <code>B</code> have the same chain ID and <code>A</code>'s sequence number is less than <code>B</code>'s
 sequence number; or</li>
 <li>there is a link <code>L</code> between <code>B</code>'s chain ID and <code>A</code>'s chain ID such that
 <code>L.start_seq_no</code> &lt;= <code>B.seq_no</code> and <code>A.seq_no</code> &lt;= <code>L.end_seq_no</code>.</li>
@@ -16386,8 +16415,9 @@ sequence number; or</li>
 each chain to every other reachable chain (the transitive closure of the links
 graph), and one where we remove redundant links (the transitive reduction of the
 links graph) e.g. if we have chains <code>C3 -&gt; C2 -&gt; C1</code> then the link <code>C3 -&gt; C1</code>
-would not be stored. Synapse uses the former implementations so that it doesn't
-need to recurse to test reachability between chains.</p>
+would not be stored. Synapse uses the former implementation so that it doesn't
+need to recurse to test reachability between chains. This trades-off extra storage
+in order to save CPU cycles and DB queries.</p>
 <h3 id="example-6"><a class="header" href="#example-6">Example</a></h3>
 <p>An example auth graph would look like the following, where chains have been
 formed based on type/state_key and are denoted by colour and are labelled with
