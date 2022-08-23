@@ -310,7 +310,7 @@ class DeferredCache(Generic[KT, VT]):
         # we return a new Deferred which will be called before any subsequent observers.
         return deferred
 
-    def set_bulk(
+    def start_bulk_input(
         self,
         keys: Collection[KT],
         callback: Optional[Callable[[], None]] = None,

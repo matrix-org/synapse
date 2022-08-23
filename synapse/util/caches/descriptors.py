@@ -474,7 +474,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 cached_defers.append(pending_deferred)
 
             if missing:
-                cache_entry = cache.set_bulk(missing, invalidate_callback)
+                cache_entry = cache.start_bulk_input(missing, invalidate_callback)
 
                 def complete_all(res: Dict[Hashable, Any]) -> None:
                     missing_results = {}
