@@ -1,1 +1,1 @@
-Cache user IDs instead of profiles to reduce cache memory usage (renames cache `_get_joined_profile_from_event_id` to `_get_user_id_from_membership_event_id`). Contributed by Nick @ Beeper (@fizzadar).
+Cache user IDs instead of profiles to reduce cache memory usage. Contributed by Nick @ Beeper (@fizzadar).
