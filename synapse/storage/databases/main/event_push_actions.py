@@ -516,6 +516,26 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             ),
         )
 
+        def get_push_actions(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, str, int, str, bool]]:
+            sql = """
+                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions, ep.highlight
+                FROM event_push_actions AS ep
+                WHERE
+                    ep.user_id = ?
+                    AND ep.stream_ordering > ?
+                    AND ep.stream_ordering <= ?
+                    AND ep.notif = 1
+                ORDER BY ep.stream_ordering ASC LIMIT ?
+            """
+            txn.execute(sql, (user_id, min_stream_ordering, max_stream_ordering, limit))
+            return cast(List[Tuple[str, str, int, str, bool]], txn.fetchall())
+
+        push_actions = await self.db_pool.runInteraction(
+            "get_unread_push_actions_for_user_in_range_http", get_push_actions
+        )
+
         # find rooms that have a read receipt in them and return the next
         # push actions
         def get_after_receipt(
@@ -615,7 +635,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 stream_ordering=row[2],
                 actions=_deserialize_action(row[3], row[4]),
             )
-            for row in after_read_receipt + no_read_receipt
+            for row in push_actions
+            # Only include push actions with a stream ordering after any receipt, or without any
+            # receipt present (invited to but never read rooms).
+            if row[2] > receipts_by_room.get(row[1], 0)
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
@@ -657,6 +680,28 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 self._get_receipts_by_room_txn,
                 user_id=user_id,
             ),
+        )
+
+        def get_push_actions(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, str, int, str, bool, int]]:
+            sql = """
+                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
+                    ep.highlight, e.received_ts
+                FROM event_push_actions AS ep
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE
+                    ep.user_id = ?
+                    AND ep.stream_ordering > ?
+                    AND ep.stream_ordering <= ?
+                    AND ep.notif = 1
+                ORDER BY ep.stream_ordering DESC LIMIT ?
+            """
+            txn.execute(sql, (user_id, min_stream_ordering, max_stream_ordering, limit))
+            return cast(List[Tuple[str, str, int, str, bool, int]], txn.fetchall())
+
+        push_actions = await self.db_pool.runInteraction(
+            "get_unread_push_actions_for_user_in_range_email", get_push_actions
         )
 
         # find rooms that have a read receipt in them and return the most recent
@@ -758,7 +803,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 actions=_deserialize_action(row[3], row[4]),
                 received_ts=row[5],
             )
-            for row in after_read_receipt + no_read_receipt
+            for row in push_actions
+            # Only include push actions with a stream ordering after any receipt, or without any
+            # receipt present (invited to but never read rooms).
+            if row[2] > receipts_by_room.get(row[1], 0)
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
