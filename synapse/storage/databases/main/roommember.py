@@ -1067,7 +1067,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # of domains will also be sorted that way.
             domains: List[str] = []
             # We use a `Set` just for fast lookups
-            domain_set: Set[str] = {}
+            domain_set: Set[str] = set()
             for u in users:
                 domain = get_domain_from_id(u)
                 if domain not in domain_set:
