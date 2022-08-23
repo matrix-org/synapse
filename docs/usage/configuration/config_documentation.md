@@ -2182,7 +2182,10 @@ their account.
 by the Matrix Identity Service API
 [specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-*Updated in Synapse 1.64.0*: No longer accepts an `email` option.
+*Deprecated in Synapse 1.64.0*: The `email` option is deprecated.
+
+*Removed in Synapse 1.66.0*: The `email` option has been removed.
+If present, Synapse will report a configuration errorwill now cause an error on startup.
 
 Example configuration:
 ```yaml
