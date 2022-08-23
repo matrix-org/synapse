@@ -760,8 +760,6 @@ class IdentityHandler:
             )
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        except HttpResponseException as e:
-            logger.info("Failed to POST %s with JSON: %s", url, e)
 
         token = data["token"]
         public_keys = data.get("public_keys", [])
