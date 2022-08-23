@@ -302,7 +302,8 @@ to install Dex.</p>
 <p>Set the Allowed Callback URLs to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></p>
 </li>
 <li>
-<p>Add a rule to add the <code>preferred_username</code> claim.</p>
+<p>Add a rule with any name to add the <code>preferred_username</code> claim. 
+(See https://auth0.com/docs/customize/rules/create-rules for more information on how to create rules.)</p>
 <details>
  <summary>Code sample</summary>
 <pre><code class="language-js">function addPersistenceAttribute(user, context, callback) {
