@@ -764,7 +764,7 @@ class FederationServer(FederationBase):
         """
         origin_host, _ = parse_server_name(origin)
 
-        if self.store.is_partial_state_room(room_id):
+        if await self.store.is_partial_state_room(room_id):
             # Before we do anything: check if the room is partial-stated.
             # Note that at the time this check was added, `on_make_knock_request` would
             # block due to https://github.com/matrix-org/synapse/issues/12997.
