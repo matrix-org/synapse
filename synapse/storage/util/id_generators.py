@@ -446,30 +446,25 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
             rows: List[Tuple[str, int]] = []
             for table, instance_column, id_column in tables:
-                logger.info(
-                    "table=%s instance_column=%s id_column=%s",
-                    table,
-                    instance_column,
-                    id_column,
-                )
                 sql = """
                     SELECT %(instance)s, %(id)s FROM %(table)s
                     WHERE ? %(cmp)s %(id)s
-                    /* Sort so that we handle rows in order for each instance. */
-                    ORDER BY %(id)s ASC
                 """ % {
                     "id": id_column,
                     "table": table,
                     "instance": instance_column,
                     "cmp": "<=" if self._positive else ">=",
                 }
-                logger.info(
-                    "sql=%s args=%s", sql, (min_stream_id * self._return_factor,)
-                )
                 cur.execute(sql, (min_stream_id * self._return_factor,))
 
                 # Cast safety: this corresponds to the types returned by the query above.
                 rows.extend(cast(Iterable[Tuple[str, int]], cur))
+
+            # Sort by stream_id (ascending, lowest -> highest) so that we handle
+            # rows in order for each instance because we don't want to overwrite
+            # the current_position of an instance to a lower stream ID than
+            # we're actually at.
+            rows.sort(key=lambda _, stream_id: stream_id)
 
             with self._lock:
                 for (
