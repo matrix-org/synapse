@@ -1066,9 +1066,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # Because `users` is sorted from lowest -> highest depth, the list
             # of domains will also be sorted that way.
             domains: List[str] = []
+            # We use a `Set` just for fast lookups
+            domain_set: Set[str] = {}
             for u in users:
                 domain = get_domain_from_id(u)
-                if domain not in domains:
+                if domain not in domain_set:
+                    domain_set.add(domain)
                     domains.append(domain)
             return domains
 
