@@ -1,0 +1,1 @@
+Remove the ability for homeservers to delegate email ownership verification and password reset confirmation to identity servers. See [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.66/docs/upgrade.md#upgrading-to-v1660) for more details.
