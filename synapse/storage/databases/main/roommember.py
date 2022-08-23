@@ -1039,7 +1039,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return True
 
     @cached(iterable=True, max_entries=10000)
-    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> List[str]:
         """
         Get current hosts in room based on current state.
 
@@ -1057,21 +1057,30 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         users = self.get_users_in_room.cache.get_immediate(
             (room_id,), None, update_metrics=False
         )
+        domains: List[str] = []
         if users is not None:
-            # Because `users` is sorted from lowest -> highest depth, the set of
+            # Because `users` is sorted from lowest -> highest depth, the list of
             # domains will also be sorted that way.
-            return {get_domain_from_id(u) for u in users}
+            for u in users:
+                domain = get_domain_from_id(u)
+                if domain not in domains:
+                    domains.append(domain)
+            return domains
 
         if isinstance(self.database_engine, Sqlite3Engine):
             # If we're using SQLite then let's just always use
             # `get_users_in_room` rather than funky SQL.
             users = await self.get_users_in_room(room_id)
-            return {get_domain_from_id(u) for u in users}
+            for u in users:
+                domain = get_domain_from_id(u)
+                if domain not in domains:
+                    domains.append(domain)
+            return domains
 
         # For PostgreSQL we can use a regex to pull out the domains from the
         # joined users in `current_state_events` via regex.
 
-        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
+        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> List[str]:
             # Returns a list of servers currently joined in the room sorted by
             # longest in the room first (aka. with the lowest depth). The
             # heuristic of sorting by servers who have been in the room the
@@ -1095,7 +1104,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 ORDER BY min(e.depth) ASC;
             """
             txn.execute(sql, (room_id,))
-            return {d for d, in txn}
+            return [d for d, in txn]
 
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room", get_current_hosts_in_room_txn
