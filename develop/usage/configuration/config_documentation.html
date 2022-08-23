@@ -1932,7 +1932,9 @@ their account.</p>
 <p>(Servers handling the these requests must answer the <code>/requestToken</code> endpoints defined
 by the Matrix Identity Service API
 <a href="https://matrix.org/docs/spec/identity_service/latest">specification</a>.)</p>
-<p><em>Updated in Synapse 1.64.0</em>: The <code>email</code> option is deprecated.</p>
+<p><em>Deprecated in Synapse 1.64.0</em>: The <code>email</code> option is deprecated.</p>
+<p><em>Removed in Synapse 1.66.0</em>: The <code>email</code> option has been removed.
+If present, Synapse will report a configuration error on startup.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">account_threepid_delegates:
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process

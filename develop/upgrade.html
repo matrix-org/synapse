@@ -232,6 +232,20 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1660"><a class="header" href="#upgrading-to-v1660">Upgrading to v1.66.0</a></h1>
+<h2 id="delegation-of-email-validation-no-longer-supported"><a class="header" href="#delegation-of-email-validation-no-longer-supported">Delegation of email validation no longer supported</a></h2>
+<p>As of this version, Synapse no longer allows the tasks of verifying email address
+ownership, and password reset confirmation, to be delegated to an identity server.
+This removal was previously planned for Synapse 1.64.0, but was
+<a href="https://github.com/matrix-org/synapse/issues/13421">delayed</a> until now to give
+homeserver administrators more notice of the change.</p>
+<p>To continue to allow users to add email addresses to their homeserver accounts,
+and perform password resets, make sure that Synapse is configured with a working
+email server in the <a href="https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email"><code>email</code> configuration
+section</a>
+(including, at a minimum, a <code>notif_from</code> setting.)</p>
+<p>Specifying an <code>email</code> setting under <code>account_threepid_delegates</code> will now cause
+an error at startup.</p>
 <h1 id="upgrading-to-v1640"><a class="header" href="#upgrading-to-v1640">Upgrading to v1.64.0</a></h1>
 <h2 id="deprecation-of-the-ability-to-delegate-e-mail-verification-to-identity-servers"><a class="header" href="#deprecation-of-the-ability-to-delegate-e-mail-verification-to-identity-servers">Deprecation of the ability to delegate e-mail verification to identity servers</a></h2>
 <p>Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.</p>
