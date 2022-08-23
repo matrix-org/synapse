@@ -5,7 +5,7 @@ This release removes the ability for homeservers to delegate email ownership
 verification and password reset confirmation to identity servers. This removal
 was originally planned for Synapse 1.64, but was later deferred until now.
 
-See the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.66/docs/upgrade.md#upgrading-to-v1660) for more details.
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
 
 Features
 --------
@@ -43,7 +43,7 @@ Deprecations and Removals
 -------------------------
 
 - Remove the ability for homeservers to delegate email ownership verification
-  and password reset confirmation to identity servers. See [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.66/docs/upgrade.md#upgrading-to-v1660) for more details.
+  and password reset confirmation to identity servers. See [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
 
 Internal Changes
 ----------------
