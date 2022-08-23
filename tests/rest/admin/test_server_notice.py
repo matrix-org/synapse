@@ -159,6 +159,62 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual("'msgtype' not in content", channel.json_body["error"])
 
+    @override_config(
+        {
+            "server_notices": {
+                "system_mxid_localpart": "notices",
+                "system_mxid_avatar_url": "somthingwrong",
+            },
+            "max_avatar_size": "10M",
+        }
+    )
+    def test_invalid_avatar_url(self) -> None:
+        """If avatar url in homeserver.yaml is invalid and
+        "check avatar size and mime type" is set, an error is returned.
+        TODO: Should be checked when reading the configuration."""
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content={
+                "user_id": self.other_user,
+                "content": {"msgtype": "m.text", "body": "test msg"},
+            },
+        )
+
+        self.assertEqual(500, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+
+    @override_config(
+        {
+            "server_notices": {
+                "system_mxid_localpart": "notices",
+                "system_mxid_display_name": "test display name",
+                "system_mxid_avatar_url": None,
+            },
+            "max_avatar_size": "10M",
+        }
+    )
+    def test_displayname_is_set_avatar_is_none(self) -> None:
+        """
+        Tests that sending a server notices is successfully,
+        if a display_name is set, avatar_url is `None` and
+        "check avatar size and mime type" is set.
+        """
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content={
+                "user_id": self.other_user,
+                "content": {"msgtype": "m.text", "body": "test msg"},
+            },
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # user has one invite
+        self._check_invite_and_join_status(self.other_user, 1, 0)
+
     def test_server_notice_disabled(self) -> None:
         """Tests that server returns error if server notice is disabled"""
         channel = self.make_request(
