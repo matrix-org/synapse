@@ -210,19 +210,20 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # frequently this function gets called.
         if self._current_state_events_membership_up_to_date:
             sql = """
-                SELECT state_key FROM current_state_events as c
+                SELECT c.state_key FROM current_state_events as c
                 /* Get the depth of the event from the events table */
                 INNER JOIN events AS e USING (event_id)
-                WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
+                WHERE c.type = 'm.room.member' AND c.room_id = ? AND membership = ?
                 /* Sorted by lowest depth first */
                 ORDER BY e.depth ASC;
             """
         else:
             sql = """
-                SELECT state_key FROM room_memberships as m
-                INNER JOIN current_state_events as c USING (event_id)
+                SELECT c.state_key FROM room_memberships as m
                 /* Get the depth of the event from the events table */
                 INNER JOIN events AS e USING (event_id)
+                INNER JOIN current_state_events as c
+                ON m.event_id = c.event_id
                 AND m.room_id = c.room_id
                 AND m.user_id = c.state_key
                 WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
