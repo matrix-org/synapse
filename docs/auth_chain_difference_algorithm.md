@@ -45,9 +45,8 @@ with the following property: for any pair of events `E` and `F` in the chain,
 the chain contains a path `E -> F` or a path `F -> E`. Synapse ensures that each
 persisted event belongs to exactly one chain, and tracks how the chains are
 connected to one another. This allows us to efficiently answer reachability
-queries. Doing so
-uses less storage than tracking this on an event-by-event basis, particularly
-when we have fewer and longer chains. See
+queries. Doing so uses less storage than tracking this on an event-by-event
+basis, particularly when we have fewer and longer chains. See
 
 > Jagadish, H. (1990). [A compression technique to materialize transitive closure](https://doi.org/10.1145/99935.99944).
 > *ACM Transactions on Database Systems (TODS)*, 15*(4)*, 558-598.
