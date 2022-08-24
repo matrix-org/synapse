@@ -246,6 +246,9 @@ jobs:
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
       - name: Install Rust
         uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -357,6 +360,9 @@ jobs:
 
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
