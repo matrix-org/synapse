@@ -59,11 +59,11 @@ jobs:
             /logs/**/*.log*
 
   # Builds
+  # Note: not dependent on tests because they are slow
 
   build-python:
     needs:
-      - test-trial
-      - test-sytest
+      - lint
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -102,8 +102,7 @@ jobs:
 
   build-pyston:
     needs:
-      - test-trial
-      - test-sytest
+      - lint
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
