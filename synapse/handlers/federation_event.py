@@ -1035,7 +1035,7 @@ class FederationEventHandler:
         # It would be better if we could query the difference from our known
         # state to the given `event_id` so the sending server doesn't have to
         # send as much and we don't have to process as many events. For example
-        # in a room like #matrixhq, we get 200k events (77k state_events, 122k
+        # in a room like #matrix:matrix.org, we get 200k events (77k state_events, 122k
         # auth_events) from this call.
         #
         # Tracked by https://github.com/matrix-org/synapse/issues/13618
