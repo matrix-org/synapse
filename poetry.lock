@@ -1038,7 +1038,7 @@ jeepney = ">=0.6"
 name = "semantic-version"
 version = "2.10.0"
 description = "A library implementing the 'SemVer' scheme."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7"
 
@@ -1101,7 +1101,7 @@ tests = ["coverage[toml] (>=5.0.2)", "pytest"]
 name = "setuptools-rust"
 version = "1.5.1"
 description = "Setuptools Rust extension plugin"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1602,7 +1602,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "6a5627bf580a86da60fa915e6bf3905d46e1c8c60fd8b1acb6ecf6b304114865"
+content-hash = "70f280429b559795fc7439c20eaa6e9077d2909e8cb7b17d9d5dff279930bbcc"
 
 [metadata.files]
 attrs = [
