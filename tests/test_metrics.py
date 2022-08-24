@@ -181,6 +181,9 @@ class PrometheusMetricsHackTestCase(unittest.HomeserverTestCase):
         Tests that a brittle hack, to disable `_created` metrics, works.
         This involves poking at the internals of prometheus-client.
         It's not the end of the world if this doesn't work.
+
+        This test gives us a way to notice if prometheus-client changes
+        their internals.
         """
         import prometheus_client.metrics
 
@@ -190,8 +193,7 @@ class PrometheusMetricsHackTestCase(unittest.HomeserverTestCase):
         # Check this assumption is still valid.
         self.assertTrue(getattr(prometheus_client.metrics, PRIVATE_FLAG_NAME))
 
-        mock = Mock()
-        with patch("prometheus_client.metrics", mock):
+        with patch("prometheus_client.metrics") as mock:
             setattr(mock, PRIVATE_FLAG_NAME, True)
             _set_prometheus_client_use_created_metrics(False)
             self.assertFalse(getattr(mock, PRIVATE_FLAG_NAME, False))
