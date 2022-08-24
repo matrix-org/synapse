@@ -554,6 +554,98 @@ class EventCreationHandler:
                 expiry_ms=30 * 60 * 1000,
             )
 
+    async def create_event_for_batch(
+        self,
+        requester: Requester,
+        event_dict: dict,
+        prev_event_ids: List[str],
+        txn_id: Optional[str] = None,
+        auth_event_ids: Optional[List[str]] = None,
+        require_consent: bool = True,
+        outlier: bool = False,
+        historical: bool = False,
+        depth: Optional[int] = None,
+    ) -> EventBase:
+        """
+        Create an event for batch persisting. Notably skips computing event context.
+        """
+        await self.auth_blocking.check_auth_blocking(requester=requester)
+
+        if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
+            room_version_id = event_dict["content"]["room_version"]
+            maybe_room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not maybe_room_version_obj:
+                # this can happen if support is withdrawn for a room version
+                raise UnsupportedRoomVersionError(room_version_id)
+            room_version_obj = maybe_room_version_obj
+        else:
+            try:
+                room_version_obj = await self.store.get_room_version(
+                    event_dict["room_id"]
+                )
+            except NotFoundError:
+                raise AuthError(403, "Unknown room")
+
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
+
+        self.validator.validate_builder(builder)
+
+        if builder.type == EventTypes.Member:
+            membership = builder.content.get("membership", None)
+            target = UserID.from_string(builder.state_key)
+
+            if membership in self.membership_types_to_include_profile_data_in:
+                # If event doesn't include a display name, add one.
+                profile = self.profile_handler
+                content = builder.content
+
+                try:
+                    if "displayname" not in content:
+                        displayname = await profile.get_displayname(target)
+                        if displayname is not None:
+                            content["displayname"] = displayname
+                    if "avatar_url" not in content:
+                        avatar_url = await profile.get_avatar_url(target)
+                        if avatar_url is not None:
+                            content["avatar_url"] = avatar_url
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information for %r: %s", target, e
+                    )
+
+        is_exempt = await self._is_exempt_from_privacy_policy(builder, requester)
+        if require_consent and not is_exempt:
+            await self.assert_accepted_privacy_policy(requester)
+
+        if requester.access_token_id is not None:
+            builder.internal_metadata.token_id = requester.access_token_id
+
+        if txn_id is not None:
+            builder.internal_metadata.txn_id = txn_id
+
+        builder.internal_metadata.outlier = outlier
+
+        builder.internal_metadata.historical = historical
+
+        event = await builder.build(
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
+            depth=depth,
+        )
+
+        # Pass on the outlier property from the builder to the event
+        # after it is created
+        if builder.internal_metadata.outlier:
+            event.internal_metadata.outlier = True
+
+        self.validator.validate_new(event, self.config)
+        await self._validate_event_relation(event)
+        logger.debug("Created event %s", event.event_id)
+
+        return event
+
     async def create_event(
         self,
         requester: Requester,
@@ -732,7 +824,6 @@ class EventCreationHandler:
                 )
 
         self.validator.validate_new(event, self.config)
-
         return event, context
 
     async def _is_exempt_from_privacy_policy(
