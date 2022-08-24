@@ -83,6 +83,7 @@ def sample_line(line: Sample, name: str) -> str:
 # Mapping from new metric names to legacy metric names.
 # We translate these back to their old names when exposing them through our
 # legacy vendored exporter.
+# Only this legacy exposition module applies these name changes.
 LEGACY_METRIC_NAMES = {
     "synapse_util_caches_cache_hits": "synapse_util_caches_cache:hits",
     "synapse_util_caches_cache_size": "synapse_util_caches_cache:size",
