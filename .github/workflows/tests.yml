@@ -244,6 +244,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -352,6 +354,9 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: synapse
+
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
