@@ -1,3 +1,10 @@
+name: Move labelled issues to correct projects
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
   move_needs_info:
     name: Move X-Needs-Info on the triage board
     runs-on: ubuntu-latest
@@ -12,9 +19,9 @@
             mutation {
               updateProjectV2ItemFieldValue(
                 input: {
-                  projectId: ${{ env.PROJECT_ID }}
-                  itemId: ${{ env.PROJECT_ID }}
-                  fieldId: ${{ env.FIELD_ID }}
+                  projectId: $projectid
+                  itemId: $contentid
+                  fieldId: $fieldid
                   value: {
                     singleSelectOptionId: "Todo"
                   }
