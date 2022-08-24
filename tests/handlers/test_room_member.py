@@ -14,7 +14,7 @@ from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 from synapse.util import Clock
 
-from tests.replication._base import RedisMultiWorkerStreamTestCase
+from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request
 from tests.test_utils import make_awaitable
 from tests.unittest import FederatingHomeserverTestCase, override_config
@@ -216,7 +216,7 @@ class TestJoinsLimitedByPerRoomRateLimiter(FederatingHomeserverTestCase):
     #   - trying to remote-join again.
 
 
-class TestReplicatedJoinsLimitedByPerRoomRateLimiter(RedisMultiWorkerStreamTestCase):
+class TestReplicatedJoinsLimitedByPerRoomRateLimiter(BaseMultiWorkerStreamTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.client.login.register_servlets,
