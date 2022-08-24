@@ -459,6 +459,32 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         return await self.db_pool.runInteraction("get_push_action_users_in_range", f)
 
+    def _get_receipts_by_room_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> List[Tuple[str, int]]:
+        receipt_types_clause, args = make_in_list_sql_clause(
+            self.database_engine,
+            "receipt_type",
+            (
+                ReceiptTypes.READ,
+                ReceiptTypes.READ_PRIVATE,
+                ReceiptTypes.UNSTABLE_READ_PRIVATE,
+            ),
+        )
+
+        sql = f"""
+            SELECT room_id, MAX(stream_ordering)
+            FROM receipts_linearized
+            INNER JOIN events USING (room_id, event_id)
+            WHERE {receipt_types_clause}
+            AND user_id = ?
+            GROUP BY room_id
+        """
+
+        args.extend((user_id,))
+        txn.execute(sql, args)
+        return cast(List[Tuple[str, int]], txn.fetchall())
+
     async def get_unread_push_actions_for_user_in_range_for_http(
         self,
         user_id: str,
@@ -482,106 +508,45 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             The list will have between 0~limit entries.
         """
 
-        # find rooms that have a read receipt in them and return the next
-        # push actions
-        def get_after_receipt(
-            txn: LoggingTransaction,
-        ) -> List[Tuple[str, str, int, str, bool]]:
-            # find rooms that have a read receipt in them and return the next
-            # push actions
-
-            receipt_types_clause, args = make_in_list_sql_clause(
-                self.database_engine,
-                "receipt_type",
-                (
-                    ReceiptTypes.READ,
-                    ReceiptTypes.READ_PRIVATE,
-                    ReceiptTypes.UNSTABLE_READ_PRIVATE,
-                ),
-            )
-
-            sql = f"""
-                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
-                    ep.highlight
-                FROM (
-                    SELECT room_id,
-                        MAX(stream_ordering) as stream_ordering
-                    FROM events
-                    INNER JOIN receipts_linearized USING (room_id, event_id)
-                    WHERE {receipt_types_clause} AND user_id = ?
-                    GROUP BY room_id
-                ) AS rl,
-                event_push_actions AS ep
-                WHERE
-                    ep.room_id = rl.room_id
-                    AND ep.stream_ordering > rl.stream_ordering
-                    AND ep.user_id = ?
-                    AND ep.stream_ordering > ?
-                    AND ep.stream_ordering <= ?
-                    AND ep.notif = 1
-                ORDER BY ep.stream_ordering ASC LIMIT ?
-            """
-            args.extend(
-                (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
-            )
-            txn.execute(sql, args)
-            return cast(List[Tuple[str, str, int, str, bool]], txn.fetchall())
-
-        after_read_receipt = await self.db_pool.runInteraction(
-            "get_unread_push_actions_for_user_in_range_http_arr", get_after_receipt
+        receipts_by_room = dict(
+            await self.db_pool.runInteraction(
+                "get_unread_push_actions_for_user_in_range_http_receipts",
+                self._get_receipts_by_room_txn,
+                user_id=user_id,
+            ),
         )
 
-        # There are rooms with push actions in them but you don't have a read receipt in
-        # them e.g. rooms you've been invited to, so get push actions for rooms which do
-        # not have read receipts in them too.
-        def get_no_receipt(
+        def get_push_actions_txn(
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, int, str, bool]]:
-            receipt_types_clause, args = make_in_list_sql_clause(
-                self.database_engine,
-                "receipt_type",
-                (
-                    ReceiptTypes.READ,
-                    ReceiptTypes.READ_PRIVATE,
-                    ReceiptTypes.UNSTABLE_READ_PRIVATE,
-                ),
-            )
-
-            sql = f"""
-                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
-                    ep.highlight
+            sql = """
+                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions, ep.highlight
                 FROM event_push_actions AS ep
-                INNER JOIN events AS e USING (room_id, event_id)
                 WHERE
-                    ep.room_id NOT IN (
-                        SELECT room_id FROM receipts_linearized
-                        WHERE {receipt_types_clause} AND user_id = ?
-                        GROUP BY room_id
-                    )
-                    AND ep.user_id = ?
+                    ep.user_id = ?
                     AND ep.stream_ordering > ?
                     AND ep.stream_ordering <= ?
                     AND ep.notif = 1
                 ORDER BY ep.stream_ordering ASC LIMIT ?
             """
-            args.extend(
-                (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
-            )
-            txn.execute(sql, args)
+            txn.execute(sql, (user_id, min_stream_ordering, max_stream_ordering, limit))
             return cast(List[Tuple[str, str, int, str, bool]], txn.fetchall())
 
-        no_read_receipt = await self.db_pool.runInteraction(
-            "get_unread_push_actions_for_user_in_range_http_nrr", get_no_receipt
+        push_actions = await self.db_pool.runInteraction(
+            "get_unread_push_actions_for_user_in_range_http", get_push_actions_txn
         )
 
         notifs = [
             HttpPushAction(
-                event_id=row[0],
-                room_id=row[1],
-                stream_ordering=row[2],
-                actions=_deserialize_action(row[3], row[4]),
+                event_id=event_id,
+                room_id=room_id,
+                stream_ordering=stream_ordering,
+                actions=_deserialize_action(actions, highlight),
             )
-            for row in after_read_receipt + no_read_receipt
+            for event_id, room_id, stream_ordering, actions, highlight in push_actions
+            # Only include push actions with a stream ordering after any receipt, or without any
+            # receipt present (invited to but never read rooms).
+            if stream_ordering > receipts_by_room.get(room_id, 0)
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
@@ -617,106 +582,49 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             The list will have between 0~limit entries.
         """
 
-        # find rooms that have a read receipt in them and return the most recent
-        # push actions
-        def get_after_receipt(
-            txn: LoggingTransaction,
-        ) -> List[Tuple[str, str, int, str, bool, int]]:
-            receipt_types_clause, args = make_in_list_sql_clause(
-                self.database_engine,
-                "receipt_type",
-                (
-                    ReceiptTypes.READ,
-                    ReceiptTypes.READ_PRIVATE,
-                    ReceiptTypes.UNSTABLE_READ_PRIVATE,
-                ),
-            )
-
-            sql = f"""
-                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
-                    ep.highlight, e.received_ts
-                FROM (
-                    SELECT room_id,
-                        MAX(stream_ordering) as stream_ordering
-                    FROM events
-                    INNER JOIN receipts_linearized USING (room_id, event_id)
-                    WHERE {receipt_types_clause} AND user_id = ?
-                    GROUP BY room_id
-                ) AS rl,
-                event_push_actions AS ep
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE
-                    ep.room_id = rl.room_id
-                    AND ep.stream_ordering > rl.stream_ordering
-                    AND ep.user_id = ?
-                    AND ep.stream_ordering > ?
-                    AND ep.stream_ordering <= ?
-                    AND ep.notif = 1
-                ORDER BY ep.stream_ordering DESC LIMIT ?
-            """
-            args.extend(
-                (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
-            )
-            txn.execute(sql, args)
-            return cast(List[Tuple[str, str, int, str, bool, int]], txn.fetchall())
-
-        after_read_receipt = await self.db_pool.runInteraction(
-            "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
+        receipts_by_room = dict(
+            await self.db_pool.runInteraction(
+                "get_unread_push_actions_for_user_in_range_email_receipts",
+                self._get_receipts_by_room_txn,
+                user_id=user_id,
+            ),
         )
 
-        # There are rooms with push actions in them but you don't have a read receipt in
-        # them e.g. rooms you've been invited to, so get push actions for rooms which do
-        # not have read receipts in them too.
-        def get_no_receipt(
+        def get_push_actions_txn(
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, int, str, bool, int]]:
-            receipt_types_clause, args = make_in_list_sql_clause(
-                self.database_engine,
-                "receipt_type",
-                (
-                    ReceiptTypes.READ,
-                    ReceiptTypes.READ_PRIVATE,
-                    ReceiptTypes.UNSTABLE_READ_PRIVATE,
-                ),
-            )
-
-            sql = f"""
+            sql = """
                 SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
                     ep.highlight, e.received_ts
                 FROM event_push_actions AS ep
                 INNER JOIN events AS e USING (room_id, event_id)
                 WHERE
-                    ep.room_id NOT IN (
-                        SELECT room_id FROM receipts_linearized
-                        WHERE {receipt_types_clause} AND user_id = ?
-                        GROUP BY room_id
-                    )
-                    AND ep.user_id = ?
+                    ep.user_id = ?
                     AND ep.stream_ordering > ?
                     AND ep.stream_ordering <= ?
                     AND ep.notif = 1
                 ORDER BY ep.stream_ordering DESC LIMIT ?
             """
-            args.extend(
-                (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
-            )
-            txn.execute(sql, args)
+            txn.execute(sql, (user_id, min_stream_ordering, max_stream_ordering, limit))
             return cast(List[Tuple[str, str, int, str, bool, int]], txn.fetchall())
 
-        no_read_receipt = await self.db_pool.runInteraction(
-            "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
+        push_actions = await self.db_pool.runInteraction(
+            "get_unread_push_actions_for_user_in_range_email", get_push_actions_txn
         )
 
         # Make a list of dicts from the two sets of results.
         notifs = [
             EmailPushAction(
-                event_id=row[0],
-                room_id=row[1],
-                stream_ordering=row[2],
-                actions=_deserialize_action(row[3], row[4]),
-                received_ts=row[5],
+                event_id=event_id,
+                room_id=room_id,
+                stream_ordering=stream_ordering,
+                actions=_deserialize_action(actions, highlight),
+                received_ts=received_ts,
             )
-            for row in after_read_receipt + no_read_receipt
+            for event_id, room_id, stream_ordering, actions, highlight, received_ts in push_actions
+            # Only include push actions with a stream ordering after any receipt, or without any
+            # receipt present (invited to but never read rooms).
+            if stream_ordering > receipts_by_room.get(room_id, 0)
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
