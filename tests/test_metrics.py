@@ -16,7 +16,8 @@ try:
     from importlib import metadata
 except ImportError:
     import importlib_metadata as metadata  # type: ignore[no-redef]
-from unittest.mock import Mock, patch
+
+from unittest.mock import patch
 
 from pkg_resources import parse_version
 
