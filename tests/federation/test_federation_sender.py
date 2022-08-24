@@ -186,8 +186,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             if room_id == test_room_id:
                 return ["host2"]
 
-            assert "We only expect our stubbed `get_current_hosts_in_room` to be called with "
-            f"test_room_id={test_room_id} but it was called with room_id={room_id}"
+            raise AssertionError(
+                "We only expect our stubbed `get_current_hosts_in_room` to be called with "
+                f"test_room_id={test_room_id} but it was called with room_id={room_id}"
+            )
 
         hs.get_datastores().main.get_current_hosts_in_room = get_current_hosts_in_room
 
