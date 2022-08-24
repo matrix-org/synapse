@@ -186,7 +186,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             if room_id == test_room_id:
                 return ["host2"]
 
-            raise AssertionError(
+            self.fail(
                 "We only expect our stubbed `get_current_hosts_in_room` to be called with "
                 f"test_room_id={test_room_id} but it was called with room_id={room_id}"
             )
