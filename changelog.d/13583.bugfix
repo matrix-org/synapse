@@ -1,0 +1,1 @@
+Faster Room Joins: fix `/make_knock` blocking indefinitely when the room in question is a partial-stated room.
