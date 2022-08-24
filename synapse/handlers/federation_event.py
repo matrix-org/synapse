@@ -1037,6 +1037,8 @@ class FederationEventHandler:
         # send as much and we don't have to process as many events. For example
         # in a room like #matrixhq, we get 200k events (77k state_events, 122k
         # auth_events) from this call.
+        #
+        # Tracked by https://github.com/matrix-org/synapse/issues/13618
         (
             state_event_ids,
             auth_event_ids,
