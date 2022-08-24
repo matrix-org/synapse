@@ -645,14 +645,14 @@ class FederationClient(FederationBase):
         except InvalidEventSignatureError as e:
             logger.warning(
                 "Signature on retrieved event %s was invalid (%s). "
-                "Checking local store/orgin server",
+                "Checking local store/origin server",
                 pdu.event_id,
                 e,
             )
             log_kv(
                 {
                     "message": "Signature on retrieved event was invalid. "
-                    "Checking local store/orgin server",
+                    "Checking local store/origin server",
                     "event_id": pdu.event_id,
                     "InvalidEventSignatureError": e,
                 }
