@@ -123,7 +123,7 @@ jobs:
           docker buildx build \
             --push \
             --platform linux/amd64 \
-            --build-arg BASE_IMAGE=pyston/slim:2.3.3 \
+            --build-arg BASE_IMAGE=${{ secrets.CI_REGISTRY }}/pyston-no-pymalloc:slim-amd64-2.3.4 \
             --tag ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }}-pyston \
             -f docker/Dockerfile-custom-base \
             .
