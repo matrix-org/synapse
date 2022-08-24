@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import os
 from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
@@ -39,6 +40,10 @@ logger = logging.getLogger(__name__)
 
 
 MAX_STATE_DELTA_HOPS = 100
+
+BEEPER_DISABLE_STATE_GROUPS_CACHE = bool(
+    os.environ.get("BEEPER_DISABLE_STATE_GROUPS_CACHE")
+)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -357,6 +362,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             cache_seq_num_non_members: Sequence number of member cache since
                 last lookup in cache
         """
+
+        if BEEPER_DISABLE_STATE_GROUPS_CACHE:
+            return
 
         # We need to work out which types we've fetched from the DB for the
         # member vs non-member caches. This should be as accurate as possible,
