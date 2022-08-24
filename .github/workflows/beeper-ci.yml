@@ -78,25 +78,23 @@ jobs:
           password: ${{ secrets.CI_REGISTRY_PASSWORD }}
       - run: |-
           if [ "${{ github.ref_name }}" = "beeper" ]; then
-            tag=$(cat pyproject.toml | grep -E "^version =" | sed -E 's/^version = "(.+)"$/\1/');
+            tag=$(cat pyproject.toml | grep -E "^version =" | sed -E 's/^version = "(.+)"$/\1/')
+            extraTag="--tag ${{ secrets.CI_REGISTRY }}/synapse:latest"
           else
-            tag="${{ github.head_ref || github.ref_name }}";
+            tag="${{ github.head_ref || github.ref_name }}"
+            extraTag=""
           fi
 
           docker buildx build \
             --push \
             --platform linux/amd64,linux/arm64 \
             --tag ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }} \
+            $extraTag \
             -f docker/Dockerfile \
             .
 
           echo "Pushed image: synapse:$tag-${{ github.sha }}"
-
           if [ "${{ github.ref_name }}" = "beeper" ]; then
-            docker tag \
-              ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }} \
-              ${{ secrets.CI_REGISTRY }}/synapse:latest
-            docker push ${{ secrets.CI_REGISTRY }}/synapse:latest
             echo "Pushed image: synapse:latest"
           fi
 
