@@ -24,6 +24,7 @@ from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
+from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
@@ -416,6 +417,7 @@ class PaginationHandler:
 
             await self._storage_controllers.purge_events.purge_room(room_id)
 
+    @trace
     async def get_messages(
         self,
         requester: Requester,
@@ -462,7 +464,7 @@ class PaginationHandler:
                 membership,
                 member_event_id,
             ) = await self.auth.check_user_in_room_or_world_readable(
-                room_id, user_id, allow_departed_users=True
+                room_id, requester, allow_departed_users=True
             )
 
             if pagin_config.direction == "b":

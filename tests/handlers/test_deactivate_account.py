@@ -11,12 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
-from typing import Any, Dict
 
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import AccountDataTypes
+from synapse.push.baserules import PushRule
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest import admin
 from synapse.rest.client import account, login
@@ -58,7 +57,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             access_token=self.token,
         )
 
-        self.assertEqual(req.code, HTTPStatus.OK, req)
+        self.assertEqual(req.code, 200, req)
 
     def test_global_account_data_deleted_upon_deactivation(self) -> None:
         """
@@ -131,12 +130,12 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             ),
         )
 
-    def _is_custom_rule(self, push_rule: Dict[str, Any]) -> bool:
+    def _is_custom_rule(self, push_rule: PushRule) -> bool:
         """
         Default rules start with a dot: such as .m.rule and .im.vector.
         This function returns true iff a rule is custom (not default).
         """
-        return "/." not in push_rule["rule_id"]
+        return "/." not in push_rule.rule_id
 
     def test_push_rules_deleted_upon_account_deactivation(self) -> None:
         """
@@ -158,22 +157,21 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         )
 
         # Test the rule exists
-        push_rules = self.get_success(self._store.get_push_rules_for_user(self.user))
+        filtered_push_rules = self.get_success(
+            self._store.get_push_rules_for_user(self.user)
+        )
         # Filter out default rules; we don't care
-        push_rules = list(filter(self._is_custom_rule, push_rules))
+        push_rules = [r for r, _ in filtered_push_rules if self._is_custom_rule(r)]
         # Check our rule made it
         self.assertEqual(
             push_rules,
             [
-                {
-                    "user_name": "@user:test",
-                    "rule_id": "personal.override.rule1",
-                    "priority_class": 5,
-                    "priority": 0,
-                    "conditions": [],
-                    "actions": [],
-                    "default": False,
-                }
+                PushRule(
+                    rule_id="personal.override.rule1",
+                    priority_class=5,
+                    conditions=[],
+                    actions=[],
+                )
             ],
             push_rules,
         )
@@ -181,9 +179,11 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         # Request the deactivation of our account
         self._deactivate_my_account()
 
-        push_rules = self.get_success(self._store.get_push_rules_for_user(self.user))
+        filtered_push_rules = self.get_success(
+            self._store.get_push_rules_for_user(self.user)
+        )
         # Filter out default rules; we don't care
-        push_rules = list(filter(self._is_custom_rule, push_rules))
+        push_rules = [r for r, _ in filtered_push_rules if self._is_custom_rule(r)]
         # Check our rule no longer exists
         self.assertEqual(push_rules, [], push_rules)
 
@@ -322,3 +322,18 @@ class DeactivateAccountTestCase(HomeserverTestCase):
                 )
             ),
         )
+
+    def test_deactivate_account_needs_auth(self) -> None:
+        """
+        Tests that making a request to /deactivate with an empty body
+        succeeds in starting the user-interactive auth flow.
+        """
+        req = self.make_request(
+            "POST",
+            "account/deactivate",
+            {},
+            access_token=self.token,
+        )
+
+        self.assertEqual(req.code, 401, req)
+        self.assertEqual(req.json_body["flows"], [{"stages": ["m.login.password"]}])

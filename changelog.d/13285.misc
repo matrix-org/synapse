@@ -1,1 +1,0 @@
-Upgrade from Poetry 1.1.14 to 1.1.12, to fix bugs when locking packages.

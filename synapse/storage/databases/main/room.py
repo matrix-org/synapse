@@ -207,7 +207,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
     def _construct_room_type_where_clause(
         self, room_types: Union[List[Union[str, None]], None]
     ) -> Tuple[Union[str, None], List[str]]:
-        if not room_types or not self.config.experimental.msc3827_enabled:
+        if not room_types:
             return None, []
         else:
             # We use None when we want get rooms without a type
@@ -2001,9 +2001,15 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
+            # We join on room_stats_state despite not using any columns from it
+            # because the join can influence the number of rows returned;
+            # e.g. a room that doesn't have state, maybe because it was deleted.
+            # The query returning the total count should be consistent with
+            # the query returning the results.
             sql = """
                 SELECT COUNT(*) as total_event_reports
                 FROM event_reports AS er
+                JOIN room_stats_state ON room_stats_state.room_id = er.room_id
                 {}
                 """.format(
                 where_clause

@@ -1,4 +1,3 @@
-from http import HTTPStatus
 from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -15,7 +14,7 @@ from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 from synapse.util import Clock
 
-from tests.replication._base import RedisMultiWorkerStreamTestCase
+from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request
 from tests.test_utils import make_awaitable
 from tests.unittest import FederatingHomeserverTestCase, override_config
@@ -217,7 +216,7 @@ class TestJoinsLimitedByPerRoomRateLimiter(FederatingHomeserverTestCase):
     #   - trying to remote-join again.
 
 
-class TestReplicatedJoinsLimitedByPerRoomRateLimiter(RedisMultiWorkerStreamTestCase):
+class TestReplicatedJoinsLimitedByPerRoomRateLimiter(BaseMultiWorkerStreamTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.client.login.register_servlets,
@@ -260,7 +259,7 @@ class TestReplicatedJoinsLimitedByPerRoomRateLimiter(RedisMultiWorkerStreamTestC
             f"/_matrix/client/v3/rooms/{self.room_id}/join",
             access_token=self.bob_token,
         )
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         # wait for join to arrive over replication
         self.replicate()

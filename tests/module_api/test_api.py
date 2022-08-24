@@ -16,6 +16,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
@@ -29,7 +30,6 @@ from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
-from tests.utils import USE_POSTGRES_FOR_TESTS
 
 
 class ModuleApiTestCase(HomeserverTestCase):
@@ -532,6 +532,34 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(res["displayname"], "simone")
         self.assertIsNone(res["avatar_url"])
 
+    def test_update_room_membership_remote_join(self):
+        """Test that the module API can join a remote room."""
+        # Necessary to fake a remote join.
+        fake_stream_id = 1
+        mocked_remote_join = simple_async_mock(
+            return_value=("fake-event-id", fake_stream_id)
+        )
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join
+        fake_remote_host = f"{self.module_api.server_name}-remote"
+
+        # Given that the join is to be faked, we expect the relevant join event not to
+        # be persisted and the module API method to raise that.
+        self.get_failure(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(
+                    sender=f"@user:{self.module_api.server_name}",
+                    target=f"@user:{self.module_api.server_name}",
+                    room_id=f"!nonexistent:{fake_remote_host}",
+                    new_membership="join",
+                    remote_room_hosts=[fake_remote_host],
+                )
+            ),
+            NotFoundError,
+        )
+
+        # Check that a remote join was attempted.
+        self.assertEqual(mocked_remote_join.call_count, 1)
+
     def test_get_room_state(self):
         """Tests that a module can retrieve the state of a room through the module API."""
         user_id = self.register_user("peter", "hackme")
@@ -635,14 +663,79 @@ class ModuleApiTestCase(HomeserverTestCase):
             [{"set_tweak": "sound", "value": "default"}]
         )
 
+    def test_lookup_room_alias(self) -> None:
+        """Test that modules can resolve a room alias to a room ID."""
+        password = "password"
+        user_id = self.register_user("user", password)
+        access_token = self.login(user_id, password)
+        room_alias = "my-alias"
+        reference_room_id = self.helper.create_room_as(
+            tok=access_token, extra_content={"room_alias_name": room_alias}
+        )
+        self.assertIsNotNone(reference_room_id)
+
+        (room_id, _) = self.get_success(
+            self.module_api.lookup_room_alias(
+                f"#{room_alias}:{self.module_api.server_name}"
+            )
+        )
+
+        self.assertEqual(room_id, reference_room_id)
+
+    def test_create_room(self) -> None:
+        """Test that modules can create a room."""
+        # First test user validation (i.e. user is local).
+        self.get_failure(
+            self.module_api.create_room(
+                user_id=f"@user:{self.module_api.server_name}abc",
+                config={},
+                ratelimit=False,
+            ),
+            RuntimeError,
+        )
+
+        # Now do the happy path.
+        user_id = self.register_user("user", "password")
+        access_token = self.login(user_id, "password")
+
+        room_id, room_alias = self.get_success(
+            self.module_api.create_room(
+                user_id=user_id, config={"room_alias_name": "foo-bar"}, ratelimit=False
+            )
+        )
+
+        # Check room creator.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/rooms/{room_id}/state/m.room.create",
+            access_token=access_token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["creator"], user_id)
+
+        # Check room alias.
+        self.assertEquals(room_alias, f"#foo-bar:{self.module_api.server_name}")
+
+        # Let's try a room with no alias.
+        room_id, room_alias = self.get_success(
+            self.module_api.create_room(user_id=user_id, config={}, ratelimit=False)
+        )
+
+        # Check room creator.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/rooms/{room_id}/state/m.room.create",
+            access_token=access_token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["creator"], user_id)
+
+        # Check room alias.
+        self.assertIsNone(room_alias)
+
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
-
-    # Testing stream ID replication from the main to worker processes requires postgres
-    # (due to needing `MultiWriterIdGenerator`).
-    if not USE_POSTGRES_FOR_TESTS:
-        skip = "Requires Postgres"
 
     servlets = [
         admin.register_servlets,
@@ -653,7 +746,6 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
 
     def default_config(self):
         conf = super().default_config()
-        conf["redis"] = {"enabled": "true"}
         conf["stream_writers"] = {"presence": ["presence_writer"]}
         conf["instance_map"] = {
             "presence_writer": {"host": "testserv", "port": 1001},
