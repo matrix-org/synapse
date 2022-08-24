@@ -2377,7 +2377,7 @@ changed at any time, with no notice.**
 
 Set to `true` to publish both legacy and non-legacy Prometheus metric names,
 or to `false` to only publish non-legacy Prometheus metric names.
-Defaults to true. Has no effect if `enable_metrics` is false.
+Defaults to `true`. Has no effect if `enable_metrics` is `false`.
 
 Legacy metric names include:
 - metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
