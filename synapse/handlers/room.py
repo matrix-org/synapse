@@ -108,6 +108,7 @@ class EventContext:
 class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self.state = hs.get_state_handler()
         self._storage_controllers = hs.get_storage_controllers()
         self.auth = hs.get_auth()
         self.auth_blocking = hs.get_auth_blocking()
@@ -1043,6 +1044,9 @@ class RoomCreationHandler:
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
         last_sent_event_id: Optional[str] = None
+        prev_event: List[str] = []
+        state_map = {}
+        auth_events = []
 
         def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
@@ -1053,21 +1057,28 @@ class RoomCreationHandler:
             return e
 
         async def create_event(
-            etype: str, content: JsonDict, **kwargs: Any
-        ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
-            nonlocal last_sent_event_id
+            etype: str,
+            content: JsonDict,
+            auth_event_ids: Optional[List[str]] = None,
+            **kwargs: Any,
+        ) -> EventBase:
             nonlocal depth
+            nonlocal prev_event
 
             event_dict = create_event_dict(etype, content, **kwargs)
 
-            event, context = await self.event_creation_handler.create_event(
+            event = await self.event_creation_handler.create_event_for_batch(
                 creator,
                 event_dict,
-                prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
+                prev_event,
                 depth=depth,
+                auth_event_ids=auth_event_ids,
             )
             depth += 1
-            return event, context
+            prev_event = [event.event_id]
+            state_map[(event.type, event.state_key)] = event.event_id
+
+            return event
 
         async def send(
             event: EventBase,
@@ -1075,9 +1086,6 @@ class RoomCreationHandler:
             creator: Requester,
         ) -> int:
             nonlocal last_sent_event_id
-            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
-                event.sender,
-            )
 
             ev = await self.event_creation_handler.handle_new_client_event(
                 requester=creator,
@@ -1101,12 +1109,15 @@ class RoomCreationHandler:
             )
 
         creation_content.update({"creator": creator_id})
-        creation_event, creation_context = await create_event(
-            etype=EventTypes.Create, content=creation_content
+        creation_event = await create_event(
+            EventTypes.Create,
+            creation_content,
         )
+        creation_context = await self.state.compute_event_context(creation_event)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
         await send(creation_event, creation_context, creator)
+        auth_events.append(creation_event.event_id)
 
         # Room create event must exist at this point
         assert last_sent_event_id is not None
@@ -1122,16 +1133,19 @@ class RoomCreationHandler:
             depth=depth,
         )
         last_sent_event_id = member_event_id
+        prev_event = [member_event_id]
         depth += 1
+        auth_events.append(member_event_id)
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
-            power_event, power_context = await create_event(
-                etype=EventTypes.PowerLevels, content=pl_content
-            )
+            power_event = await create_event(EventTypes.PowerLevels, pl_content)
+            power_context = await self.state.compute_event_context(power_event)
+            current_state_group = power_context._state_group
             last_sent_stream_id = await send(power_event, power_context, creator)
+            auth_events.append(power_event.event_id)
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1174,53 +1188,89 @@ class RoomCreationHandler:
             # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
-
-            pl_event, pl_context = await create_event(
-                etype=EventTypes.PowerLevels, content=power_level_content
+            pl_event = await create_event(
+                EventTypes.PowerLevels,
+                power_level_content,
             )
+            pl_context = await self.state.compute_event_context(pl_event)
+            current_state_group = pl_context._state_group
             last_sent_stream_id = await send(pl_event, pl_context, creator)
+            auth_events.append(pl_event.event_id)
 
         events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            room_alias_event, room_alias_context = await create_event(
-                etype=EventTypes.CanonicalAlias,
-                content={"alias": room_alias.to_string()},
+            room_alias_event = await create_event(
+                EventTypes.CanonicalAlias,
+                {"alias": room_alias.to_string()},
             )
+            assert current_state_group is not None
+            room_alias_context = await self.state.compute_event_context_for_batched(
+                room_alias_event, state_map, current_state_group
+            )
+            current_state_group = room_alias_context._state_group
             events_to_send.append((room_alias_event, room_alias_context))
 
         if (EventTypes.JoinRules, "") not in initial_state:
-            join_rules_event, join_rules_context = await create_event(
-                etype=EventTypes.JoinRules, content={"join_rule": config["join_rules"]}
+            join_rules_event = await create_event(
+                EventTypes.JoinRules,
+                {"join_rule": config["join_rules"]},
+                auth_events,
             )
-
+            assert current_state_group is not None
+            join_rules_context = await self.state.compute_event_context_for_batched(
+                join_rules_event, state_map, current_state_group
+            )
+            current_state_group = join_rules_context._state_group
             events_to_send.append((join_rules_event, join_rules_context))
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            visibility_event, visibility_context = await create_event(
-                etype=EventTypes.RoomHistoryVisibility,
-                content={"history_visibility": config["history_visibility"]},
+            visibility_event = await create_event(
+                EventTypes.RoomHistoryVisibility,
+                {"history_visibility": config["history_visibility"]},
+                auth_events,
             )
+            assert current_state_group is not None
+            visibility_context = await self.state.compute_event_context_for_batched(
+                visibility_event, state_map, current_state_group
+            )
+            current_state_group = visibility_context._state_group
             events_to_send.append((visibility_event, visibility_context))
 
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
-                guest_access_event, guest_access_context = await create_event(
-                    etype=EventTypes.GuestAccess,
-                    content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
+                guest_access_event = await create_event(
+                    EventTypes.GuestAccess,
+                    {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
+                    auth_events,
                 )
+                assert current_state_group is not None
+                guest_access_context = (
+                    await self.state.compute_event_context_for_batched(
+                        guest_access_event, state_map, current_state_group
+                    )
+                )
+                current_state_group = guest_access_context._state_group
                 events_to_send.append((guest_access_event, guest_access_context))
 
         for (etype, state_key), content in initial_state.items():
-            event, context = await create_event(
-                etype=etype, state_key=state_key, content=content
+            event = await create_event(etype, content, auth_events, state_key=state_key)
+            assert current_state_group is not None
+            context = await self.state.compute_event_context_for_batched(
+                event, state_map, current_state_group
             )
+            current_state_group = context._state_group
             events_to_send.append((event, context))
 
         if config["encrypted"]:
-            encryption_event, encryption_context = await create_event(
-                etype=EventTypes.RoomEncryption,
+            encryption_event = await create_event(
+                EventTypes.RoomEncryption,
+                {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
+                auth_events,
                 state_key="",
-                content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
+            )
+            assert current_state_group is not None
+            encryption_context = await self.state.compute_event_context_for_batched(
+                encryption_event, state_map, current_state_group
             )
             events_to_send.append((encryption_event, encryption_context))
 
