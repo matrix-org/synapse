@@ -97,6 +97,10 @@ LEGACY_METRIC_NAMES = {
 
 
 def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> bytes:
+    """
+    Generate metrics in legacy format. Modern metrics are generated directly
+    by prometheus-client.
+    """
 
     # Trigger the cache metrics to be rescraped, which updates the common
     # metrics but do not produce metrics themselves
