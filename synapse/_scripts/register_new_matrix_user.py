@@ -265,7 +265,7 @@ def _read_file(file_path: Any, config_path: str) -> str:
         with open(file_path) as file_stream:
             return file_stream.read()
     except OSError as e:
-        print(f"Error accessing file {file_path}", file=sys.stderr)
+        print(f"Error accessing file {file_path}: {e}", file=sys.stderr)
         sys.exit(1)
 
 
