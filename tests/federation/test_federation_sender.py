@@ -186,6 +186,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             if room_id == test_room_id:
                 return ["host2"]
 
+            # TODO: We should fail the test when we encounter an unxpected room ID.
+            # We can't just use `self.fail(...)` here because the app code is greedy
+            # with `Exception` and will catch it before the test can see it.
+
         hs.get_datastores().main.get_current_hosts_in_room = get_current_hosts_in_room
 
         # whenever send_transaction is called, record the edu data
