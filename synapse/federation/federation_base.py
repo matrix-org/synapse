@@ -129,6 +129,13 @@ class FederationBase:
                     "event_id": pdu.event_id,
                 }
             )
+
+            # TODO: Is it okay to assume this is called from backfilling?
+            #
+            # In any case, we definately don't want to keep fetching spam over
+            # and over and failing it.
+            await self._store.record_event_backfill_attempt(pdu.event_id)
+
             # we redact (to save disk space) as well as soft-failing (to stop
             # using the event in prev_events).
             redacted_event = prune_event(pdu)

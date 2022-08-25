@@ -1293,7 +1293,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return event_id_results
 
     @trace
-    async def record_event_backfill_attempt(self, event_id: str, room_id: str) -> None:
+    async def record_event_backfill_attempt(self, event_id: str) -> None:
         await self.db_pool.simple_upsert(
             table="event_backfill_attempts",
             keyvalues={"event_id": event_id},
@@ -1304,7 +1304,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 "last_attempt_ts": self._clock.time_msec(),
             },
             insertion_values={},
-            desc="insert_event_backfill_attempt",
+            desc="record_event_backfill_attempt",
             lock=False,
         )
 

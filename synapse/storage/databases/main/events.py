@@ -2435,17 +2435,27 @@ class PersistEventsStore:
             "DELETE FROM event_backward_extremities"
             " WHERE event_id = ? AND room_id = ?"
         )
+        backward_extremities_to_remove = [
+            (ev.event_id, ev.room_id)
+            for ev in events
+            if not ev.internal_metadata.is_outlier()
+            # If we encountered an event with no prev_events, then we might
+            # as well remove it now because it won't ever have anything else
+            # to backfill from.
+            or len(ev.prev_event_ids()) == 0
+        ]
         txn.execute_batch(
             query,
-            [
-                (ev.event_id, ev.room_id)
-                for ev in events
-                if not ev.internal_metadata.is_outlier()
-                # If we encountered an event with no prev_events, then we might
-                # as well remove it now because it won't ever have anything else
-                # to backfill from.
-                or len(ev.prev_event_ids()) == 0
-            ],
+            backward_extremities_to_remove,
+        )
+
+        # Since we no longer need it as a backward extremity, it won't be
+        # backfilled again so we no longer need to store the backfill attempts
+        # around it.
+        query = "DELETE FROM event_backfill_attempts" " WHERE event_id = ?"
+        txn.execute_batch(
+            query,
+            backward_extremities_to_remove,
         )
 
 
