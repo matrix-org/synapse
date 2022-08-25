@@ -1,1 +1,1 @@
-Fix the running of MSC1763 retention purge_jobs in multi-worker setups by only running them on the main worker. Contributed by Brad @ Beeper
+Fix the running of MSC1763 retention purge_jobs in multi-worker setups by only running them on the main worker. Contributed by Brad @ Beeper.
