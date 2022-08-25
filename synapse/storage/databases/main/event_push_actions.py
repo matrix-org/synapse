@@ -260,7 +260,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             "event_push_summary_unique_index_null",
             index_name="event_push_summary_unique_index_null",
             table="event_push_summary",
-            columns=["user_id", "room_id", "thread_id IS NULL"],
+            columns=["user_id", "room_id"],
             where_clause="thread_id IS NULL",
             unique=True,
         )
