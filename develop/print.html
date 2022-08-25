@@ -4904,9 +4904,19 @@ Defaults to false. Set to true to enable.</p>
 <h3 id="registration_shared_secret"><a class="header" href="#registration_shared_secret"><code>registration_shared_secret</code></a></h3>
 <p>If set, allows registration of standard or admin accounts by anyone who
 has the shared secret, even if registration is otherwise disabled.</p>
+<p>See also <a href="usage/configuration/config_documentation.html#registration_shared_secret_path"><code>registration_shared_secret_path</code></a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret: &lt;PRIVATE STRING&gt;
 </code></pre>
+<hr />
+<h3 id="registration_shared_secret_path"><a class="header" href="#registration_shared_secret_path"><code>registration_shared_secret_path</code></a></h3>
+<p>An alternative to <a href="usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>:
+allows the shared secret to be specified in an external file.</p>
+<p>The file should be a plain text file, containing only the shared secret.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">registration_shared_secret_file: /path/to/secrets/file
+</code></pre>
+<p><em>Added in Synapse 1.67.0.</em></p>
 <hr />
 <h3 id="bcrypt_rounds"><a class="header" href="#bcrypt_rounds"><code>bcrypt_rounds</code></a></h3>
 <p>Set the number of bcrypt rounds used to generate password hash.
