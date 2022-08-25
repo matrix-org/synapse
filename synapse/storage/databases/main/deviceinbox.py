@@ -779,6 +779,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
                 message_json = json_encoder.encode(messages_by_device["*"])
                 for device_id in devices:
+                    # Beeper hack: ignore hardcoded bridge devices as they will never
+                    # read the messages and fill up the table indefinitely.
+                    if device_id.endswith(" Bridge"):
+                        continue
                     # Add the message for all devices for this user on this
                     # server.
                     messages_json_for_user[device_id] = message_json
