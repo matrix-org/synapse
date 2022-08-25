@@ -835,24 +835,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return shared_room_ids or frozenset()
 
     async def get_joined_users_from_state(
-        self, room_id: str, state: StateMap[str], state_entry: "_StateCacheEntry"
+        self, room_id: str, state: StateMap[str]
     ) -> Dict[str, ProfileInfo]:
-        state_group: Union[object, int] = state_entry.state_group
-        if not state_group:
-            # If state_group is None it means it has yet to be assigned a
-            # state group, i.e. we need to make sure that calls with a state_group
-            # of None don't hit previous cached calls with a None state_group.
-            # To do this we set the state_group to a new object as object() != object()
-            state_group = object()
-
-        assert state_group is not None
         with Measure(self._clock, "get_joined_users_from_state"):
-            return await self._get_joined_users_from_context(state_group, state)
+            return await self._get_joined_users_from_context(state)
 
     async def _get_joined_users_from_context(
-        self,
-        state_group: Union[object, int],
-        current_state_ids: StateMap[str],
+        self, current_state_ids: StateMap[str]
     ) -> Dict[str, ProfileInfo]:
         """
         For a given state_group, get a map of user ID to profile information for users in the room.
@@ -861,11 +850,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         caches for the relevant data before passing any remaining missing event IDs to
         `_get_joined_profiles_from_event_ids` which does the actual data fetching.
         """
-
-        # We don't use `state_group`, it's there so that we can cache based
-        # on it. However, it's important that it's never None, since two current_states
-        # with a state_group of None are likely to be different.
-        assert state_group is not None
 
         users_in_room = {}
         member_event_ids = [
@@ -1104,9 +1088,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             else:
                 # The cache doesn't match the state group or prev state group,
                 # so we calculate the result from first principles.
-                joined_users = await self.get_joined_users_from_state(
-                    room_id, state, state_entry
-                )
+                joined_users = await self.get_joined_users_from_state(room_id, state)
 
                 cache.hosts_to_joined_users = {}
                 for user_id in joined_users:
