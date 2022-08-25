@@ -1326,9 +1326,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 last_attempt_ts=EXCLUDED.last_attempt_ts;
         """
 
-        txn.execute(
-            sql, (event_id, 1, self._clock.time_msec())  # type: ignore[attr-defined]
-        )
+        txn.execute(sql, (event_id, 1, self._clock.time_msec()))
 
     def _record_event_backfill_attempt_upsert_emulated_txn(
         self,

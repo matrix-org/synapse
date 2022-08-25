@@ -589,9 +589,6 @@ class PaginationHandler:
                 state, time_now, config=serialize_options
             )
 
-        # TODO: Remove (just for testing)
-        await self.store.record_event_backfill_attempt(chunk["chunk"][0]["event_id"])
-
         return chunk
 
     async def _shutdown_and_purge_room(
