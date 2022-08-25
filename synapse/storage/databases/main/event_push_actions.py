@@ -707,15 +707,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             sql = """
                 INSERT INTO event_push_actions_staging
                     (event_id, user_id, actions, notif, highlight, unread)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES ?
             """
 
-            txn.execute_batch(
+            txn.execute_values(
                 sql,
                 (
                     _gen_entry(user_id, actions)
                     for user_id, actions in user_id_actions.items()
                 ),
+                fetch=False,
             )
 
         return await self.db_pool.runInteraction(
