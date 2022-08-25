@@ -98,6 +98,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
+from synapse.storage.engines import PostgresEngine
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
@@ -1338,13 +1339,56 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
 
+        # The upserts need to be partitioned into ones with a thread ID and ones
+        # without.
+        unthreaded_args = [
+            (
+                user_id,
+                room_id,
+                summary.notif_count,
+                summary.unread_count,
+                summary.stream_ordering,
+            )
+            for (user_id, room_id, thread_id), summary in summaries.items()
+            if thread_id is None
+        ]
+
+        threaded_summaries = {
+            (user_id, room_id, thread_id): summary
+            for (user_id, room_id, thread_id), summary in summaries.items()
+            if thread_id is not None
+        }
+
+        # simple_upsert_many_txn doesn't support a predicate clause to force using
+        # the partial index (thread_id = NULL).
+        if isinstance(txn.database_engine, PostgresEngine):
+            sql = """
+            INSERT INTO event_push_summary (user_id, room_id, notif_count, unread_count, stream_ordering)
+            VALUES ?
+            ON CONFLICT (user_id, room_id)
+            WHERE thread_id IS NULL
+            DO UPDATE SET notif_count=EXCLUDED.notif_count, unread_count=EXCLUDED.unread_count, stream_ordering=EXCLUDED.stream_ordering
+            """
+
+            txn.execute_values(sql, unthreaded_args, fetch=False)
+
+        else:
+            sql = """
+            INSERT INTO event_push_summary (user_id, room_id, notif_count, unread_count, stream_ordering)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (user_id, room_id)
+            WHERE thread_id IS NULL
+            DO UPDATE SET notif_count=EXCLUDED.notif_count, unread_count=EXCLUDED.unread_count, stream_ordering=EXCLUDED.stream_ordering
+            """
+            txn.execute_batch(sql, unthreaded_args)
+
         self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_push_summary",
             key_names=("user_id", "room_id", "thread_id"),
             key_values=[
                 (user_id, room_id, thread_id)
-                for user_id, room_id, thread_id in summaries
+                for user_id, room_id, thread_id in threaded_summaries
             ],
             value_names=("notif_count", "unread_count", "stream_ordering"),
             value_values=[
@@ -1353,7 +1397,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     summary.unread_count,
                     summary.stream_ordering,
                 )
-                for summary in summaries.values()
+                for summary in threaded_summaries.values()
             ],
         )
 
