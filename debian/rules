@@ -13,7 +13,7 @@ override_dh_installsystemd:
 override_dh_strip:
 
 # many libraries pulled from PyPI have allocatable sections after
-# non-allocatable ones on which dwz errors out, for those without the issue the
+# non-allocatable ones on which dwz errors out. For those without the issue the
 # gains are only marginal
 override_dh_dwz:
 
