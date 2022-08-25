@@ -277,7 +277,6 @@ class BulkPushRuleEvaluator:
             relations = await self._get_mutual_relations(
                 relation.parent_id, itertools.chain(*rules_by_user.values())
             )
-            # XXX Does this need to point to a valid parent ID or anything?
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
 
