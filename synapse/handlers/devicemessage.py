@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from synapse.api.constants import EduTypes, ToDeviceEventTypes
@@ -314,14 +315,28 @@ class DeviceMessageHandler:
             dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
             if dehydrated_device is not None and device_id != dehydrated_device[0]:
                 raise SynapseError(
-                    403,
+                    HTTPStatus.FORBIDDEN,
                     "Can only fetch messages for own device or dehydrated devices",
                     Codes.UNAUTHORIZED,
                 )
 
         since_stream_id = 0
-        if since_token and len(since_token) > 1 and since_token[0] == "d":
-            since_stream_id = int(since_token[1:])
+        if since_token:
+            if not since_token.startswith("d"):
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "from parameter %r has an invalid format" % (since_token,),
+                    errcode=Codes.INVALID_PARAM,
+                )
+
+            try:
+                since_stream_id = int(since_token[1:])
+            except Exception:
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "from parameter %r has an invalid format" % (since_token,),
+                    errcode=Codes.INVALID_PARAM,
+                )
 
             # if we have a since token, delete any to-device messages before that token
             # (since we now know that the device has received them)

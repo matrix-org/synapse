@@ -237,7 +237,7 @@ class DehydratedDeviceServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
 
         self.PATTERNS = client_patterns(
-            "/org.matrix.msc2697.v2/dehydrated_device"
+            "/org.matrix.msc2697.v2/dehydrated_device$"
             if msc2697
             else "/org.matrix.msc3814.v1/dehydrated_device$",
             releases=(),
