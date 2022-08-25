@@ -84,4 +84,7 @@ cat poetry.lock
 echo "::endgroup::"
 
 ~/.local/bin/poetry install -E "all test"
+
+# In poetry 1.1.* we need to manually upgrade setuptools
+~/.local/bin/poetry run pip install -U setuptools
 ~/.local/bin/poetry run trial --jobs=2 tests
