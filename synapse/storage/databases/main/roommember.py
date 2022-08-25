@@ -837,56 +837,54 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_joined_users_from_state(
         self, room_id: str, state: StateMap[str]
     ) -> Dict[str, ProfileInfo]:
-        with Measure(self._clock, "get_joined_users_from_state"):
-            return await self._get_joined_users_from_context(state)
-
-    async def _get_joined_users_from_context(
-        self, current_state_ids: StateMap[str]
-    ) -> Dict[str, ProfileInfo]:
         """
-        For a given state_group, get a map of user ID to profile information for users in the room.
+        For a given set of state IDs, get a map of user ID to profile information
+        for users in the room.
 
         This method doesn't do any fetching of data itself and instead checks various
         caches for the relevant data before passing any remaining missing event IDs to
         `_get_joined_profiles_from_event_ids` which does the actual data fetching.
         """
 
-        users_in_room = {}
-        member_event_ids = [
-            e_id
-            for key, e_id in current_state_ids.items()
-            if key[0] == EventTypes.Member
-        ]
+        with Measure(self._clock, "get_joined_users_from_state"):
+            users_in_room = {}
+            member_event_ids = [
+                e_id for key, e_id in state.items() if key[0] == EventTypes.Member
+            ]
 
-        # We check if we have any of the member event ids in the event cache
-        # before we ask the DB
+            # We check if we have any of the member event ids in the event cache
+            # before we ask the DB
 
-        # We don't update the event cache hit ratio as it completely throws off
-        # the hit ratio counts. After all, we don't populate the cache if we
-        # miss it here
-        event_map = self._get_events_from_local_cache(
-            member_event_ids, update_metrics=False
-        )
-
-        missing_member_event_ids = []
-        for event_id in member_event_ids:
-            ev_entry = event_map.get(event_id)
-            if ev_entry and not ev_entry.event.rejected_reason:
-                if ev_entry.event.membership == Membership.JOIN:
-                    users_in_room[ev_entry.event.state_key] = ProfileInfo(
-                        display_name=ev_entry.event.content.get("displayname", None),
-                        avatar_url=ev_entry.event.content.get("avatar_url", None),
-                    )
-            else:
-                missing_member_event_ids.append(event_id)
-
-        if missing_member_event_ids:
-            event_to_memberships = await self._get_joined_profiles_from_event_ids(
-                missing_member_event_ids
+            # We don't update the event cache hit ratio as it completely throws off
+            # the hit ratio counts. After all, we don't populate the cache if we
+            # miss it here
+            event_map = self._get_events_from_local_cache(
+                member_event_ids, update_metrics=False
             )
-            users_in_room.update(row for row in event_to_memberships.values() if row)
 
-        return users_in_room
+            missing_member_event_ids = []
+            for event_id in member_event_ids:
+                ev_entry = event_map.get(event_id)
+                if ev_entry and not ev_entry.event.rejected_reason:
+                    if ev_entry.event.membership == Membership.JOIN:
+                        users_in_room[ev_entry.event.state_key] = ProfileInfo(
+                            display_name=ev_entry.event.content.get(
+                                "displayname", None
+                            ),
+                            avatar_url=ev_entry.event.content.get("avatar_url", None),
+                        )
+                else:
+                    missing_member_event_ids.append(event_id)
+
+            if missing_member_event_ids:
+                event_to_memberships = await self._get_joined_profiles_from_event_ids(
+                    missing_member_event_ids
+                )
+                users_in_room.update(
+                    row for row in event_to_memberships.values() if row
+                )
+
+            return users_in_room
 
     @cached(max_entries=10000)
     def _get_joined_profile_from_event_id(
