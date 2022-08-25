@@ -916,7 +916,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    def has_3pid_invite_keys(self, content: JsonDict) -> bool:
+    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
         return all(key in content for key in ("medium", "address"))
 
     def register(self, http_server: HttpServer) -> None:
@@ -949,7 +949,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if self.has_3pid_invite_keys(content):
+        if self._has_3pid_invite_keys(content):
             if not all(key in content for key in ("id_server", "id_access_token")):
                 raise SynapseError(
                     400,

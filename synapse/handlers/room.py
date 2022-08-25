@@ -369,9 +369,7 @@ class RoomCreationHandler:
         # required PL above that.
 
         pl_content = copy_and_fixup_power_levels_contents(old_room_pl_state.content)
-        users_default: int = pl_content.get(
-            "users_default", 0
-        )  # type: ignore[assignment]
+        users_default: int = pl_content.get("users_default", 0)  # type: ignore[assignment]
         restricted_level = max(users_default + 1, 50)
 
         updated = False
@@ -680,7 +678,7 @@ class RoomCreationHandler:
             # we returned the new room to the client at this point.
             logger.error("Unable to send updated alias events in new room: %s", e)
 
-    def has_all_3pid_keys(self, invite_3pid: dict) -> bool:
+    def _has_all_3pid_keys(self, invite_3pid: dict) -> bool:
         return all(
             key in invite_3pid
             for key in ("medium", "address", "id_server", "id_access_token")
@@ -742,7 +740,7 @@ class RoomCreationHandler:
 
         # validate each entry for correctness
         for invite_3pid in invite_3pid_list:
-            if not self.has_all_3pid_keys(invite_3pid):
+            if not self._has_all_3pid_keys(invite_3pid):
                 raise SynapseError(
                     400,
                     f"`id_server` and `id_access_token` are required when doing 3pid invite, caused by {invite_3pid}",
