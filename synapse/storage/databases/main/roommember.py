@@ -875,9 +875,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         with Measure(self._clock, "get_joined_user_ids_from_state"):
             users_in_room = set()
             member_event_ids = [
-                e_id
-                for key, e_id in current_state_ids.items()
-                if key[0] == EventTypes.Member
+                e_id for key, e_id in state.items() if key[0] == EventTypes.Member
             ]
 
             # We check if we have any of the member event ids in the event cache
@@ -900,8 +898,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     missing_member_event_ids.append(event_id)
 
             if missing_member_event_ids:
-                event_to_memberships = await self._get_user_ids_from_membership_event_ids(
-                    missing_member_event_ids
+                event_to_memberships = (
+                    await self._get_user_ids_from_membership_event_ids(
+                        missing_member_event_ids
+                    )
                 )
                 users_in_room.update(
                     user_id for user_id in event_to_memberships.values() if user_id
@@ -1106,7 +1106,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             else:
                 # The cache doesn't match the state group or prev state group,
                 # so we calculate the result from first principles.
-                joined_user_ids = await self.get_joined_user_ids_from_state(room_id, state)
+                joined_user_ids = await self.get_joined_user_ids_from_state(
+                    room_id, state
+                )
 
                 cache.hosts_to_joined_users = {}
                 for user_id in joined_user_ids:
