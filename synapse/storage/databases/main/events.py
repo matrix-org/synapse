@@ -2435,7 +2435,7 @@ class PersistEventsStore:
             "DELETE FROM event_backward_extremities"
             " WHERE event_id = ? AND room_id = ?"
         )
-        backward_extremities_to_remove = [
+        backward_extremity_tuples_to_remove = [
             (ev.event_id, ev.room_id)
             for ev in events
             if not ev.internal_metadata.is_outlier()
@@ -2446,16 +2446,23 @@ class PersistEventsStore:
         ]
         txn.execute_batch(
             query,
-            backward_extremities_to_remove,
+            backward_extremity_tuples_to_remove,
         )
 
         # Since we no longer need it as a backward extremity, it won't be
         # backfilled again so we no longer need to store the backfill attempts
         # around it.
-        query = "DELETE FROM event_backfill_attempts" " WHERE event_id = ?"
+        query = """
+            DELETE FROM event_backfill_attempts
+            WHERE event_id = ?
+        """
+        backward_extremity_event_ids_to_remove = [
+            (extremity_tuple[0],)
+            for extremity_tuple in backward_extremity_tuples_to_remove
+        ]
         txn.execute_batch(
             query,
-            backward_extremities_to_remove,
+            backward_extremity_event_ids_to_remove,
         )
 
 
