@@ -50,18 +50,18 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
 
     def test_username_available(self) -> None:
         """
-        The endpoint should return a HTTPStatus.OK response if the username does not exist
+        The endpoint should return a 200 response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "allowed")
         channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["available"])
 
     def test_username_unavailable(self) -> None:
         """
-        The endpoint should return a HTTPStatus.OK response if the username does not exist
+        The endpoint should return a 200 response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "disallowed")

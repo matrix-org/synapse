@@ -15,7 +15,6 @@
 import inspect
 import itertools
 import logging
-from http import HTTPStatus
 from typing import (
     Any,
     Callable,
@@ -78,7 +77,7 @@ def test_disconnect(
         if expect_cancellation:
             expected_code = HTTP_STATUS_REQUEST_CANCELLED
         else:
-            expected_code = HTTPStatus.OK
+            expected_code = 200
 
     request = channel.request
     if channel.is_finished():

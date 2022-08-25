@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
 from typing import Any, Dict
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -58,7 +57,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             access_token=self.token,
         )
 
-        self.assertEqual(req.code, HTTPStatus.OK, req)
+        self.assertEqual(req.code, 200, req)
 
     def test_global_account_data_deleted_upon_deactivation(self) -> None:
         """

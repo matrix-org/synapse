@@ -20,6 +20,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EventTypes, LoginType, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.room_versions import RoomVersion
+from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
@@ -154,7 +155,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             {},
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         callback.assert_called_once()
 
@@ -172,7 +173,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             {},
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.code, 403, channel.result)
 
     def test_third_party_rules_workaround_synapse_errors_pass_through(self) -> None:
         """
@@ -185,12 +186,12 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         """
 
         class NastyHackException(SynapseError):
-            def error_dict(self) -> JsonDict:
+            def error_dict(self, config: Optional[HomeServerConfig]) -> JsonDict:
                 """
                 This overrides SynapseError's `error_dict` to nastily inject
                 JSON into the error response.
                 """
-                result = super().error_dict()
+                result = super().error_dict(config)
                 result["nasty"] = "very"
                 return result
 
@@ -210,7 +211,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             access_token=self.tok,
         )
         # Check the error code
-        self.assertEqual(channel.result["code"], b"429", channel.result)
+        self.assertEqual(channel.code, 429, channel.result)
         # Check the JSON body has had the `nasty` key injected
         self.assertEqual(
             channel.json_body,
@@ -259,7 +260,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             {"x": "x"},
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         event_id = channel.json_body["event_id"]
 
         # ... and check that it got modified
@@ -268,7 +269,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         ev = channel.json_body
         self.assertEqual(ev["content"]["x"], "y")
 
@@ -297,7 +298,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             },
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         orig_event_id = channel.json_body["event_id"]
 
         channel = self.make_request(
@@ -314,7 +315,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             },
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         edited_event_id = channel.json_body["event_id"]
 
         # ... and check that they both got modified
@@ -323,7 +324,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, orig_event_id),
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         ev = channel.json_body
         self.assertEqual(ev["content"]["body"], "ORIGINAL BODY")
 
@@ -332,7 +333,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, edited_event_id),
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         ev = channel.json_body
         self.assertEqual(ev["content"]["body"], "EDITED BODY")
 
@@ -378,7 +379,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             },
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         event_id = channel.json_body["event_id"]
 
@@ -387,7 +388,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         self.assertIn("foo", channel.json_body["content"].keys())
         self.assertEqual(channel.json_body["content"]["foo"], "bar")

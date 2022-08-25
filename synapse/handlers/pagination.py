@@ -26,6 +26,7 @@ from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
+from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
@@ -428,6 +429,7 @@ class PaginationHandler:
         )
         purge_time.observe(purge_end - purge_start)
 
+    @trace
     async def get_messages(
         self,
         requester: Requester,

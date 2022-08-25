@@ -70,7 +70,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
 
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         det_data = {"user_id": user_id, "home_server": self.hs.hostname}
         self.assertDictContainsSubset(det_data, channel.json_body)
 
@@ -91,7 +91,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
 
-        self.assertEqual(channel.result["code"], b"400", channel.result)
+        self.assertEqual(channel.code, 400, msg=channel.result)
 
     def test_POST_appservice_registration_invalid(self) -> None:
         self.appservice = None  # no application service exists
@@ -100,20 +100,20 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
 
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
 
     def test_POST_bad_password(self) -> None:
         request_data = {"username": "kermit", "password": 666}
         channel = self.make_request(b"POST", self.url, request_data)
 
-        self.assertEqual(channel.result["code"], b"400", channel.result)
+        self.assertEqual(channel.code, 400, msg=channel.result)
         self.assertEqual(channel.json_body["error"], "Invalid password")
 
     def test_POST_bad_username(self) -> None:
         request_data = {"username": 777, "password": "monkey"}
         channel = self.make_request(b"POST", self.url, request_data)
 
-        self.assertEqual(channel.result["code"], b"400", channel.result)
+        self.assertEqual(channel.code, 400, msg=channel.result)
         self.assertEqual(channel.json_body["error"], "Invalid username")
 
     def test_POST_user_valid(self) -> None:
@@ -132,7 +132,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
 
     @override_config({"enable_registration": False})
@@ -142,7 +142,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(b"POST", self.url, request_data)
 
-        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.code, 403, msg=channel.result)
         self.assertEqual(channel.json_body["error"], "Registration has been disabled")
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
@@ -153,7 +153,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
         det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_disabled_guest_registration(self) -> None:
@@ -161,7 +161,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
-        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.code, 403, msg=channel.result)
         self.assertEqual(channel.json_body["error"], "Guest access is disabled")
 
     @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
@@ -171,16 +171,16 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             channel = self.make_request(b"POST", url, b"{}")
 
             if i == 5:
-                self.assertEqual(channel.result["code"], b"429", channel.result)
+                self.assertEqual(channel.code, 429, msg=channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEqual(channel.result["code"], b"200", channel.result)
+                self.assertEqual(channel.code, 200, msg=channel.result)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
     @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting(self) -> None:
@@ -194,16 +194,16 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             channel = self.make_request(b"POST", self.url, request_data)
 
             if i == 5:
-                self.assertEqual(channel.result["code"], b"429", channel.result)
+                self.assertEqual(channel.code, 429, msg=channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEqual(channel.result["code"], b"200", channel.result)
+                self.assertEqual(channel.code, 200, msg=channel.result)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
     @override_config({"registration_requires_token": True})
     def test_POST_registration_requires_token(self) -> None:
@@ -231,7 +231,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         # Request without auth to get flows and session
         channel = self.make_request(b"POST", self.url, params)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         flows = channel.json_body["flows"]
         # Synapse adds a dummy stage to differentiate flows where otherwise one
         # flow would be a subset of another flow.
@@ -248,7 +248,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "session": session,
         }
         channel = self.make_request(b"POST", self.url, params)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         completed = channel.json_body["completed"]
         self.assertCountEqual([LoginType.REGISTRATION_TOKEN], completed)
 
@@ -263,7 +263,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
 
         # Check the `completed` counter has been incremented and pending is 0
@@ -293,21 +293,21 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "session": session,
         }
         channel = self.make_request(b"POST", self.url, params)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.MISSING_PARAM)
         self.assertEqual(channel.json_body["completed"], [])
 
         # Test with non-string (invalid)
         params["auth"]["token"] = 1234
         channel = self.make_request(b"POST", self.url, params)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
         self.assertEqual(channel.json_body["completed"], [])
 
         # Test with unknown token (invalid)
         params["auth"]["token"] = "1234"
         channel = self.make_request(b"POST", self.url, params)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.UNAUTHORIZED)
         self.assertEqual(channel.json_body["completed"], [])
 
@@ -361,7 +361,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "session": session2,
         }
         channel = self.make_request(b"POST", self.url, params2)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.UNAUTHORIZED)
         self.assertEqual(channel.json_body["completed"], [])
 
@@ -381,7 +381,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         # Check auth still fails when using token with session2
         channel = self.make_request(b"POST", self.url, params2)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.UNAUTHORIZED)
         self.assertEqual(channel.json_body["completed"], [])
 
@@ -415,7 +415,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "session": session,
         }
         channel = self.make_request(b"POST", self.url, params)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         self.assertEqual(channel.json_body["errcode"], Codes.UNAUTHORIZED)
         self.assertEqual(channel.json_body["completed"], [])
 
@@ -570,7 +570,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_advertised_flows(self) -> None:
         channel = self.make_request(b"POST", self.url, b"{}")
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         flows = channel.json_body["flows"]
 
         # with the stock config, we only expect the dummy flow
@@ -593,7 +593,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     )
     def test_advertised_flows_captcha_and_terms_and_3pids(self) -> None:
         channel = self.make_request(b"POST", self.url, b"{}")
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         flows = channel.json_body["flows"]
 
         self.assertCountEqual(
@@ -625,7 +625,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     )
     def test_advertised_flows_no_msisdn_email_required(self) -> None:
         channel = self.make_request(b"POST", self.url, b"{}")
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
         flows = channel.json_body["flows"]
 
         # with the stock config, we expect all four combinations of 3pid
@@ -797,13 +797,13 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         # endpoint.
         channel = self.make_request(b"GET", "/sync", access_token=tok)
 
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
 
         channel = self.make_request(b"GET", "/sync", access_token=tok)
 
-        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.code, 403, msg=channel.result)
         self.assertEqual(
             channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
@@ -823,12 +823,12 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/account_validity/validity"
         request_data = {"user_id": user_id}
         channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
         channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
     def test_manual_expire(self) -> None:
         user_id = self.register_user("kermit", "monkey")
@@ -844,12 +844,12 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
         channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.code, 403, msg=channel.result)
         self.assertEqual(
             channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
@@ -868,18 +868,18 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
             "enable_renewal_emails": False,
         }
         channel = self.make_request(b"POST", url, request_data, access_token=admin_tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # Try to log the user out
         channel = self.make_request(b"POST", "/logout", access_token=tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # Log the user in again (allowed for expired accounts)
         tok = self.login("kermit", "monkey")
 
         # Try to log out all of the user's sessions
         channel = self.make_request(b"POST", "/logout/all", access_token=tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
 
 class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
@@ -954,7 +954,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         renewal_token = self.get_success(self.store.get_renewal_token_for_user(user_id))
         url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
         channel = self.make_request(b"GET", url)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # Check that we're getting HTML back.
         content_type = channel.headers.getRawHeaders(b"Content-Type")
@@ -972,7 +972,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # Move 1 day forward. Try to renew with the same token again.
         url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
         channel = self.make_request(b"GET", url)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # Check that we're getting HTML back.
         content_type = channel.headers.getRawHeaders(b"Content-Type")
@@ -992,14 +992,14 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # succeed.
         self.reactor.advance(datetime.timedelta(days=3).total_seconds())
         channel = self.make_request(b"GET", "/sync", access_token=tok)
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
     def test_renewal_invalid_token(self) -> None:
         # Hit the renewal endpoint with an invalid token and check that it behaves as
         # expected, i.e. that it responds with 404 Not Found and the correct HTML.
         url = "/_matrix/client/unstable/account_validity/renew?token=123"
         channel = self.make_request(b"GET", url)
-        self.assertEqual(channel.result["code"], b"404", channel.result)
+        self.assertEqual(channel.code, 404, msg=channel.result)
 
         # Check that we're getting HTML back.
         content_type = channel.headers.getRawHeaders(b"Content-Type")
@@ -1023,7 +1023,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         self.assertEqual(len(self.email_attempts), 1)
 
@@ -1096,7 +1096,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         self.assertEqual(len(self.email_attempts), 1)
 
@@ -1176,7 +1176,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
             b"GET",
             f"{self.url}?token={token}",
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertEqual(channel.json_body["valid"], True)
 
     def test_GET_token_invalid(self) -> None:
@@ -1185,7 +1185,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
             b"GET",
             f"{self.url}?token={token}",
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertEqual(channel.json_body["valid"], False)
 
     @override_config(
@@ -1201,10 +1201,10 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
             )
 
             if i == 5:
-                self.assertEqual(channel.result["code"], b"429", channel.result)
+                self.assertEqual(channel.code, 429, msg=channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEqual(channel.result["code"], b"200", channel.result)
+                self.assertEqual(channel.code, 200, msg=channel.result)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
@@ -1212,4 +1212,4 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
             b"GET",
             f"{self.url}?token={token}",
         )
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)

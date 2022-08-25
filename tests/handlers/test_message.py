@@ -314,4 +314,4 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", path, content={}, access_token=self.access_token
         )
-        self.assertEqual(int(channel.result["code"]), 403)
+        self.assertEqual(channel.code, 403)

@@ -125,7 +125,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/background_updates/status",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Background updates should be enabled, but none should be running.
         self.assertDictEqual(
@@ -147,7 +147,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/background_updates/status",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Background updates should be enabled, and one should be running.
         self.assertDictEqual(
@@ -181,7 +181,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/background_updates/enabled",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertDictEqual(channel.json_body, {"enabled": True})
 
         # Disable the BG updates
@@ -191,7 +191,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             content={"enabled": False},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertDictEqual(channel.json_body, {"enabled": False})
 
         # Advance a bit and get the current status, note this will finish the in
@@ -204,7 +204,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/background_updates/status",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertDictEqual(
             channel.json_body,
             {
@@ -231,7 +231,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/background_updates/status",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # There should be no change from the previous /status response.
         self.assertDictEqual(
@@ -259,7 +259,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             content={"enabled": True},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         self.assertDictEqual(channel.json_body, {"enabled": True})
 
@@ -270,7 +270,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/background_updates/status",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Background updates should be enabled and making progress.
         self.assertDictEqual(
@@ -325,7 +325,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # test that each background update is waiting now
         for update in updates:

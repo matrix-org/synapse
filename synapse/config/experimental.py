@@ -36,7 +36,7 @@ class ExperimentalConfig(Config):
             "com.beeper.msc2716_also_allow_user", False
         )
 
-        # MSC2285 (private read receipts)
+        # MSC2285 (unstable private read receipts)
         self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
 
         # MSC3244 (room version capabilities)
@@ -92,5 +92,5 @@ class ExperimentalConfig(Config):
         # MSC3715: dir param on /relations.
         self.msc3715_enabled: bool = experimental.get("msc3715_enabled", False)
 
-        # MSC3827: Filtering of /publicRooms by room type
-        self.msc3827_enabled: bool = experimental.get("msc3827_enabled", False)
+        # MSC3848: Introduce errcodes for specific event sending failures
+        self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)

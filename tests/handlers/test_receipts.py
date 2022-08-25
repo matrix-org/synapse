@@ -15,6 +15,8 @@
 from copy import deepcopy
 from typing import List
 
+from parameterized import parameterized
+
 from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.types import JsonDict
 
@@ -25,13 +27,16 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_source = hs.get_event_sources().sources.receipt
 
-    def test_filters_out_private_receipt(self):
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_filters_out_private_receipt(self, receipt_type: str) -> None:
         self._test_filters_private(
             [
                 {
                     "content": {
                         "$1435641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
+                            receipt_type: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -45,13 +50,18 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [],
         )
 
-    def test_filters_out_private_receipt_and_ignores_rest(self):
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_filters_out_private_receipt_and_ignores_rest(
+        self, receipt_type: str
+    ) -> None:
         self._test_filters_private(
             [
                 {
                     "content": {
                         "$1dgdgrd5641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
+                            receipt_type: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
                                 },
@@ -84,13 +94,18 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(self):
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(
+        self, receipt_type: str
+    ) -> None:
         self._test_filters_private(
             [
                 {
                     "content": {
                         "$14356419edgd14394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
+                            receipt_type: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
                                 },
@@ -125,7 +140,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_handles_empty_event(self):
+    def test_handles_empty_event(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -160,13 +175,18 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(self):
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(
+        self, receipt_type: str
+    ) -> None:
         self._test_filters_private(
             [
                 {
                     "content": {
                         "$14356419edgd14394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
+                            receipt_type: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
                                 },
@@ -207,7 +227,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_handles_string_data(self):
+    def test_handles_string_data(self) -> None:
         """
         Tests that an invalid shape for read-receipts is handled.
         Context: https://github.com/matrix-org/synapse/issues/10603
@@ -242,13 +262,16 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_leaves_our_private_and_their_public(self):
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_leaves_our_private_and_their_public(self, receipt_type: str) -> None:
         self._test_filters_private(
             [
                 {
                     "content": {
                         "$1dgdgrd5641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
+                            receipt_type: {
                                 "@me:server.org": {
                                     "ts": 1436451550453,
                                 },
@@ -273,7 +296,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1dgdgrd5641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
+                            receipt_type: {
                                 "@me:server.org": {
                                     "ts": 1436451550453,
                                 },
@@ -296,13 +319,16 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_we_do_not_mutate(self):
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_we_do_not_mutate(self, receipt_type: str) -> None:
         """Ensure the input values are not modified."""
         events = [
             {
                 "content": {
                     "$1435641916114394fHBLK:matrix.org": {
-                        ReceiptTypes.READ_PRIVATE: {
+                        receipt_type: {
                             "@rikj:jki.re": {
                                 "ts": 1436451550453,
                             }
@@ -320,7 +346,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
 
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
-    ):
+    ) -> None:
         """Tests that the _filter_out_private returns the expected output"""
         filtered_events = self.event_source.filter_out_private_receipts(
             events, "@me:server.org"

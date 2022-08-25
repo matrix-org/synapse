@@ -77,6 +77,4 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", self.report_path, data, access_token=self.other_user_tok
         )
-        self.assertEqual(
-            response_status, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(response_status, channel.code, msg=channel.result["body"])

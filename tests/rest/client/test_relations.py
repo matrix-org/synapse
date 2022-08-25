@@ -1060,6 +1060,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                     participated, bundled_aggregations.get("current_user_participated")
                 )
                 # The latest thread event has some fields that don't matter.
+                self.assertIn("latest_event", bundled_aggregations)
                 self.assert_dict(
                     {
                         "content": {
@@ -1072,7 +1073,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                         "sender": self.user2_id,
                         "type": "m.room.test",
                     },
-                    bundled_aggregations.get("latest_event"),
+                    bundled_aggregations["latest_event"],
                 )
 
             return assert_thread
@@ -1112,6 +1113,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             self.assertEqual(2, bundled_aggregations.get("count"))
             self.assertTrue(bundled_aggregations.get("current_user_participated"))
             # The latest thread event has some fields that don't matter.
+            self.assertIn("latest_event", bundled_aggregations)
             self.assert_dict(
                 {
                     "content": {
@@ -1124,7 +1126,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                     "sender": self.user_id,
                     "type": "m.room.test",
                 },
-                bundled_aggregations.get("latest_event"),
+                bundled_aggregations["latest_event"],
             )
             # Check the unsigned field on the latest event.
             self.assert_dict(

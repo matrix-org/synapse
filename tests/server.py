@@ -25,6 +25,7 @@ from typing import (
     Callable,
     Dict,
     Iterable,
+    List,
     MutableMapping,
     Optional,
     Tuple,
@@ -121,7 +122,15 @@ class FakeChannel:
 
     @property
     def json_body(self) -> JsonDict:
-        return json.loads(self.text_body)
+        body = json.loads(self.text_body)
+        assert isinstance(body, dict)
+        return body
+
+    @property
+    def json_list(self) -> List[JsonDict]:
+        body = json.loads(self.text_body)
+        assert isinstance(body, list)
+        return body
 
     @property
     def text_body(self) -> str:

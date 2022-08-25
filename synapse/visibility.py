@@ -23,6 +23,7 @@ from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
+from synapse.logging.opentracing import trace
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
 from synapse.storage.state import StateFilter
@@ -51,6 +52,7 @@ MEMBERSHIP_PRIORITY = (
 _HISTORY_VIS_KEY: Final[Tuple[str, str]] = (EventTypes.RoomHistoryVisibility, "")
 
 
+@trace
 async def filter_events_for_client(
     storage: StorageControllers,
     user_id: str,

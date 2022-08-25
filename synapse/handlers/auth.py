@@ -565,7 +565,7 @@ class AuthHandler:
             except LoginError as e:
                 # this step failed. Merge the error dict into the response
                 # so that the client can have another go.
-                errordict = e.error_dict()
+                errordict = e.error_dict(self.hs.config)
 
         creds = await self.store.get_completed_ui_auth_stages(session.session_id)
         for f in flows:
