@@ -80,7 +80,27 @@ def sample_line(line: Sample, name: str) -> str:
     return "{}{} {}{}\n".format(name, labelstr, floatToGoString(line.value), timestamp)
 
 
+# Mapping from new metric names to legacy metric names.
+# We translate these back to their old names when exposing them through our
+# legacy vendored exporter.
+# Only this legacy exposition module applies these name changes.
+LEGACY_METRIC_NAMES = {
+    "synapse_util_caches_cache_hits": "synapse_util_caches_cache:hits",
+    "synapse_util_caches_cache_size": "synapse_util_caches_cache:size",
+    "synapse_util_caches_cache_evicted_size": "synapse_util_caches_cache:evicted_size",
+    "synapse_util_caches_cache_total": "synapse_util_caches_cache:total",
+    "synapse_util_caches_response_cache_size": "synapse_util_caches_response_cache:size",
+    "synapse_util_caches_response_cache_hits": "synapse_util_caches_response_cache:hits",
+    "synapse_util_caches_response_cache_evicted_size": "synapse_util_caches_response_cache:evicted_size",
+    "synapse_util_caches_response_cache_total": "synapse_util_caches_response_cache:total",
+}
+
+
 def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> bytes:
+    """
+    Generate metrics in legacy format. Modern metrics are generated directly
+    by prometheus-client.
+    """
 
     # Trigger the cache metrics to be rescraped, which updates the common
     # metrics but do not produce metrics themselves
@@ -94,7 +114,8 @@ def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> byt
             # No samples, don't bother.
             continue
 
-        mname = metric.name
+        # Translate to legacy metric name if it has one.
+        mname = LEGACY_METRIC_NAMES.get(metric.name, metric.name)
         mnewname = metric.name
         mtype = metric.type
 
@@ -124,7 +145,7 @@ def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> byt
         om_samples: Dict[str, List[str]] = {}
         for s in metric.samples:
             for suffix in ["_created", "_gsum", "_gcount"]:
-                if s.name == metric.name + suffix:
+                if s.name == mname + suffix:
                     # OpenMetrics specific sample, put in a gauge at the end.
                     # (these come from gaugehistograms which don't get renamed,
                     # so no need to faff with mnewname)
@@ -140,12 +161,12 @@ def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> byt
             if emit_help:
                 output.append(
                     "# HELP {}{} {}\n".format(
-                        metric.name,
+                        mname,
                         suffix,
                         metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                     )
                 )
-            output.append(f"# TYPE {metric.name}{suffix} gauge\n")
+            output.append(f"# TYPE {mname}{suffix} gauge\n")
             output.extend(lines)
 
         # Get rid of the weird colon things while we're at it
@@ -170,11 +191,12 @@ def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> byt
             # Get rid of the OpenMetrics specific samples (we should already have
             # dealt with them above anyway.)
             for suffix in ["_created", "_gsum", "_gcount"]:
-                if s.name == metric.name + suffix:
+                if s.name == mname + suffix:
                     break
             else:
+                sample_name = LEGACY_METRIC_NAMES.get(s.name, s.name)
                 output.append(
-                    sample_line(s, s.name.replace(":total", "").replace(":", "_"))
+                    sample_line(s, sample_name.replace(":total", "").replace(":", "_"))
                 )
 
     return "".join(output).encode("utf-8")

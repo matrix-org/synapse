@@ -22,7 +22,6 @@ from synapse.api.errors import (
     ResourceLimitError,
     SynapseError,
 )
-from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
@@ -143,12 +142,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(
             config=hs_config, federation_client=self.mock_federation_client
         )
-
-        load_legacy_spam_checkers(hs)
-
-        module_api = hs.get_module_api()
-        for module, config in hs.config.modules.loaded_modules:
-            module(config=config, api=module_api)
 
         return hs
 

@@ -533,6 +533,32 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             desc="get_local_users_in_room",
         )
 
+    async def check_local_user_in_room(self, user_id: str, room_id: str) -> bool:
+        """
+        Check whether a given local user is currently joined to the given room.
+
+        Returns:
+            A boolean indicating whether the user is currently joined to the room
+
+        Raises:
+            Exeption when called with a non-local user to this homeserver
+        """
+        if not self.hs.is_mine_id(user_id):
+            raise Exception(
+                "Cannot call 'check_local_user_in_room' on "
+                "non-local user %s" % (user_id,),
+            )
+
+        (
+            membership,
+            member_event_id,
+        ) = await self.get_local_current_membership_for_user_in_room(
+            user_id=user_id,
+            room_id=room_id,
+        )
+
+        return membership == Membership.JOIN
+
     async def get_local_current_membership_for_user_in_room(
         self, user_id: str, room_id: str
     ) -> Tuple[Optional[str], Optional[str]]:
@@ -847,9 +873,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         with Measure(self._clock, "get_joined_users_from_state"):
-            users_in_room = {}
+            users_in_room = set()
             member_event_ids = [
-                e_id for key, e_id in state.items() if key[0] == EventTypes.Member
+                e_id
+                for key, e_id in current_state_ids.items()
+                if key[0] == EventTypes.Member
             ]
 
             # We check if we have any of the member event ids in the event cache
@@ -867,67 +895,59 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 ev_entry = event_map.get(event_id)
                 if ev_entry and not ev_entry.event.rejected_reason:
                     if ev_entry.event.membership == Membership.JOIN:
-                        users_in_room[ev_entry.event.state_key] = ProfileInfo(
-                            display_name=ev_entry.event.content.get(
-                                "displayname", None
-                            ),
-                            avatar_url=ev_entry.event.content.get("avatar_url", None),
-                        )
+                        users_in_room.add(ev_entry.event.state_key)
                 else:
                     missing_member_event_ids.append(event_id)
 
             if missing_member_event_ids:
-                event_to_memberships = await self._get_joined_profiles_from_event_ids(
+                event_to_memberships = await self._get_user_ids_from_membership_event_ids(
                     missing_member_event_ids
                 )
                 users_in_room.update(
-                    row for row in event_to_memberships.values() if row
+                    user_id for user_id in event_to_memberships.values() if user_id
                 )
 
             return users_in_room
 
-    @cached(max_entries=10000)
-    def _get_joined_profile_from_event_id(
+    @cached(
+        max_entries=10000,
+        # This name matches the old function that has been replaced - the cache name
+        # is kept here to maintain backwards compatibility.
+        name="_get_joined_profile_from_event_id",
+    )
+    def _get_user_id_from_membership_event_id(
         self, event_id: str
     ) -> Optional[Tuple[str, ProfileInfo]]:
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="_get_joined_profile_from_event_id",
+        cached_method_name="_get_user_id_from_membership_event_id",
         list_name="event_ids",
     )
-    async def _get_joined_profiles_from_event_ids(
+    async def _get_user_ids_from_membership_event_ids(
         self, event_ids: Iterable[str]
-    ) -> Dict[str, Optional[Tuple[str, ProfileInfo]]]:
+    ) -> Dict[str, Optional[str]]:
         """For given set of member event_ids check if they point to a join
-        event and if so return the associated user and profile info.
+        event.
 
         Args:
             event_ids: The member event IDs to lookup
 
         Returns:
-            Map from event ID to `user_id` and ProfileInfo (or None if not join event).
+            Map from event ID to `user_id`, or None if event is not a join.
         """
 
         rows = await self.db_pool.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=event_ids,
-            retcols=("user_id", "display_name", "avatar_url", "event_id"),
+            retcols=("user_id", "event_id"),
             keyvalues={"membership": Membership.JOIN},
             batch_size=1000,
-            desc="_get_joined_profiles_from_event_ids",
+            desc="_get_user_ids_from_membership_event_ids",
         )
 
-        return {
-            row["event_id"]: (
-                row["user_id"],
-                ProfileInfo(
-                    avatar_url=row["avatar_url"], display_name=row["display_name"]
-                ),
-            )
-            for row in rows
-        }
+        return {row["event_id"]: row["user_id"] for row in rows}
 
     @cached(max_entries=10000)
     async def is_host_joined(self, room_id: str, host: str) -> bool:
@@ -1086,10 +1106,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             else:
                 # The cache doesn't match the state group or prev state group,
                 # so we calculate the result from first principles.
-                joined_users = await self.get_joined_users_from_state(room_id, state)
+                joined_user_ids = await self.get_joined_user_ids_from_state(room_id, state)
 
                 cache.hosts_to_joined_users = {}
-                for user_id in joined_users:
+                for user_id in joined_user_ids:
                     host = intern_string(get_domain_from_id(user_id))
                     cache.hosts_to_joined_users.setdefault(host, set()).add(user_id)
 
