@@ -18,9 +18,10 @@
 -- allows us to be more intelligent when we decide to retry (we don't need to
 -- fail over and over) and we can process that event in the background so we
 -- don't block on it each time.
-CREATE TABLE IF NOT EXISTS event_backfill_access_time(
+CREATE TABLE IF NOT EXISTS event_backfill_attempts(
     event_id TEXT NOT NULL,
-    ts BIGINT NOT NULL
+    num_attempts INT NOT NULL,
+    last_attempt_ts BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS event_backfill_access_time_event_id ON event_backfill_access_time(event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS event_backfill_attempts_event_id ON event_backfill_attempts(event_id);
