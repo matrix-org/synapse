@@ -25,16 +25,18 @@ The MAU value is recalculated once every 5 minutes for active users, while inact
 Internally this works by checking all users, and adding any recently active users to the `monthly_active_users` table. Every hour, any
 users with timestamps later than 30 days are removed. The sum of all rows of that table is the final count of active users.
 
+It is important to note that **deactivated** users are not immediately removed from the pool of active users, but as blocked users won't
+perform actions they will eventually be removed from the cohort.
+
 ### Trial days
 
 If `mau_trial_days` is set, the user must have had activity at least this number of days apart for them to be considered part of the cohort.
-As an example, if `mau_trial_days` is set to `2` and Alice is active on days 1,2 and 3 then they will be counted as an active user. If Bob
-is active on days 1 and 2, then they will NOT be counted as active.
+As an example, if `mau_trial_days` is set to `2` and Alice is active on days 1 and 3 then they will be counted as an active user. If Bob
+is active on days 1 and 2, then they will NOT be counted as active. Please note that users do not need to be active on concurrent days to
+be deemed active.  
 
 The `mau_appservice_trial_days` config further extends this rule by applying different durations depending on the appservice ID of the user.
 
-It is important to note that **deactivated** users are not immediately removed from the pool of active users, but as blocked users won't
-perform actions they will eventually be removed from the cohort.
 
 ## Limiting usage of the homeserver when the maximum MAU is reached
 
