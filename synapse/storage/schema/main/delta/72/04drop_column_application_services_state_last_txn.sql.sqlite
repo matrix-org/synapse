@@ -18,8 +18,8 @@
 CREATE TABLE application_services_state2 (
     as_id TEXT PRIMARY KEY,
     state VARCHAR(5),
-    read_receipt_stream_id INT,
-    presence_stream_id INT,
+    read_receipt_stream_id BIGINT,
+    presence_stream_id BIGINT,
     to_device_stream_id BIGINT,
     device_list_stream_id BIGINT
 );
@@ -38,3 +38,5 @@ FROM application_services_state;
 
 DROP TABLE application_services_state;
 ALTER TABLE application_services_state2 RENAME TO application_services_state;
+
+CREATE INDEX IF NOT EXISTS application_services_state_pkey on application_services_state (as_id);
