@@ -2124,10 +2124,28 @@ registration_requires_token: true
 If set, allows registration of standard or admin accounts by anyone who
 has the shared secret, even if registration is otherwise disabled.
 
+See also [`registration_shared_secret_path`](#registration_shared_secret_path).
+
 Example configuration:
 ```yaml
 registration_shared_secret: <PRIVATE STRING>
 ```
+
+---
+### `registration_shared_secret_path`
+
+An alternative to [`registration_shared_secret`](#registration_shared_secret):
+allows the shared secret to be specified in an external file.
+
+The file should be a plain text file, containing only the shared secret.
+
+Example configuration:
+```yaml
+registration_shared_secret_file: /path/to/secrets/file
+```
+
+_Added in Synapse 1.67.0._
+
 ---
 ### `bcrypt_rounds`
 
