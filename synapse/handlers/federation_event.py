@@ -104,15 +104,25 @@ backfill_processing_after_timer = Histogram(
     "sec",
     [],
     buckets=(
+        0.1,
+        0.25,
+        0.5,
         1.0,
+        2.5,
         5.0,
+        7.5,
         10.0,
+        15.0,
         20.0,
+        25.0,
         30.0,
         40.0,
+        50.0,
         60.0,
         80.0,
+        100.0,
         120.0,
+        150.0,
         180.0,
         "+Inf",
     ),
@@ -1036,6 +1046,14 @@ class FederationEventHandler:
             InvalidResponseError: if the remote homeserver's response contains fields
                 of the wrong type.
         """
+
+        # It would be better if we could query the difference from our known
+        # state to the given `event_id` so the sending server doesn't have to
+        # send as much and we don't have to process as many events. For example
+        # in a room like #matrix:matrix.org, we get 200k events (77k state_events, 122k
+        # auth_events) from this call.
+        #
+        # Tracked by https://github.com/matrix-org/synapse/issues/13618
         (
             state_event_ids,
             auth_event_ids,
