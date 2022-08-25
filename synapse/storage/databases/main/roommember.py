@@ -860,9 +860,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return shared_room_ids or frozenset()
 
-    async def get_joined_users_from_state(
+    async def get_joined_user_ids_from_state(
         self, room_id: str, state: StateMap[str]
-    ) -> Dict[str, ProfileInfo]:
+    ) -> Set[str]:
         """
         For a given set of state IDs, get a map of user ID to profile information
         for users in the room.
@@ -872,7 +872,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         `_get_joined_profiles_from_event_ids` which does the actual data fetching.
         """
 
-        with Measure(self._clock, "get_joined_users_from_state"):
+        with Measure(self._clock, "get_joined_user_ids_from_state"):
             users_in_room = set()
             member_event_ids = [
                 e_id
