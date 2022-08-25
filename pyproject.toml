@@ -87,7 +87,7 @@ include = [
     { path = "rust/src/**", format = "sdist" },
 ]
 
-build = "build.py"
+build = "build_rust.py"
 
 [tool.poetry.scripts]
 synapse_homeserver = "synapse.app.homeserver:main"

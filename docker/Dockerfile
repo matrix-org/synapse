@@ -101,11 +101,19 @@ RUN \
     libxml++2.6-dev \
     libxslt1-dev \
     openssl \
-    rustc \
     zlib1g-dev \
     git \
-    rustc cargo \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+
+# Install rust and ensure its in the PATH
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+RUN mkdir /rust /cargo
+
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
@@ -118,8 +126,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
+COPY rust /synapse/rust/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst /synapse/
+COPY pyproject.toml README.rst build_rust.py /synapse/
 
 # Repeat of earlier build argument declaration, as this is a new build stage.
 ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
