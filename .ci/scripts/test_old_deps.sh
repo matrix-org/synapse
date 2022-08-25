@@ -12,8 +12,12 @@ set -ex
 
 apt-get update
 apt-get install -y \
-        python3 python3-dev python3-pip python3-venv pipx \
+        curl python3 python3-dev python3-pip python3-venv pipx \
         libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
+
+# Install rust for building.
+curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+source "$HOME/.cargo/env"
 
 export LANG="C.UTF-8"
 
