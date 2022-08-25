@@ -129,7 +129,6 @@ class FederationBase:
                     "event_id": pdu.event_id,
                 }
             )
-
             # we redact (to save disk space) as well as soft-failing (to stop
             # using the event in prev_events).
             redacted_event = prune_event(pdu)
