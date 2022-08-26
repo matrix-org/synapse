@@ -221,6 +221,18 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
         ],
         "actions": ["dont_notify"],
     },
+    {
+        "rule_id": "global/override/.m.rule.suppress_power_levels",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.room.power_levels",
+                "_cache_key": "_suppress_power_levels",
+            }
+        ],
+        "actions": ["dont_notify"],
+    },
     # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
     # otherwise invites will be matched by .m.rule.member_event
     {
