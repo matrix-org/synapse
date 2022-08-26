@@ -431,8 +431,6 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see the docs [here](../../workers.md)).
-
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is

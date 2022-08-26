@@ -32,13 +32,8 @@ stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
 for a reply ─ such as sending an event.
 
-Redis support was added in v1.13.0 with it becoming the recommended method in
-v1.18.0. It replaced the old direct TCP connections (which is deprecated as of
-v1.18.0) to the main process. With Redis, rather than all the workers connecting
-to the main process, all the workers and the main process connect to Redis,
-which relays replication commands between processes. This can give a significant
-cpu saving on the main process and will be a prerequisite for upcoming
-performance improvements.
+All the workers and tha main process connect to Redis, which relays replication
+commands between processes.
 
 If Redis support is enabled Synapse will use it as a shared cache, as well as a
 pub/sub mechanism.
@@ -325,7 +320,6 @@ effects of bursts of events from that bridge on events sent by normal users.
 
 Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
-(This is only supported with Redis-based replication.)
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
@@ -618,15 +612,9 @@ which processes handle the various proccessing such as push notifications.
 
 ## Migration from old config
 
-There are two main independent changes that have been made: introducing Redis
-support and merging apps into `synapse.app.generic_worker`. Both these changes
-are backwards compatible and so no changes to the config are required, however
-server admins are encouraged to plan to migrate to Redis as the old style direct
-TCP replication config is deprecated.
-
-To migrate to Redis add the `redis` config as above, and optionally remove the
-TCP `replication` listener from master and `worker_replication_port` from worker
-config.
+A main change that has occurred is the merging of worker apps into
+`synapse.app.generic_worker`. This change is backwards compatible and so no
+changes to the config are required.
 
 To migrate apps to use `synapse.app.generic_worker` simply update the
 `worker_app` option in the worker configs, and where worker are started (e.g.

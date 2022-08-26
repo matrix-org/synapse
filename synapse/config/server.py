@@ -165,7 +165,6 @@ KNOWN_LISTENER_TYPES = {
     "http",
     "metrics",
     "manhole",
-    "replication",
 }
 
 KNOWN_RESOURCES = {

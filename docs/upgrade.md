@@ -89,6 +89,22 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.67.0
+
+## Direct TCP replication is no longer supported: migrate to Redis
+
+Redis support was added in v1.13.0 with it becoming the recommended method in
+v1.18.0. It replaced the old direct TCP connections (which was deprecated as of
+v1.18.0) to the main process. With Redis, rather than all the workers connecting
+to the main process, all the workers and the main process connect to Redis,
+which relays replication commands between processes. This can give a significant
+cpu saving on the main process and will be a prerequisite for upcoming
+performance improvements.
+
+To migrate to Redis add the [`redis` config](./workers.md#shared-configuration),
+and remove the TCP `replication` listener from master and `worker_replication_port`
+from worker config.
+
 # Upgrading to v1.66.0
 
 ## Delegation of email validation no longer supported
