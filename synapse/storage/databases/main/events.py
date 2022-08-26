@@ -2449,9 +2449,9 @@ class PersistEventsStore:
             backward_extremity_tuples_to_remove,
         )
 
-        # Since we no longer need it as a backward extremity, it won't be
-        # backfilled again so we no longer need to store the backfill attempts
-        # around it.
+        # Since we no longer need these backward extremities, it also means that
+        # they won't be backfilled from again so we no longer need to store the
+        # backfill attempts around it.
         query = """
             DELETE FROM event_backfill_attempts
             WHERE event_id = ?
