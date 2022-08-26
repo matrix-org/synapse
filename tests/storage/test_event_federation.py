@@ -576,6 +576,63 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(event_id, "$fake_event_id_500")
 
+    def test_get_oldest_event_ids_with_depth_in_room(self):
+        # asdf
+        room_id = "@ROOM:some-host"
+
+        # The silly graph we use to test grabbing backward extremities,
+        # where the top is the oldest events.
+        #                   1 (oldest)
+        #                   |
+        #                   2
+        #                 / | \
+        #                ´  |  `
+        #     [b1, b2, b3]  |   |
+        #                |  |   |
+        #                A  |   |
+        #                \  |   |
+        #                 ` 3   |
+        #                   |   |
+        #                   |   [b4, b5, b6]
+        #                   |   |
+        #                   |   B
+        #                   |  /
+        #                   4 ´
+        #                   |
+        #                   5 (newest)
+
+        event_graph = {
+            "1": [],
+            "2": ["1"],
+            "3": ["2"],
+            "4": ["3"],
+            "5": ["4"],
+            "A": ["b1", "b2", "b3"],
+            "b1": ["2"],
+            "b2": ["2"],
+            "b3": ["2"],
+            "B": ["b4", "b5", "b6"],
+            "b4": ["3"],
+            "b5": ["3"],
+            "b6": ["3"],
+        }
+
+        depth_map = {
+            "1": 1,
+            "2": 2,
+            "b1": 3,
+            "b2": 3,
+            "b3": 3,
+            "A": 4,
+            "3": 5,
+            "b4": 6,
+            "b5": 6,
+            "b6": 6,
+            "B": 7,
+            "4": 8,
+            "5": 9,
+        }
+
 
 @attr.s
 class FakeEvent:
