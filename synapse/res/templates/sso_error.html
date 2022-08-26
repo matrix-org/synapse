@@ -1,7 +1,7 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Authentication failed' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Authentication failed -->
-    <div class="error_page">
+<div class="error_page">
 {# If an error of unauthorised is returned it means we have actively rejected their login #}
 {% if error == "unauthorised" %}
         <header>

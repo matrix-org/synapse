@@ -1,6 +1,6 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Your email has now been validated' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Your email has now been validated -->
 <p>Your email has now been validated, please return to your client. You may now close this window.</p>
 
 {% include "fragments/footer.html" without context %}

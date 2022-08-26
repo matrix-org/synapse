@@ -1,7 +1,6 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Your account has been successfully renewed and is valid until ' + expiration_ts|format_ts("%d-%m-%Y") + '.' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Your account has been successfully renewed and is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}.
--->
 <p>Your account has been successfully renewed and is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}.</p>
 
 {% include "fragments/footer.html" without context %}

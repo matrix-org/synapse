@@ -1,6 +1,6 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Request failed' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Request failed -->
 <p>The request failed for the following reason: {{ failure_reason }}.</p>
 <p>No changes have been made to your account.</p>
 

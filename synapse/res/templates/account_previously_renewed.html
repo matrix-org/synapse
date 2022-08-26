@@ -1,6 +1,6 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Your account is valid until ' + expiration_ts|format_ts("%d-%m-%Y") + '.' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Your account is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}. -->
 <p>Your account is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}.</p>
 
 {% include "fragments/footer.html" without context %}

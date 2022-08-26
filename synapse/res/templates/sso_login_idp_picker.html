@@ -1,6 +1,5 @@
-{% include "fragments/header.html" without context %}
-
-<!-- Choose identity provider -->
+{% set title = 'Choose identity provider' %}
+{% include "fragments/header.html" with context %}
 
 <header>
     <h1>Log in to {{ server_name }} </h1>

@@ -1,6 +1,6 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Authentication' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Authentication -->
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
         {% if error is defined %}

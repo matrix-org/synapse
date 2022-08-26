@@ -1,6 +1,6 @@
-{% include "fragments/header.html" without context %}
+{% set title = 'Registration failure' %}
+{% include "fragments/header.html" with context %}
 
-<!-- Registration failure -->
 <p>Validation failed for the following reason: {{ failure_reason }}.</p>
 
 {% include "fragments/footer.html" without context %}
