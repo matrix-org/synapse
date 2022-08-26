@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import attr
 from parameterized import parameterized
@@ -23,6 +23,8 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.events import _EventInternalMetadata
+from synapse.storage.database import LoggingTransaction
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 
 import tests.unittest
@@ -578,34 +580,33 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def test_get_oldest_event_ids_with_depth_in_room(self):
         # asdf
-        room_id = "@ROOM:some-host"
+        room_id = "!backfill-room-test:some-host"
 
         # The silly graph we use to test grabbing backward extremities,
         # where the top is the oldest events.
-        #                   1 (oldest)
-        #                   |
-        #                   2
-        #                 / | \
-        #                ´  |  `
-        #     [b1, b2, b3]  |   |
-        #                |  |   |
-        #                A  |   |
-        #                \  |   |
-        #                 ` 3   |
-        #                   |   |
-        #                   |   [b4, b5, b6]
-        #                   |   |
-        #                   |   B
-        #                   |  /
-        #                   4 ´
-        #                   |
-        #                   5 (newest)
+        #    1 (oldest)
+        #    |
+        #    2 ⹁
+        #    |  \
+        #    |   [b1, b2, b3]
+        #    |   |
+        #    |   A
+        #    |  /
+        #    3 {
+        #    |  \
+        #    |   [b4, b5, b6]
+        #    |   |
+        #    |   B
+        #    |  /
+        #    4 ´
+        #    |
+        #    5 (newest)
 
-        event_graph = {
+        event_graph: Dict[str, List[str]] = {
             "1": [],
             "2": ["1"],
-            "3": ["2"],
-            "4": ["3"],
+            "3": ["2", "A"],
+            "4": ["3", "B"],
             "5": ["4"],
             "A": ["b1", "b2", "b3"],
             "b1": ["2"],
@@ -617,7 +618,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             "b6": ["3"],
         }
 
-        depth_map = {
+        depth_map: Dict[str, int] = {
             "1": 1,
             "2": 2,
             "b1": 3,
@@ -632,6 +633,70 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             "4": 8,
             "5": 9,
         }
+
+        # The events we have persisted on our server.
+        # The rest are events in the room but not backfilled tet.
+        our_server_events = ["5", "4", "B", "3", "A"]
+
+        complete_event_dict_map: Dict[str, JsonDict] = {}
+        stream_ordering = 0
+        for (event_id, prev_events) in event_graph.items():
+            depth = depth_map[event_id]
+
+            complete_event_dict_map[event_id] = {
+                "event_id": event_id,
+                "type": "test_regular_type",
+                "room_id": room_id,
+                "sender": "@sender",
+                "prev_events": prev_events,
+                "auth_events": [],
+                "origin_server_ts": stream_ordering,
+                "depth": depth,
+                "stream_ordering": stream_ordering,
+                "content": {"body": "event" + event_id},
+            }
+
+            stream_ordering += 1
+
+        def insert_our_server_events(txn: LoggingTransaction):
+            # Insert our server events
+            for event_id in our_server_events:
+                event_dict = complete_event_dict_map.get(event_id)
+
+                self.store.db_pool.simple_insert_txn(
+                    txn,
+                    table="events",
+                    values={
+                        "event_id": event_dict.get("event_id"),
+                        "type": event_dict.get("type"),
+                        "room_id": event_dict.get("room_id"),
+                        "depth": event_dict.get("depth"),
+                        "topological_ordering": event_dict.get("depth"),
+                        "stream_ordering": event_dict.get("stream_ordering"),
+                        "processed": True,
+                        "outlier": False,
+                    },
+                )
+
+            # Insert the event edges
+            for event_id in our_server_events:
+                for prev_event_id in event_graph[event_id]:
+                    self.store.db_pool.simple_insert_txn(
+                        txn,
+                        table="event_edges",
+                        values={
+                            "event_id": event_id,
+                            "prev_event_id": prev_event_id,
+                            "room_id": room_id,
+                        },
+                    )
+
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "insert_our_server_events",
+                insert_our_server_events,
+            )
+        )
 
 
 @attr.s
