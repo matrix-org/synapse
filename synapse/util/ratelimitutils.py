@@ -17,9 +17,21 @@ import contextlib
 import logging
 import threading
 import typing
-from typing import Any, DefaultDict, Dict, Iterator, List, Mapping, Optional, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from prometheus_client.core import Counter
+from typing_extensions import ContextManager
 
 from twisted.internet import defer
 
@@ -79,7 +91,9 @@ _rate_limiter_instances: Set["FederationRateLimiter"] = set()
 _rate_limiter_instances_lock = threading.Lock()
 
 
-def _get_counts_from_rate_limiter_instance(count_func) -> Mapping[Tuple[str, ...], int]:
+def _get_counts_from_rate_limiter_instance(
+    count_func: Callable[["FederationRateLimiter"], int]
+) -> Mapping[Tuple[str, ...], int]:
     """Returns a count of something (slept/rejected hosts) by (metrics_name)"""
     # Cast to a list to prevent it changing while the Prometheus
     # thread is collecting metrics
@@ -134,7 +148,7 @@ class FederationRateLimiter:
         self,
         clock: Clock,
         config: FederationRatelimitSettings,
-        metrics_name: Optional[str],
+        metrics_name: Optional[str] = None,
     ):
         """
         Args:
@@ -181,7 +195,7 @@ class _PerHostRatelimiter:
         self,
         clock: Clock,
         config: FederationRatelimitSettings,
-        metrics_name: Optional[str],
+        metrics_name: Optional[str] = None,
     ):
         """
         Args:
@@ -249,7 +263,7 @@ class _PerHostRatelimiter:
         return len(self.request_times) > self.sleep_limit
 
     async def _on_enter_with_tracing(self, request_id: object) -> None:
-        maybe_metrics_cm = contextlib.nullcontext()
+        maybe_metrics_cm: ContextManager = contextlib.nullcontext()
         if self.metrics_name:
             maybe_metrics_cm = queue_wait_timer.labels(self.metrics_name).time()
         with start_active_span("ratelimit wait"), maybe_metrics_cm:
