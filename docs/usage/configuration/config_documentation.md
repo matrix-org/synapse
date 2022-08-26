@@ -2139,6 +2139,9 @@ allows the shared secret to be specified in an external file.
 
 The file should be a plain text file, containing only the shared secret.
 
+If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
+
 Example configuration:
 ```yaml
 registration_shared_secret_file: /path/to/secrets/file
@@ -2555,7 +2558,10 @@ Config options relating to signing keys
 ---
 ### `signing_key_path`
 
-Path to the signing key to sign messages with.
+Path to the signing key to sign events and federation requests with.
+
+*New in Synapse 1.67*: If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
 
 Example configuration:
 ```yaml
