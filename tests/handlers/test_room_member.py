@@ -16,7 +16,7 @@ from synapse.util import Clock
 
 from tests.replication._base import RedisMultiWorkerStreamTestCase
 from tests.server import make_request
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import make_awaitable
 from tests.unittest import (
     FederatingHomeserverTestCase,
     HomeserverTestCase,
