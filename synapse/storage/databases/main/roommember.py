@@ -864,12 +864,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self, room_id: str, state: StateMap[str]
     ) -> Set[str]:
         """
-        For a given set of state IDs, get a map of user ID to profile information
-        for users in the room.
+        For a given set of state IDs, get a set of user IDs in the room.
 
-        This method doesn't do any fetching of data itself and instead checks various
-        caches for the relevant data before passing any remaining missing event IDs to
-        `_get_joined_profiles_from_event_ids` which does the actual data fetching.
+        This method checks the local event cache, before calling
+        `_get_user_ids_from_membership_event_ids` for any uncached events.
         """
 
         with Measure(self._clock, "get_joined_user_ids_from_state"):
