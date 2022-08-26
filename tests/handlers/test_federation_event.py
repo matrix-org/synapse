@@ -325,7 +325,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 )
             )
 
-        # Make sure our second backfill attempt was recorded
+        # Make sure our second backfill attempt was recorded (`num_attempts` was incremented)
         backfill_num_attempts = self.get_success(
             main_store.db_pool.simple_select_one_onecol(
                 table="event_backfill_attempts",
@@ -341,5 +341,5 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertIsNone(
             persisted,
-            "pulled event with invalid signature should not be persisted at all",
+            "pulled event that fails the history check should not be persisted at all",
         )
