@@ -17,6 +17,7 @@
 import logging
 import re
 from enum import Enum
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
 
@@ -916,9 +917,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
-        return all(key in content for key in ("medium", "address"))
-
     def register(self, http_server: HttpServer) -> None:
         # /rooms/$roomid/[invite|join|leave]
         PATTERNS = (
@@ -949,29 +947,31 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if self._has_3pid_invite_keys(content):
+        if membership_action == "invite" and all(
+            key in content for key in ("medium", "address")
+        ):
             if not all(key in content for key in ("id_server", "id_access_token")):
                 raise SynapseError(
-                    400,
+                    HTTPStatus.BAD_REQUEST,
                     "`id_server` and `id_access_token` are required when doing 3pid invite",
                     Codes.MISSING_PARAM,
                 )
-            if membership_action == "invite":
-                try:
-                    await self.room_member_handler.do_3pid_invite(
-                        room_id,
-                        requester.user,
-                        content["medium"],
-                        content["address"],
-                        content["id_server"],
-                        requester,
-                        txn_id,
-                        content["id_access_token"],
-                    )
-                except ShadowBanError:
-                    # Pretend the request succeeded.
-                    pass
-                return 200, {}
+
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    content["medium"],
+                    content["address"],
+                    content["id_server"],
+                    requester,
+                    txn_id,
+                    content["id_access_token"],
+                )
+            except ShadowBanError:
+                # Pretend the request succeeded.
+                pass
+            return 200, {}
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:

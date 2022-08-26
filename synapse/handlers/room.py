@@ -19,6 +19,7 @@ import math
 import random
 import string
 from collections import OrderedDict
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -678,12 +679,6 @@ class RoomCreationHandler:
             # we returned the new room to the client at this point.
             logger.error("Unable to send updated alias events in new room: %s", e)
 
-    def _has_all_3pid_keys(self, invite_3pid: dict) -> bool:
-        return all(
-            key in invite_3pid
-            for key in ("medium", "address", "id_server", "id_access_token")
-        )
-
     async def create_room(
         self,
         requester: Requester,
@@ -711,8 +706,8 @@ class RoomCreationHandler:
                 was, requested, `room_alias`. Secondly, the stream_id of the
                 last persisted event.
         Raises:
-            SynapseError if the room ID couldn't be stored, or something went
-            horribly wrong.
+            SynapseError if the room ID couldn't be stored, 3pid invitation config
+            validation failed, or something went horribly wrong.
             ResourceLimitError if server is blocked to some resource being
             exceeded
         """
@@ -740,10 +735,14 @@ class RoomCreationHandler:
 
         # validate each entry for correctness
         for invite_3pid in invite_3pid_list:
-            if not self._has_all_3pid_keys(invite_3pid):
+            if not all(
+                key in invite_3pid
+                for key in ("medium", "address", "id_server", "id_access_token")
+            ):
                 raise SynapseError(
-                    400,
-                    f"`id_server` and `id_access_token` are required when doing 3pid invite, caused by {invite_3pid}",
+                    HTTPStatus.BAD_REQUEST,
+                    "all of: `medium`, `address`, `id_server` and `id_access_token` "
+                    f"are required when doing 3pid invite, caused by {invite_3pid}",
                     Codes.MISSING_PARAM,
                 )
 
