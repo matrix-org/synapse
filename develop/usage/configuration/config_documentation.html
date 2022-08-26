@@ -1713,23 +1713,25 @@ should be in the form of providers.json). By default this list is empty.</p>
 <p>See <a href="../../CAPTCHA_SETUP.html">here</a> for full details on setting up captcha.</p>
 <hr />
 <h3 id="recaptcha_public_key"><a class="header" href="#recaptcha_public_key"><code>recaptcha_public_key</code></a></h3>
-<p>This homeserver's ReCAPTCHA public key. Must be specified if <code>enable_registration_captcha</code> is
-enabled.</p>
+<p>This homeserver's ReCAPTCHA public key. Must be specified if
+<a href="#enable_registration_captcha"><code>enable_registration_captcha</code></a> is enabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">recaptcha_public_key: &quot;YOUR_PUBLIC_KEY&quot;
 </code></pre>
 <hr />
 <h3 id="recaptcha_private_key"><a class="header" href="#recaptcha_private_key"><code>recaptcha_private_key</code></a></h3>
-<p>This homeserver's ReCAPTCHA private key. Must be specified if <code>enable_registration_captcha</code> is
+<p>This homeserver's ReCAPTCHA private key. Must be specified if
+<a href="#enable_registration_captcha"><code>enable_registration_captcha</code></a> is
 enabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">recaptcha_private_key: &quot;YOUR_PRIVATE_KEY&quot;
 </code></pre>
 <hr />
 <h3 id="enable_registration_captcha"><a class="header" href="#enable_registration_captcha"><code>enable_registration_captcha</code></a></h3>
-<p>Set to true to enable ReCaptcha checks when registering, preventing signup
-unless a captcha is answered. Requires a valid ReCaptcha public/private key.
-Defaults to false.</p>
+<p>Set to <code>true</code> to require users to complete a CAPTCHA test when registering an account.
+Requires a valid ReCaptcha public/private key.
+Defaults to <code>false</code>.</p>
+<p>Note that <a href="#enable_registration"><code>enable_registration</code></a> must also be set to allow account registration.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_registration_captcha: true
 </code></pre>
@@ -1781,69 +1783,34 @@ it allows users to connect to arbitrary endpoints without having first signed up
 <p>Registration can be rate-limited using the parameters in the <a href="#ratelimiting">Ratelimiting</a> section of this manual.</p>
 <hr />
 <h3 id="enable_registration"><a class="header" href="#enable_registration"><code>enable_registration</code></a></h3>
-<p>Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
-you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
-without any verification, you must also set <code>enable_registration_without_verification</code> to true.</p>
+<p>Enable registration for new users. Defaults to <code>false</code>.</p>
+<p>It is highly recommended that if you enable registration, you set one or more
+or the following options, to avoid abuse of your server by &quot;bots&quot;:</p>
+<ul>
+<li><a href="#enable_registration_captcha"><code>enable_registration_captcha</code></a></li>
+<li><a href="#registrations_require_3pid"><code>registrations_require_3pid</code></a></li>
+<li><a href="#registration_requires_token"><code>registration_requires_token</code></a></li>
+</ul>
+<p>(In order to enable registration without any verification, you must also set
+<a href="#enable_registration_without_verification"><code>enable_registration_without_verification</code></a>.)</p>
+<p>Note that even if this setting is disabled, new accounts can still be created
+via the admin API if
+<a href="#registration_shared_secret"><code>registration_shared_secret</code></a> is set.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_registration: true
 </code></pre>
 <hr />
 <h3 id="enable_registration_without_verification"><a class="header" href="#enable_registration_without_verification"><code>enable_registration_without_verification</code></a></h3>
 <p>Enable registration without email or captcha verification. Note: this option is <em>not</em> recommended,
-as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
-unless <code>enable_registration</code> is also enabled.</p>
+as registration without verification is a known vector for spam and abuse. Defaults to <code>false</code>. Has no effect
+unless <a href="#enable_registration"><code>enable_registration</code></a> is also enabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_registration_without_verification: true
 </code></pre>
 <hr />
-<h3 id="session_lifetime"><a class="header" href="#session_lifetime"><code>session_lifetime</code></a></h3>
-<p>Time that a user's session remains valid for, after they log in.</p>
-<p>Note that this is not currently compatible with guest logins.</p>
-<p>Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
-logged in.</p>
-<p>By default, this is infinite.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">session_lifetime: 24h
-</code></pre>
-<hr />
-<h3 id="refresh_access_token_lifetime"><a class="header" href="#refresh_access_token_lifetime"><code>refresh_access_token_lifetime</code></a></h3>
-<p>Time that an access token remains valid for, if the session is using refresh tokens.</p>
-<p>For more information about refresh tokens, please see the <a href="user_authentication/refresh_tokens.html">manual</a>.</p>
-<p>Note that this only applies to clients which advertise support for refresh tokens.</p>
-<p>Note also that this is calculated at login time and refresh time: changes are not applied to
-existing sessions until they are refreshed.</p>
-<p>By default, this is 5 minutes.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">refreshable_access_token_lifetime: 10m
-</code></pre>
-<hr />
-<h3 id="refresh_token_lifetime-24h"><a class="header" href="#refresh_token_lifetime-24h"><code>refresh_token_lifetime: 24h</code></a></h3>
-<p>Time that a refresh token remains valid for (provided that it is not
-exchanged for another one first).
-This option can be used to automatically log-out inactive sessions.
-Please see the manual for more information.</p>
-<p>Note also that this is calculated at login time and refresh time:
-changes are not applied to existing sessions until they are refreshed.</p>
-<p>By default, this is infinite.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">refresh_token_lifetime: 24h
-</code></pre>
-<hr />
-<h3 id="nonrefreshable_access_token_lifetime"><a class="header" href="#nonrefreshable_access_token_lifetime"><code>nonrefreshable_access_token_lifetime</code></a></h3>
-<p>Time that an access token remains valid for, if the session is NOT
-using refresh tokens.</p>
-<p>Please note that not all clients support refresh tokens, so setting
-this to a short value may be inconvenient for some users who will
-then be logged out frequently.</p>
-<p>Note also that this is calculated at login time: changes are not applied
-retrospectively to existing sessions for users that have already logged in.</p>
-<p>By default, this is infinite.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">nonrefreshable_access_token_lifetime: 24h
-</code></pre>
-<hr />
 <h3 id="registrations_require_3pid"><a class="header" href="#registrations_require_3pid"><code>registrations_require_3pid</code></a></h3>
-<p>If this is set, the user must provide all of the specified types of 3PID when registering.</p>
+<p>If this is set, users must provide all of the specified types of 3PID when registering an account.</p>
+<p>Note that <a href="#enable_registration"><code>enable_registration</code></a> must also be set to allow account registration.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registrations_require_3pid:
   - email
@@ -1879,16 +1846,20 @@ flow (overrides <code>registrations_require_3pid</code> if MSISDNs are set as re
 <h3 id="registration_requires_token"><a class="header" href="#registration_requires_token"><code>registration_requires_token</code></a></h3>
 <p>Require users to submit a token during registration.
 Tokens can be managed using the admin <a href="../administration/admin_api/registration_tokens.html">API</a>.
-Note that <code>enable_registration</code> must be set to true.
 Disabling this option will not delete any tokens previously generated.
-Defaults to false. Set to true to enable.</p>
+Defaults to <code>false</code>. Set to <code>true</code> to enable.</p>
+<p>Note that <a href="#enable_registration"><code>enable_registration</code></a> must also be set to allow account registration.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_requires_token: true
 </code></pre>
 <hr />
 <h3 id="registration_shared_secret"><a class="header" href="#registration_shared_secret"><code>registration_shared_secret</code></a></h3>
-<p>If set, allows registration of standard or admin accounts by anyone who
-has the shared secret, even if registration is otherwise disabled.</p>
+<p>If set, allows registration of standard or admin accounts by anyone who has the
+shared secret, even if <a href="#enable_registration"><code>enable_registration</code></a> is not
+set.</p>
+<p>This is primarily intended for use with the <code>register_new_matrix_user</code> script
+(see <a href="../../setup/installation.html#registering-a-user">Registering a user</a>);
+however, the interface is <a href="../admin_api/register_api.html">documented</a>.</p>
 <p>See also <a href="#registration_shared_secret_path"><code>registration_shared_secret_path</code></a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret: &lt;PRIVATE STRING&gt;
@@ -2070,6 +2041,54 @@ raise an error if the registration completes and the username conflicts.</p>
 <p>Defaults to false.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">inhibit_user_in_use_error: true
+</code></pre>
+<hr />
+<h2 id="user-session-management"><a class="header" href="#user-session-management">User session management</a></h2>
+<hr />
+<h3 id="session_lifetime"><a class="header" href="#session_lifetime"><code>session_lifetime</code></a></h3>
+<p>Time that a user's session remains valid for, after they log in.</p>
+<p>Note that this is not currently compatible with guest logins.</p>
+<p>Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
+logged in.</p>
+<p>By default, this is infinite.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">session_lifetime: 24h
+</code></pre>
+<hr />
+<h3 id="refresh_access_token_lifetime"><a class="header" href="#refresh_access_token_lifetime"><code>refresh_access_token_lifetime</code></a></h3>
+<p>Time that an access token remains valid for, if the session is using refresh tokens.</p>
+<p>For more information about refresh tokens, please see the <a href="user_authentication/refresh_tokens.html">manual</a>.</p>
+<p>Note that this only applies to clients which advertise support for refresh tokens.</p>
+<p>Note also that this is calculated at login time and refresh time: changes are not applied to
+existing sessions until they are refreshed.</p>
+<p>By default, this is 5 minutes.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">refreshable_access_token_lifetime: 10m
+</code></pre>
+<hr />
+<h3 id="refresh_token_lifetime-24h"><a class="header" href="#refresh_token_lifetime-24h"><code>refresh_token_lifetime: 24h</code></a></h3>
+<p>Time that a refresh token remains valid for (provided that it is not
+exchanged for another one first).
+This option can be used to automatically log-out inactive sessions.
+Please see the manual for more information.</p>
+<p>Note also that this is calculated at login time and refresh time:
+changes are not applied to existing sessions until they are refreshed.</p>
+<p>By default, this is infinite.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">refresh_token_lifetime: 24h
+</code></pre>
+<hr />
+<h3 id="nonrefreshable_access_token_lifetime"><a class="header" href="#nonrefreshable_access_token_lifetime"><code>nonrefreshable_access_token_lifetime</code></a></h3>
+<p>Time that an access token remains valid for, if the session is NOT
+using refresh tokens.</p>
+<p>Please note that not all clients support refresh tokens, so setting
+this to a short value may be inconvenient for some users who will
+then be logged out frequently.</p>
+<p>Note also that this is calculated at login time: changes are not applied
+retrospectively to existing sessions for users that have already logged in.</p>
+<p>By default, this is infinite.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">nonrefreshable_access_token_lifetime: 24h
 </code></pre>
 <hr />
 <h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
@@ -2295,14 +2314,12 @@ defaults to the server signing key.</p>
 <h2 id="single-sign-on-integration"><a class="header" href="#single-sign-on-integration">Single sign-on integration</a></h2>
 <p>The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.</p>
-<p>You will probably also want to set the following options to false to
+<p>You will probably also want to set the following options to <code>false</code> to
 disable the regular login/registration flows:</p>
 <ul>
-<li><code>enable_registration</code></li>
-<li><code>password_config.enabled</code></li>
+<li><a href="#enable_registration"><code>enable_registration</code></a></li>
+<li><a href="#password_config"><code>password_config.enabled</code></a></li>
 </ul>
-<p>You will also want to investigate the settings under the &quot;sso&quot; configuration
-section below.</p>
 <hr />
 <h3 id="saml2_config"><a class="header" href="#saml2_config"><code>saml2_config</code></a></h3>
 <p>Enable SAML2 for registration and login. Uses pysaml2. To learn more about pysaml and

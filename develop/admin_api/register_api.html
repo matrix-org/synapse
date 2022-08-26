@@ -151,9 +151,9 @@
 non-interactive way. This is generally used for bootstrapping a Synapse
 instance with administrator accounts.</p>
 <p>To authenticate yourself to the server, you will need both the shared secret
-(<code>registration_shared_secret</code> in the homeserver configuration), and a
-one-time nonce. If the registration shared secret is not configured, this API
-is not enabled.</p>
+(<a href="../configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>
+in the homeserver configuration), and a one-time nonce. If the registration
+shared secret is not configured, this API is not enabled.</p>
 <p>To fetch the nonce, you need to request one from the API:</p>
 <pre><code>&gt; GET /_synapse/admin/v1/register
 
