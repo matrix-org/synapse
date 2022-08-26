@@ -352,39 +352,6 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
         """Tests that a user cannot not forgets a room that has not left."""
         self.get_failure(self.handler.forget(self.alice_ID, self.room_id), SynapseError)
 
-    def test_rejoin_forgotten_by_server(self) -> None:
-        """Test that a user that has forgotten a room can do a re-join.
-        The room was also forgotten from the local server and only
-        remote users are in the room."""
-
-        # add remote user
-        self.get_success(
-            event_injection.inject_member_event(
-                self.hs, self.room_id, "@charlie:elsewhere", "join"
-            )
-        )
-
-        self.helper.leave(self.room_id, user=self.alice, tok=self.alice_token)
-        self.get_success(self.handler.forget(self.alice_ID, self.room_id))
-        self.assertTrue(
-            self.get_success(self.store.did_forget(self.alice, self.room_id))
-        )
-
-        # the server has forgotten the room
-        self.assertTrue(
-            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        )
-
-        self.helper.join(self.room_id, user=self.alice, tok=self.alice_token)
-        self.assertFalse(
-            self.get_success(self.store.did_forget(self.alice, self.room_id))
-        )
-
-        # the server has not forgotten the room anymore
-        self.assertFalse(
-            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
-        )
-
     def test_rejoin_forgotten_by_user(self) -> None:
         """Test that a user that has forgotten a room can do a re-join.
         The room was not forgotten from the local server.
