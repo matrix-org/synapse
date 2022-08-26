@@ -1071,10 +1071,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_all_new_events_stream", get_all_new_events_stream_txn
         )
 
-        events = await self.get_events_as_list(
-            event_to_received_ts.keys(),
-            get_prev_content=get_prev_content,
+        event_entries = await self.get_events_from_cache_or_db(
+            event_to_received_ts.keys(), get_prev_content=get_prev_content
         )
+        eventCache_list = list(event_entries.values())
+        events = [e.event for e in eventCache_list]
 
         return upper_bound, events, event_to_received_ts
 
