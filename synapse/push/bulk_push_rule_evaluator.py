@@ -251,7 +251,9 @@ class BulkPushRuleEvaluator:
             # This can happen due to out of band memberships
             return
 
-        count_as_unread = _should_count_as_unread(event, context)
+        # Disable counting as unread as it is unused and can cause additional
+        # (unwanted) rows to be added to the event_push_actions table.
+        count_as_unread = False
 
         rules_by_user = await self._get_rules_for_event(event)
         actions_by_user: Dict[str, List[Union[dict, str]]] = {}
