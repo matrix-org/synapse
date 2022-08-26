@@ -1998,7 +1998,7 @@ enable_registration: true
 ### `enable_registration_without_verification`
 
 Enable registration without email or captcha verification. Note: this option is *not* recommended,
-as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+as registration without verification is a known vector for spam and abuse. Defaults to `false`. Has no effect
 unless [`enable_registration`](#enable_registration) is also enabled.
 
 Example configuration:
