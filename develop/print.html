@@ -4913,6 +4913,8 @@ has the shared secret, even if registration is otherwise disabled.</p>
 <p>An alternative to <a href="usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>:
 allows the shared secret to be specified in an external file.</p>
 <p>The file should be a plain text file, containing only the shared secret.</p>
+<p>If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret_file: /path/to/secrets/file
 </code></pre>
@@ -5226,7 +5228,9 @@ forms to work.</p>
 <p>Config options relating to signing keys</p>
 <hr />
 <h3 id="signing_key_path"><a class="header" href="#signing_key_path"><code>signing_key_path</code></a></h3>
-<p>Path to the signing key to sign messages with.</p>
+<p>Path to the signing key to sign events and federation requests with.</p>
+<p><em>New in Synapse 1.67</em>: If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">signing_key_path: &quot;CONFDIR/SERVERNAME.signing.key&quot;
 </code></pre>
