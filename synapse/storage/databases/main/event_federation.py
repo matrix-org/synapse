@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import itertools
 import logging
 from queue import Empty, PriorityQueue
@@ -71,6 +72,12 @@ pdus_pruned_from_federation_queue = Counter(
 
 logger = logging.getLogger(__name__)
 
+BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS: int = int(
+    datetime.timedelta(days=7).total_seconds()
+)
+BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS: int = int(
+    datetime.timedelta(hours=1).total_seconds()
+)
 
 # All the info we need while iterating the DAG while backfilling
 @attr.s(frozen=True, slots=True, auto_attribs=True)
@@ -715,7 +722,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     @trace
     @tag_args
     async def get_oldest_event_ids_with_depth_in_room(
-        self, room_id: str
+        self,
+        room_id: str,
+        current_depth: int,
     ) -> List[Tuple[str, int]]:
         """Gets the oldest events(backwards extremities) in the room along with the
         aproximate depth.
@@ -735,34 +744,69 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         def get_oldest_event_ids_with_depth_in_room_txn(
             txn: LoggingTransaction, room_id: str
         ) -> List[Tuple[str, int]]:
-            # Assemble a dictionary with event_id -> depth for the oldest events
+            # Assemble a tuple lookup of event_id -> depth for the oldest events
             # we know of in the room. Backwards extremeties are the oldest
             # events we know of in the room but we only know of them because
-            # some other event referenced them by prev_event and aren't peristed
-            # in our database yet (meaning we don't know their depth
+            # some other event referenced them by prev_event and aren't
+            # persisted in our database yet (meaning we don't know their depth
             # specifically). So we need to look for the aproximate depth from
             # the events connected to the current backwards extremeties.
             sql = """
-                SELECT b.event_id, MAX(e.depth) FROM events as e
+                SELECT backward_extrem.event_id, MAX(event.depth) FROM events as event
                 /**
                  * Get the edge connections from the event_edges table
                  * so we can see whether this event's prev_events points
                  * to a backward extremity in the next join.
                  */
-                INNER JOIN event_edges as g
-                ON g.event_id = e.event_id
+                INNER JOIN event_edges as edge
+                ON edge.event_id = event.event_id
                 /**
                  * We find the "oldest" events in the room by looking for
                  * events connected to backwards extremeties (oldest events
                  * in the room that we know of so far).
                  */
-                INNER JOIN event_backward_extremities as b
-                ON g.prev_event_id = b.event_id
-                WHERE b.room_id = ? AND g.is_state is ?
-                GROUP BY b.event_id
+                INNER JOIN event_backward_extremities as backward_extrem
+                ON edge.prev_event_id = backward_extrem.event_id
+                /**
+                 * We use this info to make sure we don't retry to use a backfill point
+                 * if we've already attempted to backfill from it recently.
+                 */
+                INNER JOIN event_backfill_attempts as backfill_attempt_info
+                ON backfill_attempt_info.event_id = backward_extrem.event_id
+                WHERE
+                    backward_extrem.room_id = ?
+                    /* We only care about normal events because TODO: why? */
+                    AND edge.is_state is ? /* False */
+                    /**
+                     * We only want backwards extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than a given depth).
+                     */
+                    AND MAX(event.depth) <= current_depth
+                    /**
+                     * Exponential back-off (up to the upper bound) so we don't retry the 
+                     * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
+                     */
+                    AND ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ?, ? /* upper bound */)
+                /* TODO: Why? */
+                GROUP BY backward_extrem.event_id
+                /**
+                 * Sort from highest (closest to the `max_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 */
+                ORDER BY MAX(event.depth) DESC
             """
 
-            txn.execute(sql, (room_id, False))
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    False,
+                    self._clock.time_msec(),
+                    1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
+                    1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                ),
+            )
 
             return cast(List[Tuple[str, int]], txn.fetchall())
 

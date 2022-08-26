@@ -258,7 +258,14 @@ class FederationHandler:
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
             for event_id, depth in await self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id
+                room_id=room_id,
+                # We don't want events that come after-in-time from our current
+                # position when we're backfilling looking backwards.
+                #
+                #                           current_depth (ignore events that come after this, ignore 2-4)
+                #                           |
+                # <oldest-in-time> [0]<--[1]▼<--[2]<--[3]<--[4] <newest-in-time>
+                current_depth=current_depth,
             )
         ]
 
