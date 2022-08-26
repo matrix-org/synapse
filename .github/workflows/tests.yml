@@ -209,7 +209,6 @@ jobs:
         POSTGRES: ${{ matrix.postgres && 1}}
         MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
         WORKERS: ${{ matrix.workers && 1 }}
-        REDIS: ${{ matrix.redis && 1 }}
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
         TOP: ${{ github.workspace }}
 
@@ -236,7 +235,6 @@ jobs:
           - sytest-tag: buster
             postgres: postgres
             workers: workers
-            redis: redis
 
     steps:
       - uses: actions/checkout@v2
