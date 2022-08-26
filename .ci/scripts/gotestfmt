@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# wraps `gotestfmt`
+
+set -o pipefail
+set -e
+
+# tee the test results to a log, and pipe them into gotestfmt, telling it to hide successful results,
+# so that we can clearly see unsuccessful results
+tee complement.json | gotestfmt -hide successful-packages
+
+# gotestfmt will exit non-zero if there were any failures, so if we got to this
+# point, we must have had a successful result. Pipe the results back through
+# gotestfmt, showing all results.
+gotestfmt -hide successful-downloads < complement.json
