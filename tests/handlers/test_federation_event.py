@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from unittest import mock
+from typing import (
+    List,
+)
 
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.federation.transport.client import StateRequestResponse
 from synapse.logging.context import LoggingContext
@@ -51,7 +54,16 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         We check that the pulled event is correctly persisted, and that the state is
         as we expect.
         """
-        return self._test_process_pulled_event_with_missing_state(False)
+        results = self._test_process_pulled_event_with_missing_state(
+            prev_exists_as_outlier=False,
+        )
+
+        self._assert_pulled_event(results.get("pulled_event"))
+        self._assert_state_at_pulled_event(
+            pulled_event=results.get("pulled_event"),
+            state_at_pulled_event=results.get("state_at_pulled_event"),
+            prev_exists_as_outlier=False,
+        )
 
     def test_process_pulled_event_with_missing_state_where_prev_is_outlier(
         self,
@@ -63,14 +75,127 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         but in this case we already have the prev_event (as an outlier, obviously -
         if it were a regular event, we wouldn't need to request the state).
         """
-        return self._test_process_pulled_event_with_missing_state(True)
+        results = self._test_process_pulled_event_with_missing_state(
+            prev_exists_as_outlier=True,
+        )
+
+        self._assert_pulled_event(results.get("pulled_event"))
+        self._assert_state_at_pulled_event(
+            pulled_event=results.get("pulled_event"),
+            state_at_pulled_event=results.get("state_at_pulled_event"),
+            prev_exists_as_outlier=True,
+        )
+
+    def test_process_pulled_event_records_failed_backfill_attempts(
+        self,
+    ) -> None:
+        """ """
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
+
+        # Create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(main_store.get_room_version(room_id))
+
+        # We expect an outbound request to /state_ids, so stub that out
+        self.mock_federation_transport_client.get_room_state_ids.return_value = make_awaitable(
+            {
+                # Mimic the other server not knowing about the state at all.
+                # We want to cause Synapse to throw an error (`Unable to get
+                # missing prev_event $fake_prev_event`) and fail to backfill
+                # the pulled event.
+                "pdu_ids": [],
+                "auth_chain_ids": [],
+            }
+        )
+        # We also expect an outbound request to /state
+        self.mock_federation_transport_client.get_room_state.return_value = make_awaitable(
+            StateRequestResponse(
+                # Mimic the other server not knowing about the state at all.
+                # We want to cause Synapse to throw an error (`Unable to get
+                # missing prev_event $fake_prev_event`) and fail to backfill
+                # the pulled event.
+                auth_events=[],
+                state=[],
+            )
+        )
+
+        pulled_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "test_regular_type",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [
+                        # The fake prev event will make the pulled event fail
+                        # the history check (`Unable to get missing prev_event
+                        # $fake_prev_event`)
+                        "$fake_prev_event"
+                    ],
+                    "auth_events": [],
+                    "origin_server_ts": 1,
+                    "depth": 12,
+                    "content": {"body": "pulled"},
+                }
+            ),
+            room_version,
+        )
+
+        # The function under test: try to process the pulled event
+        with LoggingContext("test"):
+            self.get_success(
+                self.hs.get_federation_event_handler()._process_pulled_event(
+                    self.OTHER_SERVER_NAME, pulled_event, backfilled=True
+                )
+            )
+
+        # Make sure our backfill attempt was recorded
+        backfill_num_attempts = self.get_success(
+            main_store.db_pool.simple_select_one_onecol(
+                table="event_backfill_attempts",
+                keyvalues={"event_id": pulled_event.event_id},
+                retcol="num_attempts",
+            )
+        )
+        self.assertEqual(backfill_num_attempts, 1)
+
+        # The function under test: try to process the pulled event again
+        with LoggingContext("test"):
+            self.get_success(
+                self.hs.get_federation_event_handler()._process_pulled_event(
+                    self.OTHER_SERVER_NAME, pulled_event, backfilled=True
+                )
+            )
+
+        # Make sure our second backfill attempt was recorded
+        backfill_num_attempts = self.get_success(
+            main_store.db_pool.simple_select_one_onecol(
+                table="event_backfill_attempts",
+                keyvalues={"event_id": pulled_event.event_id},
+                retcol="num_attempts",
+            )
+        )
+        self.assertEqual(backfill_num_attempts, 2)
+
+        # And as a sanity check, make sure the event was not persisted through all of this.
+        persisted = self.get_success(
+            main_store.get_event(pulled_event.event_id, allow_none=True)
+        )
+        self.assertIsNone(
+            persisted,
+            "pulled event with invalid signature should not be persisted at all",
+        )
 
     def _test_process_pulled_event_with_missing_state(
-        self, prev_exists_as_outlier: bool
+        self,
+        *,
+        backfilled: bool = False,
+        prev_exists_as_outlier: bool = False,
     ) -> None:
         OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
         main_store = self.hs.get_datastores().main
-        state_storage_controller = self.hs.get_storage_controllers().state
 
         # create the room
         user_id = self.register_user("kermit", "test")
@@ -205,9 +330,17 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         with LoggingContext("test"):
             self.get_success(
                 self.hs.get_federation_event_handler()._process_pulled_event(
-                    self.OTHER_SERVER_NAME, pulled_event, backfilled=False
+                    self.OTHER_SERVER_NAME, pulled_event, backfilled=backfilled
                 )
             )
+
+        return {
+            "pulled_event": pulled_event,
+            "state_at_pulled_event": state_at_prev_event,
+        }
+
+    def _assert_pulled_event(self, pulled_event: EventBase) -> None:
+        main_store = self.hs.get_datastores().main
 
         # check that the event is correctly persisted
         persisted = self.get_success(main_store.get_event(pulled_event.event_id))
@@ -216,12 +349,21 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             persisted.internal_metadata.is_outlier(), "pulled event was an outlier"
         )
 
+    def _assert_state_at_pulled_event(
+        self,
+        *,
+        pulled_event: EventBase,
+        state_at_pulled_event: List[EventBase],
+        prev_exists_as_outlier: bool,
+    ) -> None:
+        state_storage_controller = self.hs.get_storage_controllers().state
+
         # check that the state at that event is as expected
         state = self.get_success(
             state_storage_controller.get_state_ids_for_event(pulled_event.event_id)
         )
         expected_state = {
-            (e.type, e.state_key): e.event_id for e in state_at_prev_event
+            (e.type, e.state_key): e.event_id for e in state_at_pulled_event
         }
         self.assertEqual(state, expected_state)
 
