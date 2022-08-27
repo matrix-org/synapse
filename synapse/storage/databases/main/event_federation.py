@@ -794,7 +794,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         backfill_attempt_info IS NULL
-                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ?, ? /* upper bound */)
+                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `max_depth`) to the lowest depth
