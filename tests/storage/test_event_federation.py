@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Tuple, Union
+import datetime
+import logging
+from typing import Dict, List, Tuple, Union
 
 import attr
-import datetime
 from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -33,8 +34,6 @@ from synapse.util import Clock, json_encoder
 
 import tests.unittest
 import tests.utils
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -587,9 +586,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(count, 1)
 
-        _, event_id = self.get_success(
+        next_staged_event_info = self.get_success(
             self.store.get_next_staged_event_id_for_room(room_id)
         )
+        assert next_staged_event_info
+        _, event_id = next_staged_event_info
         self.assertEqual(event_id, "$fake_event_id_500")
 
     def _setup_room_for_backfill_tests(self) -> _BackfillSetupInfo:
@@ -669,7 +670,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 "room_id": room_id,
                 "sender": "@sender",
                 "prev_event_ids": prev_event_ids,
-                "auth_events": [],
+                "auth_event_ids": [],
                 "origin_server_ts": stream_ordering,
                 "depth": depth,
                 "stream_ordering": stream_ordering,
@@ -681,7 +682,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         def populate_db(txn: LoggingTransaction):
             # Insert our server events
             for event_id in our_server_events:
-                event_dict = complete_event_dict_map.get(event_id)
+                event_dict = complete_event_dict_map[event_id]
 
                 self.store.db_pool.simple_insert_txn(
                     txn,
@@ -715,9 +716,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             prev_events_of_our_events = {
                 prev_event_id
                 for our_server_event in our_server_events
-                for prev_event_id in complete_event_dict_map.get(our_server_event).get(
+                for prev_event_id in complete_event_dict_map[our_server_event][
                     "prev_event_ids"
-                )
+                ]
             }
             backward_extremities = prev_events_of_our_events - our_server_events
             for backward_extremity in backward_extremities:
@@ -750,9 +751,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "B"
         backfill_points = self.get_success(
-            self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id, depth_map.get("B")
-            )
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, depth_map["B"])
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(
@@ -761,9 +760,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "A"
         backfill_points = self.get_success(
-            self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id, depth_map.get("A")
-            )
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, depth_map["A"])
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Event "2" has a depth of 2 but is not included here because we only
@@ -793,9 +790,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "B"
         backfill_points = self.get_success(
-            self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id, depth_map.get("B")
-            )
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, depth_map["B"])
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Only the backfill points that we didn't record earlier exist here.
@@ -832,9 +827,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Try at "A" and make sure that "b3" is not in the list because we've
         # already attemted many times
         backfill_points = self.get_success(
-            self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id, depth_map.get("A")
-            )
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, depth_map["A"])
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(backfill_event_ids, ["b3", "b2"])
@@ -845,9 +838,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "A" again after we advanced enough time and we should see "b3" again
         backfill_points = self.get_success(
-            self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id, depth_map.get("A")
-            )
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, depth_map["A"])
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(backfill_event_ids, ["b3", "b2", "b1"])

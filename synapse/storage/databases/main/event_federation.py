@@ -79,6 +79,7 @@ BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS: int = int(
     datetime.timedelta(hours=1).total_seconds()
 )
 
+
 # All the info we need while iterating the DAG while backfilling
 @attr.s(frozen=True, slots=True, auto_attribs=True)
 class BackfillQueueNavigationItem:
@@ -789,7 +790,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND event.depth <= ? /* current_depth */
                     /**
-                     * Exponential back-off (up to the upper bound) so we don't retry the 
+                     * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
                      */
                     AND (
@@ -1616,7 +1617,12 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
     ) -> Optional[Tuple[str, str]]:
-        """Get the next event ID in the staging area for the given room."""
+        """
+        Get the next event ID in the staging area for the given room.
+
+        Returns:
+            Tuple of the `origin` and `event_id`
+        """
 
         def _get_next_staged_event_id_for_room_txn(
             txn: LoggingTransaction,
