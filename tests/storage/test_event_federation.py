@@ -30,6 +30,10 @@ from synapse.util import json_encoder
 import tests.unittest
 import tests.utils
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
@@ -578,8 +582,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(event_id, "$fake_event_id_500")
 
-    def test_get_oldest_event_ids_with_depth_in_room(self):
-        # asdf
+    def _setup_room_for_backfill_tests(self) -> str:
+        """
+        Sets up a room with various events and backward extremities to test
+        backfill functions against.
+
+        Returns:
+            room_id to test against
+        """
         room_id = "!backfill-room-test:some-host"
 
         # The silly graph we use to test grabbing backward extremities,
@@ -636,11 +646,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # The events we have persisted on our server.
         # The rest are events in the room but not backfilled tet.
-        our_server_events = ["5", "4", "B", "3", "A"]
+        our_server_events = {"5", "4", "B", "3", "A"}
 
         complete_event_dict_map: Dict[str, JsonDict] = {}
         stream_ordering = 0
-        for (event_id, prev_events) in event_graph.items():
+        for (event_id, prev_event_ids) in event_graph.items():
             depth = depth_map[event_id]
 
             complete_event_dict_map[event_id] = {
@@ -648,7 +658,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 "type": "test_regular_type",
                 "room_id": room_id,
                 "sender": "@sender",
-                "prev_events": prev_events,
+                "prev_event_ids": prev_event_ids,
                 "auth_events": [],
                 "origin_server_ts": stream_ordering,
                 "depth": depth,
@@ -658,7 +668,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
             stream_ordering += 1
 
-        def insert_our_server_events(txn: LoggingTransaction):
+        def populate_db(txn: LoggingTransaction):
             # Insert our server events
             for event_id in our_server_events:
                 event_dict = complete_event_dict_map.get(event_id)
@@ -691,12 +701,41 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                         },
                     )
 
+            # Insert the backward extremities
+            prev_events_of_our_events = {
+                prev_event_id
+                for our_server_event in our_server_events
+                for prev_event_id in complete_event_dict_map.get(our_server_event).get(
+                    "prev_event_ids"
+                )
+            }
+            backward_extremities = prev_events_of_our_events - our_server_events
+            for backward_extremity in backward_extremities:
+                self.store.db_pool.simple_insert_txn(
+                    txn,
+                    table="event_backward_extremities",
+                    values={
+                        "event_id": backward_extremity,
+                        "room_id": room_id,
+                    },
+                )
+
         self.get_success(
             self.store.db_pool.runInteraction(
-                "insert_our_server_events",
-                insert_our_server_events,
+                "populate_db",
+                populate_db,
             )
         )
+
+        return room_id
+
+    def test_get_oldest_event_ids_with_depth_in_room(self):
+        room_id = self._setup_room_for_backfill_tests()
+
+        backfill_points = self.get_success(
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, 7)
+        )
+        logger.info("asdfasdf backfill_points=%s", backfill_points)
 
 
 @attr.s

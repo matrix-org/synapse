@@ -775,7 +775,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 ON backfill_attempt_info.event_id = backward_extrem.event_id
                 WHERE
                     backward_extrem.room_id = ?
-                    /* We only care about normal events because TODO: why? */
+                    /* We only care about normal events because TODO: why */
                     AND edge.is_state is ? /* False */
                     /**
                      * We only want backwards extremities that are older than or at
@@ -787,13 +787,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      *                           |
                      * <oldest-in-time> [0]<--[1]▼<--[2]<--[3]<--[4] <newest-in-time>
                      */
-                    AND MAX(event.depth) <= current_depth
+                    AND event.depth <= ? /* current_depth */
                     /**
                      * Exponential back-off (up to the upper bound) so we don't retry the 
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
                      */
                     AND ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ?, ? /* upper bound */)
-                /* TODO: Why? */
+                /* TODO: Why */
                 GROUP BY backward_extrem.event_id
                 /**
                  * Sort from highest (closest to the `max_depth`) to the lowest depth
@@ -807,6 +807,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 (
                     room_id,
                     False,
+                    current_depth,
                     self._clock.time_msec(),
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
                     1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
