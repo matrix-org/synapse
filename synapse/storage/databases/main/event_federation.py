@@ -727,8 +727,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         room_id: str,
         current_depth: int,
     ) -> List[Tuple[str, int]]:
-        """Gets the oldest events(backwards extremities) in the room along with the
-        aproximate depth.
+        """
+        Gets the oldest events(backwards extremities) in the room lower than the
+        given `current_depth` along with the aproximate depth.
 
         We use this function so that we can compare and see if someones current
         depth at their current scrollback is within pagination range of the
@@ -737,6 +738,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the users current scrollback because
+                we only care about finding events older than the given
+                `current_depth` when scrolling and paginating backwards.
 
         Returns:
             List of (event_id, depth) tuples
