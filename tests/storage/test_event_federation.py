@@ -735,6 +735,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
     def test_get_oldest_event_ids_with_depth_in_room(self):
         room_id = self._setup_room_for_backfill_tests()
 
+        # Try at B
         backfill_points = self.get_success(
             self.store.get_oldest_event_ids_with_depth_in_room(room_id, 7)
         )
@@ -742,6 +743,15 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertListEqual(
             backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
         )
+
+        # Try at A
+        backfill_points = self.get_success(
+            self.store.get_oldest_event_ids_with_depth_in_room(room_id, 4)
+        )
+        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
+        # Event "2" is not included here because we only know the aproximate
+        # depth of 5 from our event "3".
+        self.assertListEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
 
 @attr.s

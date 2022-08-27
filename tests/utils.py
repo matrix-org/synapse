@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import atexit
 import os
 from typing import Any, Callable, Dict, List, Tuple, Union, overload
@@ -54,8 +53,6 @@ SQLITE_PERSIST_DB = os.environ.get("SYNAPSE_TEST_PERSIST_SQLITE_DB") is not None
 
 # the dbname we will connect to in order to create the base database.
 POSTGRES_DBNAME_FOR_INITIAL_CREATE = "postgres"
-
-logger = logging.getLogger(__name__)
 
 
 def setupdb() -> None:
