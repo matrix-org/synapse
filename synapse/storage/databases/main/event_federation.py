@@ -752,7 +752,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             # specifically). So we need to look for the aproximate depth from
             # the events connected to the current backwards extremeties.
             sql = """
-                SELECT backward_extrem.event_id, MAX(event.depth) FROM events as event
+                SELECT backward_extrem.event_id, event.depth FROM events as event
                 /**
                  * Get the edge connections from the event_edges table
                  * so we can see whether this event's prev_events points
@@ -796,13 +796,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                         backfill_attempt_info IS NULL
                         OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ?, ? /* upper bound */)
                     )
-                /* TODO: Why */
-                GROUP BY backward_extrem.event_id
                 /**
                  * Sort from highest (closest to the `max_depth`) to the lowest depth
                  * because the closest are most relevant to backfill from first.
                  */
-                ORDER BY MAX(event.depth) DESC, backward_extrem.event_id DESC
+                ORDER BY event.depth DESC, backward_extrem.event_id DESC
             """
 
             txn.execute(
