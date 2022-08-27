@@ -780,7 +780,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     /**
                      * We only want backwards extremities that are older than or at
                      * the same position of the given `current_depth` (where older
-                     * means less than a given depth) because we're looking backwards
+                     * means less than the given depth) because we're looking backwards
                      * from the `current_depth` when backfilling.
                      *
                      *                           current_depth (ignore events that come after this, ignore 2-4)
