@@ -17,15 +17,18 @@ from typing import Dict, List, Tuple, Union
 import attr
 from parameterized import parameterized
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
     RoomVersion,
 )
 from synapse.events import _EventInternalMetadata
+from synapse.server import HomeServer
 from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict
-from synapse.util import json_encoder
+from synapse.util import Clock, json_encoder
 
 import tests.unittest
 import tests.utils
@@ -36,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
     def test_get_prev_events_for_room(self):
@@ -735,7 +738,10 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_points = self.get_success(
             self.store.get_oldest_event_ids_with_depth_in_room(room_id, 7)
         )
-        logger.info("asdfasdf backfill_points=%s", backfill_points)
+        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
+        self.assertListEqual(
+            backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
+        )
 
 
 @attr.s

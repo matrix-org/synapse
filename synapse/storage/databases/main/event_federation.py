@@ -771,7 +771,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * We use this info to make sure we don't retry to use a backfill point
                  * if we've already attempted to backfill from it recently.
                  */
-                INNER JOIN event_backfill_attempts as backfill_attempt_info
+                LEFT JOIN event_backfill_attempts as backfill_attempt_info
                 ON backfill_attempt_info.event_id = backward_extrem.event_id
                 WHERE
                     backward_extrem.room_id = ?
@@ -792,14 +792,17 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * Exponential back-off (up to the upper bound) so we don't retry the 
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
                      */
-                    AND ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ?, ? /* upper bound */)
+                    AND (
+                        backfill_attempt_info IS NULL
+                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ?, ? /* upper bound */)
+                    )
                 /* TODO: Why */
                 GROUP BY backward_extrem.event_id
                 /**
                  * Sort from highest (closest to the `max_depth`) to the lowest depth
                  * because the closest are most relevant to backfill from first.
                  */
-                ORDER BY MAX(event.depth) DESC
+                ORDER BY MAX(event.depth) DESC, backward_extrem.event_id DESC
             """
 
             txn.execute(
