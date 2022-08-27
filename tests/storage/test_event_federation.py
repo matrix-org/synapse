@@ -766,8 +766,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        # Event "2" is not included here because we only know the aproximate
-        # depth of 5 from our event "3".
+        # Event "2" has a depth of 2 but is not included here because we only
+        # know the approximate depth of 5 from our event "3".
         self.assertListEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
     def test_get_oldest_event_ids_with_depth_in_room_excludes_events_we_have_attempted(
