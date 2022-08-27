@@ -1,1 +1,1 @@
-Improve aesthetics of HTML templates
+Improve aesthetics of HTML templates.
