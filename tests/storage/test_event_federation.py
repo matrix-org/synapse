@@ -839,10 +839,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(backfill_event_ids, ["b3", "b2"])
 
-        # Now advance time by 20 hours and see if we can now backfill it
+        # Now advance time by 20 hours (above 2^4 because we made 4 attemps) and
+        # see if we can now backfill it
         self.reactor.advance(datetime.timedelta(hours=20).total_seconds())
 
-        # Try at "A" again after we advanced the time and we should see "b3" again
+        # Try at "A" again after we advanced enough time and we should see "b3" again
         backfill_points = self.get_success(
             self.store.get_oldest_event_ids_with_depth_in_room(
                 room_id, depth_map.get("A")
