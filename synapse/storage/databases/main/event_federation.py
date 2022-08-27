@@ -766,26 +766,26 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             # specifically). So we need to look for the aproximate depth from
             # the events connected to the current backwards extremeties.
             sql = """
-                SELECT backward_extrem.event_id, event.depth FROM events as event
+                SELECT backward_extrem.event_id, event.depth FROM events AS event
                 /**
                  * Get the edge connections from the event_edges table
                  * so we can see whether this event's prev_events points
                  * to a backward extremity in the next join.
                  */
-                INNER JOIN event_edges as edge
+                INNER JOIN event_edges AS edge
                 ON edge.event_id = event.event_id
                 /**
                  * We find the "oldest" events in the room by looking for
                  * events connected to backwards extremeties (oldest events
                  * in the room that we know of so far).
                  */
-                INNER JOIN event_backward_extremities as backward_extrem
+                INNER JOIN event_backward_extremities AS backward_extrem
                 ON edge.prev_event_id = backward_extrem.event_id
                 /**
                  * We use this info to make sure we don't retry to use a backfill point
                  * if we've already attempted to backfill from it recently.
                  */
-                LEFT JOIN event_backfill_attempts as backfill_attempt_info
+                LEFT JOIN event_backfill_attempts AS backfill_attempt_info
                 ON backfill_attempt_info.event_id = backward_extrem.event_id
                 WHERE
                     backward_extrem.room_id = ?
@@ -808,7 +808,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         backfill_attempt_info IS NULL
-                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(power(2, backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth
@@ -886,7 +886,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * We use this info to make sure we don't retry to use a backfill point
                  * if we've already attempted to backfill from it recently.
                  */
-                LEFT JOIN event_backfill_attempts as backfill_attempt_info USING (event_id)
+                LEFT JOIN event_backfill_attempts AS backfill_attempt_info USING (event_id)
                 WHERE
                     insertion_event_extremity.room_id = ?
                     AND event.depth <= ? /* current_depth */
@@ -896,7 +896,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         backfill_attempt_info IS NULL
-                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(2^backfill_attempt_info.num_attempts * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least(power(2, backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth
