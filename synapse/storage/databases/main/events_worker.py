@@ -2122,8 +2122,6 @@ class EventsWorkerStore(SQLBaseStore):
             LIMIT 1;
         """
 
-        #
-
         def get_event_id_for_timestamp_txn(txn: LoggingTransaction) -> Optional[str]:
             if direction == "b":
                 # Find closest event *before* a given timestamp. We use descending

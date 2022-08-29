@@ -1,0 +1,1 @@
+Fix MSC3030 `/timestamp_to_event` endpoint returning the correct next event when the events have the same timestamp.
