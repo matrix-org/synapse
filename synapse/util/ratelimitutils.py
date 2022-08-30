@@ -155,7 +155,8 @@ class FederationRateLimiter:
             clock
             config
             metrics_name: The name of the rate limiter so we can differentiate it
-                from the rest in the metrics
+                from the rest in the metrics. If `None`, we don't track metrics
+                for this rate limiter.
 
         """
         self.metrics_name = metrics_name
@@ -202,6 +203,8 @@ class _PerHostRatelimiter:
             clock
             config
             metrics_name: The name of the rate limiter so we can differentiate it
+                from the rest in the metrics. If `None`, we don't track metrics
+                for this rate limiter.
                 from the rest in the metrics
         """
         self.clock = clock
