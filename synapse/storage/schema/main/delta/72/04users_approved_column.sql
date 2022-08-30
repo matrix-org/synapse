@@ -15,7 +15,7 @@
 
 -- Add a column to the users table to track whether the user needs to be approved by an
 -- administrator.
-ALTER TABLE users ADD COLUMN approved SMALLINT;
+ALTER TABLE users ADD COLUMN approved BOOLEAN;
 
 -- Run a background update to set the approved flag on already existing users.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES

@@ -1797,7 +1797,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="is_user_pending_approval",
         )
 
-        return bool(ret)
+        return ret
 
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
@@ -2002,7 +2002,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             txn=txn,
             table="users",
             keyvalues={"name": user_id},
-            updatevalues={"approved": int(approved)},
+            updatevalues={"approved": approved},
         )
 
         # Invalidate the caches of methods that read the value of the 'approved' flag.
@@ -2223,7 +2223,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         now = int(self._clock.time())
 
-        pending_approval = self._require_approval and not approved
+        user_approved = approved or not self._require_approval
 
         try:
             if was_guest:
@@ -2250,7 +2250,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
-                        "approved": 0 if pending_approval else 1,
+                        "approved": user_approved,
                     },
                 )
             else:
@@ -2266,7 +2266,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
-                        "approved": 0 if pending_approval else 1,
+                        "approved": user_approved,
                     },
                 )
 
