@@ -113,7 +113,9 @@ RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-tool
 # This is aiming at installing the `[tool.poetry.depdendencies]` from pyproject.toml.
 COPY --from=requirements /synapse/requirements.txt /synapse/
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --prefix="/install" -U setuptools pip
+  pip install --prefix="/install" -U setuptools
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install -U setuptools pip
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/install" --no-deps --no-warn-script-location -r /synapse/requirements.txt
 
