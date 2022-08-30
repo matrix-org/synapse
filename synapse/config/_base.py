@@ -876,35 +876,34 @@ def find_config_files(search_paths: List[str]) -> List[str]:
         A list of file paths.
     """
 
-    config_files = []
-    if search_paths:
-        for config_path in search_paths:
-            if os.path.isdir(config_path):
-                # We accept specifying directories as config paths, we search
-                # inside that directory for all files matching *.yaml, and then
-                # we apply them in *sorted* order.
-                files = []
-                for entry in os.listdir(config_path):
-                    entry_path = os.path.join(config_path, entry)
-                    if not os.path.isfile(entry_path):
-                        err = "Found subdirectory in config directory: %r. IGNORING."
-                        print(err % (entry_path,))
-                        continue
+    config_files = {config_path: [] for config_path in search_paths}
+    for config_path, files in config_files.items():
+        if os.path.isdir(config_path):
+            # We accept specifying directories as config paths, we search
+            # inside that directory for all files matching *.yaml, and then
+            # we apply them in *sorted* order.
+            found_files = []
+            for entry in os.listdir(config_path):
+                entry_path = os.path.join(config_path, entry)
+                if not os.path.isfile(entry_path):
+                    err = "Found subdirectory in config directory: %r. IGNORING."
+                    print(err % (entry_path,))
+                    continue
 
-                    if not entry.endswith(".yaml"):
-                        err = (
-                            "Found file in config directory that does not end in "
-                            "'.yaml': %r. IGNORING."
-                        )
-                        print(err % (entry_path,))
-                        continue
+                if not entry.endswith(".yaml"):
+                    err = (
+                        "Found file in config directory that does not end in "
+                        "'.yaml': %r. IGNORING."
+                    )
+                    print(err % (entry_path,))
+                    continue
 
-                    files.append(entry_path)
+                found_files.append(entry_path)
 
-                config_files.extend(sorted(files))
-            else:
-                config_files.append(config_path)
-    return config_files
+            files.extend(sorted(found_files))
+        else:
+            files.append(config_path)
+    return list(itertools.chain(*config_files.values()))
 
 
 @attr.s(auto_attribs=True)
