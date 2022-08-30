@@ -1,3 +1,12 @@
+Synapse 1.66.0rc2 (2022-08-30)
+==============================
+
+Bugfixes
+--------
+
+- Fix rate limit gauge metrics registering twice and misreporting (`synapse_rate_limit_sleep_affected_hosts`, `synapse_rate_limit_reject_affected_hosts`). ([\#13649](https://github.com/matrix-org/synapse/issues/13649))
+
+
 Synapse 1.66.0rc1 (2022-08-23)
 ==============================
 
