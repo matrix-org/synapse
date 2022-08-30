@@ -13,7 +13,7 @@
 1.  Enable the `/_synapse/metrics` Synapse endpoint that Prometheus uses to
     collect data:
 
-    There are two methods of enabling metrics endpoint in Synapse.
+    There are two methods of enabling the metrics endpoint in Synapse.
 
     The first serves the metrics as a part of the usual web server and
     can be enabled by adding the \"metrics\" resource to the existing
