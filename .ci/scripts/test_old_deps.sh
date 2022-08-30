@@ -73,7 +73,7 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
-pipx install poetry==1.1.14
+pipx install poetry==1.2.0rc1
 ~/.local/bin/poetry lock
 
 echo "::group::Patched pyproject.toml"
@@ -85,6 +85,4 @@ echo "::endgroup::"
 
 ~/.local/bin/poetry install -E "all test"
 
-# In poetry 1.1.* we need to manually upgrade setuptools
-~/.local/bin/poetry run pip install -U setuptools
 ~/.local/bin/poetry run trial --jobs=2 tests
