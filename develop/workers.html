@@ -237,7 +237,11 @@ redis:
 </code></pre>
 <p>See the sample config for the full documentation of each option.</p>
 <p>Under <strong>no circumstances</strong> should the replication listener be exposed to the
-public internet; it has no authentication and is unencrypted.</p>
+public internet; replication traffic is:</p>
+<ul>
+<li>always unencrypted</li>
+<li>unauthenticated, unless <code>worker_replication_secret</code> is configured</li>
+</ul>
 <h3 id="worker-configuration"><a class="header" href="#worker-configuration">Worker configuration</a></h3>
 <p>In the config file for each worker, you must specify the type of worker
 application (<code>worker_app</code>), and you should specify a unique name for the worker
