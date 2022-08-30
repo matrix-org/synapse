@@ -15,8 +15,15 @@
 import resource
 from unittest import mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.app.phone_stats_home import phone_stats_home
+from synapse.metrics.shared_usage_metrics import SharedUsageMetrics
+from synapse.rest import admin
+from synapse.rest.client import login
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -30,7 +37,9 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
             (self.hs.get_clock().time(), resource.getrusage(resource.RUSAGE_SELF))
         ]
         stats: JsonDict = {}
-        self.get_success(phone_stats_home(self.hs, stats, past_stats))
+        self.get_success(
+            phone_stats_home(self.hs, stats, SharedUsageMetrics(self.hs), past_stats)
+        )
         self.assertEqual(stats["cpu_average"], 0)
 
     def test_performance_100(self) -> None:
@@ -47,5 +56,36 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
         stats: JsonDict = {}
         self.reactor.advance(1)
         # `old_resource` has type `Mock` instead of `struct_rusage`
-        self.get_success(phone_stats_home(self.hs, stats, past_stats))  # type: ignore[arg-type]
+        self.get_success(
+            phone_stats_home(
+                self.hs,
+                stats,
+                SharedUsageMetrics(self.hs),
+                past_stats,  # type: ignore[arg-type]
+            )
+        )
         self.assertApproximates(stats["cpu_average"], 100, tolerance=2.5)
+
+
+class SharedMetricsTestCase(HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.metrics = hs.get_shared_usage_metrics()
+        self.get_success(self.metrics.setup())
+
+    def test_dau(self) -> None:
+        """Tests that the daily active users count is correctly updated."""
+        self.assertEqual(self.metrics.daily_active_users, 0)
+
+        self.register_user("user", "password")
+        self.login("user", "password")
+
+        self.assertEqual(self.metrics.daily_active_users, 0)
+
+        self.reactor.advance(3000)
+
+        self.assertEqual(self.metrics.daily_active_users, 1)
