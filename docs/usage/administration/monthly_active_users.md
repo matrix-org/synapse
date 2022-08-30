@@ -3,39 +3,46 @@
 Synapse can be configured to record the number of monthly active users (also referred to as MAU) on a given homeserver.
 For clarity's sake, MAU only tracks local users.
 
-Please note that the metrics recorded by the [Homeserver Usage Stats](/usage/administration/monitoriing/reporting_homeserver_usage_statistics)
-are calculated differently. The `monthly_active_users` does not take into account any of the rules below, and counts any users 
-who have made a request to the homeserver in the last 30 days.
+Please note that the metrics recorded by the [Homeserver Usage Stats](/usage/administration/monitoring/reporting_homeserver_usage_statistics)
+are calculated differently. The `monthly_active_users` from the usage stats does not take into account any
+of the rules below, and counts any users who have made a request to the homeserver in the last 30 days.
 
-See the [configuration manual](/usage/configuration/config_documentation.html#limit_usage_by_mau) for details on how to configure MAU.
+See the [configuration manual](../../usage/configuration/config_documentation.md#limit_usage_by_mau) for details on how to configure MAU.
 
 ## Calculating active users
 
-Individual user activity is measured in active days, so if a user performs an action on a given day, that day is then recorded. When
-calculating the MAU figure, any users with a recorded action in the last 30 days are considered part of the cohort.
+Individual user activity is measured in active days. If a user performs an action, the exact time of that action is then recorded. When
+calculating the MAU figure, any users with a recorded action in the last 30 days are considered part of the cohort. Days are measured
+as a rolling window from the current system time to 30 days ago.
+
+So for example, if Synapse were to calculate the active users on the 15th July at 13:25, it would include any activity from 15th June 13:25 onwards.
 
 A user is **never** considered active if they are either:
  - Part of the trial day cohort (described below)
- - Have an `appservice_id`.
+ - Are owned by an Application Service (AS).
+   - Note: This **only** cover users that are part of an application service `namespaces.users` registration. The namespace
+     must also be marked as `exclusive`.
 
-Otherwise, any request to Synapse will mark the user as active. Internally, this is any request that records
-the client's IP address into the database.
+Otherwise, any request to Synapse will mark the user as active. Please note that registration will not mark a user as active *unless* 
+they register with a 3pid that is included in the config field `mau_limits_reserved_threepids`.
 
-The MAU value is recalculated once every 5 minutes for active users, while inactive users are removed from the cohort once every hour.
-Internally this works by checking all users, and adding any recently active users to the `monthly_active_users` table. Every hour, any
-users with timestamps later than 30 days are removed. The sum of all rows of that table is the final count of active users.
+The Prometheus metric for MAU is recalculated every 5 minutes.
 
-It is important to note that **deactivated** users are not immediately removed from the pool of active users, but as blocked users won't
-perform actions they will eventually be removed from the cohort.
+Once an hour, Synapse checks to see if any users are in active (with only activity timestamps later than 30 days). These users
+are removed from the active users cohort. If they then become active, they are immediately restored to the cohort.
+
+It is important to note that **deactivated** users are not immediately removed from the pool of active users, but as these users won't
+perform actions they will eventually be removed from the cohort. This is also the case with shadow banned users.
 
 ### Trial days
 
-If `mau_trial_days` is set, the user must have had activity at least this number of days apart for them to be considered part of the cohort.
-As an example, if `mau_trial_days` is set to `2` and Alice is active on days 1 and 3 then they will be counted as an active user. If Bob
-is active on days 1 and 2, then they will NOT be counted as active. Please note that users do not need to be active on concurrent days to
-be deemed active.  
+If the config option `mau_trial_days` is set, a user must have been active this many days **after** registration to be active. A user is in the
+trial period if their registration timestamp (also known as the `creation_ts`) is less than `mau_trial_days` old.
 
-The `mau_appservice_trial_days` config further extends this rule by applying different durations depending on the appservice ID of the user.
+As an example, if `mau_trial_days` is set to `3` and a user is active **after** 3 days (72 hours from registration time) then they will be counted as active.
+
+The `mau_appservice_trial_days` config further extends this rule by applying different durations depending on the `appservice_id` of the user.
+Users registered by an application service will be recorded with an `appservice_id` matching the `id` key in the registration file for that service.
 
 
 ## Limiting usage of the homeserver when the maximum MAU is reached
@@ -46,15 +53,19 @@ homeserver will begin to block some actions.
 Individual users matching **any** of the below criteria never have their actions blocked:
   - Considered part of the cohort of MAU users.
   - Considered part of the trial period.
-  - Registered as a `support` user. 
+  - Registered as a `support` user.
+  - Application service users if `track_appservice_user_ips` is NOT set.
+
+Please not that server admins are **NOT** blocked.
 
 The following actions are blocked when the MAU limit is exceeded:
   - Logging in
   - Sending events
   - Creating rooms
+  - Syncing
 
 Registration is also blocked for all new signups *unless* the user is registering with a threepid included in the `mau_limits_reserved_threepids`
-config value. Users that register this way are also immediately considered active on that day.
+config value.
 
 When a request is blocked, the response will have the `errcode` `M_RESOURCE_LIMIT_EXCEEDED`.
 
@@ -66,8 +77,8 @@ Synapse records several different prometheus metrics for MAU.
 
 `synapse_admin_mau:max` records the maximum MAU as dictated by the `max_mau_value` config value.
 
-`synapse_admin_mau_current_mau_by_service` records the current MAU including appservice users. This *also*
-includes non-appservice users under the `native` label.
+`synapse_admin_mau_current_mau_by_service` records the current MAU including appservice users. The label `app_service` can be used
+to filter by a specific service ID. This *also* includes non-appservice users under `app_service=native` .
 
 `synapse_admin_mau:registered_reserved_users` records the number of users specified in `mau_limits_reserved_threepids` which have
 registered accounts on the homeserver.
