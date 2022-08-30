@@ -19,7 +19,7 @@ So for example, if Synapse were to calculate the active users on the 15th July a
 
 A user is **never** considered active if they are either:
  - Part of the trial day cohort (described below)
- - Are owned by an Application Service (AS).
+ - Are owned by an application service.
    - Note: This **only** cover users that are part of an application service `namespaces.users` registration. The namespace
      must also be marked as `exclusive`.
 
@@ -73,12 +73,12 @@ When a request is blocked, the response will have the `errcode` `M_RESOURCE_LIMI
 
 Synapse records several different prometheus metrics for MAU.
 
-`synapse_admin_mau:current` records the current MAU figure for native (non-appservice) users.
+`synapse_admin_mau:current` records the current MAU figure for native (non-application-service) users.
 
 `synapse_admin_mau:max` records the maximum MAU as dictated by the `max_mau_value` config value.
 
-`synapse_admin_mau_current_mau_by_service` records the current MAU including appservice users. The label `app_service` can be used
-to filter by a specific service ID. This *also* includes non-appservice users under `app_service=native` .
+`synapse_admin_mau_current_mau_by_service` records the current MAU including application service users. The label `app_service` can be used
+to filter by a specific service ID. This *also* includes non-application-service users under `app_service=native` .
 
 `synapse_admin_mau:registered_reserved_users` records the number of users specified in `mau_limits_reserved_threepids` which have
 registered accounts on the homeserver.
