@@ -1,1 +1,1 @@
-Fix two typos with colon in headlines.
+Remove unintentional colons from [config manual](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html) headers.
