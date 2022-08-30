@@ -2,6 +2,7 @@
 name = "synapse-rust"
 version = "0.1.0"
 edition = "2021"
+rust = "1.63.0"
 
 [lib]
 name = "synapse_rust"
