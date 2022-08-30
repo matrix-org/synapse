@@ -478,12 +478,10 @@ async def start(hs: "HomeServer") -> None:
     setup_sentry(hs)
     setup_sdnotify(hs)
 
-    # Start collecting shared usage metrics.
-    await hs.get_shared_usage_metrics().setup()
-
     # If background tasks are running on the main process or this is the worker in
-    # charge of them, start collecting the phone home stats.
+    # charge of them, start collecting the phone home stats and shared usage metrics.
     if hs.config.worker.run_background_tasks:
+        await hs.get_shared_usage_metrics().setup()
         start_phone_stats_home(hs)
 
     # We now freeze all allocated objects in the hopes that (almost)
