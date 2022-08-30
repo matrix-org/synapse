@@ -9741,7 +9741,7 @@ worker_replication_secret: &quot;&quot;
 redis:
     enabled: true
 </code></pre>
-<p>See the sample config for the full documentation of each option.</p>
+<p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a> for the full documentation of each option.</p>
 <p>Under <strong>no circumstances</strong> should the replication listener be exposed to the
 public internet; replication traffic is:</p>
 <ul>
@@ -9749,15 +9749,17 @@ public internet; replication traffic is:</p>
 <li>unauthenticated, unless <code>worker_replication_secret</code> is configured</li>
 </ul>
 <h3 id="worker-configuration"><a class="header" href="#worker-configuration">Worker configuration</a></h3>
-<p>In the config file for each worker, you must specify the type of worker
-application (<code>worker_app</code>), and you should specify a unique name for the worker
-(<code>worker_name</code>). The currently available worker applications are listed below.
-You must also specify the HTTP replication endpoint that it should talk to on
-the main synapse process.  <code>worker_replication_host</code> should specify the host of
-the main synapse and <code>worker_replication_http_port</code> should point to the HTTP
-replication port. If the worker will handle HTTP requests then the
-<code>worker_listeners</code> option should be set with a <code>http</code> listener, in the same way
-as the <code>listeners</code> option in the shared config.</p>
+<p>In the config file for each worker, you must specify:</p>
+<ul>
+<li>The type of worker (<code>worker_app</code>). The currently available worker applications are listed below.</li>
+<li>A unique name for the worker (<code>worker_name</code>).</li>
+<li>The HTTP replication endpoint that it should talk to on the main synapse process
+(<code>worker_replication_host</code> and <code>worker_replication_http_port</code>)</li>
+<li>If handling HTTP requests, a <code>worker_listeners</code> option with an <code>http</code>
+listener, in the same way as the <code>listeners</code> option in the shared config.</li>
+<li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
+the main process (<code>worker_main_http_uri</code>).</li>
+</ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: generic_worker1
@@ -9765,6 +9767,8 @@ worker_name: generic_worker1
 # The replication listener on the main synapse process.
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
+
+worker_main_http_uri: http://localhost:8008/
 
 worker_listeners:
   - type: http
@@ -9841,10 +9845,12 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
 # Encryption requests
+# Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
 ^/_matrix/client/(r0|v3|unstable)/keys/query$
 ^/_matrix/client/(r0|v3|unstable)/keys/changes$
 ^/_matrix/client/(r0|v3|unstable)/keys/claim$
 ^/_matrix/client/(r0|v3|unstable)/room_keys/
+^/_matrix/client/(r0|v3|unstable)/keys/upload/
 
 # Registration/login requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
@@ -10138,31 +10144,16 @@ endpoint as long as either this worker or the main process are configured to
 handle it, and are online.</p>
 <p>If <code>update_user_directory</code> is set to <code>false</code>, and this worker is not running,
 the above endpoint may give outdated results.</p>
-<h3 id="synapseappfrontend_proxy"><a class="header" href="#synapseappfrontend_proxy"><code>synapse.app.frontend_proxy</code></a></h3>
-<p>Proxies some frequently-requested client endpoints to add caching and remove
-load from the main synapse. It can handle REST endpoints matching the following
-regular expressions:</p>
-<pre><code>^/_matrix/client/(r0|v3|unstable)/keys/upload
-</code></pre>
-<p>If <code>use_presence</code> is False in the homeserver config, it can also handle REST
-endpoints matching the following regular expressions:</p>
-<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/presence/[^/]+/status
-</code></pre>
-<p>This &quot;stub&quot; presence handler will pass through <code>GET</code> request but make the
-<code>PUT</code> effectively a no-op.</p>
-<p>It will proxy any requests it cannot handle to the main synapse instance. It
-must therefore be configured with the location of the main instance, via
-the <code>worker_main_http_uri</code> setting in the <code>frontend_proxy</code> worker configuration
-file. For example:</p>
-<pre><code class="language-yaml">worker_main_http_uri: http://127.0.0.1:8008
-</code></pre>
 <h3 id="historical-apps"><a class="header" href="#historical-apps">Historical apps</a></h3>
-<p><em>Note:</em> Historically there used to be more apps, however they have been
-amalgamated into a single <code>synapse.app.generic_worker</code> app. The remaining apps
-are ones that do specific processing unrelated to requests, e.g. the <code>pusher</code>
-that handles sending out push notifications for new events. The intention is for
-all these to be folded into the <code>generic_worker</code> app and to use config to define
-which processes handle the various proccessing such as push notifications.</p>
+<p>The following used to be separate worker application types, but are now
+equivalent to <code>synapse.app.generic_worker</code>:</p>
+<ul>
+<li><code>synapse.app.client_reader</code></li>
+<li><code>synapse.app.event_creator</code></li>
+<li><code>synapse.app.federation_reader</code></li>
+<li><code>synapse.app.frontend_proxy</code></li>
+<li><code>synapse.app.synchrotron</code></li>
+</ul>
 <h2 id="migration-from-old-config"><a class="header" href="#migration-from-old-config">Migration from old config</a></h2>
 <p>There are two main independent changes that have been made: introducing Redis
 support and merging apps into <code>synapse.app.generic_worker</code>. Both these changes
@@ -10250,6 +10241,8 @@ worker_name: generic_worker1
 # The replication listener on the main synapse process.
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
+
+worker_main_http_uri: http://localhost:8008/
 
 worker_listeners:
   - type: http
