@@ -1,1 +1,0 @@
-Fix rate limit gauge metrics registering twice and misreporting (`synapse_rate_limit_sleep_affected_hosts`, `synapse_rate_limit_reject_affected_hosts`).
