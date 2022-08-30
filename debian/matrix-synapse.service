@@ -5,7 +5,7 @@ Description=Synapse Matrix homeserver
 Type=notify
 User=matrix-synapse
 WorkingDirectory=/var/lib/matrix-synapse
-ExecStartPre=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/ --generate-keys
+ExecStartPre=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d --generate-config
 ExecStart=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always

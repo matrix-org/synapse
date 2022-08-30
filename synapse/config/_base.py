@@ -16,6 +16,7 @@
 
 import argparse
 import errno
+import itertools
 import logging
 import os
 import re
@@ -413,6 +414,14 @@ class RootConfig:
             if hasattr(config, func_name):
                 getattr(config, func_name)(*args, **kwargs)
 
+    @staticmethod
+    def pop_config_by_name(config_files: List[str], name: str) -> Optional[str]:
+        for idx, path in enumerate(config_files):
+            if os.path.basename(path) == name:
+                return config_files.pop(idx)
+
+        return None
+
     def generate_config(
         self,
         config_dir_path: str,
@@ -704,12 +713,33 @@ class RootConfig:
             == _ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT
         ):
             if config_args.report_stats is None:
-                parser.error(
-                    "Please specify either --report-stats=yes or --report-stats=no\n\n"
-                    + MISSING_REPORT_STATS_SPIEL
+                report_stats_file = cls.pop_config_by_name(
+                    config_files, "report_stats.yaml"
                 )
+                if report_stats_file:
+                    with open(report_stats_file) as f:
+                        config_args.report_stats = yaml.safe_load(f)["report_stats"]
+                else:
+                    parser.error(
+                        "Please specify either --report-stats=yes or --report-stats=no\n\n"
+                        + MISSING_REPORT_STATS_SPIEL
+                    )
 
-            (config_path,) = config_files
+            server_name = config_args.server_name
+            if not server_name:
+                server_name_file = cls.pop_config_by_name(
+                    config_files, "server_name.yaml"
+                )
+                if server_name_file:
+                    with open(server_name_file) as f:
+                        server_name = yaml.safe_load(f)["server_name"]
+                else:
+                    raise ConfigError(
+                        "Must specify a server_name to a generate config for."
+                        " Pass -H server.name."
+                    )
+
+            (config_path, *_) = config_files
             if not path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
 
@@ -718,13 +748,6 @@ class RootConfig:
                 else:
                     data_dir_path = os.getcwd()
                 data_dir_path = os.path.abspath(data_dir_path)
-
-                server_name = config_args.server_name
-                if not server_name:
-                    raise ConfigError(
-                        "Must specify a server_name to a generate config for."
-                        " Pass -H server.name."
-                    )
 
                 config_str = obj.generate_config(
                     config_dir_path=config_dir_path,
