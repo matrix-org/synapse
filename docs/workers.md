@@ -32,7 +32,7 @@ stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
 for a reply ─ such as sending an event.
 
-All the workers and tha main process connect to Redis, which relays replication
+All the workers and the main process connect to Redis, which relays replication
 commands between processes.
 
 If Redis support is enabled Synapse will use it as a shared cache, as well as a

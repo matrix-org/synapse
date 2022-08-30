@@ -98,7 +98,7 @@ v1.18.0. It replaced the old direct TCP connections (which was deprecated as of
 v1.18.0) to the main process. With Redis, rather than all the workers connecting
 to the main process, all the workers and the main process connect to Redis,
 which relays replication commands between processes. This can give a significant
-cpu saving on the main process and will be a prerequisite for upcoming
+CPU saving on the main process and is a prerequisite for upcoming
 performance improvements.
 
 To migrate to Redis add the [`redis` config](./workers.md#shared-configuration),
