@@ -102,8 +102,9 @@ CPU saving on the main process and is a prerequisite for upcoming
 performance improvements.
 
 To migrate to Redis add the [`redis` config](./workers.md#shared-configuration),
-and remove the TCP `replication` listener from master and `worker_replication_port`
-from worker config.
+and remove the TCP `replication` listener from config of the master and
+`worker_replication_port` from worker config. Note that a HTTP listener with a
+`replication` resource is still required.
 
 # Upgrading to v1.66.0
 
