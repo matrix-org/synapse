@@ -21,7 +21,10 @@ if TYPE_CHECKING:
 from prometheus_client import Gauge
 
 # Gauge to expose daily active users metrics
-current_dau_gauge = Gauge("synapse_admin_dau", "Current DAU")
+current_dau_gauge = Gauge(
+    "synapse_admin_daily_active_users",
+    "Current daily active users count",
+)
 
 
 class SharedUsageMetrics:
