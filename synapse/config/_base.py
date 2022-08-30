@@ -413,6 +413,13 @@ class RootConfig:
             if hasattr(config, func_name):
                 getattr(config, func_name)(*args, **kwargs)
 
+    @staticmethod
+    def paths_from_environment(envvar: str) -> List[str]:
+        envval = os.environ.get(envvar)
+        if not envval:
+            return []
+        return envval.split(":")
+
     def generate_config(
         self,
         config_dir_path: str,
@@ -601,7 +608,9 @@ class RootConfig:
             action="append",
             metavar="CONFIG_FILE",
             help="Specify config file. Can be given multiple times and"
-            " may specify directories containing *.yaml files.",
+            " may specify directories containing *.yaml files."
+            " Also uses the value of the CONFIGURATION_DIRECTORY environment"
+            " variable, where multiple values can be delimited by colons.",
         )
 
         # we nest the mutually-exclusive group inside another group so that the help
@@ -666,7 +675,8 @@ class RootConfig:
             metavar="DIRECTORY",
             help=(
                 "Specify where data such as the media store and database file should be"
-                " stored. Defaults to the current working directory."
+                " stored. Defaults to the first entry of the STATE_DIRECTORY environment"
+                " variable or the current working directory in that order."
             ),
         )
         generate_group.add_argument(
@@ -681,7 +691,10 @@ class RootConfig:
         cls.invoke_all_static("add_arguments", parser)
         config_args = parser.parse_args(argv)
 
-        config_files = find_config_files(search_paths=config_args.config_path)
+        config_paths_env = cls.paths_from_environment("CONFIGURATION_DIRECTORY")
+        config_files = find_config_files(
+            search_paths=config_paths_env + config_args.config_path
+        )
 
         if not config_files:
             parser.error(
@@ -695,7 +708,8 @@ class RootConfig:
         else:
             config_dir_path = os.path.dirname(config_files[-1])
         config_dir_path = os.path.abspath(config_dir_path)
-        data_dir_path = os.getcwd()
+        data_dir_path_env = cls.paths_from_environment("STATE_DIRECTORY")
+        data_dir_path = data_dir_path_env[0] if data_dir_path_env else os.getcwd()
 
         obj = cls(config_files)
 
@@ -713,10 +727,7 @@ class RootConfig:
             if not path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
 
-                if config_args.data_directory:
-                    data_dir_path = config_args.data_directory
-                else:
-                    data_dir_path = os.getcwd()
+                data_dir_path = config_args.data_directory or data_dir_path
                 data_dir_path = os.path.abspath(data_dir_path)
 
                 server_name = config_args.server_name
