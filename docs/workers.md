@@ -120,8 +120,10 @@ redis:
 See the sample config for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
-public internet; it is unencrypted and unauthenticated unless
-`worker_replication_secret` is configured.
+public internet; replication traffic is:
+
+* always unencrypted
+* unauthenticated, unless `worker_replication_secret` is configured
 
 
 ### Worker configuration
