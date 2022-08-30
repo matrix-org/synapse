@@ -38,6 +38,7 @@ from synapse.logging.opentracing import (
     trace,
 )
 from synapse.types import Requester, create_requester
+from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -118,6 +119,7 @@ class Auth:
             errcode=Codes.NOT_JOINED,
         )
 
+    @cancellable
     async def get_user_by_req(
         self,
         request: SynapseRequest,
@@ -166,6 +168,7 @@ class Auth:
                     parent_span.set_tag("appservice_id", requester.app_service.id)
             return requester
 
+    @cancellable
     async def _wrapped_get_user_by_req(
         self,
         request: SynapseRequest,
@@ -281,6 +284,7 @@ class Auth:
                 403, "Application service has not registered this user (%s)" % user_id
             )
 
+    @cancellable
     async def _get_appservice_user(self, request: Request) -> Optional[Requester]:
         """
         Given a request, reads the request parameters to determine:
@@ -523,6 +527,7 @@ class Auth:
         return bool(query_params) or bool(auth_headers)
 
     @staticmethod
+    @cancellable
     def get_access_token_from_request(request: Request) -> str:
         """Extracts the access_token from the request.
 
