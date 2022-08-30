@@ -94,27 +94,6 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 HTTP_STATUS_REQUEST_CANCELLED = 499
 
 
-_cancellable_method_names = frozenset(
-    {
-        # `RestServlet`, `BaseFederationServlet` and `BaseFederationServerServlet`
-        # methods
-        "on_GET",
-        "on_PUT",
-        "on_POST",
-        "on_DELETE",
-        # `_AsyncResource`, `DirectServeHtmlResource` and `DirectServeJsonResource`
-        # methods
-        "_async_render_GET",
-        "_async_render_PUT",
-        "_async_render_POST",
-        "_async_render_DELETE",
-        "_async_render_OPTIONS",
-        # `ReplicationEndpoint` methods
-        "_handle_request",
-    }
-)
-
-
 def return_json_error(
     f: failure.Failure, request: SynapseRequest, config: Optional[HomeServerConfig]
 ) -> None:
