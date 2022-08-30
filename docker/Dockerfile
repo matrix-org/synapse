@@ -47,7 +47,7 @@ RUN \
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry==1.2.0rc1"
+  pip install --user "poetry==1.2.0rc2"
 
 WORKDIR /synapse
 

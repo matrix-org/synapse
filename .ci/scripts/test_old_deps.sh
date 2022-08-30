@@ -73,7 +73,7 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
-pipx install poetry==1.2.0rc1
+pip install --user poetry==1.2.0rc2
 ~/.local/bin/poetry lock
 
 echo "::group::Patched pyproject.toml"
