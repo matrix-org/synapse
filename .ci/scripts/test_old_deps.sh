@@ -12,7 +12,7 @@ set -ex
 
 apt-get update
 apt-get install -y \
-        curl python3 python3-dev python3-pip python3-venv pipx \
+        curl python3 python3-dev python3-pip python3-venv \
         libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
 
 # Install rust for building.
@@ -83,6 +83,6 @@ echo "::group::Lockfile after patch"
 cat poetry.lock
 echo "::endgroup::"
 
-~/.local/bin/poetry install -E "all test"
+~/.local/bin/poetry install -v -E "all test"
 
-~/.local/bin/poetry run trial --jobs=2 tests
+~/.local/bin/poetry run python -m twisted.trial --jobs=2 tests
