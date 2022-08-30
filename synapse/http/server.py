@@ -33,7 +33,6 @@ from typing import (
     Optional,
     Pattern,
     Tuple,
-    TypeVar,
     Union,
 )
 
@@ -64,6 +63,7 @@ from synapse.logging.context import defer_to_thread, preserve_fn, run_in_backgro
 from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
+from synapse.util.cancellation import is_method_cancellable
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
@@ -94,9 +94,6 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 HTTP_STATUS_REQUEST_CANCELLED = 499
 
 
-F = TypeVar("F", bound=Callable[..., Any])
-
-
 _cancellable_method_names = frozenset(
     {
         # `RestServlet`, `BaseFederationServlet` and `BaseFederationServerServlet`
@@ -116,46 +113,6 @@ _cancellable_method_names = frozenset(
         "_handle_request",
     }
 )
-
-
-def cancellable(method: F) -> F:
-    """Marks a function as cancellable.
-
-    Servlet methods with this decorator will be cancelled if the client disconnects before we
-    finish processing the request.
-
-    Although this annotation is particularly useful for servlet methods, it's also
-    useful for intermediate functions, where it documents the fact that the function has
-    been audited for cancellation safety and needs to preserve that.
-    This then simplifies auditing new functions that call those same intermediate
-    functions.
-
-    During cancellation, `Deferred.cancel()` will be invoked on the `Deferred` wrapping
-    the method. The `cancel()` call will propagate down to the `Deferred` that is
-    currently being waited on. That `Deferred` will raise a `CancelledError`, which will
-    propagate up, as per normal exception handling.
-
-    Before applying this decorator to a new function, you MUST recursively check
-    that all `await`s in the function are on `async` functions or `Deferred`s that
-    handle cancellation cleanly, otherwise a variety of bugs may occur, ranging from
-    premature logging context closure, to stuck requests, to database corruption.
-
-    See the documentation page on Cancellation for more information.
-
-    Usage:
-        class SomeServlet(RestServlet):
-            @cancellable
-            async def on_GET(self, request: SynapseRequest) -> ...:
-                ...
-    """
-
-    method.cancellable = True  # type: ignore[attr-defined]
-    return method
-
-
-def is_method_cancellable(method: Callable[..., Any]) -> bool:
-    """Checks whether a servlet method has the `@cancellable` flag."""
-    return getattr(method, "cancellable", False)
 
 
 def return_json_error(
