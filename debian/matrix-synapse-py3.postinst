@@ -40,12 +40,12 @@ EOF
     /opt/venvs/matrix-synapse/lib/manage_debconf.pl update
 
     if ! getent passwd $USER >/dev/null; then
-      adduser --quiet --system --no-create-home --home /var/lib/matrix-synapse $USER
+      adduser --quiet --system --group --no-create-home --home /var/lib/matrix-synapse $USER
     fi
 
     for DIR in /var/lib/matrix-synapse /var/log/matrix-synapse /etc/matrix-synapse; do
       if ! dpkg-statoverride --list --quiet $DIR >/dev/null; then
-        dpkg-statoverride --force --quiet --update --add $USER nogroup 0755 $DIR
+        dpkg-statoverride --force --quiet --update --add $USER "$(id -gn $USER)" 0755 $DIR
       fi
     done
 

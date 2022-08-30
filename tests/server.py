@@ -61,6 +61,10 @@ from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
 from synapse.config.database import DatabaseConnectionConfig
+from synapse.events.presence_router import load_legacy_presence_router
+from synapse.events.spamcheck import load_legacy_spam_checkers
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
+from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import ContextResourceUsage
 from synapse.server import HomeServer
@@ -912,5 +916,15 @@ def setup_test_homeserver(
 
     # Make the threadpool and database transactions synchronous for testing.
     _make_test_homeserver_synchronous(hs)
+
+    # Load any configured modules into the homeserver
+    module_api = hs.get_module_api()
+    for module, config in hs.config.modules.loaded_modules:
+        module(config=config, api=module_api)
+
+    load_legacy_spam_checkers(hs)
+    load_legacy_third_party_event_rules(hs)
+    load_legacy_presence_router(hs)
+    load_legacy_password_auth_providers(hs)
 
     return hs
