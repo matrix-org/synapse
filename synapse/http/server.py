@@ -119,20 +119,28 @@ _cancellable_method_names = frozenset(
 
 
 def cancellable(method: F) -> F:
-    """Marks a servlet method as cancellable.
+    """Marks a function as cancellable.
 
-    Methods with this decorator will be cancelled if the client disconnects before we
+    Servlet methods with this decorator will be cancelled if the client disconnects before we
     finish processing the request.
+
+    Although this annotation is particularly useful for servlet methods, it's also
+    useful for intermediate functions, where it documents the fact that the function has
+    been audited for cancellation safety and needs to preserve that.
+    This then simplifies auditing new functions that call those same intermediate
+    functions.
 
     During cancellation, `Deferred.cancel()` will be invoked on the `Deferred` wrapping
     the method. The `cancel()` call will propagate down to the `Deferred` that is
     currently being waited on. That `Deferred` will raise a `CancelledError`, which will
     propagate up, as per normal exception handling.
 
-    Before applying this decorator to a new endpoint, you MUST recursively check
+    Before applying this decorator to a new function, you MUST recursively check
     that all `await`s in the function are on `async` functions or `Deferred`s that
     handle cancellation cleanly, otherwise a variety of bugs may occur, ranging from
     premature logging context closure, to stuck requests, to database corruption.
+
+    See the documentation page on Cancellation for more information.
 
     Usage:
         class SomeServlet(RestServlet):
@@ -140,12 +148,6 @@ def cancellable(method: F) -> F:
             async def on_GET(self, request: SynapseRequest) -> ...:
                 ...
     """
-    if method.__name__ not in _cancellable_method_names and not any(
-        method.__name__.startswith(prefix) for prefix in _cancellable_method_names
-    ):
-        raise ValueError(
-            "@cancellable decorator can only be applied to servlet methods."
-        )
 
     method.cancellable = True  # type: ignore[attr-defined]
     return method
