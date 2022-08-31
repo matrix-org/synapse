@@ -38,7 +38,7 @@ from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
 from synapse import event_auth
-from synapse.api.constants import EventContentFields, EventTypes, MAX_DEPTH, Membership
+from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -274,7 +274,7 @@ class FederationHandler:
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Backfilling anyway."
             )
-            return self._maybe_backfill_inner(
+            return await self._maybe_backfill_inner(
                 room_id=room_id,
                 # We use `MAX_DEPTH` so that we find all backfill points next
                 # time (all events are below the `MAX_DEPTH`)
@@ -285,7 +285,10 @@ class FederationHandler:
         elif not sorted_backfill_points and current_depth == MAX_DEPTH:
             # Even after trying again with `MAX_DEPTH`, we didn't find any
             # backward extremities to backfill from.
-            logger.debug("Not backfilling as no backward extremeties found.")
+            logger.debug(
+                "_maybe_backfill_inner: Not backfilling as no backward extremeties found."
+            )
+            return False
 
         # If we're approaching an extremity we trigger a backfill, otherwise we
         # no-op.
