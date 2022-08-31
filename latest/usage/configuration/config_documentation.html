@@ -482,7 +482,7 @@ configuration.</p>
 <p><code>metrics</code>: (see the docs <a href="../../metrics-howto.html">here</a>),</p>
 </li>
 <li>
-<p><code>replication</code>: (see the docs <a href="../../workers.html">here</a>).</p>
+<p><code>replication</code>: (deprecated as of Synapse 1.18, see the docs <a href="../../workers.html">here</a>).</p>
 </li>
 </ul>
 </li>
@@ -502,7 +502,7 @@ on this port. Sub-options for each resource are:</p>
 </li>
 <li>
 <p><code>compress</code>: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
-<code>client</code>, <code>consent</code> and <code>metrics</code> resources.</p>
+<code>client</code>, <code>consent</code>, <code>metrics</code> and <code>federation</code> resources.</p>
 </li>
 </ul>
 </li>
@@ -769,6 +769,9 @@ using Synapse's media repository.</p>
 <h3 id="redaction_retention_period"><a class="header" href="#redaction_retention_period"><code>redaction_retention_period</code></a></h3>
 <p>How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.</p>
+<p>Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to <code>0</code>, Synapse may
+still take up to 5 minutes to purge redacted events from the database.</p>
 <p>Defaults to <code>7d</code>. Set to <code>null</code> to disable.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">redaction_retention_period: 28d
@@ -832,7 +835,11 @@ the <code>allowed_lifetime_min</code> and <code>allowed_lifetime_max</code> conf
 which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.</p>
-<p>The message retention policies feature is disabled by default.</p>
+<p>The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk. There are known bugs with the implementation
+which can cause database corruption. Setting retention to delete older history
+is less risky than deleting newer history but in general caution is advised when enabling this
+experimental feature. You can read more about this feature <a href="../../message_retention_policies.html">here</a>.</p>
 <p>This setting has the following sub-options:</p>
 <ul>
 <li>
@@ -1925,7 +1932,9 @@ their account.</p>
 <p>(Servers handling the these requests must answer the <code>/requestToken</code> endpoints defined
 by the Matrix Identity Service API
 <a href="https://matrix.org/docs/spec/identity_service/latest">specification</a>.)</p>
-<p><em>Updated in Synapse 1.64.0</em>: The <code>email</code> option is deprecated.</p>
+<p><em>Deprecated in Synapse 1.64.0</em>: The <code>email</code> option is deprecated.</p>
+<p><em>Removed in Synapse 1.66.0</em>: The <code>email</code> option has been removed.
+If present, Synapse will report a configuration error on startup.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">account_threepid_delegates:
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
@@ -3012,7 +3021,7 @@ user directory. Defaults to false.</li>
 <h3 id="user_consent"><a class="header" href="#user_consent"><code>user_consent</code></a></h3>
 <p>For detailed instructions on user consent configuration, see <a href="../../consent_tracking.html">here</a>.</p>
 <p>Parts of this section are required if enabling the <code>consent</code> resource under
-<code>listeners</code>, in particular <code>template_dir</code> and <code>version</code>. # TODO: link <code>listeners</code></p>
+<a href="#listeners"><code>listeners</code></a>, in particular <code>template_dir</code> and <code>version</code>.</p>
 <ul>
 <li>
 <p><code>template_dir</code>: gives the location of the templates for the HTML forms.
@@ -3027,7 +3036,7 @@ parameter.</p>
 </li>
 <li>
 <p><code>server_notice_content</code>: if enabled, will send a user a &quot;Server Notice&quot;
-asking them to consent to the privacy policy. The <code>server_notices</code> section ##TODO: link
+asking them to consent to the privacy policy. The <a href="#server_notices"><code>server_notices</code> section</a>
 must also be configured for this to work. Notices will <em>not</em> be sent to
 guest users unless <code>send_server_notice_to_guests</code> is set to true.</p>
 </li>
