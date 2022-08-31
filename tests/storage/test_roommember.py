@@ -158,7 +158,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # Check that alice's display name is now None
         self.assertEqual(row[0]["display_name"], None)
 
-    def test_room_is_locally_forgotten(self):
+    def test_room_is_locally_forgotten(self) -> None:
         """Test that when the last local user has forgotten a room it is known as forgotten."""
         # join two local and one remote user
         self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
@@ -199,7 +199,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
 
-    def test_join_locally_forgotten_room(self):
+    def test_join_locally_forgotten_room(self) -> None:
         """Tests if a user joins a forgotten room the room is not forgotten anymore."""
         self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
         self.assertFalse(

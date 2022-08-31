@@ -233,7 +233,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
     ) -> None:
         """
         Test to make sure that failed backfill attempts for an event are
-        recorded in the `event_backfill_attempts` table.
+        recorded in the `event_failed_backfill_attempts` table.
 
         In this test, we pretend we are processing a "pulled" event via
         backfill. The pulled event has a fake `prev_event` which our server has
@@ -310,7 +310,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Make sure our backfill attempt was recorded
         backfill_num_attempts = self.get_success(
             main_store.db_pool.simple_select_one_onecol(
-                table="event_backfill_attempts",
+                table="event_failed_backfill_attempts",
                 keyvalues={"event_id": pulled_event.event_id},
                 retcol="num_attempts",
             )
@@ -328,7 +328,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Make sure our second backfill attempt was recorded (`num_attempts` was incremented)
         backfill_num_attempts = self.get_success(
             main_store.db_pool.simple_select_one_onecol(
-                table="event_backfill_attempts",
+                table="event_failed_backfill_attempts",
                 keyvalues={"event_id": pulled_event.event_id},
                 retcol="num_attempts",
             )
@@ -349,7 +349,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
     ) -> None:
         """
         Test to make sure that failed backfill attempts
-        (`event_backfill_attempts` table) for an event are cleared after the
+        (`event_failed_backfill_attempts` table) for an event are cleared after the
         event is successfully persisted.
 
         In this test, we pretend we are processing a "pulled" event via
@@ -411,12 +411,14 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Fake the "pulled" event failing to backfill once so we can test
         # if it's cleared out later on.
         self.get_success(
-            main_store.record_event_backfill_attempt(pulled_event.event_id)
+            main_store.record_event_failed_backfill_attempt(
+                pulled_event.room_id, pulled_event.event_id
+            )
         )
         # Make sure we have a backfill attempt recorded for the pulled event
         backfill_num_attempts = self.get_success(
             main_store.db_pool.simple_select_one_onecol(
-                table="event_backfill_attempts",
+                table="event_failed_backfill_attempts",
                 keyvalues={"event_id": pulled_event.event_id},
                 retcol="num_attempts",
             )
@@ -434,7 +436,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Make sure the backfill attempt for the pulled event are cleared
         backfill_num_attempts = self.get_success(
             main_store.db_pool.simple_select_one_onecol(
-                table="event_backfill_attempts",
+                table="event_failed_backfill_attempts",
                 keyvalues={"event_id": pulled_event.event_id},
                 retcol="num_attempts",
                 allow_none=True,

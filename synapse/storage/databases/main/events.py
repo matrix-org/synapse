@@ -2449,20 +2449,17 @@ class PersistEventsStore:
             backward_extremity_tuples_to_remove,
         )
 
-        # Since we no longer need these backward extremities, it also means that
-        # they won't be backfilled from again so we no longer need to store the
-        # backfill attempts around it.
+        # Clear out the failed backfill attempts after we successfully pulled
+        # the event. Since we no longer need these events as backward
+        # extremities, it also means that they won't be backfilled from again so
+        # we no longer need to store the backfill attempts around it.
         query = """
-            DELETE FROM event_backfill_attempts
-            WHERE event_id = ?
+            DELETE FROM event_failed_backfill_attempts
+            WHERE event_id = ? and room_id = ?
         """
-        backward_extremity_event_ids_to_remove = [
-            (extremity_tuple[0],)
-            for extremity_tuple in backward_extremity_tuples_to_remove
-        ]
         txn.execute_batch(
             query,
-            backward_extremity_event_ids_to_remove,
+            backward_extremity_tuples_to_remove,
         )
 
 

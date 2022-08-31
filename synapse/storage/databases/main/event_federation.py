@@ -1416,52 +1416,68 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return event_id_results
 
     @trace
-    async def record_event_backfill_attempt(self, event_id: str) -> None:
+    async def record_event_failed_backfill_attempt(
+        self, room_id: str, event_id: str
+    ) -> None:
+        """
+        Record when we fail to backfill an event.
+
+        This information allows us to be more intelligent when we decide to
+        retry (we don't need to fail over and over) and we can process that
+        event in the background so we don't block on it each time.
+
+        Args:
+            room_id: The room where the event failed to backfill from
+            event_id: The event that failed to be backfilled
+        """
         if self.database_engine.can_native_upsert:
             await self.db_pool.runInteraction(
-                "record_event_backfill_attempt",
-                self._record_event_backfill_attempt_upsert_native_txn,
+                "record_event_failed_backfill_attempt",
+                self._record_event_failed_backfill_attempt_upsert_native_txn,
+                room_id,
                 event_id,
                 db_autocommit=True,  # Safe as its a single upsert
             )
         else:
             await self.db_pool.runInteraction(
-                "record_event_backfill_attempt",
-                self._record_event_backfill_attempt_upsert_emulated_txn,
+                "record_event_failed_backfill_attempt",
+                self._record_event_failed_backfill_attempt_upsert_emulated_txn,
+                room_id,
                 event_id,
             )
 
-    def _record_event_backfill_attempt_upsert_native_txn(
+    def _record_event_failed_backfill_attempt_upsert_native_txn(
         self,
         txn: LoggingTransaction,
+        room_id: str,
         event_id: str,
     ) -> None:
         assert self.database_engine.can_native_upsert
 
         sql = """
-            INSERT INTO event_backfill_attempts (
-                event_id, num_attempts, last_attempt_ts
+            INSERT INTO event_failed_backfill_attempts (
+                room_id, event_id, num_attempts, last_attempt_ts
             )
-                VALUES (?, ?, ?)
-            ON CONFLICT (event_id) DO UPDATE SET
-                event_id=EXCLUDED.event_id,
-                num_attempts=event_backfill_attempts.num_attempts + 1,
+                VALUES (?, ?, ?, ?)
+            ON CONFLICT (room_id, event_id) DO UPDATE SET
+                num_attempts=event_failed_backfill_attempts.num_attempts + 1,
                 last_attempt_ts=EXCLUDED.last_attempt_ts;
         """
 
-        txn.execute(sql, (event_id, 1, self._clock.time_msec()))
+        txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec()))
 
-    def _record_event_backfill_attempt_upsert_emulated_txn(
+    def _record_event_failed_backfill_attempt_upsert_emulated_txn(
         self,
         txn: LoggingTransaction,
+        room_id: str,
         event_id: str,
     ) -> None:
-        self.database_engine.lock_table(txn, "event_backfill_attempts")
+        self.database_engine.lock_table(txn, "event_failed_backfill_attempts")
 
         prev_row = self.db_pool.simple_select_one_txn(
             txn,
-            table="event_backfill_attempts",
-            keyvalues={"event_id": event_id},
+            table="event_failed_backfill_attempts",
+            keyvalues={"room_id": room_id, "event_id": event_id},
             retcols=("num_attempts"),
             allow_none=True,
         )
@@ -1469,8 +1485,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         if not prev_row:
             self.db_pool.simple_insert_txn(
                 txn,
-                table="event_backfill_attempts",
+                table="event_failed_backfill_attempts",
                 values={
+                    "room_id": room_id,
                     "event_id": event_id,
                     "num_attempts": 1,
                     "last_attempt_ts": self._clock.time_msec(),
@@ -1479,10 +1496,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         else:
             self.db_pool.simple_update_one_txn(
                 txn,
-                table="event_backfill_attempts",
-                keyvalues={"event_id": event_id},
+                table="event_failed_backfill_attempts",
+                keyvalues={"room_id": room_id, "event_id": event_id},
                 updatevalues={
-                    "event_id": event_id,
                     "num_attempts": prev_row["num_attempts"] + 1,
                     "last_attempt_ts": self._clock.time_msec(),
                 },
