@@ -814,7 +814,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * would use `power(2, n)` or the power operator, `2^n`.
                      */
                     AND (
-                        failed_backfill_attempt_info IS NULL
+                        failed_backfill_attempt_info.event_id IS NULL
                         OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
                     )
                 /**
@@ -914,7 +914,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * would use `power(2, n)` or the power operator, `2^n`.
                      */
                     AND (
-                        failed_backfill_attempt_info IS NULL
+                        failed_backfill_attempt_info.event_id IS NULL
                         OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + least((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
                     )
                 /**
