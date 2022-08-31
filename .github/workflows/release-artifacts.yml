@@ -96,8 +96,8 @@ jobs:
       fail-fast: false
       matrix:
         PYTHON:
-          - { VERSION: "cp37-cp37m", PATH: "/opt/python/cp36-cp36m/bin/python" }
-          - { VERSION: "cp38-cp38", PATH: "/opt/python/cp39-cp39/bin/python" }
+          - { VERSION: "cp37-cp37m", PATH: "/opt/python/cp37-cp37m/bin/python" }
+          - { VERSION: "cp38-cp38", PATH: "/opt/python/cp38-cp38/python" }
           - { VERSION: "cp39-cp39", PATH: "/opt/python/cp39-cp39/bin/python" }
           - { VERSION: "cp310-cp310", PATH: "/opt/python/cp310-cp310/bin/python" }
         MANYLINUX:
