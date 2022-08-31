@@ -785,8 +785,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * We use this info to make sure we don't retry to use a backfill point
                  * if we've already attempted to backfill from it recently.
                  */
-                LEFT JOIN event_backfill_attempts AS backfill_attempt_info
-                ON backfill_attempt_info.event_id = backward_extrem.event_id
+                LEFT JOIN event_failed_backfill_attempts AS failed_backfill_attempt_info
+                ON
+                    failed_backfill_attempt_info.room_id = backward_extrem.room_id
+                    AND failed_backfill_attempt_info.event_id = backward_extrem.event_id
                 WHERE
                     backward_extrem.room_id = ?
                     /* We only care about normal events because TODO: why */
@@ -812,8 +814,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * would use `power(2, n)` or the power operator, `2^n`.
                      */
                     AND (
-                        backfill_attempt_info IS NULL
-                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least((2 << (backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
+                        failed_backfill_attempt_info IS NULL
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + least((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth
@@ -891,7 +893,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * We use this info to make sure we don't retry to use a backfill point
                  * if we've already attempted to backfill from it recently.
                  */
-                LEFT JOIN event_backfill_attempts AS backfill_attempt_info USING (event_id)
+                LEFT JOIN event_failed_backfill_attempts AS failed_backfill_attempt_info USING (room_id, event_id)
                 WHERE
                     insertion_event_extremity.room_id = ?
                     AND event.depth <= ? /* current_depth */
@@ -905,8 +907,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * would use `power(2, n)` or the power operator, `2^n`.
                      */
                     AND (
-                        backfill_attempt_info IS NULL
-                        OR ? /* current_time */ >= backfill_attempt_info.last_attempt_ts + least((2 << (backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
+                        failed_backfill_attempt_info IS NULL
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + least((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth

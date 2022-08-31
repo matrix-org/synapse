@@ -781,10 +781,10 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
         # haven't passed the backoff interval.
-        self.get_success(self.store.record_event_backfill_attempt("b5"))
-        self.get_success(self.store.record_event_backfill_attempt("b4"))
-        self.get_success(self.store.record_event_backfill_attempt("b3"))
-        self.get_success(self.store.record_event_backfill_attempt("b2"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b5"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b4"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b3"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b2"))
 
         # No time has passed since we attempted to backfill ^
 
@@ -811,11 +811,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
         # haven't passed the backoff interval.
-        self.get_success(self.store.record_event_backfill_attempt("b3"))
-        self.get_success(self.store.record_event_backfill_attempt("b1"))
-        self.get_success(self.store.record_event_backfill_attempt("b1"))
-        self.get_success(self.store.record_event_backfill_attempt("b1"))
-        self.get_success(self.store.record_event_backfill_attempt("b1"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b3"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
+        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
 
         # Now advance time by 2 hours and we should only be able to see "b3"
         # because we have waited long enough for the single attempt (2^1 hours)
