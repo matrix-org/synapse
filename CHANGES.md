@@ -1,3 +1,11 @@
+Synapse 1.66.0
+==============
+
+Deployments with multiple workers should note that the direct TCP replication
+configuration was deprecated in Synapse v1.18.0 and will be removed in Synapse
+v1.67.0. See [docs/workers.md](https://github.com/matrix-org/synapse/blob/release-v1.18.0/docs/workers.md)
+for more details.
+
 Synapse 1.66.0rc2 (2022-08-30)
 ==============================
 
