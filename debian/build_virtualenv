@@ -78,11 +78,16 @@ case "$DEB_BUILD_OPTIONS" in
 
         cp -r tests "$tmpdir"
 
+        # To avoid pulling in the unbuilt Synapse in the local directory
+        pushd /
+
         # TODO: Revert back to full tests.
         PYTHONPATH="$tmpdir" \
             "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests.test_rust
 
         ;;
+
+        popd
 esac
 
 # build the config file

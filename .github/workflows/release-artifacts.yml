@@ -124,7 +124,7 @@ jobs:
           # and so they a) take forever and b) require build deps to be
           # installed.
           # Similarly, cryptography isn't build for i868.
-          CIBW_TEST_SKIP: pp39-* *i686* *musl*
+          CIBW_TEST_SKIP: pp39-* *i686* *musl* pp37-macosx*
           CIBW_BUILD_VERBOSITY: 1
 
       - uses: actions/upload-artifact@v3
