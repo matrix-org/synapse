@@ -14,14 +14,14 @@
  */
 
 
--- Add a table that keeps track of when we last tried to backfill an event. This
+-- Add a table that keeps track of when we failed to backfill an event. This
 -- allows us to be more intelligent when we decide to retry (we don't need to
 -- fail over and over) and we can process that event in the background so we
 -- don't block on it each time.
-CREATE TABLE IF NOT EXISTS event_backfill_attempts(
+CREATE TABLE IF NOT EXISTS event_failed_backfill_attempts(
+    room_id TEXT NOT NULL,
     event_id TEXT NOT NULL,
     num_attempts INT NOT NULL,
-    last_attempt_ts BIGINT NOT NULL
+    last_attempt_ts BIGINT NOT NULL,
+    PRIMARY KEY (room_id, event_id)
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS event_backfill_attempts_event_id ON event_backfill_attempts(event_id);
