@@ -110,16 +110,12 @@ jobs:
           CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
           CIBW_BUILD: cp310-manylinux_x86_64
           CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
+          CIBW_TEST_COMMAND: python -c "from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))"
 
       - uses: actions/upload-artifact@v3
         with:
           name: Wheel
           path: ./wheelhouse/*.whl
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Sdist
-          path: dist/*.tar.gz
 
 
   # if it's a tag, create a release and attach the artifacts to it
