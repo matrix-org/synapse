@@ -91,7 +91,7 @@ jobs:
 
   manylinux:
     runs-on: ubuntu-latest
-    container: ghcr.io/pyca/${{ matrix.MANYLINUX.CONTAINER }}
+    container: quay.io/pyca/${{ matrix.MANYLINUX.CONTAINER }}
     strategy:
       fail-fast: false
       matrix:
