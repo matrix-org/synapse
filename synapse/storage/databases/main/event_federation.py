@@ -1293,24 +1293,37 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return event_id_results
 
     @trace
-    async def record_event_backfill_attempt(self, room_id: str, event_id: str) -> None:
+    async def record_event_failed_backfill_attempt(
+        self, room_id: str, event_id: str
+    ) -> None:
+        """
+        Record when we fail to backfill an event.
+
+        This information allows us to be more intelligent when we decide to
+        retry (we don't need to fail over and over) and we can process that
+        event in the background so we don't block on it each time.
+
+        Args:
+            room_id: The room where the event failed to backfill from
+            event_id: The event that failed to be backfilled
+        """
         if self.database_engine.can_native_upsert:
             await self.db_pool.runInteraction(
-                "record_event_backfill_attempt",
-                self._record_event_backfill_attempt_upsert_native_txn,
+                "record_event_failed_backfill_attempt",
+                self._record_event_failed_backfill_attempt_upsert_native_txn,
                 room_id,
                 event_id,
                 db_autocommit=True,  # Safe as its a single upsert
             )
         else:
             await self.db_pool.runInteraction(
-                "record_event_backfill_attempt",
-                self._record_event_backfill_attempt_upsert_emulated_txn,
+                "record_event_failed_backfill_attempt",
+                self._record_event_failed_backfill_attempt_upsert_emulated_txn,
                 room_id,
                 event_id,
             )
 
-    def _record_event_backfill_attempt_upsert_native_txn(
+    def _record_event_failed_backfill_attempt_upsert_native_txn(
         self,
         txn: LoggingTransaction,
         room_id: str,
@@ -1330,7 +1343,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec()))
 
-    def _record_event_backfill_attempt_upsert_emulated_txn(
+    def _record_event_failed_backfill_attempt_upsert_emulated_txn(
         self,
         txn: LoggingTransaction,
         room_id: str,

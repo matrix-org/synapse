@@ -863,7 +863,9 @@ class FederationEventHandler:
         except SynapseError as err:
             logger.warning("Event %s failed sanity check: %s", event_id, err)
             if backfilled:
-                await self._store.record_event_backfill_attempt(event_id)
+                await self._store.record_event_failed_backfill_attempt(
+                    event.room_id, event_id
+                )
             return
 
         try:
@@ -900,7 +902,9 @@ class FederationEventHandler:
                 )
         except FederationError as e:
             if backfilled:
-                await self._store.record_event_backfill_attempt(event_id)
+                await self._store.record_event_failed_backfill_attempt(
+                    event.room_id, event_id
+                )
 
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
