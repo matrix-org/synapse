@@ -741,8 +741,8 @@ class RoomCreationHandler:
             ):
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
-                    "all of: `medium`, `address`, `id_server` and `id_access_token` "
-                    f"are required when doing 3pid invite, caused by {invite_3pid}",
+                    "all of `medium`, `address`, `id_server` and `id_access_token` "
+                    "are required when making a 3pid invite",
                     Codes.MISSING_PARAM,
                 )
 
