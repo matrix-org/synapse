@@ -47,7 +47,7 @@ rm -rf "$TEMP_VENV"
 
 # Use --no-deps to only install pinned versions in exported_requirements.txt,
 # and to avoid https://github.com/pypa/pip/issues/9644
-dh_virtualenv \
+dh_virtualenv -v \
     --install-suffix "matrix-synapse" \
     --builtin-venv \
     --python "$SNAKE" \
@@ -78,8 +78,9 @@ case "$DEB_BUILD_OPTIONS" in
 
         cp -r tests "$tmpdir"
 
+        # TODO: Revert back to full tests.
         PYTHONPATH="$tmpdir" \
-            "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests
+            "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests.test_rust
 
         ;;
 esac
