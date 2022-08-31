@@ -269,24 +269,6 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
     )
-    MSC2716v3 = RoomVersion(
-        "org.matrix.msc2716v3",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=False,
-        strict_canonicaljson=True,
-        limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=True,
-        msc2716_historical=True,
-        msc2716_redactions=True,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-    )
     MSC3787 = RoomVersion(
         "org.matrix.msc3787",
         RoomDisposition.UNSTABLE,
@@ -323,6 +305,24 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,
     )
+    MSC2716v4 = RoomVersion(
+        "org.matrix.msc2716v4",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=False,
+        msc3375_redaction_rules=False,
+        msc2403_knocking=True,
+        msc2716_historical=True,
+        msc2716_redactions=True,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
+    )
 
 
 KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
@@ -338,9 +338,9 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V7,
         RoomVersions.V8,
         RoomVersions.V9,
-        RoomVersions.MSC2716v3,
         RoomVersions.MSC3787,
         RoomVersions.V10,
+        RoomVersions.MSC2716v4,
     )
 }
 

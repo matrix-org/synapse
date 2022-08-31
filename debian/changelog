@@ -1,3 +1,29 @@
+matrix-synapse-py3 (1.66.0~rc2+nmu1) UNRELEASED; urgency=medium
+
+  * Update debhelper to compatibility level 12.
+  * Drop the preinst script stopping synapse.
+  * Allocate a group for the system user.
+
+ -- Jörg Behrmann <behrmann@physik.fu-berlin.de>  Tue, 23 Aug 2022 17:17:00 +0100
+
+matrix-synapse-py3 (1.66.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.66.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 30 Aug 2022 12:25:19 +0100
+
+matrix-synapse-py3 (1.66.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.66.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 23 Aug 2022 09:48:55 +0100
+
+matrix-synapse-py3 (1.65.0) stable; urgency=medium
+
+  * New Synapse release 1.65.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Aug 2022 16:51:26 +0100
+
 matrix-synapse-py3 (1.65.0~rc2) stable; urgency=medium
 
   * New Synapse release 1.65.0rc2.

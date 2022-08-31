@@ -410,6 +410,33 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.assertIn("score", c)
             self.assertIn("reason", c)
 
+    def test_count_correct_despite_table_deletions(self) -> None:
+        """
+        Tests that the count matches the number of rows, even if rows in joined tables
+        are missing.
+        """
+
+        # Delete rows from room_stats_state for one of our rooms.
+        self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_delete(
+                "room_stats_state", {"room_id": self.room_id1}, desc="_"
+            )
+        )
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        # The 'total' field is 10 because only 10 reports will actually
+        # be retrievable since we deleted the rows in the room_stats_state
+        # table.
+        self.assertEqual(channel.json_body["total"], 10)
+        # This is consistent with the number of rows actually returned.
+        self.assertEqual(len(channel.json_body["event_reports"]), 10)
+
 
 class EventReportDetailTestCase(unittest.HomeserverTestCase):
     servlets = [

@@ -1639,6 +1639,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("history_visibility", channel.json_body)
         self.assertIn("state_events", channel.json_body)
         self.assertIn("room_type", channel.json_body)
+        self.assertIn("forgotten", channel.json_body)
 
         self.assertEqual(room_id_1, channel.json_body["room_id"])
         self.assertIs(True, channel.json_body["federatable"])
