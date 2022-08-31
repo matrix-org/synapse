@@ -113,7 +113,8 @@ jobs:
           # We need to escape out of the project directory, otherwise python try
           # and load the synapse module from that directory (which won't have a
           # built synapse_rust module)
-          CIBW_TEST_COMMAND: 'cd /; python -c "from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))"'
+          CIBW_TEST_COMMAND: >
+            cd / && python -c "import synapse; print(synapse.__file__); from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))"
           CIBW_BUILD_VERBOSITY: 1
 
       - uses: actions/upload-artifact@v3
