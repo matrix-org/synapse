@@ -510,7 +510,9 @@ class SyncRestServlet(RestServlet):
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
             if room.unread_thread_notifications:
-                result["unread_thread_notifications"] = room.unread_thread_notifications
+                result[
+                    "org.matrix.msc3773.unread_thread_notifications"
+                ] = room.unread_thread_notifications
             result["summary"] = room.summary
             if self._msc2654_enabled:
                 result["org.matrix.msc2654.unread_count"] = room.unread_count
