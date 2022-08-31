@@ -114,9 +114,9 @@ jobs:
           # and load the synapse module from that directory (which won't have a
           # built synapse_rust module)
           CIBW_TEST_COMMAND: >
-            cd / &&
-            ls -lh /tmp/*/venv/lib/python3.8/site-packages/synapse/ &&
-            python -c "import synapse; print(synapse.__file__); from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))"
+            cd /;
+            ls -lh /tmp/*/venv/lib/python3.8/site-packages/synapse/;
+            python -c "import synapse; print(synapse.__file__); from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))";
           CIBW_BUILD_VERBOSITY: 1
 
       - uses: actions/upload-artifact@v3
