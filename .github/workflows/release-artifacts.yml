@@ -109,6 +109,7 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
+          name: Wheel
           path: ./wheelhouse/*.whl
 
       - uses: actions/upload-artifact@v2
@@ -123,7 +124,7 @@ jobs:
     if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build-debs
-      - manylinux
+      - build_wheels
     runs-on: ubuntu-latest
     steps:
       - name: Download all workflow run artifacts
