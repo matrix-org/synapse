@@ -113,9 +113,9 @@ jobs:
           toolchain: stable
       - run: ${{ matrix.PYTHON.PATH }} -m venv .venv
       # We install wheel first so that when we pull any deps we can use wheels.
-      - run: .venv/bin/pip install -U wheel
+      - run: .venv/bin/pip install -U wheel setuptools pip
       - name: Install Python dependencies
-        run: .venv/bin/pip install -v -U poetry
+        run: .venv/bin/pip install -U poetry
       - name: Build the wheel
         run: .venv/bin/poetry build
       - run: auditwheel repair --plat ${{ matrix.MANYLINUX.NAME }} dist/matrix_synapse*.whl -w wheelhouse/
