@@ -108,7 +108,7 @@ jobs:
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
-          CIBW_BUILD: cp10-manylinux_x86_64
+          CIBW_BUILD: cp310-manylinux_x86_64
           CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
 
       - uses: actions/upload-artifact@v3
