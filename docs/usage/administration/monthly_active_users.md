@@ -19,20 +19,20 @@ So for example, if Synapse were to calculate the active users on the 15th July a
 
 A user is **never** considered active if they are either:
  - Part of the trial day cohort (described below)
- - Are owned by an application service.
+ - Owned by an application service.
    - Note: This **only** cover users that are part of an application service `namespaces.users` registration. The namespace
      must also be marked as `exclusive`.
 
 Otherwise, any request to Synapse will mark the user as active. Please note that registration will not mark a user as active *unless* 
 they register with a 3pid that is included in the config field `mau_limits_reserved_threepids`.
 
-The Prometheus metric for MAU is recalculated every 5 minutes.
+The Prometheus metric for MAU is refreshed every 5 minutes.
 
 Once an hour, Synapse checks to see if any users are in active (with only activity timestamps later than 30 days). These users
 are removed from the active users cohort. If they then become active, they are immediately restored to the cohort.
 
-It is important to note that **deactivated** users are not immediately removed from the pool of active users, but as these users won't
-perform actions they will eventually be removed from the cohort. This is also the case with shadow banned users.
+It is important to note that **deactivated** and **shadow banned** users are not immediately removed from the pool of active users, but as these users won't
+perform actions they will eventually be removed from the cohort.
 
 ### Trial days
 
@@ -56,7 +56,7 @@ Individual users matching **any** of the below criteria never have their actions
   - Registered as a `support` user.
   - Application service users if `track_appservice_user_ips` is NOT set.
 
-Please not that server admins are **NOT** blocked.
+Please not that server admins are **not** exempt from blocking.
 
 The following actions are blocked when the MAU limit is exceeded:
   - Logging in
