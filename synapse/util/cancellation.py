@@ -16,7 +16,7 @@ from typing import Any, Callable, TypeVar
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def cancellable(method: F) -> F:
+def cancellable(function: F) -> F:
     """Marks a function as cancellable.
 
     Servlet methods with this decorator will be cancelled if the client disconnects before we
@@ -47,10 +47,10 @@ def cancellable(method: F) -> F:
                 ...
     """
 
-    method.cancellable = True  # type: ignore[attr-defined]
-    return method
+    function.cancellable = True  # type: ignore[attr-defined]
+    return function
 
 
-def is_function_cancellable(method: Callable[..., Any]) -> bool:
+def is_function_cancellable(function: Callable[..., Any]) -> bool:
     """Checks whether a servlet method has the `@cancellable` flag."""
-    return getattr(method, "cancellable", False)
+    return getattr(function, "cancellable", False)
