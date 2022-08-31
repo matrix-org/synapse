@@ -107,9 +107,9 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_ENVIRONMENT: CARGO_HOME=/cargo PATH=/cargo/bin:/usr/local/bin
+          CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
           CIBW_SKIP: cp36-*
-          CIBW_BEFORE_ALL: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
 
       - uses: actions/upload-artifact@v3
         with:
