@@ -117,7 +117,7 @@ jobs:
       - name: Install Python dependencies
         run: .venv/bin/pip install -U poetry
       - name: Build the wheel
-        run: .venv/bin/poetry build
+        run: VIRTUAL_ENV=.venv/ .venv/bin/poetry build
       - run: auditwheel repair --plat ${{ matrix.MANYLINUX.NAME }} dist/matrix_synapse*.whl -w wheelhouse/
       - run: .venv/bin/pip install matrix-synapse --no-index -f wheelhouse/
       - run: |
