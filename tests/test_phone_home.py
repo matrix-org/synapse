@@ -20,7 +20,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.app.phone_stats_home import phone_stats_home
 from synapse.metrics.shared_usage_metrics import SharedUsageMetrics
 from synapse.rest import admin
-from synapse.rest.client import login
+from synapse.rest.client import login, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -71,6 +71,7 @@ class SharedMetricsTestCase(HomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
+        sync.register_servlets,
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -82,7 +83,8 @@ class SharedMetricsTestCase(HomeserverTestCase):
         self.assertEqual(self.metrics.daily_active_users, 0)
 
         self.register_user("user", "password")
-        self.login("user", "password")
+        tok = self.login("user", "password")
+        self.make_request("GET", "/sync", access_token=tok)
 
         self.assertEqual(self.metrics.daily_active_users, 0)
 
