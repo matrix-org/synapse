@@ -119,7 +119,7 @@ jobs:
       - name: Build the wheel
         run: .venv/bin/poetry build
       - run: auditwheel repair --plat ${{ matrix.MANYLINUX.NAME }} dist/matrix_synapse*.whl -w wheelhouse/
-      - run: .venv/bin/pip install matrix-synapse wheelhouse/dist/matrix_synapse*.whl
+      - run: .venv/bin/pip install matrix-synapse wheelhouse/matrix_synapse*.whl
       - run: |
           .venv/bin/python -c "from synapse.synapse_rust import sum_as_string; sum_as_string(1, 2)"
 
