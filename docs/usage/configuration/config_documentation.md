@@ -597,7 +597,6 @@ Defaults to false. If this is enabled, a value for `max_mau_value` must also be 
 
 See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
 
-
 Example configuration:
 ```yaml
 limit_usage_by_mau: true
