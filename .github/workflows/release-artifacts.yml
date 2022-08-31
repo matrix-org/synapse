@@ -138,7 +138,7 @@ jobs:
     if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build-debs
-      - build-sdist
+      - manylinux
     runs-on: ubuntu-latest
     steps:
       - name: Download all workflow run artifacts
