@@ -431,7 +431,7 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see the docs [here](../../workers.md)).
+   * `replication`: (deprecated as of Synapse 1.18, see the docs [here](../../workers.md)).
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
@@ -1873,8 +1873,8 @@ See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 ---
 ### `recaptcha_public_key`
 
-This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is
-enabled.
+This homeserver's ReCAPTCHA public key. Must be specified if
+[`enable_registration_captcha`](#enable_registration_captcha) is enabled.
 
 Example configuration:
 ```yaml
@@ -1883,7 +1883,8 @@ recaptcha_public_key: "YOUR_PUBLIC_KEY"
 ---
 ### `recaptcha_private_key`
 
-This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is
+This homeserver's ReCAPTCHA private key. Must be specified if
+[`enable_registration_captcha`](#enable_registration_captcha) is
 enabled.
 
 Example configuration:
@@ -1893,9 +1894,11 @@ recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ---
 ### `enable_registration_captcha`
 
-Set to true to enable ReCaptcha checks when registering, preventing signup
-unless a captcha is answered. Requires a valid ReCaptcha public/private key.
-Defaults to false.
+Set to `true` to require users to complete a CAPTCHA test when registering an account.
+Requires a valid ReCaptcha public/private key.
+Defaults to `false`.
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -1971,9 +1974,21 @@ Registration can be rate-limited using the parameters in the [Ratelimiting](#rat
 ---
 ### `enable_registration`
 
-Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
-you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
-without any verification, you must also set `enable_registration_without_verification` to true.
+Enable registration for new users. Defaults to `false`.
+
+It is highly recommended that if you enable registration, you set one or more
+or the following options, to avoid abuse of your server by "bots":
+
+ * [`enable_registration_captcha`](#enable_registration_captcha)
+ * [`registrations_require_3pid`](#registrations_require_3pid)
+ * [`registration_requires_token`](#registration_requires_token)
+
+(In order to enable registration without any verification, you must also set
+[`enable_registration_without_verification`](#enable_registration_without_verification).)
+
+Note that even if this setting is disabled, new accounts can still be created
+via the admin API if
+[`registration_shared_secret`](#registration_shared_secret) is set.
 
 Example configuration:
 ```yaml
@@ -1981,88 +1996,21 @@ enable_registration: true
 ```
 ---
 ### `enable_registration_without_verification`
+
 Enable registration without email or captcha verification. Note: this option is *not* recommended,
-as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
-unless `enable_registration` is also enabled.
+as registration without verification is a known vector for spam and abuse. Defaults to `false`. Has no effect
+unless [`enable_registration`](#enable_registration) is also enabled.
 
 Example configuration:
 ```yaml
 enable_registration_without_verification: true
 ```
 ---
-### `session_lifetime`
-
-Time that a user's session remains valid for, after they log in.
-
-Note that this is not currently compatible with guest logins.
-
-Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
-logged in.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-session_lifetime: 24h
-```
-----
-### `refresh_access_token_lifetime`
-
-Time that an access token remains valid for, if the session is using refresh tokens.
-
-For more information about refresh tokens, please see the [manual](user_authentication/refresh_tokens.md).
-
-Note that this only applies to clients which advertise support for refresh tokens.
-
-Note also that this is calculated at login time and refresh time: changes are not applied to
-existing sessions until they are refreshed.
-
-By default, this is 5 minutes.
-
-Example configuration:
-```yaml
-refreshable_access_token_lifetime: 10m
-```
----
-### `refresh_token_lifetime: 24h`
-
-Time that a refresh token remains valid for (provided that it is not
-exchanged for another one first).
-This option can be used to automatically log-out inactive sessions.
-Please see the manual for more information.
-
-Note also that this is calculated at login time and refresh time:
-changes are not applied to existing sessions until they are refreshed.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-refresh_token_lifetime: 24h
-```
----
-### `nonrefreshable_access_token_lifetime`
-
-Time that an access token remains valid for, if the session is NOT
-using refresh tokens.
-
-Please note that not all clients support refresh tokens, so setting
-this to a short value may be inconvenient for some users who will
-then be logged out frequently.
-
-Note also that this is calculated at login time: changes are not applied
-retrospectively to existing sessions for users that have already logged in.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-nonrefreshable_access_token_lifetime: 24h
-```
----
 ### `registrations_require_3pid`
 
-If this is set, the user must provide all of the specified types of 3PID when registering.
+If this is set, users must provide all of the specified types of 3PID when registering an account.
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -2110,9 +2058,11 @@ enable_3pid_lookup: false
 
 Require users to submit a token during registration.
 Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
-Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
-Defaults to false. Set to true to enable.
+Defaults to `false`. Set to `true` to enable.
+
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -2121,13 +2071,39 @@ registration_requires_token: true
 ---
 ### `registration_shared_secret`
 
-If set, allows registration of standard or admin accounts by anyone who
-has the shared secret, even if registration is otherwise disabled.
+If set, allows registration of standard or admin accounts by anyone who has the
+shared secret, even if [`enable_registration`](#enable_registration) is not
+set.
+
+This is primarily intended for use with the `register_new_matrix_user` script
+(see [Registering a user](../../setup/installation.md#registering-a-user));
+however, the interface is [documented](../admin_api/register_api.html).
+
+See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
 Example configuration:
 ```yaml
 registration_shared_secret: <PRIVATE STRING>
 ```
+
+---
+### `registration_shared_secret_path`
+
+An alternative to [`registration_shared_secret`](#registration_shared_secret):
+allows the shared secret to be specified in an external file.
+
+The file should be a plain text file, containing only the shared secret.
+
+If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
+
+Example configuration:
+```yaml
+registration_shared_secret_file: /path/to/secrets/file
+```
+
+_Added in Synapse 1.67.0._
+
 ---
 ### `bcrypt_rounds`
 
@@ -2359,6 +2335,79 @@ Example configuration:
 inhibit_user_in_use_error: true
 ```
 ---
+## User session management
+---
+### `session_lifetime`
+
+Time that a user's session remains valid for, after they log in.
+
+Note that this is not currently compatible with guest logins.
+
+Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
+logged in.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+session_lifetime: 24h
+```
+----
+### `refresh_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is using refresh tokens.
+
+For more information about refresh tokens, please see the [manual](user_authentication/refresh_tokens.md).
+
+Note that this only applies to clients which advertise support for refresh tokens.
+
+Note also that this is calculated at login time and refresh time: changes are not applied to
+existing sessions until they are refreshed.
+
+By default, this is 5 minutes.
+
+Example configuration:
+```yaml
+refreshable_access_token_lifetime: 10m
+```
+---
+### `refresh_token_lifetime: 24h`
+
+Time that a refresh token remains valid for (provided that it is not
+exchanged for another one first).
+This option can be used to automatically log-out inactive sessions.
+Please see the manual for more information.
+
+Note also that this is calculated at login time and refresh time:
+changes are not applied to existing sessions until they are refreshed.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+refresh_token_lifetime: 24h
+```
+---
+### `nonrefreshable_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is NOT
+using refresh tokens.
+
+Please note that not all clients support refresh tokens, so setting
+this to a short value may be inconvenient for some users who will
+then be logged out frequently.
+
+Note also that this is calculated at login time: changes are not applied
+retrospectively to existing sessions for users that have already logged in.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+nonrefreshable_access_token_lifetime: 24h
+```
+
+---
 ## Metrics ###
 Config options related to metrics.
 
@@ -2537,7 +2586,10 @@ Config options relating to signing keys
 ---
 ### `signing_key_path`
 
-Path to the signing key to sign messages with.
+Path to the signing key to sign events and federation requests with.
+
+*New in Synapse 1.67*: If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
 
 Example configuration:
 ```yaml
@@ -2642,13 +2694,10 @@ key_server_signing_keys_path: "key_server_signing_keys.key"
 The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.
 
-You will probably also want to set the following options to false to
+You will probably also want to set the following options to `false` to
 disable the regular login/registration flows:
-   * `enable_registration`
-   * `password_config.enabled`
-
-You will also want to investigate the settings under the "sso" configuration
-section below.
+   * [`enable_registration`](#enable_registration)
+   * [`password_config.enabled`](#password_config)
 
 ---
 ### `saml2_config`
