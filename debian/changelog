@@ -1,8 +1,12 @@
 matrix-synapse-py3 (1.66.0~rc2+nmu1) UNRELEASED; urgency=medium
 
+  [ Jörg Behrmann ]
   * Update debhelper to compatibility level 12.
   * Drop the preinst script stopping synapse.
   * Allocate a group for the system user.
+
+  [ Erik Johnston ]
+  * Disable `dh_auto_configure` as it broke during Rust build.
 
  -- Jörg Behrmann <behrmann@physik.fu-berlin.de>  Tue, 23 Aug 2022 17:17:00 +0100
 
