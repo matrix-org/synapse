@@ -812,7 +812,9 @@ class RegisterRestServlet(RestServlet):
             "user_id": user_id,
             "home_server": self.hs.hostname,
         }
-        if not params.get("inhibit_login", False):
+        # We don't want to log the user in if we're going to deny them access because
+        # they need to be approved first.
+        if not params.get("inhibit_login", False) and not self._require_approval:
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             (

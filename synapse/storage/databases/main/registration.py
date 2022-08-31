@@ -1797,7 +1797,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="is_user_pending_approval",
         )
 
-        return ret
+        # We need to handle the case of the column being None because even though the
+        # background update *should* have taken care of setting a value for all users,
+        # we can't be certain it's finished running.
+        return bool(ret)
 
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
