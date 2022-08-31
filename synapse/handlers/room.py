@@ -1067,12 +1067,13 @@ class RoomCreationHandler:
 
             event_dict = create_event_dict(etype, content, **kwargs)
 
-            event = await self.event_creation_handler.create_event_for_batch(
+            event = await self.event_creation_handler.create_event(
                 creator,
                 event_dict,
-                prev_event,
-                depth=depth,
+                prev_event_ids=prev_event,
                 auth_event_ids=auth_event_ids,
+                depth=depth,
+                for_batch=True,
             )
             depth += 1
             prev_event = [event.event_id]
