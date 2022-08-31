@@ -84,7 +84,7 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "contains_url": {"type": "boolean"},
         "lazy_load_members": {"type": "boolean"},
         "include_redundant_members": {"type": "boolean"},
-        "unread_thread_notifications": {"type": "boolean"},
+        "org.matrix.msc3773.unread_thread_notifications": {"type": "boolean"},
         # Include or exclude events with the provided labels.
         # cf https://github.com/matrix-org/matrix-doc/pull/2326
         "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
@@ -309,7 +309,7 @@ class Filter:
             "include_redundant_members", False
         )
         self.unread_thread_notifications = filter_json.get(
-            "unread_thread_notifications", False
+            "org.matrix.msc3773.unread_thread_notifications", False
         )
 
         self.types = filter_json.get("types", None)
