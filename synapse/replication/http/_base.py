@@ -32,7 +32,7 @@ from synapse.logging import opentracing
 from synapse.logging.opentracing import trace_with_opname
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.cancellation import is_method_cancellable
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
@@ -312,7 +312,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         url_args = list(self.PATH_ARGS)
         method = self.METHOD
 
-        if self.CACHE and is_method_cancellable(self._handle_request):
+        if self.CACHE and is_function_cancellable(self._handle_request):
             raise Exception(
                 f"{self.__class__.__name__} has been marked as cancellable, but CACHE "
                 "is set. The cancellable flag would have no effect."
@@ -360,6 +360,6 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         # The `@cancellable` decorator may be applied to `_handle_request`. But we
         # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,
         # so we have to set up the cancellable flag ourselves.
-        request.is_render_cancellable = is_method_cancellable(self._handle_request)
+        request.is_render_cancellable = is_function_cancellable(self._handle_request)
 
         return await self._handle_request(request, **kwargs)

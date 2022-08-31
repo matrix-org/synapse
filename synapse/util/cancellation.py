@@ -51,6 +51,6 @@ def cancellable(method: F) -> F:
     return method
 
 
-def is_method_cancellable(method: Callable[..., Any]) -> bool:
+def is_function_cancellable(method: Callable[..., Any]) -> bool:
     """Checks whether a servlet method has the `@cancellable` flag."""
     return getattr(method, "cancellable", False)

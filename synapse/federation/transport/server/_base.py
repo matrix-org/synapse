@@ -34,7 +34,7 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict
-from synapse.util.cancellation import is_method_cancellable
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -376,7 +376,7 @@ class BaseFederationServlet:
             if code is None:
                 continue
 
-            if is_method_cancellable(code):
+            if is_function_cancellable(code):
                 # The wrapper added by `self._wrap` will inherit the cancellable flag,
                 # but the wrapper itself does not support cancellation yet.
                 # Once resolved, the cancellation tests in

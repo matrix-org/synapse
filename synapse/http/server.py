@@ -63,7 +63,7 @@ from synapse.logging.context import defer_to_thread, preserve_fn, run_in_backgro
 from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
-from synapse.util.cancellation import is_method_cancellable
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
@@ -327,7 +327,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
         method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
-            request.is_render_cancellable = is_method_cancellable(method_handler)
+            request.is_render_cancellable = is_function_cancellable(method_handler)
 
             raw_callback_return = method_handler(request)
 
@@ -489,7 +489,7 @@ class JsonResource(DirectServeJsonResource):
     async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
-        request.is_render_cancellable = is_method_cancellable(callback)
+        request.is_render_cancellable = is_function_cancellable(callback)
 
         # Make sure we have an appropriate name for this handler in prometheus
         # (rather than the default of JsonResource).
