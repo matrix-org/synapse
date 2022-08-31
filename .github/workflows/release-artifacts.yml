@@ -94,7 +94,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-20.04, macos-10.15]
 
     steps:
       - uses: actions/checkout@v3
@@ -108,7 +108,7 @@ jobs:
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
-          CIBW_BUILD: cp310-manylinux_x86_64
+          CIBW_SKIP: "cp36* *-musllinux_i686"
           CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
           CIBW_TEST_COMMAND: python -c "from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))"
 
