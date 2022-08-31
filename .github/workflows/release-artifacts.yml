@@ -111,6 +111,7 @@ jobs:
           CIBW_SKIP: "cp36* *-musllinux_i686"
           CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
           CIBW_TEST_COMMAND: python -c "from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))"
+          CIBW_BUILD_VERBOSITY: 1
 
       - uses: actions/upload-artifact@v3
         with:
