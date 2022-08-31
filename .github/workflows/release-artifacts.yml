@@ -119,6 +119,11 @@ jobs:
             echo '/tmp/*/venv/lib/python3*/site-packages/synapse/';
             ls -lh /tmp/*/venv/lib/python3*/site-packages/synapse/;
             python -c "import synapse; print(synapse.__file__); from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))";
+
+          # Skip testing for pypy 39+ as Pillow doesn't provide wheels for those
+          # and so they a) take forever and b) require build deps to be
+          # installed.
+          CIBW_TEST_SKIP: pp39-* pp310-*
           CIBW_BUILD_VERBOSITY: 1
 
       - uses: actions/upload-artifact@v3
