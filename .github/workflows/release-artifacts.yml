@@ -89,44 +89,27 @@ jobs:
           name: debs
           path: debs/*
 
-  manylinux:
-    runs-on: ubuntu-latest
-    container: quay.io/pypa/${{ matrix.MANYLINUX.CONTAINER }}
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
-        PYTHON:
-          - { VERSION: "cp37-cp37m", PATH: "/opt/python/cp37-cp37m/bin/python" }
-          - { VERSION: "cp38-cp38", PATH: "/opt/python/cp38-cp38/bin/python" }
-          - { VERSION: "cp39-cp39", PATH: "/opt/python/cp39-cp39/bin/python" }
-          - { VERSION: "cp310-cp310", PATH: "/opt/python/cp310-cp310/bin/python" }
-        MANYLINUX:
-          - { NAME: "manylinux2014_x86_64", CONTAINER: "manylinux2014_x86_64" }
-          - { NAME: "musllinux_1_1_x86_64", CONTAINER: "musllinux_1_1_x86_64" }
-    name: "${{ matrix.PYTHON.VERSION }} for ${{ matrix.MANYLINUX.NAME }}"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - run: ${{ matrix.PYTHON.PATH }} -m venv .venv
-      # We install wheel first so that when we pull any deps we can use wheels.
-      - run: .venv/bin/pip install -U wheel setuptools pip
-      - name: Install Python dependencies
-        run: .venv/bin/pip install -U poetry==1.2.0
-      - name: Build the wheel
-        run: .venv/bin/poetry build
-      - run: auditwheel repair --plat ${{ matrix.MANYLINUX.NAME }} dist/matrix_synapse*.whl -w wheelhouse/
-      - run: .venv/bin/pip install wheelhouse/matrix_synapse*.whl
-      - run: |
-          .venv/bin/python -c "from synapse.synapse_rust import sum_as_string; sum_as_string(1, 2)"
+        os: [ubuntu-20.04, macOS-11]
 
-      - uses: actions/upload-artifact@v2
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.9.0
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+
+      - uses: actions/upload-artifact@v3
         with:
-          name: Wheel
-          path: wheelhouse/*.whl
+          path: ./wheelhouse/*.whl
 
       - uses: actions/upload-artifact@v2
         with:
