@@ -85,9 +85,9 @@ case "$DEB_BUILD_OPTIONS" in
         PYTHONPATH="$tmpdir" \
             "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests.test_rust
 
-        ;;
-
         popd
+
+        ;;
 esac
 
 # build the config file
