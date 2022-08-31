@@ -1200,7 +1200,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](workers.md) for more details.
+the [worker documentation](https://matrix-org.github.io/synapse/v1.66/workers.html) for more details.
 
 # Upgrading to v1.14.0
 
