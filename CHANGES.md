@@ -398,6 +398,20 @@ No significant changes since 1.62.0rc3.
 
 Authors of spam-checker plugins should consult the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.62/docs/upgrade.md#upgrading-to-v1620) to learn about the enriched signatures for spam checker callbacks, which are supported with this release of Synapse.
 
+## Security advisory
+
+The following issue is fixed in 1.62.0.
+
+* [GHSA-jhjh-776m-4765](https://github.com/matrix-org/synapse/security/advisories/GHSA-jhjh-776m-4765) / [CVE-2022-31152](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-31152)
+
+  Synapse instances prior to 1.62.0 did not implement the Matrix [event authorization rules](https://spec.matrix.org/v1.3/rooms/v10/#authorization-rules) correctly. An attacker could craft events which would be accepted by Synapse but not a spec-conformant server, potentially causing divergence in the room state between servers.
+
+  Homeservers with federation disabled via the [`federation_domain_whitelist`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#federation_domain_whitelist) config option are unaffected.
+
+  Administrators of homeservers with federation enabled are advised to upgrade to v1.62.0 or higher.
+
+  Fixed by [#13087](https://github.com/matrix-org/synapse/pull/13087) and [#13088](https://github.com/matrix-org/synapse/pull/13088).
+
 Synapse 1.62.0rc3 (2022-07-04)
 ==============================
 
