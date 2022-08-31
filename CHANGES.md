@@ -3,6 +3,12 @@ Synapse 1.66.0 (2022-08-31)
 
 No significant changes since 1.66.0rc2.
 
+This release removes the ability for homeservers to delegate email ownership
+verification and password reset confirmation to identity servers. This removal
+was originally planned for Synapse 1.64, but was later deferred until now.
+
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
+
 Deployments with multiple workers should note that the direct TCP replication
 configuration was deprecated in Synapse v1.18.0 and will be removed in Synapse
 v1.67.0. In particular, the TCP `replication` [listener](https://matrix-org.github.io/synapse/v1.66/usage/configuration/config_documentation.html#listeners)
@@ -29,12 +35,6 @@ Bugfixes
 
 Synapse 1.66.0rc1 (2022-08-23)
 ==============================
-
-This release removes the ability for homeservers to delegate email ownership
-verification and password reset confirmation to identity servers. This removal
-was originally planned for Synapse 1.64, but was later deferred until now.
-
-See the [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
 
 Features
 --------
