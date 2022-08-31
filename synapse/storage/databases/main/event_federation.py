@@ -915,7 +915,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + least((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth
@@ -926,8 +926,15 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
             """
 
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "least"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "min"
+            else:
+                raise RuntimeError("Unknown database engine")
+
             txn.execute(
-                sql,
+                sql % (least_function,),
                 (
                     room_id,
                     current_depth,
