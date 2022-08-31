@@ -110,12 +110,10 @@ jobs:
           CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
           CIBW_SKIP: "cp36* *-musllinux_i686"
           CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
-          # We need to escape out of the project directory, otherwise python try
-          # and load the synapse module from that directory (which won't have a
-          # built synapse_rust module)
+          CIBW_BUILD_FRONTEND: "build"
           CIBW_TEST_COMMAND: >
-            cd /;
-            ls -lh /tmp/*/venv/lib/python3.8/site-packages/synapse/;
+            echo '/tmp/*/venv/lib/python3*/site-packages/synapse/';
+            ls -lh /tmp/*/venv/lib/python3*/site-packages/synapse/;
             python -c "import synapse; print(synapse.__file__); from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))";
           CIBW_BUILD_VERBOSITY: 1
 
