@@ -5,7 +5,7 @@ No significant changes since 1.66.0rc2.
 
 Deployments with multiple workers should note that the direct TCP replication
 configuration was deprecated in Synapse v1.18.0 and will be removed in Synapse
-v1.67.0. See [docs/workers.md](https://github.com/matrix-org/synapse/blob/release-v1.18.0/docs/workers.md)
+v1.67.0. See the [worker documentation](https://matrix-org.github.io/synapse/v1.66/workers.html)
 for more details.
 
 
