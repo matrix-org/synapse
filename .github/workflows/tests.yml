@@ -63,15 +63,7 @@ jobs:
   tests-done:
     if: ${{ always() }}
     needs:
-      - check-sampleconfig
-      - lint
-      - lint-crlf
-      - trial
-      - trial-olddeps
-      - sytest
-      - export-data
-      - portdb
-      - complement
+      - linting-done
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
