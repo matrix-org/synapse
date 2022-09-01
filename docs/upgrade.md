@@ -89,6 +89,13 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.67.0
+
+## Minimum version of Poetry is now v1.2.0
+
+The minimum supported version of poetry is now 1.2. This should only affect
+those installing from a source checkout.
+
 # Upgrading to v1.66.0
 
 ## Delegation of email validation no longer supported
@@ -1200,7 +1207,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](workers.md) for more details.
+the [worker documentation](https://matrix-org.github.io/synapse/v1.66/workers.html) for more details.
 
 # Upgrading to v1.14.0
 

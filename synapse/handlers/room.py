@@ -19,6 +19,7 @@ import math
 import random
 import string
 from collections import OrderedDict
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -704,8 +705,8 @@ class RoomCreationHandler:
                 was, requested, `room_alias`. Secondly, the stream_id of the
                 last persisted event.
         Raises:
-            SynapseError if the room ID couldn't be stored, or something went
-            horribly wrong.
+            SynapseError if the room ID couldn't be stored, 3pid invitation config
+            validation failed, or something went horribly wrong.
             ResourceLimitError if server is blocked to some resource being
             exceeded
         """
@@ -730,6 +731,19 @@ class RoomCreationHandler:
 
         invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
+
+        # validate each entry for correctness
+        for invite_3pid in invite_3pid_list:
+            if not all(
+                key in invite_3pid
+                for key in ("medium", "address", "id_server", "id_access_token")
+            ):
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "all of `medium`, `address`, `id_server` and `id_access_token` "
+                    "are required when making a 3pid invite",
+                    Codes.MISSING_PARAM,
+                )
 
         if not is_requester_admin:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
@@ -978,7 +992,7 @@ class RoomCreationHandler:
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
-            id_access_token = invite_3pid.get("id_access_token")  # optional
+            id_access_token = invite_3pid["id_access_token"]
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
             # Note that do_3pid_invite can raise a  ShadowBanError, but this was

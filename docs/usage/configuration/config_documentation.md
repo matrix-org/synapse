@@ -431,7 +431,7 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see the docs [here](../../workers.md)).
+   * `replication`: (deprecated as of Synapse 1.18, see the docs [here](../../workers.md)).
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
@@ -594,6 +594,8 @@ This option disables/enables monthly active user blocking. Used in cases where t
 server owner wants to limit to the number of monthly active users. When enabled and a limit is
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
+
+See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
 
 Example configuration:
 ```yaml
