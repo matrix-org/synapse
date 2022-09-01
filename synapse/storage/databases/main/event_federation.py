@@ -891,9 +891,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             txn: LoggingTransaction, room_id: str
         ) -> List[Tuple[str, int]]:
             sql = """
-                SELECT insertion_event_extremity.event_id, event.depth FROM insertion_events as insertion_event
+                SELECT
+                    insertion_event_extremity.event_id, event.depth
                 /* We only want insertion events that are also marked as backwards extremities */
-                INNER JOIN insertion_event_extremities as insertion_event_extremity USING (event_id)
+                FROM insertion_event_extremities AS insertion_event_extremity
                 /* Get the depth of the insertion event from the events table */
                 INNER JOIN events AS event USING (event_id)
                 /**
