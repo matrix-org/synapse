@@ -358,10 +358,15 @@ class LoginRestServlet(RestServlet):
         nonce_str = req_message.split(':')[1]
         cache_message = await self._external_cache.get(self._cache_name, nonce_str)
         if cache_message is None:
-            raise SynapseError(400, "Wallet sign message is invalid, Please log in again.")
+            logger.error("redis cache mesage not found, cache_name: %r, key: %r", self._cache_name, nonce_str)
+            raise SynapseError(400, "Wallet sign message is invalid, Please login "
+                                    "again.", Codes.INVALID_SIGNATUR_MESSAGE)
 
         if cache_message != req_message:
-            raise SynapseError(400, "Wallet sign message is invalid, Please log in again.")
+            logger.warning("request message is invalid, Please logi, cache_message: "
+                           "%r, req_message: %r", cache_message, req_message)
+            raise SynapseError(400, "Wallet sign message is invalid, Please login "
+                                    "again.", Codes.INVALID_SIGNATUR_MESSAGE)
 
         # 根据user查询账户信息
         # map old-school login fields into new-school "identifier" fields.
@@ -371,14 +376,14 @@ class LoginRestServlet(RestServlet):
 
         username = identifier_dict.get("user")
         if not username:
-            raise SynapseError(400, "User identifier is missing 'user' key")
+            raise SynapseError(400, "User identifier is missing 'user' key", Codes.INVALID_PARAM)
 
         # user是amax链账号，验证下
 
         # 调chain.get_accountn方法拿用户信息
         account = self.amax_client.get_account(username)
         if account is None:
-            raise SynapseError(400, "Get user accoount failed")
+            raise SynapseError(400, "Get user accoount failed", Codes.GET_CHAIN_ACCOUNT_FAILED)
         permissions = account.get('permissions')
         print("permissions==>", permissions)
         perm_name = permissions[0]['perm_name']
@@ -387,12 +392,12 @@ class LoginRestServlet(RestServlet):
         user_publickey = permissions[0]['required_auth']['keys'][0]['key']
         print("user_publickey==>", user_publickey)
         if not user_publickey:
-            raise SynapseError(400, "Get user_publickey failed")
+            raise SynapseError(400, "Get user_publickey failed", Codes.INVALID_PARSED_PUBLICKKEY)
 
         # 验证是否是amax链的公钥
         matched = match('AM', user_publickey)
         if matched is None:
-            raise SynapseError(400, "Parsed user_publickey is invalid")
+            raise SynapseError(400, "Parsed user_publickey is invalid", Codes.INVALID_PARSED_PUBLICKKEY)
 
         canonical_user_id, callback = await self.auth_handler.validate_signature_login(
             login_submission, user_publickey, ratelimit=True

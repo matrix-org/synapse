@@ -1433,7 +1433,7 @@ class AuthHandler:
             for recovered_vk in recovered_vks:
                 # Test if recovered vk is valid for the data
                 if not recovered_vk.verify(signature, data):
-                    raise SynapseError(400, "Unknown signature %s" % signature)
+                    raise SynapseError(400, "Unknown signature %s" % signature, Codes.INVALID_WALLET_SIGNATURE)
 
                 # if vk.curve != recovered_vk.curve:
                 #     raise SynapseError(400, "Unknown cuurve type %s" % recovered_vk.curve)
