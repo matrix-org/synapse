@@ -15,10 +15,10 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from pydantic import StrictBool, StrictStr, constr
+from pydantic import StrictBool, StrictStr, conlist, constr
 
 from twisted.web.server import Request
 
@@ -842,17 +842,21 @@ class AccountStatusRestServlet(RestServlet):
         self._auth = hs.get_auth()
         self._account_handler = hs.get_account_handler()
 
+    class PostBody(RequestBodyModel):
+        # TODO: we could validate that each user id is an mxid here, and/or parse it
+        #       as a UserID
+        if TYPE_CHECKING:
+            user_ids: List[StrictStr]
+        else:
+            user_ids: conlist(item_type=StrictStr, min_items=1)
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self._auth.get_user_by_req(request)
 
-        body = parse_json_object_from_request(request)
-        if "user_ids" not in body:
-            raise SynapseError(
-                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
-            )
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         statuses, failures = await self._account_handler.get_account_statuses(
-            body["user_ids"],
+            body.user_ids,
             allow_remote=True,
         )
 
