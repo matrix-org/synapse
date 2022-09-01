@@ -35,9 +35,9 @@ from synapse.rest.admin._base import (
 )
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.storage.state import StateFilter
+from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, RoomID, UserID, create_requester
 from synapse.util import json_decoder
-from synapse.streams.config import PaginationConfig
 
 if TYPE_CHECKING:
     from synapse.api.auth import Auth

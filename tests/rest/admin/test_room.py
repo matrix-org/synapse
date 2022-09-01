@@ -11,14 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import urllib.parse
+from http import HTTPStatus
 from typing import List, Optional
 from unittest.mock import Mock
 
-from http import HTTPStatus
-import json
-from synapse.util.stringutils import random_string
-from synapse.handlers.pagination import PurgeStatus
 from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -26,10 +24,11 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
-from synapse.handlers.pagination import PaginationHandler
+from synapse.handlers.pagination import PaginationHandler, PurgeStatus
 from synapse.rest.client import directory, events, login, room
 from synapse.server import HomeServer
 from synapse.util import Clock
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 
