@@ -729,7 +729,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     ) -> List[Tuple[str, int]]:
         """
         Gets the oldest events(backwards extremities) in the room along with the
-        approximate depth (sorted by depth descending).
+        approximate depth. Sorted by depth, highest to lowest (descending) so the closest
+        events to the `current_depth` are first in the list.
 
         We use this function so that we can compare and see if someones
         `current_depth` at their current scrollback is within pagination range
@@ -747,12 +748,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         Args:
             room_id: Room where we want to find the oldest events
-            current_depth: The depth at the users current scrollback position because
-                we only care about finding events older than the given
+            current_depth: The depth at the users current scrollback position
+                because we only care about finding events older than the given
                 `current_depth` when scrolling and paginating backwards.
 
         Returns:
-            List of (event_id, depth) tuples (sorted by depth descending).
+            List of (event_id, depth) tuples. Sorted by depth, highest to lowest
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
         def get_backfill_points_in_room_txn(
@@ -861,7 +864,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     ) -> List[Tuple[str, int]]:
         """
         Get the insertion events we know about that we haven't backfilled yet
-        along with the approximate depth (sorted by depth descending).
+        along with the approximate depth. Sorted by depth, highest to lowest
+        (descending) so the closest events to the `current_depth` are first
+        in the list.
 
         We use this function so that we can compare and see if someones
         `current_depth` at their current scrollback is within pagination range
@@ -884,7 +889,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 `current_depth` when scrolling and paginating backwards.
 
         Returns:
-            List of (event_id, depth) tuples (sorted by depth descending)
+            List of (event_id, depth) tuples. Sorted by depth, highest to lowest
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
         def get_insertion_event_backward_extremities_in_room_txn(
