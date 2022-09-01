@@ -27,7 +27,7 @@ current_dau_gauge = Gauge(
 )
 
 
-class SharedUsageMetrics:
+class CommonUsageMetrics:
     """Usage metrics shared between the phone home stats and the prometheus exporter."""
 
     def __init__(self, hs: "HomeServer") -> None:

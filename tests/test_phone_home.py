@@ -18,7 +18,7 @@ from unittest import mock
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.app.phone_stats_home import phone_stats_home
-from synapse.metrics.shared_usage_metrics import SharedUsageMetrics
+from synapse.metrics.shared_usage_metrics import CommonUsageMetrics
 from synapse.rest import admin
 from synapse.rest.client import login, sync
 from synapse.server import HomeServer
@@ -38,7 +38,7 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
         ]
         stats: JsonDict = {}
         self.get_success(
-            phone_stats_home(self.hs, stats, SharedUsageMetrics(self.hs), past_stats)
+            phone_stats_home(self.hs, stats, CommonUsageMetrics(self.hs), past_stats)
         )
         self.assertEqual(stats["cpu_average"], 0)
 
@@ -60,7 +60,7 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
             phone_stats_home(
                 self.hs,
                 stats,
-                SharedUsageMetrics(self.hs),
+                CommonUsageMetrics(self.hs),
                 past_stats,  # type: ignore[arg-type]
             )
         )
@@ -75,7 +75,7 @@ class SharedMetricsTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.metrics = hs.get_shared_usage_metrics()
+        self.metrics = hs.get_common_usage_metrics()
         self.get_success(self.metrics.setup())
 
     def test_dau(self) -> None:
