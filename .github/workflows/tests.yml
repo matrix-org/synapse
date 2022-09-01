@@ -232,10 +232,6 @@ jobs:
             postgres: multi-postgres
             workers: workers
 
-          - sytest-tag: buster
-            postgres: postgres
-            workers: workers
-
     steps:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
