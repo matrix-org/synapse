@@ -28,6 +28,9 @@ The source code of Synapse is hosted on GitHub. You will also need [a recent ver
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
 
+A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
+
 
 # 3. Get the source.
 
