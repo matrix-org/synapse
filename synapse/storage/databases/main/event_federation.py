@@ -729,7 +729,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     ) -> List[Tuple[str, int]]:
         """
         Gets the oldest events(backwards extremities) in the room along with the
-        aproximate depth (sorted by depth descending).
+        approximate depth (sorted by depth descending).
 
         We use this function so that we can compare and see if someones
         `current_depth` at their current scrollback is within pagination range
@@ -763,7 +763,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             # events we know of in the room but we only know of them because
             # some other event referenced them by prev_event and aren't
             # persisted in our database yet (meaning we don't know their depth
-            # specifically). So we need to look for the aproximate depth from
+            # specifically). So we need to look for the approximate depth from
             # the events connected to the current backwards extremeties.
             sql = """
                 SELECT backward_extrem.event_id, event.depth FROM events AS event
@@ -861,7 +861,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     ) -> List[Tuple[str, int]]:
         """
         Get the insertion events we know about that we haven't backfilled yet
-        along with the aproximate depth (sorted by depth descending).
+        along with the approximate depth (sorted by depth descending).
 
         We use this function so that we can compare and see if someones
         `current_depth` at their current scrollback is within pagination range
