@@ -73,33 +73,23 @@ jobs:
     steps:
       - run: "true"
 
-  trial-python-versions:
-    name: "Calculate list of python versions to run trial against"
-    needs: linting-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - id: set-pythons
-        run: |
-          # Only run oldest and latest support versions for PRs.
-          pythons='["3.7", "3.10"]'
-          if [[ $GITHUB_REF != refs/pull/* ]]; then
-              pythons='["3.7", "3.8", "3.9" "3.10"]'
-          fi
-          echo "::set-output name=pythons::$dists"
-    # map the step outputs to job outputs
-    outputs:
-      pythons: ${{ steps.set-pythons.outputs.pythons }}
-
   trial:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: trial-python-versions
+    needs: linting-done
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version:  ${{ fromJson(trial-python-versions.pythons) }}
+        python-version:  ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
         extras: ["all"]
+        is_pr:
+          - ${{ startsWith(github.ref, 'refs/pull/') }}
+        exclude:
+          - is_pr: true
+            python-version: 3.8
+          - is_pr: true
+            python-version: 3.9
+
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
