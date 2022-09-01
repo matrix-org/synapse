@@ -20,7 +20,7 @@
 -- don't block on it each time.
 CREATE TABLE IF NOT EXISTS event_failed_backfill_attempts(
     room_id TEXT NOT NULL REFERENCES rooms (room_id),
-    event_id TEXT NOT NULL REFERENCES events (event_id),
+    event_id TEXT NOT NULL,
     num_attempts INT NOT NULL,
     last_attempt_ts BIGINT NOT NULL,
     PRIMARY KEY (room_id, event_id)
