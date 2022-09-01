@@ -1,0 +1,1 @@
+Avoid calculating the unstable unread counts from [MSC2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654) unless the results will be returned to the user.
