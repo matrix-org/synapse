@@ -89,6 +89,25 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.66.0
+
+## Delegation of email validation no longer supported
+
+As of this version, Synapse no longer allows the tasks of verifying email address
+ownership, and password reset confirmation, to be delegated to an identity server.
+This removal was previously planned for Synapse 1.64.0, but was
+[delayed](https://github.com/matrix-org/synapse/issues/13421) until now to give
+homeserver administrators more notice of the change.
+
+To continue to allow users to add email addresses to their homeserver accounts,
+and perform password resets, make sure that Synapse is configured with a working
+email server in the [`email` configuration
+section](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
+(including, at a minimum, a `notif_from` setting.)
+
+Specifying an `email` setting under `account_threepid_delegates` will now cause
+an error at startup.
+
 # Upgrading to v1.64.0
 
 ## Deprecation of the ability to delegate e-mail verification to identity servers
@@ -1181,7 +1200,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](workers.md) for more details.
+the [worker documentation](https://matrix-org.github.io/synapse/v1.66/workers.html) for more details.
 
 # Upgrading to v1.14.0
 

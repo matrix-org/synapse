@@ -1,1 +1,0 @@
-Allow specifying additional request fields when using the `HomeServerTestCase.login` helper method.
