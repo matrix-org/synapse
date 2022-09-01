@@ -938,7 +938,6 @@ class RoomTimestampToEventRestServlet(RestServlet):
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/timestamp_to_event$")
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__()
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
         self._timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
