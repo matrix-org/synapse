@@ -901,7 +901,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * We use this info to make sure we don't retry to use a backfill point
                  * if we've already attempted to backfill from it recently.
                  */
-                LEFT JOIN event_failed_backfill_attempts AS failed_backfill_attempt_info USING (room_id, event_id)
+                LEFT JOIN event_failed_backfill_attempts AS failed_backfill_attempt_info
+                ON
+                    failed_backfill_attempt_info.room_id = insertion_event_extremity.room_id
+                    AND failed_backfill_attempt_info.event_id = insertion_event_extremity.event_id
                 WHERE
                     insertion_event_extremity.room_id = ?
                     AND event.depth <= ? /* current_depth */
