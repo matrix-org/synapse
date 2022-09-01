@@ -39,20 +39,6 @@ jobs:
       - name: Check line endings
         run: scripts-dev/check_line_terminators.sh
 
-  lint-newsfile:
-    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@v2
-      - run: "pip install 'towncrier>=18.6.0rc1'"
-      - run: scripts-dev/check-newsfragment.sh
-        env:
-          PULL_REQUEST_NUMBER: ${{ github.event.number }}
-
   lint-pydantic:
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +54,7 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, lint-pydantic, check-sampleconfig, check-schema-delta]
+    needs: [lint, lint-crlf, lint-pydantic, check-sampleconfig, check-schema-delta]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -80,7 +66,6 @@ jobs:
       - check-sampleconfig
       - lint
       - lint-crlf
-      - lint-newsfile
       - trial
       - trial-olddeps
       - sytest
@@ -92,7 +77,3 @@ jobs:
       - uses: matrix-org/done-action@v2
         with:
           needs: ${{ toJSON(needs) }}
-
-          # The newsfile lint may be skipped on non PR builds
-          skippable:
-            lint-newsfile
