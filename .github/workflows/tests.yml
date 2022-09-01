@@ -247,8 +247,6 @@ jobs:
         with:
             toolchain: stable
             override: true
-      - name: Setup Poetry
-        uses: matrix-org/setup-python-poetry@v1
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
