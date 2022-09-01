@@ -64,7 +64,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 # How often to run the background job to update the "recently accessed"
 # attribute of local and remote media.
 UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000  # 1 minute
