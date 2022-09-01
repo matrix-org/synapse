@@ -501,19 +501,23 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
 
 
 @cli.command()
-def wait_for_actions() -> None:
-    _wait_for_actions()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+def wait_for_actions(gh_token: Optional[str]) -> None:
+    _wait_for_actions(gh_token)
 
 
-def _wait_for_actions() -> None:
+def _wait_for_actions(gh_token: Optional[str]) -> None:
     # Find out the version and tag name.
     current_version = get_package_version()
     tag_name = f"v{current_version}"
 
-    # Authentication is optional on this endpoint.
+    # Authentication is optional on this endpoint,
+    # but use a token if we have one to reduce the chance of being rate-limited.
     url = f"https://api.github.com/repos/matrix-org/synapse/actions/runs?branch={tag_name}"
-
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+    headers = {"Accept": "application/vnd.github+json"}
+    if gh_token is not None:
+        headers["authorization"] = f"token {gh_token}"
+    req = urllib.request.Request(url, headers=headers)
 
     time.sleep(10 * 60)
     while True:
@@ -662,7 +666,7 @@ def full(gh_token: str) -> None:
     _tag(gh_token)
 
     click.echo("\n*** wait for actions ***")
-    _wait_for_actions()
+    _wait_for_actions(gh_token)
 
     click.echo("\n*** publish ***")
     _publish(gh_token)
