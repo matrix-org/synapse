@@ -13,15 +13,7 @@
  * limitations under the License.
  */
 
-
--- Add a table that keeps track of when we failed to backfill an event. This
--- allows us to be more intelligent when we decide to retry (we don't need to
--- fail over and over) and we can process that event in the background so we
--- don't block on it each time.
-CREATE TABLE IF NOT EXISTS event_failed_backfill_attempts(
-    room_id TEXT NOT NULL REFERENCES rooms (room_id),
-    event_id TEXT NOT NULL,
-    num_attempts INT NOT NULL,
-    last_attempt_ts BIGINT NOT NULL,
-    PRIMARY KEY (room_id, event_id)
-);
+-- Drop previously received private read receipts so they do not accidentally
+-- get leaked to other users.
+DELETE FROM receipts_linearized WHERE receipt_type = 'org.matrix.msc2285.read.private';
+DELETE FROM receipts_graph WHERE receipt_type = 'org.matrix.msc2285.read.private';

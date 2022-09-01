@@ -1450,7 +1450,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id: The room where the event failed to backfill from
             event_id: The event that failed to be backfilled
         """
-        if self.database_engine.can_native_upsert:
+        if (
+            self.database_engine.can_native_upsert
+            and "event_failed_backfill_attempts"
+            not in self.db_pool._unsafe_to_upsert_tables
+        ):
             await self.db_pool.runInteraction(
                 "record_event_failed_backfill_attempt",
                 self._record_event_failed_backfill_attempt_upsert_native_txn,
