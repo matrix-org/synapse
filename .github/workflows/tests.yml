@@ -111,7 +111,6 @@ jobs:
             postgres:${{ matrix.postgres-version }}
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          poetry-version: 1.2.0rc2
           python-version: ${{ matrix.python-version }}
           extras: ${{ matrix.extras }}
       - name: Await PostgreSQL
@@ -181,7 +180,6 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          poetry-version: 1.2.0rc2
           python-version: ${{ matrix.python-version }}
           extras: ${{ matrix.extras }}
       - run: poetry run trial --jobs=2 tests
@@ -290,7 +288,6 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          poetry-version: 1.2.0rc2
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
 
@@ -328,7 +325,6 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          poetry-version: 1.2.0rc2
           python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
