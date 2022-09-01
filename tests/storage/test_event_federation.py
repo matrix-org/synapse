@@ -943,8 +943,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self,
     ):
         """
-        Test to make sure that events we have attempted to backfill (and within
-        backoff timeout duration) do not show up as an event to backfill again.
+        Test to make sure that insertion events we have attempted to backfill
+        (and within backoff timeout duration) do not show up as an event to
+        backfill again.
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
@@ -975,9 +976,10 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self,
     ):
         """
-        Test to make sure after we fake attempt to backfill event "b3" many times,
-        we can see retry and see the "b3" again after the backoff timeout duration
-        has exceeded.
+        Test to make sure after we fake attempt to backfill event
+        "insertion_eventA" many times, we can see retry and see the
+        "insertion_eventA" again after the backoff timeout duration has
+        exceeded.
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
