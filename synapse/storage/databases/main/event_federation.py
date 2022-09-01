@@ -794,7 +794,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     AND failed_backfill_attempt_info.event_id = backward_extrem.event_id
                 WHERE
                     backward_extrem.room_id = ?
-                    /* We only care about normal events because TODO: why */
+                    /* We only care about non-state events because TODO: why */
                     AND edge.is_state is ? /* False */
                     /**
                      * We only want backwards extremities that are older than or at
