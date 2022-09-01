@@ -1,1 +1,1 @@
-Add Admin APIs to Fetch Messages Within a Particular Window.
+Add admin APIs to fetch messages within a particular window of time.
