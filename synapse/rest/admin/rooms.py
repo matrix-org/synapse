@@ -83,7 +83,7 @@ class RoomRestV2Servlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
 
         requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_user_is_admin(self._auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -311,6 +311,7 @@ class RoomRestServlet(RestServlet):
 
         members = await self.store.get_users_in_room(room_id)
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
+        ret["forgotten"] = await self.store.is_locally_forgotten_room(room_id)
 
         return HTTPStatus.OK, ret
 
@@ -340,7 +341,7 @@ class RoomRestServlet(RestServlet):
         pagination_handler: "PaginationHandler",
     ) -> Tuple[int, JsonDict]:
         requester = await auth.get_user_by_req(request)
-        await assert_user_is_admin(auth, requester.user)
+        await assert_user_is_admin(auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -474,7 +475,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         assert request.args is not None
 
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -564,7 +565,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         self, request: SynapseRequest, room_identifier: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
         content = parse_json_object_from_request(request, allow_empty_body=True)
 
         room_id, _ = await self.resolve_room_id(room_identifier)
@@ -755,7 +756,7 @@ class RoomEventContextServlet(RestServlet):
         self, request: SynapseRequest, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         limit = parse_integer(request, "limit", default=10)
 
@@ -847,7 +848,7 @@ class BlockRoomRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_user_is_admin(self._auth, requester)
 
         content = parse_json_object_from_request(request)
 

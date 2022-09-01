@@ -244,7 +244,7 @@ class ServerNoticesManager:
         assert self.server_notices_mxid is not None
 
         notice_user_data_in_room = await self._message_handler.get_room_data(
-            self.server_notices_mxid,
+            create_requester(self.server_notices_mxid),
             room_id,
             EventTypes.Member,
             self.server_notices_mxid,

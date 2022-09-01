@@ -192,7 +192,7 @@ class UserRestServletV2(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         target_user = UserID.from_string(user_id)
         body = parse_json_object_from_request(request)
@@ -584,10 +584,9 @@ class WhoisRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
-        auth_user = requester.user
 
-        if target_user != auth_user:
-            await assert_user_is_admin(self.auth, auth_user)
+        if target_user != requester.user:
+            await assert_user_is_admin(self.auth, requester)
 
         if not self.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only whois a local user")
@@ -610,7 +609,7 @@ class DeactivateAccountRestServlet(RestServlet):
         self, request: SynapseRequest, target_user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         if not self.is_mine(UserID.from_string(target_user_id)):
             raise SynapseError(
@@ -702,7 +701,7 @@ class ResetPasswordRestServlet(RestServlet):
         This needs user to have administrator access in Synapse.
         """
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         UserID.from_string(target_user_id)
 
@@ -816,7 +815,7 @@ class UserAdminServlet(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
         auth_user = requester.user
 
         target_user = UserID.from_string(user_id)
@@ -930,7 +929,7 @@ class UserTokenRestServlet(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
         auth_user = requester.user
 
         if not self.is_mine_id(user_id):
