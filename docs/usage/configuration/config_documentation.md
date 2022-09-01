@@ -595,6 +595,8 @@ server owner wants to limit to the number of monthly active users. When enabled 
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
 
+See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
+
 Example configuration:
 ```yaml
 limit_usage_by_mau: true
