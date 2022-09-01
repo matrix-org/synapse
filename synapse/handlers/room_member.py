@@ -1382,7 +1382,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_server: str,
         requester: Requester,
         txn_id: Optional[str],
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
         prev_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[str, int]:
@@ -1397,7 +1397,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             requester: The user making the request.
             txn_id: The transaction ID this is part of, or None if this is not
                 part of a transaction.
-            id_access_token: The optional identity server access token.
+            id_access_token: Identity server access token.
             depth: Override the depth used to order the event in the DAG.
             prev_event_ids: The event IDs to use as the prev events
                 Should normally be set to None, which will cause the depth to be calculated
@@ -1494,7 +1494,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         user: UserID,
         txn_id: Optional[str],
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
         prev_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
