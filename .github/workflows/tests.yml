@@ -281,7 +281,6 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
 
