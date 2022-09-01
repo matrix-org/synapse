@@ -28,7 +28,7 @@ jobs:
       - run: scripts-dev/check_schema_delta.py --force-colors
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@try-newer-actions"
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@dmr/try-newer-actions"
     with:
       typechecking-extras: "all"
 
