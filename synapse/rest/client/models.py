@@ -25,8 +25,8 @@ class AuthenticationData(RequestBodyModel):
 
     (The name "Authentication Data" is taken directly from the spec.)
 
-    Additional keys will be present, depending on the `type` field. Use `.dict()` to
-    access them.
+    Additional keys will be present, depending on the `type` field. Use
+    `.dict(exclude_unset=True)` to access them.
     """
 
     class Config:
