@@ -13,7 +13,6 @@
 # limitations under the License.
 import json
 import urllib.parse
-from http import HTTPStatus
 from typing import List, Optional
 from unittest.mock import Mock
 
@@ -1803,8 +1802,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
         token = "t1-0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s"
-            % (room_id, self.admin_user_tok, token),
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s" % (room_id, token),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code)
         self.assertTrue("start" in channel.json_body)
@@ -1820,9 +1819,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
         token = "s0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v1/rooms/%s/messages?from=%s"
-            % (room_id, self.admin_user_tok, token),
-            access_token=self.admin_user_tok
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s" % (room_id, token),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code)
         self.assertTrue("start" in channel.json_body)
@@ -1864,13 +1862,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Check that we get the first and second message when querying /messages.
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s&dir=b&filter=%s"
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s&dir=b&filter=%s"
             % (
                 room_id,
-                self.admin_user_tok,
                 second_token_str,
                 json.dumps({"types": [EventTypes.Message]}),
             ),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
@@ -1893,13 +1891,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # has been purged.
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s&dir=b&filter=%s"
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s&dir=b&filter=%s"
             % (
                 room_id,
-                self.admin_user_tok,
                 second_token_str,
                 json.dumps({"types": [EventTypes.Message]}),
             ),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
@@ -1911,13 +1909,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # anymore.
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s&dir=b&filter=%s"
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s&dir=b&filter=%s"
             % (
                 room_id,
-                self.admin_user_tok,
                 first_token_str,
                 json.dumps({"types": [EventTypes.Message]}),
             ),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
