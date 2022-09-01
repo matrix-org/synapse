@@ -205,9 +205,11 @@ class Auth:
                             errcode=Codes.EXPIRED_ACCOUNT,
                         )
 
-            if ip_addr and (
-                not requester.app_service or self._track_appservice_user_ips
-            ) and not requester.user_id.startswith("@_"):
+            if (
+                ip_addr
+                and (not requester.app_service or self._track_appservice_user_ips)
+                and not requester.user.to_string().startswith("@_")
+            ):
                 # XXX(quenting): I'm 95% confident that we could skip setting the
                 # device_id to "dummy-device" for appservices, and that the only impact
                 # would be some rows which whould not deduplicate in the 'user_ips'
