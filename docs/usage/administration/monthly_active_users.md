@@ -28,7 +28,7 @@ they register with a 3pid that is included in the config field `mau_limits_reser
 
 The Prometheus metric for MAU is refreshed every 5 minutes.
 
-Once an hour, Synapse checks to see if any users are in active (with only activity timestamps later than 30 days). These users
+Once an hour, Synapse checks to see if any users are inactive (with only activity timestamps later than 30 days). These users
 are removed from the active users cohort. If they then become active, they are immediately restored to the cohort.
 
 It is important to note that **deactivated** users are not immediately removed from the pool of active users, but as these users won't
