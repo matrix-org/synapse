@@ -28,7 +28,7 @@ jobs:
       - run: scripts-dev/check_schema_delta.py --force-colors
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@try-newer-actions"
     with:
       typechecking-extras: "all"
 
@@ -60,7 +60,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: matrix-org/setup-python-poetry@v1
+      - uses: matrix-org/setup-python-poetry@dmr/try-newer-actions
         with:
           extras: "all"
       - run: poetry run scripts-dev/check_pydantic_models.py
