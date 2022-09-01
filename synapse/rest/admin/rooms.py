@@ -878,11 +878,11 @@ class RoomMessagesRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester)
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester)
 
         pagination_config = await PaginationConfig.from_request(
-            self.store, request, default_limit=10
+            self._store, request, default_limit=10
         )
         # Twisted will have processed the args by now.
         assert request.args is not None
@@ -902,7 +902,7 @@ class RoomMessagesRestServlet(RestServlet):
         else:
             event_filter = None
 
-        msgs = await self.pagination_handler.get_messages(
+        msgs = await self._pagination_handler.get_messages(
             room_id=room_id,
             requester=requester,
             pagin_config=pagination_config,
@@ -955,7 +955,7 @@ class RoomTimestampToEventRestServlet(RestServlet):
         (
             event_id,
             origin_server_ts,
-        ) = await self.timestamp_lookup_handler.get_event_for_timestamp(
+        ) = await self._timestamp_lookup_handler.get_event_for_timestamp(
             requester, room_id, timestamp, direction
         )
 

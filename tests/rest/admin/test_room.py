@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import time
 import urllib.parse
 from typing import List, Optional
 from unittest.mock import Mock
@@ -1794,7 +1795,30 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
+    def test_timestamp_to_event(self) -> None:
+        """Test that providing the current timestamp can get the last event."""
+        user = self.register_user("foo", "pass")
+        user_tok = self.login("foo", "pass")
+        room_id = self.helper.create_room_as(user, tok=user_tok)
+
+        self.helper.send(room_id, body="message 1", tok=user_tok)
+        second_event_id = self.helper.send(room_id, body="message 2", tok=user_tok)[
+            "event_id"
+        ]
+        ts = str(round(time.time() * 1000))
+
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/timestamp_to_event?dir=b&ts=%s"
+            % (room_id, ts),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code)
+        self.assertTrue("event_id" in channel.json_body)
+        self.assertEqual(second_event_id, channel.json_body["event_id"])
+
     def test_topo_token_is_accepted(self) -> None:
+        """Test Topo Token is accepted."""
         user = self.register_user("foo1", "pass")
         user_tok = self.login("foo1", "pass")
         room_id = self.helper.create_room_as(user, tok=user_tok)
@@ -1812,6 +1836,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertTrue("end" in channel.json_body)
 
     def test_stream_token_is_accepted_for_fwd_pagianation(self) -> None:
+        """Test that stream token is accepted for forward pagination."""
         user = self.register_user("foo2", "pass")
         user_tok = self.login("foo2", "pass")
         room_id = self.helper.create_room_as(user, tok=user_tok)
@@ -1829,6 +1854,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertTrue("end" in channel.json_body)
 
     def test_room_messages_purge(self) -> None:
+        """Test room messages can be retrieved by an admin that isn't in the room."""
         user = self.register_user("foo3", "pass")
         user_tok = self.login("foo3", "pass")
         room_id = self.helper.create_room_as(user, tok=user_tok)
