@@ -6502,7 +6502,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 10
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 12,
@@ -6600,7 +6600,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 10
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 26,
@@ -6699,7 +6699,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 23
+            "y": 48
           },
           "hiddenSeries": false,
           "id": 13,
@@ -6803,7 +6803,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 48
           },
           "hiddenSeries": false,
           "id": 27,
@@ -6901,7 +6901,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 61
           },
           "hiddenSeries": false,
           "id": 28,
@@ -6998,7 +6998,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 61
           },
           "hiddenSeries": false,
           "id": 25,
@@ -7033,7 +7033,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_metrics_block_time_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_time_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -7058,11 +7058,13 @@
           },
           "yaxes": [
             {
-              "format": "ms",
+              "$$hashKey": "object:180",
+              "format": "s",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:181",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -7086,7 +7088,7 @@
             "h": 15,
             "w": 12,
             "x": 0,
-            "y": 49
+            "y": 74
           },
           "hiddenSeries": false,
           "id": 154,
@@ -7107,7 +7109,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -7207,7 +7209,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 69
           },
           "hiddenSeries": false,
           "id": 1,
@@ -7309,7 +7311,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 69
           },
           "hiddenSeries": false,
           "id": 8,
@@ -7409,7 +7411,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 38,
@@ -7505,7 +7507,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 39,
@@ -7513,11 +7515,16 @@
             "alignAsTable": true,
             "avg": false,
             "current": false,
-            "max": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": true,
             "min": false,
+            "rightSide": false,
             "show": true,
+            "sort": "max",
+            "sortDesc": true,
             "total": false,
-            "values": false
+            "values": true
           },
           "lines": true,
           "linewidth": 1,
@@ -7565,11 +7572,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:101",
               "format": "rps",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:102",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -7599,7 +7608,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 56
+            "y": 89
           },
           "hiddenSeries": false,
           "id": 65,
@@ -11855,8 +11864,8 @@
     ]
   },
   "time": {
-    "from": "2022-07-22T04:08:13.716Z",
-    "to": "2022-07-22T18:44:27.863Z"
+    "from": "now-3h",
+    "to": "now"
   },
   "timepicker": {
     "now": true,
@@ -11887,6 +11896,6 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 124,
+  "version": 132,
   "weekStart": ""
 }
