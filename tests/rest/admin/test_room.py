@@ -1806,7 +1806,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s"
             % (room_id, self.admin_user_tok, token),
         )
-        self.assertEqual(HTTPStatus.OK, channel.code)
+        self.assertEqual(200, channel.code)
         self.assertTrue("start" in channel.json_body)
         self.assertEqual(token, channel.json_body["start"])
         self.assertTrue("chunk" in channel.json_body)
@@ -1820,10 +1820,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
         token = "s0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s"
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s"
             % (room_id, self.admin_user_tok, token),
+            access_token=self.admin_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code)
+        self.assertEqual(200, channel.code)
         self.assertTrue("start" in channel.json_body)
         self.assertEqual(token, channel.json_body["start"])
         self.assertTrue("chunk" in channel.json_body)
@@ -1871,7 +1872,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 json.dumps({"types": [EventTypes.Message]}),
             ),
         )
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         chunk = channel.json_body["chunk"]
         self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
@@ -1900,7 +1901,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 json.dumps({"types": [EventTypes.Message]}),
             ),
         )
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         chunk = channel.json_body["chunk"]
         self.assertEqual(len(chunk), 1, [event["content"] for event in chunk])
@@ -1918,7 +1919,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 json.dumps({"types": [EventTypes.Message]}),
             ),
         )
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         chunk = channel.json_body["chunk"]
         self.assertEqual(len(chunk), 0, [event["content"] for event in chunk])

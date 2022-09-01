@@ -869,12 +869,11 @@ class RoomMessagesRestServlet(RestServlet):
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/messages$")
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__()
         self._hs = hs
-        self.clock = hs.get_clock()
-        self.pagination_handler = hs.get_pagination_handler()
-        self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
+        self._clock = hs.get_clock()
+        self._pagination_handler = hs.get_pagination_handler()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -912,7 +911,7 @@ class RoomMessagesRestServlet(RestServlet):
             use_admin_priviledge=True,
         )
 
-        return 200, msgs
+        return HTTPStatus.OK, msgs
 
 
 class RoomTimestampToEventRestServlet(RestServlet):
@@ -942,7 +941,7 @@ class RoomTimestampToEventRestServlet(RestServlet):
         super().__init__()
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
-        self.timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
+        self._timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
