@@ -667,19 +667,19 @@ def full(gh_token: str) -> None:
     click.echo("\n*** publish ***")
     _publish(gh_token)
 
-    click.echo("\nUpdate the Debian repository")
-    click.confirm("Started updating Debian repository?", abort=True)
-
     click.echo("\n*** upload ***")
     _upload()
+
+    click.echo("\n*** merge back ***")
+    _merge_back()
+
+    click.echo("\nUpdate the Debian repository")
+    click.confirm("Started updating Debian repository?", abort=True)
 
     click.echo("\nWait for all release methods to be ready.")
     # Docker should be ready because it was done by the workflows earlier
     # PyPI should be ready because we just ran upload().
     click.confirm("Debs ready?", abort=True)
-
-    click.echo("\n*** merge back ***")
-    _merge_back()
 
     click.echo("\n*** announce ***")
     _announce()
