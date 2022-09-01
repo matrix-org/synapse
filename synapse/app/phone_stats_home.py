@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, List, Sized, Tuple
 from prometheus_client import Gauge
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.metrics.shared_usage_metrics import CommonUsageMetrics
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -50,7 +49,6 @@ registered_reserved_users_mau_gauge = Gauge(
 async def phone_stats_home(
     hs: "HomeServer",
     stats: JsonDict,
-    shared_metrics: CommonUsageMetrics,
     stats_process: List[Tuple[int, "resource.struct_rusage"]] = _stats_process,
 ) -> None:
     """Collect usage statistics and send them to the configured endpoint.
@@ -60,8 +58,6 @@ async def phone_stats_home(
         stats: the dict in which to store the statistics sent to the configured
             endpoint. Mostly used in tests to figure out the data that is supposed to
             be sent.
-        shared_metrics: metrics shared between the Prometheus exporter and the phone
-            home stats, populated outside of this function.
         stats_process: statistics about resource usage of the process.
     """
 
@@ -97,6 +93,7 @@ async def phone_stats_home(
     #
 
     store = hs.get_datastores().main
+    shared_metrics = await hs.get_common_usage_metrics_manager().get_metrics()
 
     stats["homeserver"] = hs.config.server.server_name
     stats["server_context"] = hs.config.server.server_context
@@ -219,14 +216,9 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
         clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
-    # Collect metrics shared between the Prometheus exporter and the phone home stats.
-    shared_metrics = hs.get_common_usage_metrics()
-
     if hs.config.metrics.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
-        clock.looping_call(
-            phone_stats_home, 3 * 60 * 60 * 1000, hs, stats, shared_metrics
-        )
+        clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000, hs, stats)
 
         # We need to defer this init for the cases that we daemonize
         # otherwise the process ID we get is that of the non-daemon process
@@ -234,4 +226,4 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
-        clock.call_later(5 * 60, phone_stats_home, hs, stats, shared_metrics)
+        clock.call_later(5 * 60, phone_stats_home, hs, stats)

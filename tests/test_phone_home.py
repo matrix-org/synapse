@@ -18,7 +18,6 @@ from unittest import mock
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.app.phone_stats_home import phone_stats_home
-from synapse.metrics.shared_usage_metrics import CommonUsageMetrics
 from synapse.rest import admin
 from synapse.rest.client import login, sync
 from synapse.server import HomeServer
@@ -37,9 +36,7 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
             (self.hs.get_clock().time(), resource.getrusage(resource.RUSAGE_SELF))
         ]
         stats: JsonDict = {}
-        self.get_success(
-            phone_stats_home(self.hs, stats, CommonUsageMetrics(self.hs), past_stats)
-        )
+        self.get_success(phone_stats_home(self.hs, stats, past_stats))
         self.assertEqual(stats["cpu_average"], 0)
 
     def test_performance_100(self) -> None:
@@ -57,17 +54,12 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
         self.reactor.advance(1)
         # `old_resource` has type `Mock` instead of `struct_rusage`
         self.get_success(
-            phone_stats_home(
-                self.hs,
-                stats,
-                CommonUsageMetrics(self.hs),
-                past_stats,  # type: ignore[arg-type]
-            )
+            phone_stats_home(self.hs, stats, past_stats)  # type: ignore[arg-type]
         )
         self.assertApproximates(stats["cpu_average"], 100, tolerance=2.5)
 
 
-class SharedMetricsTestCase(HomeserverTestCase):
+class CommonMetricsTestCase(HomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -75,19 +67,31 @@ class SharedMetricsTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.metrics = hs.get_common_usage_metrics()
-        self.get_success(self.metrics.setup())
+        self.metrics_manager = hs.get_common_usage_metrics_manager()
+        self.get_success(self.metrics_manager.setup())
 
     def test_dau(self) -> None:
         """Tests that the daily active users count is correctly updated."""
-        self.assertEqual(self.metrics.daily_active_users, 0)
+        self._assert_metric_value("daily_active_users", 0)
 
         self.register_user("user", "password")
         tok = self.login("user", "password")
         self.make_request("GET", "/sync", access_token=tok)
 
-        self.assertEqual(self.metrics.daily_active_users, 0)
+        self._assert_metric_value("daily_active_users", 0)
 
         self.reactor.advance(3000)
 
-        self.assertEqual(self.metrics.daily_active_users, 1)
+        self._assert_metric_value("daily_active_users", 1)
+
+    def _assert_metric_value(self, metric_name: str, expected: int) -> None:
+        """Compare the given value to the current value of the common usage metric with
+        the given name.
+
+        Args:
+            metric_name: The metric to look up.
+            expected: Expected value for this metric.
+        """
+        metrics = self.get_success(self.metrics_manager.get_metrics())
+        value = getattr(metrics, metric_name)
+        self.assertEqual(value, expected)

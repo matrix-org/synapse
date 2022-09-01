@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
+import attr
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 
@@ -27,14 +29,36 @@ current_dau_gauge = Gauge(
 )
 
 
+@attr.s(auto_attribs=True)
 class CommonUsageMetrics:
     """Usage metrics shared between the phone home stats and the prometheus exporter."""
+
+    daily_active_users: int
+
+
+class CommonUsageMetricsManager:
+    """Collects common usage metrics."""
 
     def __init__(self, hs: "HomeServer") -> None:
         self._store = hs.get_datastores().main
         self._clock = hs.get_clock()
 
-        self.daily_active_users = -1
+        self._metrics: Optional[CommonUsageMetrics] = None
+
+    async def get_metrics(self) -> CommonUsageMetrics:
+        """Get the CommonUsageMetrics object. If no collection has happened yet, do it
+        before returning the metrics.
+
+        Returns:
+            The CommonUsageMetrics object to read common metrics from.
+        """
+        if self._metrics is None:
+            await self._collect()
+
+        # self._collect should always set self._metrics to a non-None value.
+        assert self._metrics is not None
+
+        return self._metrics
 
     async def setup(self) -> None:
         """Reads the current values for the shared usage metrics and starts a looping
@@ -50,10 +74,28 @@ class CommonUsageMetrics:
 
     async def update(self) -> None:
         """Updates the shared usage metrics."""
-        await self.update_daily_active_users()
+        await self._collect()
+        await self._update_gauges()
 
-    async def update_daily_active_users(self) -> None:
-        """Updates the daily active users count."""
+    async def _collect(self) -> None:
+        """Collect the common metrics and either create the CommonUsageMetrics object to
+        use if it doesn't exist yet, or update it.
+        """
         dau_count = await self._store.count_daily_users()
-        current_dau_gauge.set(float(dau_count))
-        self.daily_active_users = dau_count
+
+        if self._metrics is not None:
+            self._metrics.daily_active_users = dau_count
+        else:
+            self._metrics = CommonUsageMetrics(
+                daily_active_users=dau_count,
+            )
+
+    async def _update_gauges(self) -> None:
+        """Update the Prometheus gauges."""
+        if self._metrics is None:
+            await self._collect()
+
+        # self._collect should always set self._metrics to a non-None value.
+        assert self._metrics is not None
+
+        current_dau_gauge.set(float(self._metrics.daily_active_users))
