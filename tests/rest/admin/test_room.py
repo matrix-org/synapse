@@ -15,6 +15,10 @@ import urllib.parse
 from typing import List, Optional
 from unittest.mock import Mock
 
+from http import HTTPStatus
+import json
+from synapse.util.stringutils import random_string
+from synapse.handlers.pagination import PurgeStatus
 from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -1782,6 +1786,134 @@ class RoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", url.encode("ascii"), access_token=user_tok)
         self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_topo_token_is_accepted(self) -> None:
+        user = self.register_user("foo1", "pass")
+        user_tok = self.login("foo1", "pass")
+        room_id = self.helper.create_room_as(user, tok=user_tok)
+
+        token = "t1-0_0_0_0_0_0_0_0_0"
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s"
+            % (room_id, self.admin_user_tok, token),
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code)
+        self.assertTrue("start" in channel.json_body)
+        self.assertEqual(token, channel.json_body["start"])
+        self.assertTrue("chunk" in channel.json_body)
+        self.assertTrue("end" in channel.json_body)
+
+    def test_stream_token_is_accepted_for_fwd_pagianation(self) -> None:
+        user = self.register_user("foo2", "pass")
+        user_tok = self.login("foo2", "pass")
+        room_id = self.helper.create_room_as(user, tok=user_tok)
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s"
+            % (room_id, self.admin_user_tok, token),
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code)
+        self.assertTrue("start" in channel.json_body)
+        self.assertEqual(token, channel.json_body["start"])
+        self.assertTrue("chunk" in channel.json_body)
+        self.assertTrue("end" in channel.json_body)
+
+    def test_room_messages_purge(self) -> None:
+        user = self.register_user("foo3", "pass")
+        user_tok = self.login("foo3", "pass")
+        room_id = self.helper.create_room_as(user, tok=user_tok)
+
+        store = self.hs.get_datastores().main
+        pagination_handler = self.hs.get_pagination_handler()
+
+        # Send a first message in the room, which will be removed by the purge.
+        first_event_id = self.helper.send(room_id, body="message 1", tok=user_tok)[
+            "event_id"
+        ]
+        first_token = self.get_success(
+            store.get_topological_token_for_event(first_event_id)
+        )
+        first_token_str = self.get_success(first_token.to_string(store))
+
+        # Send a second message in the room, which won't be removed, and which we'll
+        # use as the marker to purge events before.
+        second_event_id = self.helper.send(room_id, body="message 2", tok=user_tok)[
+            "event_id"
+        ]
+        second_token = self.get_success(
+            store.get_topological_token_for_event(second_event_id)
+        )
+        second_token_str = self.get_success(second_token.to_string(store))
+
+        # Send a third event in the room to ensure we don't fall under any edge case
+        # due to our marker being the latest forward extremity in the room.
+        self.helper.send(room_id, body="message 3", tok=user_tok)
+
+        # Check that we get the first and second message when querying /messages.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s&dir=b&filter=%s"
+            % (
+                room_id,
+                self.admin_user_tok,
+                second_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
+
+        # Purge every event before the second event.
+        purge_id = random_string(16)
+        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
+        self.get_success(
+            pagination_handler._purge_history(
+                purge_id=purge_id,
+                room_id=room_id,
+                token=second_token_str,
+                delete_local_events=True,
+            )
+        )
+
+        # Check that we only get the second message through /message now that the first
+        # has been purged.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s&dir=b&filter=%s"
+            % (
+                room_id,
+                self.admin_user_tok,
+                second_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 1, [event["content"] for event in chunk])
+
+        # Check that we get no event, but also no error, when querying /messages with
+        # the token that was pointing at the first event, because we don't have it
+        # anymore.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?access_token=%s&from=%s&dir=b&filter=%s"
+            % (
+                room_id,
+                self.admin_user_tok,
+                first_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 0, [event["content"] for event in chunk])
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
