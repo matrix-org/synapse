@@ -811,14 +811,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
                      *
-                     * We use `2 << (n - 1)` as a power of 2 equivalent for compatibility
-                     * with SQLite. The left shift equivalent only works with powers of 2
-                     * because left shift is a binary operation (base-2). Otherwise, we
-                     * would use `power(2, n)` or the power operator, `2^n`.
+                     * We use `1 << n` as a power of 2 equivalent for compatibility
+                     * with older SQLites. The left shift equivalent only works with
+                     * powers of 2 because left shift is a binary operation (base-2).
+                     * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth
@@ -919,14 +919,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
                      *
-                     * We use `2 << (n - 1)` as a power of 2 equivalent for compatibility
-                     * with SQLite. The left shift equivalent only works with powers of 2
-                     * because left shift is a binary operation (base-2). Otherwise, we
-                     * would use `power(2, n)` or the power operator, `2^n`.
+                     * We use `1 << n` as a power of 2 equivalent for compatibility
+                     * with older SQLites. The left shift equivalent only works with
+                     * powers of 2 because left shift is a binary operation (base-2).
+                     * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((2 << (failed_backfill_attempt_info.num_attempts - 1)) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest (closest to the `current_depth`) to the lowest depth
