@@ -15,5 +15,5 @@
 
 -- Drop previously received private read receipts so they do not accidentally
 -- get leaked to other users.
-DELETE FROM receipts_linearized WHERE receipt_type = "org.matrix.msc2285.read.private";
-DELETE FROM receipts_graph WHERE receipt_type = "org.matrix.msc2285.read.private";
+DELETE FROM receipts_linearized WHERE receipt_type = 'org.matrix.msc2285.read.private';
+DELETE FROM receipts_graph WHERE receipt_type = 'org.matrix.msc2285.read.private';
