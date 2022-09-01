@@ -5,7 +5,7 @@ name: Build release artifacts
 on:
   # we build on PRs and develop to (hopefully) get early warning
   # of things breaking (but only build one set of debs)
-  pull_request:
+#  pull_request:
   push:
     branches: ["develop", "release-*"]
 
