@@ -49,8 +49,6 @@ class ReceiptRestServlet(RestServlet):
             ReceiptTypes.READ_PRIVATE,
             ReceiptTypes.FULLY_READ,
         }
-        if hs.config.experimental.msc2285_enabled:
-            self._known_receipt_types.add(ReceiptTypes.UNSTABLE_READ_PRIVATE)
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
