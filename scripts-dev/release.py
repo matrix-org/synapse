@@ -679,6 +679,7 @@ def full(gh_token: str) -> None:
     click.echo("\nWait for all release methods to be ready.")
     # Docker should be ready because it was done by the workflows earlier
     # PyPI should be ready because we just ran upload().
+    # TODO Automatically poll until the Debs have made it to packages.matrix.org
     click.confirm("Debs ready?", abort=True)
 
     click.echo("\n*** announce ***")
