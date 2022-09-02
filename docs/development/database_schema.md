@@ -200,7 +200,7 @@ same `event_id` (in the same or different rooms). After room version `3`, that
 can only happen with a hash collision, which we basically hope will never
 happen.
 
-There are several places in Synapse and even Matrix API's like [`GET
+There are several places in Synapse and even Matrix APIs like [`GET
 /_matrix/federation/v1/event/{eventId}`](https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid)
 where we assume that event IDs are globally unique.
 
