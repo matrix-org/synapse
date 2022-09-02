@@ -82,6 +82,16 @@ jobs:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
         extras: ["all"]
+        is_pr:
+          - ${{ startsWith(github.ref, 'refs/pull/') }}
+
+        # If we're a PR then we only test min and max python.
+        exclude:
+          - is_pr: true
+            python-version: 3.8
+          - is_pr: true
+            python-version: 3.9
+
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
