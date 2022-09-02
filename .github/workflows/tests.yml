@@ -84,6 +84,8 @@ jobs:
         extras: ["all"]
         is_pr:
           - ${{ startsWith(github.ref, 'refs/pull/') }}
+
+        # If we're a PR then we only test min and max python.
         exclude:
           - is_pr: true
             python-version: 3.8
