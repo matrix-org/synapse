@@ -431,7 +431,7 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see the docs [here](../../workers.md)).
+   * `replication`: (deprecated as of Synapse 1.18, see the docs [here](../../workers.md)).
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
@@ -594,6 +594,8 @@ This option disables/enables monthly active user blocking. Used in cases where t
 server owner wants to limit to the number of monthly active users. When enabled and a limit is
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
+
+See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
 
 Example configuration:
 ```yaml
@@ -2484,7 +2486,7 @@ report_stats_endpoint: https://example.com/report-usage-stats/push
 Config settings related to the client/server API
 
 ---
-### `room_prejoin_state:`
+### `room_prejoin_state`
 
 Controls for the state that is shared with users who receive an invite
 to a room. By default, the following state event types are shared with users who
@@ -2624,7 +2626,7 @@ Example configuration:
 key_refresh_interval: 2d
 ```
 ---
-### `trusted_key_servers:`
+### `trusted_key_servers`
 
 The trusted servers to download signing keys from.
 

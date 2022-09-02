@@ -309,7 +309,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             receipt_types=(
                 ReceiptTypes.READ,
                 ReceiptTypes.READ_PRIVATE,
-                ReceiptTypes.UNSTABLE_READ_PRIVATE,
             ),
         )
 
@@ -531,7 +530,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (
                 ReceiptTypes.READ,
                 ReceiptTypes.READ_PRIVATE,
-                ReceiptTypes.UNSTABLE_READ_PRIVATE,
             ),
         )
 

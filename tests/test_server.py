@@ -26,12 +26,12 @@ from synapse.http.server import (
     DirectServeJsonResource,
     JsonResource,
     OptionsResource,
-    cancellable,
 )
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict
 from synapse.util import Clock
+from synapse.util.cancellation import cancellable
 
 from tests import unittest
 from tests.http.server._base import test_disconnect
