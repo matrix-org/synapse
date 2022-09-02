@@ -193,7 +193,7 @@ There are three separate aspects to this:
    in Python, evaluates to `True`.
 
 
-## `event_id` uniqueness
+## `event_id` global uniqueness
 
 In room versions `1` and `2` it's possible to end up with two events with the
 same `event_id` (in the same or different rooms). After room version `3`, that
