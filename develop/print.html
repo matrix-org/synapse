@@ -13399,7 +13399,13 @@ parts of the process.</p>
 </li>
 <li>
 <p>Enable Synapse metrics:</p>
-<p>There are two methods of enabling metrics in Synapse.</p>
+<p>In <code>homeserver.yaml</code>, make sure <code>enable_metrics</code> is
+set to <code>True</code>.</p>
+</li>
+<li>
+<p>Enable the <code>/_synapse/metrics</code> Synapse endpoint that Prometheus uses to
+collect data:</p>
+<p>There are two methods of enabling the metrics endpoint in Synapse.</p>
 <p>The first serves the metrics as a part of the usual web server and
 can be enabled by adding the &quot;metrics&quot; resource to the existing
 listener as such:</p>
@@ -13424,8 +13430,6 @@ over HTTP only, and will be available at <code>/_synapse/metrics</code>.</p>
       bind_addresses:
         - '0.0.0.0'
 </code></pre>
-<p>For both options, you will need to ensure that <code>enable_metrics</code> is
-set to <code>True</code>.</p>
 </li>
 <li>
 <p>Restart Synapse.</p>
