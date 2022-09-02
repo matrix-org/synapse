@@ -78,4 +78,4 @@ cat poetry.lock
 echo "::endgroup::"
 
 poetry install -v -E "all test"
-poetry run python -m twisted.trial --jobs=2 tests/
+poetry run trial --jobs=2 tests/
