@@ -305,3 +305,19 @@ towncrier = ">=18.6.0rc1"
 [build-system]
 requires = ["poetry-core>=1.0.0", "setuptools_rust>=1.3"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.cibuildwheel]
+# Skip unsupported platforms (by us or by Rust).
+skip = "cp36* *-musllinux_i686"
+
+# We need a rust compiler
+before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
+environment= { PATH = "$PATH:$HOME/.cargo/bin" }
+
+# For some reason if we don't manually clean the build directory we
+# can end up poluting the next build with a .so that is for the wrong
+# Python version.
+before-build = "rm -rf {project}/build"
+build-frontend = "build"
+test-command = "python -c 'from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))'"

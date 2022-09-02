@@ -107,25 +107,9 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_ENVIRONMENT: 'PATH="$PATH:$HOME/.cargo/bin"'
-          CIBW_SKIP: "cp36* *-musllinux_i686"
-          CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
-          # For some reason if we don't manually clean the build directory we
-          # can end up poluting the next build with a .so that is for the wrong
-          # Python version.
-          CIBW_BEFORE_BUILD: "rm -rf {project}/build"
-          CIBW_BUILD_FRONTEND: "build"
-          CIBW_TEST_COMMAND: >
-            echo '/tmp/*/venv/lib/python3*/site-packages/synapse/';
-            ls -lh /tmp/*/venv/lib/python3*/site-packages/synapse/;
-            python -c "import synapse; print(synapse.__file__); from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))";
-
-          # Skip testing for pypy 3.9 as Pillow doesn't provide wheels for those
-          # and so they a) take forever and b) require build deps to be
-          # installed.
-          # Similarly, cryptography isn't build for i868.
+          # Skip testing for platforms which various libraries don't have wheels
+          # for, and so need extra build deps.
           CIBW_TEST_SKIP: pp39-* *i686* *musl* pp37-macosx*
-          CIBW_BUILD_VERBOSITY: 1
 
       - uses: actions/upload-artifact@v3
         with:
