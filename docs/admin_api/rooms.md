@@ -532,7 +532,7 @@ The following query parameters are available:
 * `ts` - a timestamp in milliseconds where we will find the closest event in
   the given direction.
 * `dir` - can be `f` or `b` to indicate forwards and backwards in time from the
-  given timestamp.
+  given timestamp. Defaults to `f`.
 
 **Response**
 
