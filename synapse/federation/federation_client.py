@@ -1190,7 +1190,7 @@ class FederationClient(FederationBase):
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
             if self._is_unknown_endpoint(e, err):
-                if room_version.event_format != EventFormatVersions.V1:
+                if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",

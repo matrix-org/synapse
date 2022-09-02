@@ -1156,7 +1156,7 @@ class EventsWorkerStore(SQLBaseStore):
             if format_version is None:
                 # This means that we stored the event before we had the concept
                 # of a event format version, so it must be a V1 event.
-                format_version = EventFormatVersions.V1
+                format_version = EventFormatVersions.ROOM_V1_V2
 
             room_version_id = row.room_version_id
 
@@ -1186,10 +1186,10 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 # So, the following approximations should be adequate.
 
-                if format_version == EventFormatVersions.V1:
+                if format_version == EventFormatVersions.ROOM_V1_V2:
                     # if it's event format v1 then it must be room v1 or v2
                     room_version = RoomVersions.V1
-                elif format_version == EventFormatVersions.V2:
+                elif format_version == EventFormatVersions.ROOM_V3:
                     # if it's event format v2 then it must be room v3
                     room_version = RoomVersions.V3
                 else:
