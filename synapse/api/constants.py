@@ -216,11 +216,11 @@ class EventContentFields:
     MSC2716_HISTORICAL: Final = "org.matrix.msc2716.historical"
     # For "insertion" events to indicate what the next batch ID should be in
     # order to connect to it
-    MSC2716_NEXT_BATCH_ID: Final = "org.matrix.msc2716.next_batch_id"
+    MSC2716_NEXT_BATCH_ID: Final = "next_batch_id"
     # Used on "batch" events to indicate which insertion event it connects to
-    MSC2716_BATCH_ID: Final = "org.matrix.msc2716.batch_id"
+    MSC2716_BATCH_ID: Final = "batch_id"
     # For "marker" events
-    MSC2716_MARKER_INSERTION: Final = "org.matrix.msc2716.marker.insertion"
+    MSC2716_INSERTION_EVENT_REFERENCE: Final = "insertion_event_reference"
 
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
@@ -257,5 +257,15 @@ class GuestAccess:
 
 class ReceiptTypes:
     READ: Final = "m.read"
-    READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
+    READ_PRIVATE: Final = "m.read.private"
     FULLY_READ: Final = "m.fully_read"
+
+
+class PublicRoomsFilterFields:
+    """Fields in the search filter for `/publicRooms` that we understand.
+
+    As defined in https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3publicrooms
+    """
+
+    GENERIC_SEARCH_TERM: Final = "generic_search_term"
+    ROOM_TYPES: Final = "room_types"

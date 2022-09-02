@@ -728,6 +728,7 @@ class RelationsTestCase(BaseRelationsTestCase):
 
 
 class RelationPaginationTestCase(BaseRelationsTestCase):
+    @unittest.override_config({"experimental_features": {"msc3715_enabled": True}})
     def test_basic_paginate_relations(self) -> None:
         """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
@@ -799,7 +800,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             )
             expected_event_ids.append(channel.json_body["event_id"])
 
-        prev_token = ""
+        prev_token: Optional[str] = ""
         found_event_ids: List[str] = []
         for _ in range(20):
             from_token = ""
@@ -998,7 +999,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 6)
+        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
 
     def test_annotation_to_annotation(self) -> None:
         """Any relation to an annotation should be ignored."""
@@ -1034,7 +1035,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 6)
+        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 7)
 
     def test_thread(self) -> None:
         """
@@ -1059,6 +1060,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                     participated, bundled_aggregations.get("current_user_participated")
                 )
                 # The latest thread event has some fields that don't matter.
+                self.assertIn("latest_event", bundled_aggregations)
                 self.assert_dict(
                     {
                         "content": {
@@ -1071,28 +1073,28 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                         "sender": self.user2_id,
                         "type": "m.room.test",
                     },
-                    bundled_aggregations.get("latest_event"),
+                    bundled_aggregations["latest_event"],
                 )
 
             return assert_thread
 
         # The "user" sent the root event and is making queries for the bundled
         # aggregations: they have participated.
-        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 8)
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 9)
         # The "user2" sent replies in the thread and is making queries for the
         # bundled aggregations: they have participated.
         #
         # Note that this re-uses some cached values, so the total number of
         # queries is much smaller.
         self._test_bundled_aggregations(
-            RelationTypes.THREAD, _gen_assert(True), 2, access_token=self.user2_token
+            RelationTypes.THREAD, _gen_assert(True), 3, access_token=self.user2_token
         )
 
         # A user with no interactions with the thread: they have not participated.
         user3_id, user3_token = self._create_user("charlie")
         self.helper.join(self.room, user=user3_id, tok=user3_token)
         self._test_bundled_aggregations(
-            RelationTypes.THREAD, _gen_assert(False), 2, access_token=user3_token
+            RelationTypes.THREAD, _gen_assert(False), 3, access_token=user3_token
         )
 
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
@@ -1111,6 +1113,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             self.assertEqual(2, bundled_aggregations.get("count"))
             self.assertTrue(bundled_aggregations.get("current_user_participated"))
             # The latest thread event has some fields that don't matter.
+            self.assertIn("latest_event", bundled_aggregations)
             self.assert_dict(
                 {
                     "content": {
@@ -1123,7 +1126,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                     "sender": self.user_id,
                     "type": "m.room.test",
                 },
-                bundled_aggregations.get("latest_event"),
+                bundled_aggregations["latest_event"],
             )
             # Check the unsigned field on the latest event.
             self.assert_dict(
@@ -1139,7 +1142,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 8)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
 
     def test_nested_thread(self) -> None:
         """

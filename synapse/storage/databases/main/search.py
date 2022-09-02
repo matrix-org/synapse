@@ -113,7 +113,6 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
-    EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
     EVENT_SEARCH_DELETE_NON_STRINGS = "event_search_sqlite_delete_non_strings"
 
@@ -130,15 +129,6 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
         )
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, self._background_reindex_search_order
-        )
-
-        # we used to have a background update to turn the GIN index into a
-        # GIST one; we no longer do that (obviously) because we actually want
-        # a GIN index. However, it's possible that some people might still have
-        # the background update queued, so we register a handler to clear the
-        # background update.
-        self.db_pool.updates.register_noop_background_update(
-            self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME
         )
 
         self.db_pool.updates.register_background_update_handler(

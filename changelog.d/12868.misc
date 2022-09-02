@@ -1,1 +1,0 @@
-Enable the `batch_send` endpoint on synapse worker processes. Contributed by Nick @ Beeper.

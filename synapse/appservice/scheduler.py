@@ -319,7 +319,9 @@ class _ServiceQueuer:
         rooms_of_interesting_users.update(event.room_id for event in events)
         # EDUs
         rooms_of_interesting_users.update(
-            ephemeral["room_id"] for ephemeral in ephemerals
+            ephemeral["room_id"]
+            for ephemeral in ephemerals
+            if ephemeral.get("room_id") is not None
         )
 
         # Look up the AS users in those rooms
@@ -329,8 +331,9 @@ class _ServiceQueuer:
             )
 
         # Add recipients of to-device messages.
-        # device_message["user_id"] is the ID of the recipient.
-        users.update(device_message["user_id"] for device_message in to_device_messages)
+        users.update(
+            device_message["to_user_id"] for device_message in to_device_messages
+        )
 
         # Compute and return the counts / fallback key usage states
         otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)

@@ -59,6 +59,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         { "stream_id": 12345, "event_id": "$abcdef..." }
 
+    Responds with a 409 when a `PartialStateConflictError` is raised due to an event
+    context that needs to be recomputed due to the un-partial stating of a room.
+
     The returned event ID may not match the sent event if it was deduplicated.
     """
 

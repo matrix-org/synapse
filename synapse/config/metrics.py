@@ -18,7 +18,7 @@ from typing import Any, Optional
 import attr
 
 from synapse.types import JsonDict
-from synapse.util.check_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import check_requirements
 
 from ._base import Config, ConfigError
 
@@ -42,6 +42,35 @@ class MetricsConfig(Config):
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_metrics = config.get("enable_metrics", False)
+
+        """
+        ### `enable_legacy_metrics` (experimental)
+
+        **Experimental: this option may be removed or have its behaviour
+        changed at any time, with no notice.**
+
+        Set to `true` to publish both legacy and non-legacy Prometheus metric names,
+        or to `false` to only publish non-legacy Prometheus metric names.
+        Defaults to `true`. Has no effect if `enable_metrics` is `false`.
+
+        Legacy metric names include:
+        - metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
+        - counters that don't end with the `_total` suffix, such as `synapse_federation_client_sent_edus`, therefore not adhering to the OpenMetrics standard.
+
+        These legacy metric names are unconventional and not compliant with OpenMetrics standards.
+        They are included for backwards compatibility.
+
+        Example configuration:
+        ```yaml
+        enable_legacy_metrics: false
+        ```
+
+        See https://github.com/matrix-org/synapse/issues/11106 for context.
+
+        *Since v1.67.0.*
+        """
+        self.enable_legacy_metrics = config.get("enable_legacy_metrics", True)
+
         self.report_stats = config.get("report_stats", None)
         self.report_stats_endpoint = config.get(
             "report_stats_endpoint", "https://matrix.org/report-usage-stats/push"
@@ -57,12 +86,7 @@ class MetricsConfig(Config):
 
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
-            try:
-                check_requirements("sentry")
-            except DependencyException as e:
-                raise ConfigError(
-                    e.message  # noqa: B306, DependencyException.message is a property
-                )
+            check_requirements("sentry")
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:
@@ -73,46 +97,8 @@ class MetricsConfig(Config):
     def generate_config_section(
         self, report_stats: Optional[bool] = None, **kwargs: Any
     ) -> str:
-        res = """\
-        ## Metrics ###
-
-        # Enable collection and rendering of performance metrics
-        #
-        #enable_metrics: false
-
-        # Enable sentry integration
-        # NOTE: While attempts are made to ensure that the logs don't contain
-        # any sensitive information, this cannot be guaranteed. By enabling
-        # this option the sentry server may therefore receive sensitive
-        # information, and it in turn may then diseminate sensitive information
-        # through insecure notification channels if so configured.
-        #
-        #sentry:
-        #    dsn: "..."
-
-        # Flags to enable Prometheus metrics which are not suitable to be
-        # enabled by default, either for performance reasons or limited use.
-        #
-        metrics_flags:
-            # Publish synapse_federation_known_servers, a gauge of the number of
-            # servers this homeserver knows about, including itself. May cause
-            # performance problems on large homeservers.
-            #
-            #known_servers: true
-
-        # Whether or not to report anonymized homeserver usage statistics.
-        #
-        """
-
-        if report_stats is None:
-            res += "#report_stats: true|false\n"
+        if report_stats is not None:
+            res = "report_stats: %s\n" % ("true" if report_stats else "false")
         else:
-            res += "report_stats: %s\n" % ("true" if report_stats else "false")
-
-        res += """
-        # The endpoint to report the anonymized homeserver usage statistics to.
-        # Defaults to https://matrix.org/report-usage-stats/push
-        #
-        #report_stats_endpoint: https://example.com/report-usage-stats/push
-        """
+            res = "\n"
         return res

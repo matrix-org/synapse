@@ -96,6 +96,51 @@ jobs:
             /logs/results.tap
             /logs/**/*.log*
 
+  complement:
+    if: "${{ !failure() && !cancelled() }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arrangement: monolith
+            database: SQLite
+
+          - arrangement: monolith
+            database: Postgres
+
+          - arrangement: workers
+            database: Postgres
+
+    steps:
+      - name: Run actions/checkout@v2 for synapse
+        uses: actions/checkout@v2
+        with:
+          path: synapse
+
+      - name: Prepare Complement's Prerequisites
+        run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      # This step is specific to the 'Twisted trunk' test run:
+      - name: Patch dependencies
+        run: |
+          set -x
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -yqq python3 pipx
+          pipx install poetry==1.1.14
+
+          poetry remove -n twisted
+          poetry add -n --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry lock --no-update
+          # NOT IN 1.1.14 poetry lock --check
+        working-directory: synapse
+
+      - run: |
+          set -o pipefail
+          TEST_ONLY_SKIP_DEP_HASH_VERIFICATION=1 POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+        shell: bash
+        name: Run Complement Tests
+
   # open an issue if the build fails, so we know about it.
   open-issue:
     if: failure()
@@ -103,6 +148,7 @@ jobs:
       - mypy
       - trial
       - sytest
+      - complement
 
     runs-on: ubuntu-latest
 

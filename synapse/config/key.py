@@ -159,16 +159,18 @@ class KeyConfig(Config):
             )
         )
 
-        self.macaroon_secret_key = config.get(
+        macaroon_secret_key: Optional[str] = config.get(
             "macaroon_secret_key", self.root.registration.registration_shared_secret
         )
 
-        if not self.macaroon_secret_key:
+        if not macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
             logger.warning("Config is missing macaroon_secret_key")
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
+        else:
+            self.macaroon_secret_key = macaroon_secret_key.encode("utf-8")
 
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values
@@ -182,111 +184,22 @@ class KeyConfig(Config):
         **kwargs: Any,
     ) -> str:
         base_key_name = os.path.join(config_dir_path, server_name)
+        macaroon_secret_key = ""
+        form_secret = ""
 
         if generate_secrets:
             macaroon_secret_key = 'macaroon_secret_key: "%s"' % (
                 random_string_with_symbols(50),
             )
             form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
-        else:
-            macaroon_secret_key = "#macaroon_secret_key: <PRIVATE STRING>"
-            form_secret = "#form_secret: <PRIVATE STRING>"
 
         return (
             """\
-        # a secret which is used to sign access tokens. If none is specified,
-        # the registration_shared_secret is used, if one is given; otherwise,
-        # a secret key is derived from the signing key.
-        #
         %(macaroon_secret_key)s
-
-        # a secret which is used to calculate HMACs for form values, to stop
-        # falsification of values. Must be specified for the User Consent
-        # forms to work.
-        #
         %(form_secret)s
-
-        ## Signing Keys ##
-
-        # Path to the signing key to sign messages with
-        #
         signing_key_path: "%(base_key_name)s.signing.key"
-
-        # The keys that the server used to sign messages with but won't use
-        # to sign new messages.
-        #
-        old_signing_keys:
-          # For each key, `key` should be the base64-encoded public key, and
-          # `expired_ts`should be the time (in milliseconds since the unix epoch) that
-          # it was last used.
-          #
-          # It is possible to build an entry from an old signing.key file using the
-          # `export_signing_key` script which is provided with synapse.
-          #
-          # For example:
-          #
-          #"ed25519:id": { key: "base64string", expired_ts: 123456789123 }
-
-        # How long key response published by this server is valid for.
-        # Used to set the valid_until_ts in /key/v2 APIs.
-        # Determines how quickly servers will query to check which keys
-        # are still valid.
-        #
-        #key_refresh_interval: 1d
-
-        # The trusted servers to download signing keys from.
-        #
-        # When we need to fetch a signing key, each server is tried in parallel.
-        #
-        # Normally, the connection to the key server is validated via TLS certificates.
-        # Additional security can be provided by configuring a `verify key`, which
-        # will make synapse check that the response is signed by that key.
-        #
-        # This setting supercedes an older setting named `perspectives`. The old format
-        # is still supported for backwards-compatibility, but it is deprecated.
-        #
-        # 'trusted_key_servers' defaults to matrix.org, but using it will generate a
-        # warning on start-up. To suppress this warning, set
-        # 'suppress_key_server_warning' to true.
-        #
-        # Options for each entry in the list include:
-        #
-        #    server_name: the name of the server. required.
-        #
-        #    verify_keys: an optional map from key id to base64-encoded public key.
-        #       If specified, we will check that the response is signed by at least
-        #       one of the given keys.
-        #
-        #    accept_keys_insecurely: a boolean. Normally, if `verify_keys` is unset,
-        #       and federation_verify_certificates is not `true`, synapse will refuse
-        #       to start, because this would allow anyone who can spoof DNS responses
-        #       to masquerade as the trusted key server. If you know what you are doing
-        #       and are sure that your network environment provides a secure connection
-        #       to the key server, you can set this to `true` to override this
-        #       behaviour.
-        #
-        # An example configuration might look like:
-        #
-        #trusted_key_servers:
-        #  - server_name: "my_trusted_server.example.com"
-        #    verify_keys:
-        #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
-        #  - server_name: "my_other_trusted_server.example.com"
-        #
         trusted_key_servers:
           - server_name: "matrix.org"
-
-        # Uncomment the following to disable the warning that is emitted when the
-        # trusted_key_servers include 'matrix.org'. See above.
-        #
-        #suppress_key_server_warning: true
-
-        # The signing keys to use when acting as a trusted key server. If not specified
-        # defaults to the server signing key.
-        #
-        # Can contain multiple keys, one per line.
-        #
-        #key_server_signing_keys_path: "key_server_signing_keys.key"
         """
             % locals()
         )

@@ -53,37 +53,6 @@ class CasConfig(Config):
             self.cas_displayname_attribute = None
             self.cas_required_attributes = []
 
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        # Enable Central Authentication Service (CAS) for registration and login.
-        #
-        cas_config:
-          # Uncomment the following to enable authorization against a CAS server.
-          # Defaults to false.
-          #
-          #enabled: true
-
-          # The URL of the CAS authorization endpoint.
-          #
-          #server_url: "https://cas-server.com"
-
-          # The attribute of the CAS response to use as the display name.
-          #
-          # If unset, no displayname will be set.
-          #
-          #displayname_attribute: name
-
-          # It is possible to configure Synapse to only allow logins if CAS attributes
-          # match particular values. All of the keys in the mapping below must exist
-          # and the values must match the given value. Alternately if the given value
-          # is None then any value is allowed (the attribute just must exist).
-          # All of the listed attributes must match for the login to be permitted.
-          #
-          #required_attributes:
-          #  userGroup: "staff"
-          #  department: None
-        """
-
 
 # CAS uses a legacy required attributes mapping, not the one provided by
 # SsoAttributeRequirement.

@@ -14,13 +14,13 @@
 
 """Tests for the password_auth_provider interface"""
 
+from http import HTTPStatus
 from typing import Any, Type, Union
 from unittest.mock import Mock
 
 import synapse
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
-from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.module_api import ModuleApi
 from synapse.rest.client import account, devices, login, logout, register
 from synapse.types import JsonDict, UserID
@@ -166,16 +166,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.reset_mock()
         super().setUp()
 
-    def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver()
-        # Load the modules into the homeserver
-        module_api = hs.get_module_api()
-        for module, config in hs.config.modules.loaded_modules:
-            module(config=config, api=module_api)
-        load_legacy_password_auth_providers(hs)
-
-        return hs
-
     @override_config(legacy_providers_config(LegacyPasswordOnlyAuthProvider))
     def test_password_only_auth_progiver_login_legacy(self):
         self.password_only_auth_provider_login_test_body()
@@ -188,14 +178,14 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # check_password must return an awaitable
         mock_password_provider.check_password.return_value = make_awaitable(True)
         channel = self._send_password_login("u", "p")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@u:test", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with("@u:test", "p")
         mock_password_provider.reset_mock()
 
         # login with mxid should work too
         channel = self._send_password_login("@u:bz", "p")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@u:bz", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with("@u:bz", "p")
         mock_password_provider.reset_mock()
@@ -204,7 +194,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # in these cases, but at least we can guard against the API changing
         # unexpectedly
         channel = self._send_password_login(" USER🙂NAME ", " pASS\U0001F622word ")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@ USER🙂NAME :test", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with(
             "@ USER🙂NAME :test", " pASS😢word "
@@ -258,10 +248,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # check_password must return an awaitable
         mock_password_provider.check_password.return_value = make_awaitable(False)
         channel = self._send_password_login("u", "p")
-        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
 
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@localuser:test", channel.json_body["user_id"])
 
     @override_config(legacy_providers_config(LegacyPasswordOnlyAuthProvider))
@@ -382,7 +372,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("u", "p")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_password.assert_not_called()
 
     @override_config(legacy_providers_config(LegacyCustomAuthProvider))
@@ -406,14 +396,14 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login with missing param should be rejected
         channel = self._send_login("test.login_type", "u")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
 
         mock_password_provider.check_auth.return_value = make_awaitable(
             ("@user:bz", None)
         )
         channel = self._send_login("test.login_type", "u", test_field="y")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@user:bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
@@ -427,7 +417,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             ("@ MALFORMED! :bz", None)
         )
         channel = self._send_login("test.login_type", " USER🙂NAME ", test_field=" abc ")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@ MALFORMED! :bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             " USER🙂NAME ", "test.login_type", {"test_field": " abc "}
@@ -510,7 +500,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             ("@user:bz", callback)
         )
         channel = self._send_login("test.login_type", "u", test_field="y")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@user:bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
@@ -549,7 +539,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
 
     @override_config(
@@ -584,7 +574,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
 
     @override_config(
@@ -615,7 +605,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
         mock_password_provider.check_password.assert_not_called()
 
@@ -646,13 +636,13 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             ("@localuser:test", None)
         )
         channel = self._send_login("test.login_type", "localuser", test_field="")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         tok1 = channel.json_body["access_token"]
 
         channel = self._send_login(
             "test.login_type", "localuser", test_field="", device_id="dev2"
         )
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
         # make the initial request which returns a 401
         channel = self._delete_device(tok1, "dev2")
@@ -721,7 +711,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # password login shouldn't work and should be rejected with a 400
         # ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
     def test_on_logged_out(self):
         """Tests that the on_logged_out callback is called when the user logs out."""
@@ -884,7 +874,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             },
             access_token=tok,
         )
-        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
         self.assertEqual(
             channel.json_body["errcode"],
             Codes.THREEPID_DENIED,
@@ -906,7 +896,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             },
             access_token=tok,
         )
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertIn("sid", channel.json_body)
 
         m.assert_called_once_with("email", "bar@test.com", registration)
@@ -949,12 +939,12 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             "register",
             {"auth": {"session": session, "type": LoginType.DUMMY}},
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         return channel.json_body
 
     def _get_login_flows(self) -> JsonDict:
         channel = self.make_request("GET", "/_matrix/client/r0/login")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         return channel.json_body["flows"]
 
     def _send_password_login(self, user: str, password: str) -> FakeChannel:

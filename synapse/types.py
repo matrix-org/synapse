@@ -267,7 +267,6 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
             )
 
         domain = parts[1]
-
         # This code will need changing if we want to support multiple domain
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
@@ -279,6 +278,8 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
         """Parses the input string and attempts to ensure it is valid."""
+        # TODO: this does not reject an empty localpart or an overly-long string.
+        # See https://spec.matrix.org/v1.2/appendices/#identifier-grammar
         try:
             obj = cls.from_string(s)
             # Apply additional validation to the domain. This is only done

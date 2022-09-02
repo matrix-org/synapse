@@ -135,11 +135,42 @@ jobs:
             /logs/**/*.log*
 
 
-  # TODO: run complement (as with twisted trunk, see #12473).
+  complement:
+    if: "${{ !failure() && !cancelled() }}"
+    runs-on: ubuntu-latest
 
-  # open an issue if the build fails, so we know about it.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arrangement: monolith
+            database: SQLite
+
+          - arrangement: monolith
+            database: Postgres
+
+          - arrangement: workers
+            database: Postgres
+
+    steps:
+      - name: Run actions/checkout@v2 for synapse
+        uses: actions/checkout@v2
+        with:
+          path: synapse
+
+      - name: Prepare Complement's Prerequisites
+        run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      - run: |
+          set -o pipefail
+          TEST_ONLY_IGNORE_POETRY_LOCKFILE=1 POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+        shell: bash
+        name: Run Complement Tests
+
+  # Open an issue if the build fails, so we know about it.
+  # Only do this if we're not experimenting with this action in a PR.
   open-issue:
-    if: failure()
+    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request'"
     needs:
       # TODO: should mypy be included here? It feels more brittle than the other two.
       - mypy

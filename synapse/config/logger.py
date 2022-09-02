@@ -153,11 +153,6 @@ class LoggingConfig(Config):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
-        ## Logging ##
-
-        # A yaml python logging config file as described by
-        # https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-        #
         log_config: "%(log_config)s"
         """
             % locals()

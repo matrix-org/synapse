@@ -1,3 +1,16 @@
+# Commits in this file will be removed from GitHub blame results.
+#
+# To use this file locally, use:
+#   git blame --ignore-revs-file="path/to/.git-blame-ignore-revs" <files>
+#
+# or configure the `blame.ignoreRevsFile` option in your git config.
+#
+# If ignoring a pull request that was not squash merged, only the merge
+# commit needs to be put here. Child commits will be resolved from it.
+
+# Run black (#3679).
+8b3d9b6b199abb87246f982d5db356f1966db925
+
 # Black reformatting (#5482).
 32e7c9e7f20b57dd081023ac42d6931a8da9b3a3
 

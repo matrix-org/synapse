@@ -40,29 +40,38 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y git \
+    apt-get update -qq && apt-get install -yqq \
+      build-essential cargo git libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
-# We use a specific commit from poetry's master branch instead of our usual 1.1.12,
-# to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
-#    https://github.com/python-poetry/poetry/pull/5156 and
-#    https://github.com/python-poetry/poetry/issues/5141 ;
-# without it, we generate a requirements.txt with incorrect environment markers,
-# which causes necessary packages to be omitted when we `pip install`.
-#
-# NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
-# pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
+  pip install --user "poetry==1.2.0"
 
 WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
 
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
+
+# If specified, we won't verify the hashes of dependencies.
+# This is only needed if the hashes of dependencies cannot be checked for some
+# reason, such as when a git repository is used directly as a dependency.
+ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
+
+# If specified, we won't use the Poetry lockfile.
+# Instead, we'll just install what a regular `pip install` would from PyPI.
+ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
+
+# Export the dependencies, but only if we're actually going to use the Poetry lockfile.
+# Otherwise, just create an empty requirements file so that the Dockerfile can
+# proceed.
+RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+    /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}; \
+  else \
+    touch /synapse/requirements.txt; \
+  fi
 
 ###
 ### Stage 1: builder
@@ -73,7 +82,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y \
+ apt-get update -qq && apt-get install -yqq \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -85,6 +94,7 @@ RUN \
     openssl \
     rustc \
     zlib1g-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # To speed up rebuilds, install all of the dependencies before we copy over
@@ -101,8 +111,17 @@ COPY synapse /synapse/synapse/
 # ... and what we need to `pip install`.
 COPY pyproject.toml README.rst /synapse/
 
+# Repeat of earlier build argument declaration, as this is a new build stage.
+ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
+
 # Install the synapse package itself.
-RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
+# If we have populated requirements.txt, we don't install any dependencies
+# as we should already have those from the previous `pip install` step.
+RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+    pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
+  else \
+    pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
+  fi
 
 ###
 ### Stage 2: runtime
@@ -118,7 +137,7 @@ LABEL org.opencontainers.image.licenses='Apache-2.0'
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update && apt-get install -y \
+  apt-get update -qq && apt-get install -yqq \
     curl \
     gosu \
     libjpeg62-turbo \

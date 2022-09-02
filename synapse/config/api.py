@@ -31,54 +31,6 @@ class ApiConfig(Config):
         self.room_prejoin_state = list(self._get_prejoin_state_types(config))
         self.track_puppeted_user_ips = config.get("track_puppeted_user_ips", False)
 
-    def generate_config_section(cls, **kwargs: Any) -> str:
-        formatted_default_state_types = "\n".join(
-            "           # - %s" % (t,) for t in _DEFAULT_PREJOIN_STATE_TYPES
-        )
-
-        return """\
-        ## API Configuration ##
-
-        # Controls for the state that is shared with users who receive an invite
-        # to a room
-        #
-        room_prejoin_state:
-           # By default, the following state event types are shared with users who
-           # receive invites to the room:
-           #
-%(formatted_default_state_types)s
-           #
-           # Uncomment the following to disable these defaults (so that only the event
-           # types listed in 'additional_event_types' are shared). Defaults to 'false'.
-           #
-           #disable_default_event_types: true
-
-           # Additional state event types to share with users when they are invited
-           # to a room.
-           #
-           # By default, this list is empty (so only the default event types are shared).
-           #
-           #additional_event_types:
-           #  - org.example.custom.event.type
-
-        # We record the IP address of clients used to access the API for various
-        # reasons, including displaying it to the user in the "Where you're signed in"
-        # dialog.
-        #
-        # By default, when puppeting another user via the admin API, the client IP
-        # address is recorded against the user who created the access token (ie, the
-        # admin user), and *not* the puppeted user.
-        #
-        # Uncomment the following to also record the IP address against the puppeted
-        # user. (This also means that the puppeted user will count as an "active" user
-        # for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
-        # above.)
-        #
-        #track_puppeted_user_ips: true
-        """ % {
-            "formatted_default_state_types": formatted_default_state_types
-        }
-
     def _get_prejoin_state_types(self, config: JsonDict) -> Iterable[str]:
         """Get the event types to include in the prejoin state
 

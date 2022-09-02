@@ -25,6 +25,7 @@ from synapse.api.constants import (
     GuestAccess,
     HistoryVisibility,
     JoinRules,
+    PublicRoomsFilterFields,
 )
 from synapse.api.errors import (
     Codes,
@@ -181,6 +182,7 @@ class RoomListHandler:
                 == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
                 "join_rule": room["join_rules"],
+                "room_type": room["room_type"],
             }
 
             # Filter out Nones – rather omit the field altogether
@@ -239,7 +241,9 @@ class RoomListHandler:
         response["chunk"] = results
 
         response["total_room_count_estimate"] = await self.store.count_public_rooms(
-            network_tuple, ignore_non_federatable=from_federation
+            network_tuple,
+            ignore_non_federatable=from_federation,
+            search_filter=search_filter,
         )
 
         return response
@@ -508,8 +512,21 @@ class RoomListNextBatch:
 
 
 def _matches_room_entry(room_entry: JsonDict, search_filter: dict) -> bool:
-    if search_filter and search_filter.get("generic_search_term", None):
-        generic_search_term = search_filter["generic_search_term"].upper()
+    """Determines whether the given search filter matches a room entry returned over
+    federation.
+
+    Only used if the remote server does not support MSC2197 remote-filtered search, and
+    hence does not support MSC3827 filtering of `/publicRooms` by room type either.
+
+    In this case, we cannot apply the `room_type` filter since no `room_type` field is
+    returned.
+    """
+    if search_filter and search_filter.get(
+        PublicRoomsFilterFields.GENERIC_SEARCH_TERM, None
+    ):
+        generic_search_term = search_filter[
+            PublicRoomsFilterFields.GENERIC_SEARCH_TERM
+        ].upper()
         if generic_search_term in room_entry.get("name", "").upper():
             return True
         elif generic_search_term in room_entry.get("topic", "").upper():

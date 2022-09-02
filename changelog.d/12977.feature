@@ -1,1 +1,0 @@
-Add new `media_retention` options to the homeserver config for routinely cleaning up non-recently accessed media.

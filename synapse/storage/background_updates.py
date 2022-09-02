@@ -507,25 +507,6 @@ class BackgroundUpdater:
             update_handler
         )
 
-    def register_noop_background_update(self, update_name: str) -> None:
-        """Register a noop handler for a background update.
-
-        This is useful when we previously did a background update, but no
-        longer wish to do the update. In this case the background update should
-        be removed from the schema delta files, but there may still be some
-        users who have the background update queued, so this method should
-        also be called to clear the update.
-
-        Args:
-            update_name: Name of update
-        """
-
-        async def noop_update(progress: JsonDict, batch_size: int) -> int:
-            await self._end_background_update(update_name)
-            return 1
-
-        self.register_background_update_handler(update_name, noop_update)
-
     def register_background_index_update(
         self,
         update_name: str,

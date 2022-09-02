@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,17 +16,17 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import Codes, StoreError, SynapseError
-from synapse.http.server import HttpServer, respond_with_html_bytes
+from synapse.api.errors import Codes, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
-    parse_string,
 )
 from synapse.http.site import SynapseRequest
 from synapse.push import PusherConfigException
 from synapse.rest.client._base import client_patterns
+from synapse.rest.synapse.client.unsubscribe import UnsubscribeResource
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -132,48 +133,21 @@ class PushersSetRestServlet(RestServlet):
         return 200, {}
 
 
-class PushersRemoveRestServlet(RestServlet):
+class LegacyPushersRemoveRestServlet(UnsubscribeResource, RestServlet):
     """
-    To allow pusher to be delete by clicking a link (ie. GET request)
+    A servlet to handle legacy "email unsubscribe" links, forwarding requests to the ``UnsubscribeResource``
+
+    This should be kept for some time, so unsubscribe links in past emails stay valid.
     """
 
-    PATTERNS = client_patterns("/pushers/remove$", v1=True)
-    SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__()
-        self.hs = hs
-        self.notifier = hs.get_notifier()
-        self.auth = hs.get_auth()
-        self.pusher_pool = self.hs.get_pusherpool()
+    PATTERNS = client_patterns("/pushers/remove$", releases=[], v1=False, unstable=True)
 
     async def on_GET(self, request: SynapseRequest) -> None:
-        requester = await self.auth.get_user_by_req(request, rights="delete_pusher")
-        user = requester.user
-
-        app_id = parse_string(request, "app_id", required=True)
-        pushkey = parse_string(request, "pushkey", required=True)
-
-        try:
-            await self.pusher_pool.remove_pusher(
-                app_id=app_id, pushkey=pushkey, user_id=user.to_string()
-            )
-        except StoreError as se:
-            if se.code != 404:
-                # This is fine: they're already unsubscribed
-                raise
-
-        self.notifier.on_new_replication_data()
-
-        respond_with_html_bytes(
-            request,
-            200,
-            PushersRemoveRestServlet.SUCCESS_HTML,
-        )
-        return None
+        # Forward the request to the UnsubscribeResource
+        await self._async_render(request)
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     PushersRestServlet(hs).register(http_server)
     PushersSetRestServlet(hs).register(http_server)
-    PushersRemoveRestServlet(hs).register(http_server)
+    LegacyPushersRemoveRestServlet(hs).register(http_server)

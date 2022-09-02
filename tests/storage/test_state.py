@@ -369,8 +369,8 @@ class StateStoreTestCase(HomeserverTestCase):
         state_dict_ids = cache_entry.value
 
         self.assertEqual(cache_entry.full, False)
-        self.assertEqual(cache_entry.known_absent, {(e1.type, e1.state_key)})
-        self.assertDictEqual(state_dict_ids, {(e1.type, e1.state_key): e1.event_id})
+        self.assertEqual(cache_entry.known_absent, set())
+        self.assertDictEqual(state_dict_ids, {})
 
         ############################################
         # test that things work with a partial cache
@@ -387,7 +387,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(is_all, False)
-        self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
+        self.assertDictEqual({}, state_dict)
 
         room_id = self.room.to_string()
         (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
@@ -412,7 +412,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(is_all, False)
-        self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
+        self.assertDictEqual({}, state_dict)
 
         (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
@@ -443,7 +443,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(is_all, False)
-        self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
+        self.assertDictEqual({}, state_dict)
 
         (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,

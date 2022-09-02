@@ -12,10 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import codecs
-import itertools
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Union,
+)
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -146,6 +155,70 @@ def decode_body(
     return etree.fromstring(body, parser)
 
 
+def _get_meta_tags(
+    tree: "etree.Element",
+    property: str,
+    prefix: str,
+    property_mapper: Optional[Callable[[str], Optional[str]]] = None,
+) -> Dict[str, Optional[str]]:
+    """
+    Search for meta tags prefixed with a particular string.
+
+    Args:
+        tree: The parsed HTML document.
+        property: The name of the property which contains the tag name, e.g.
+            "property" for Open Graph.
+        prefix: The prefix on the property to search for, e.g. "og" for Open Graph.
+        property_mapper: An optional callable to map the property to the Open Graph
+            form. Can return None for a key to ignore that key.
+
+    Returns:
+        A map of tag name to value.
+    """
+    results: Dict[str, Optional[str]] = {}
+    for tag in tree.xpath(
+        f"//*/meta[starts-with(@{property}, '{prefix}:')][@content][not(@content='')]"
+    ):
+        # if we've got more than 50 tags, someone is taking the piss
+        if len(results) >= 50:
+            logger.warning(
+                "Skipping parsing of Open Graph for page with too many '%s:' tags",
+                prefix,
+            )
+            return {}
+
+        key = tag.attrib[property]
+        if property_mapper:
+            key = property_mapper(key)
+            # None is a special value used to ignore a value.
+            if key is None:
+                continue
+
+        results[key] = tag.attrib["content"]
+
+    return results
+
+
+def _map_twitter_to_open_graph(key: str) -> Optional[str]:
+    """
+    Map a Twitter card property to the analogous Open Graph property.
+
+    Args:
+        key: The Twitter card property (starts with "twitter:").
+
+    Returns:
+        The Open Graph property (starts with "og:") or None to have this property
+        be ignored.
+    """
+    # Twitter card properties with no analogous Open Graph property.
+    if key == "twitter:card" or key == "twitter:creator":
+        return None
+    if key == "twitter:site":
+        return "og:site_name"
+    # Otherwise, swap twitter to og.
+    return "og" + key[7:]
+
+
 def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     """
     Parse the HTML document into an Open Graph response.
@@ -160,10 +233,8 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
         The Open Graph response as a dictionary.
     """
 
-    # if we see any image URLs in the OG response, then spider them
-    # (although the client could choose to do this by asking for previews of those
-    # URLs to avoid DoSing the server)
-
+    # Search for Open Graph (og:) meta tags, e.g.:
+    #
     # "og:type"         : "video",
     # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
     # "og:site_name"    : "YouTube",
@@ -176,25 +247,32 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "og:video:height" : "720",
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
-    og: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath(
-        "//*/meta[starts-with(@property, 'og:')][@content][not(@content='')]"
-    ):
-        # if we've got more than 50 tags, someone is taking the piss
-        if len(og) >= 50:
-            logger.warning("Skipping OG for page with too many 'og:' tags")
-            return {}
+    og = _get_meta_tags(tree, "property", "og")
 
-        og[tag.attrib["property"]] = tag.attrib["content"]
-
-    # TODO: grab article: meta tags too, e.g.:
-
+    # TODO: Search for properties specific to the different Open Graph types,
+    # such as article: meta tags, e.g.:
+    #
     # "article:publisher" : "https://www.facebook.com/thethudonline" />
     # "article:author" content="https://www.facebook.com/thethudonline" />
     # "article:tag" content="baby" />
     # "article:section" content="Breaking News" />
     # "article:published_time" content="2016-03-31T19:58:24+00:00" />
     # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
+
+    # Search for Twitter Card (twitter:) meta tags, e.g.:
+    #
+    # "twitter:site"    : "@matrixdotorg"
+    # "twitter:creator" : "@matrixdotorg"
+    #
+    # Twitter cards tags also duplicate Open Graph tags.
+    #
+    # See https://developer.twitter.com/en/docs/twitter-for-websites/cards/guides/getting-started
+    twitter = _get_meta_tags(tree, "name", "twitter", _map_twitter_to_open_graph)
+    # Merge the Twitter values with the Open Graph values, but do not overwrite
+    # information from Open Graph tags.
+    for key, value in twitter.items():
+        if key not in og:
+            og[key] = value
 
     if "og:title" not in og:
         # Attempt to find a title from the title tag, or the biggest header on the page.
@@ -276,7 +354,7 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
     from lxml import etree
 
-    TAGS_TO_REMOVE = (
+    TAGS_TO_REMOVE = {
         "header",
         "nav",
         "aside",
@@ -291,31 +369,42 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
         "img",
         "picture",
         etree.Comment,
-    )
+    }
 
     # Split all the text nodes into paragraphs (by splitting on new
     # lines)
     text_nodes = (
         re.sub(r"\s+", "\n", el).strip()
-        for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
+        for el in _iterate_over_text(tree.find("body"), TAGS_TO_REMOVE)
     )
     return summarize_paragraphs(text_nodes)
 
 
 def _iterate_over_text(
-    tree: "etree.Element", *tags_to_ignore: Union[str, "etree.Comment"]
+    tree: Optional["etree.Element"],
+    tags_to_ignore: Set[Union[str, "etree.Comment"]],
+    stack_limit: int = 1024,
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
+
+    Args:
+        tree: The parent element to iterate. Can be None if there isn't one.
+        tags_to_ignore: Set of tags to ignore
+        stack_limit: Maximum stack size limit for depth-first traversal.
+            Nodes will be dropped if this limit is hit, which may truncate the
+            textual result.
+            Intended to limit the maximum working memory when generating a preview.
     """
-    # This is basically a stack that we extend using itertools.chain.
-    # This will either consist of an element to iterate over *or* a string
+
+    if tree is None:
+        return
+
+    # This is a stack whose items are elements to iterate over *or* strings
     # to be returned.
-    elements = iter([tree])
-    while True:
-        el = next(elements, None)
-        if el is None:
-            return
+    elements: List[Union[str, "etree.Element"]] = [tree]
+    while elements:
+        el = elements.pop()
 
         if isinstance(el, str):
             yield el
@@ -329,17 +418,22 @@ def _iterate_over_text(
             if el.text:
                 yield el.text
 
-            # We add to the stack all the elements children, interspersed with
-            # each child's tail text (if it exists). The tail text of a node
-            # is text that comes *after* the node, so we always include it even
-            # if we ignore the child node.
-            elements = itertools.chain(
-                itertools.chain.from_iterable(  # Basically a flatmap
-                    [child, child.tail] if child.tail else [child]
-                    for child in el.iterchildren()
-                ),
-                elements,
-            )
+            # We add to the stack all the element's children, interspersed with
+            # each child's tail text (if it exists).
+            #
+            # We iterate in reverse order so that earlier pieces of text appear
+            # closer to the top of the stack.
+            for child in el.iterchildren(reversed=True):
+                if len(elements) > stack_limit:
+                    # We've hit our limit for working memory
+                    break
+
+                if child.tail:
+                    # The tail text of a node is text that comes *after* the node,
+                    # so we always include it even if we ignore the child node.
+                    elements.append(child.tail)
+
+                elements.append(child)
 
 
 def summarize_paragraphs(

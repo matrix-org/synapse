@@ -43,6 +43,7 @@ class RelationPaginationServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self._relations_handler = hs.get_relations_handler()
+        self._msc3715_enabled = hs.config.experimental.msc3715_enabled
 
     async def on_GET(
         self,
@@ -55,9 +56,15 @@ class RelationPaginationServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         limit = parse_integer(request, "limit", default=5)
-        direction = parse_string(
-            request, "org.matrix.msc3715.dir", default="b", allowed_values=["f", "b"]
-        )
+        if self._msc3715_enabled:
+            direction = parse_string(
+                request,
+                "org.matrix.msc3715.dir",
+                default="b",
+                allowed_values=["f", "b"],
+            )
+        else:
+            direction = "b"
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 

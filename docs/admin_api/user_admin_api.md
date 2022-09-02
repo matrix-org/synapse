@@ -124,9 +124,8 @@ Body parameters:
   - `address` - string. Value of third-party ID.
   belonging to a user.
 - `external_ids` - array, optional. Allow setting the identifier of the external identity
-  provider for SSO (Single sign-on). Details in
-  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
-  section `sso` and `oidc_providers`.
+  provider for SSO (Single sign-on). Details in the configuration manual under the
+  sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
   - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
     in the homeserver configuration. Note that no error is raised if the provided
     value is not in the homeserver configuration.
@@ -545,7 +544,7 @@ Gets a list of all local media that a specific `user_id` has created.
 These are media that the user has uploaded themselves
 ([local media](../media_repository.md#local-media)), as well as
 [URL preview images](../media_repository.md#url-previews) requested by the user if the
-[feature is enabled](../development/url_previews.md).
+[feature is enabled](../usage/configuration/config_documentation.md#url_preview_enabled).
 
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -754,6 +753,7 @@ A response body like the following is returned:
       "device_id": "QBUAZIFURK",
       "display_name": "android",
       "last_seen_ip": "1.2.3.4",
+      "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
       "last_seen_ts": 1474491775024,
       "user_id": "<user_id>"
     },
@@ -761,6 +761,7 @@ A response body like the following is returned:
       "device_id": "AUIECTSRND",
       "display_name": "ios",
       "last_seen_ip": "1.2.3.5",
+      "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
       "last_seen_ts": 1474491775025,
       "user_id": "<user_id>"
     }
@@ -786,6 +787,8 @@ The following fields are returned in the JSON response body:
   - `display_name` - Display name set by the user for this device.
     Absent if no name has been set.
   - `last_seen_ip` - The IP address where this device was last seen.
+    (May be a few minutes out of date, for efficiency reasons).
+  - `last_seen_user_agent` - The user agent of the device when it was last seen.
     (May be a few minutes out of date, for efficiency reasons).
   - `last_seen_ts` - The timestamp (in milliseconds since the unix epoch) when this
     devices was last seen. (May be a few minutes out of date, for efficiency reasons).
@@ -838,6 +841,7 @@ A response body like the following is returned:
   "device_id": "<device_id>",
   "display_name": "android",
   "last_seen_ip": "1.2.3.4",
+  "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
   "last_seen_ts": 1474491775024,
   "user_id": "<user_id>"
 }
@@ -858,6 +862,8 @@ The following fields are returned in the JSON response body:
 - `display_name` - Display name set by the user for this device.
   Absent if no name has been set.
 - `last_seen_ip` - The IP address where this device was last seen.
+  (May be a few minutes out of date, for efficiency reasons).
+  - `last_seen_user_agent` - The user agent of the device when it was last seen.
   (May be a few minutes out of date, for efficiency reasons).
 - `last_seen_ts` - The timestamp (in milliseconds since the unix epoch) when this
   devices was last seen. (May be a few minutes out of date, for efficiency reasons).

@@ -1,1 +1,0 @@
-Report login failures due to unknown third party identifiers in the same way as failures due to invalid passwords. This prevents an attacker from using the error response to determine if the identifier exists. Contributed by Daniel Aloni.

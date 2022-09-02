@@ -237,3 +237,25 @@ poetry run pip install build && poetry run python -m build
 because [`build`](https://github.com/pypa/build) is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 `poetry build` too.
+
+
+# Troubleshooting
+
+## Check the version of poetry with `poetry --version`.
+
+The minimum version of poetry supported by Synapse is 1.2.
+
+It can also be useful to check the version of `poetry-core` in use. If you've
+installed `poetry` with `pipx`, try `pipx runpip poetry list | grep
+poetry-core`.
+
+## Clear caches: `poetry cache clear --all pypi`.
+
+Poetry caches a bunch of information about packages that isn't readily available
+from PyPI. (This is what makes poetry seem slow when doing the first
+`poetry install`.) Try `poetry cache list` and `poetry cache clear --all
+<name of cache>` to see if that fixes things.
+
+## Try `--verbose` or `--dry-run` arguments.
+
+Sometimes useful to see what poetry's internal logic is.

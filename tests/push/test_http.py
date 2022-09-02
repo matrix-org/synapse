@@ -577,7 +577,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # Carry out our option-value specific test
         #
         # This push should still only contain an unread count of 1 (for 1 unread room)
-        self._check_push_attempt(6, 1)
+        self._check_push_attempt(7, 1)
 
     @override_config({"push": {"group_unread_count_by_room": False}})
     def test_push_unread_count_message_count(self) -> None:
@@ -591,7 +591,7 @@ class HTTPPusherTests(HomeserverTestCase):
         #
         # We're counting every unread message, so there should now be 3 since the
         # last read receipt
-        self._check_push_attempt(6, 3)
+        self._check_push_attempt(7, 3)
 
     def _test_push_unread_count(self) -> None:
         """
@@ -641,18 +641,18 @@ class HTTPPusherTests(HomeserverTestCase):
         response = self.helper.send(
             room_id, body="Hello there!", tok=other_access_token
         )
-        # To get an unread count, the user who is getting notified has to have a read
-        # position in the room. We'll set the read position to this event in a moment
+
         first_message_event_id = response["event_id"]
 
         expected_push_attempts = 1
-        self._check_push_attempt(expected_push_attempts, 0)
+        self._check_push_attempt(expected_push_attempts, 1)
 
         self._send_read_request(access_token, first_message_event_id, room_id)
 
-        # Unread count has not changed. Therefore, ensure that read request does not
-        # trigger a push notification.
-        self.assertEqual(len(self.push_attempts), 1)
+        # Unread count has changed. Therefore, ensure that read request triggers
+        # a push notification.
+        expected_push_attempts += 1
+        self.assertEqual(len(self.push_attempts), expected_push_attempts)
 
         # Send another message
         response2 = self.helper.send(
