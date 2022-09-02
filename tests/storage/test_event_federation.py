@@ -682,6 +682,19 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             stream_ordering += 1
 
         def populate_db(txn: LoggingTransaction):
+            # Insert the room to satisfy the foreign key constraint of
+            # `event_failed_backfill_attempts`
+            self.store.db_pool.simple_insert_txn(
+                txn,
+                "rooms",
+                {
+                    "room_id": room_id,
+                    "creator": "room_creator_user_id",
+                    "is_public": True,
+                    "room_version": "6",
+                },
+            )
+
             # Insert our server events
             for event_id in our_server_events:
                 event_dict = complete_event_dict_map[event_id]
@@ -867,6 +880,19 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         }
 
         def populate_db(txn: LoggingTransaction):
+            # Insert the room to satisfy the foreign key constraint of
+            # `event_failed_backfill_attempts`
+            self.store.db_pool.simple_insert_txn(
+                txn,
+                "rooms",
+                {
+                    "room_id": room_id,
+                    "creator": "room_creator_user_id",
+                    "is_public": True,
+                    "room_version": "6",
+                },
+            )
+
             # Insert our server events
             stream_ordering = 0
             for event_id, depth in depth_map.items():
