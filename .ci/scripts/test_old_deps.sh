@@ -10,8 +10,8 @@ export DEBIAN_FRONTEND=noninteractive
 
 set -ex
 
-apt-get update
-apt-get install -y \
+sudo apt-get update
+sudo apt-get install -y \
         python3 python3-dev python3-pip python3-venv pipx \
         libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
 
