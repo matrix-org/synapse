@@ -69,7 +69,7 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
-pip install --user poetry==1.2.0
+pipx install poetry==1.2.0
 ~/.local/bin/poetry lock
 
 echo "::group::Patched pyproject.toml"
@@ -81,4 +81,4 @@ echo "::endgroup::"
 
 ~/.local/bin/poetry install -v -E "all test"
 
-~/.local/bin/poetry run python -m twisted.trial --jobs=2 tests
+~/.local/bin/poetry run python -m twisted.trial --jobs=2 tests/
