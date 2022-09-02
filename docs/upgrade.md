@@ -89,6 +89,13 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.67.0
+
+## Minimum version of Poetry is now v1.2.0
+
+The minimum supported version of poetry is now 1.2. This should only affect
+those installing from a source checkout.
+
 # Upgrading to v1.66.0
 
 ## Delegation of email validation no longer supported
