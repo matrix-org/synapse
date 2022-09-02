@@ -132,6 +132,15 @@ jobs:
           name: Wheel
           path: ./wheelhouse/*.whl
 
+      - name: Build sdist
+        if: matrix.os == 'ubuntu' && matrix.python-version == 'cp310'
+        run: python -m build --sdist
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Sdist
+          path: dist/*.tar.gz
+
 
   # if it's a tag, create a release and attach the artifacts to it
   attach-assets:
