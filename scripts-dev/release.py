@@ -501,7 +501,7 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
 
 
 @cli.command()
-@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
 def wait_for_actions(gh_token: Optional[str]) -> None:
     _wait_for_actions(gh_token)
 
