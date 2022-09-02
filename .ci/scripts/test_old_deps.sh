@@ -10,11 +10,6 @@ export DEBIAN_FRONTEND=noninteractive
 
 set -ex
 
-sudo apt-get update
-sudo apt-get install -y \
-        python3 python3-dev python3-pip python3-venv pipx \
-        libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
-
 export LANG="C.UTF-8"
 
 # Prevent virtualenv from auto-updating pip to an incompatible version
@@ -55,7 +50,7 @@ sed -i \
 # toml file. This means we don't have to ensure compatibility between old deps and
 # dev tools.
 
-pip install --user toml
+pip install toml
 
 REMOVE_DEV_DEPENDENCIES="
 import toml
@@ -69,8 +64,8 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
-pipx install poetry==1.2.0
-~/.local/bin/poetry lock
+pip install poetry==1.2.0
+poetry lock
 
 echo "::group::Patched pyproject.toml"
 cat pyproject.toml
@@ -79,6 +74,5 @@ echo "::group::Lockfile after patch"
 cat poetry.lock
 echo "::endgroup::"
 
-~/.local/bin/poetry install -v -E "all test"
-
-~/.local/bin/poetry run python -m twisted.trial --jobs=2 tests/
+poetry install -v -E "all test"
+poetry run python -m twisted.trial --jobs=2 tests/
