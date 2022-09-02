@@ -150,16 +150,14 @@ jobs:
     # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - name: Test with old deps
-        uses: docker://ubuntu:focal # For old python and sqlite
-        # Note: focal seems to be using 3.8, but the oldest is 3.7?
-        # See https://github.com/matrix-org/synapse/issues/12343
+      - uses: matrix-org/setup-python-poetry@v1
         with:
-          workdir: /github/workspace
-          entrypoint: .ci/scripts/test_old_deps.sh
+          python-version: 3.7
+      - name: Test with old deps
+        run: .ci/scripts/test_old_deps.sh
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
