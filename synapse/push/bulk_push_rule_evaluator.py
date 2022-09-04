@@ -34,14 +34,15 @@ from synapse.api.constants import EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
+from synapse.push.push_rule_evaluator import _flatten_dict
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
 
-from .baserules import FilteredPushRules, PushRule
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 if TYPE_CHECKING:
@@ -282,9 +283,11 @@ class BulkPushRuleEvaluator:
         ) = await self._get_power_levels_and_sender_level(event, context)
 
         relations = await self._get_mutual_relations(
-            event, itertools.chain(*rules_by_user.values())
+            event, itertools.chain(*(r.rules() for r in rules_by_user.values()))
         )
 
+        logger.info("Flatten map: %s", _flatten_dict(event))
+        logger.info("room_member_count: %s", room_member_count)
         evaluator = PushRuleEvaluatorForEvent(
             event,
             room_member_count,
@@ -333,7 +336,7 @@ class BulkPushRuleEvaluator:
                 # current user, it'll be added to the dict later.
                 actions_by_user[uid] = []
 
-            for rule, enabled in rules:
+            for rule, enabled in rules.rules():
                 if not enabled:
                     continue
 
