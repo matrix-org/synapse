@@ -30,7 +30,6 @@ from typing import (
 
 from synapse.api.errors import StoreError
 from synapse.config.homeserver import ExperimentalConfig
-from synapse.push.baserules import FilteredPushRules, PushRule, compile_push_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
@@ -51,6 +50,7 @@ from synapse.storage.util.id_generators import (
     IdGenerator,
     StreamIdGenerator,
 )
+from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRules
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -72,18 +72,19 @@ def _load_rules(
     """
 
     ruleslist = [
-        PushRule(
+        PushRule.from_db(
             rule_id=rawrule["rule_id"],
             priority_class=rawrule["priority_class"],
-            conditions=db_to_json(rawrule["conditions"]),
-            actions=db_to_json(rawrule["actions"]),
+            conditions=rawrule["conditions"],
+            actions=rawrule["actions"],
         )
         for rawrule in rawrules
     ]
 
-    push_rules = compile_push_rules(ruleslist)
+    push_rules = PushRules(ruleslist)
 
-    filtered_rules = FilteredPushRules(push_rules, enabled_map, experimental_config)
+    # TODO: Experimental config
+    filtered_rules = FilteredPushRules(push_rules, enabled_map)
 
     return filtered_rules
 

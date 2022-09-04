@@ -34,15 +34,14 @@ from synapse.api.constants import EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
+from synapse.push.push_rule_evaluator import _flatten_dict
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
+from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRuleEvaluator
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
-
-from .baserules import FilteredPushRules, PushRule
-from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -160,14 +159,14 @@ class BulkPushRuleEvaluator:
 
         rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
-        logger.debug("Users in room: %s", local_users)
+        # logger.debug("Users in room: %s", local_users)
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "Returning push rules for %r %r",
-                event.room_id,
-                list(rules_by_user.keys()),
-            )
+        # if logger.isEnabledFor(logging.DEBUG):
+        #     logger.debug(
+        #         "Returning push rules for %r %r",
+        #         event.room_id,
+        #         list(rules_by_user.keys()),
+        #     )
 
         return rules_by_user
 
@@ -285,13 +284,16 @@ class BulkPushRuleEvaluator:
             event, itertools.chain(*rules_by_user.values())
         )
 
-        evaluator = PushRuleEvaluatorForEvent(
-            event,
+        logger.info("Flatten map: %s", _flatten_dict(event))
+        logger.info("room_member_count: %s", room_member_count)
+        evaluator = PushRuleEvaluator(
+            _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels,
-            relations,
-            self._relations_match_enabled,
+            # power_levels,
+            {},  # TODO
+            # relations,
+            # self._relations_match_enabled,
         )
 
         users = rules_by_user.keys()
@@ -333,17 +335,7 @@ class BulkPushRuleEvaluator:
                 # current user, it'll be added to the dict later.
                 actions_by_user[uid] = []
 
-            for rule, enabled in rules:
-                if not enabled:
-                    continue
-
-                matches = evaluator.check_conditions(rule.conditions, uid, display_name)
-                if matches:
-                    actions = [x for x in rule.actions if x != "dont_notify"]
-                    if actions and "notify" in actions:
-                        # Push rules say we should notify the user of this event
-                        actions_by_user[uid] = actions
-                    break
+            actions_by_user[uid] = evaluator.run(rules, uid, display_name)
 
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
