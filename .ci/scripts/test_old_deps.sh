@@ -53,7 +53,7 @@ sed -i \
 # toml file. This means we don't have to ensure compatibility between old deps and
 # dev tools.
 
-pip install toml
+pip install toml wheel
 
 REMOVE_DEV_DEPENDENCIES="
 import toml
@@ -90,7 +90,6 @@ echo "::endgroup::"
 poetry install -v -E "all test"
 
 source "$(poetry env info --path)/bin/activate"
-PATH="$(pwd):$PATH"
 
 echo "::group::Env details2"
 env | sort
@@ -104,4 +103,4 @@ echo "---"
 python -c "import tests; print(tests.__file__)"
 echo "::endgroup::"
 
-python -m twisted.trial tests
+python -m twisted.trial --jobs 2 "$(pwd)/tests/"
