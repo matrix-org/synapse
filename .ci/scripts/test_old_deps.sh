@@ -90,7 +90,6 @@ echo "::endgroup::"
 poetry install -v -E "all test"
 
 source "$(poetry env info --path)/bin/activate"
-pip uninstall -y tests
 
 echo "::group::Env details2"
 env | sort
@@ -99,6 +98,9 @@ poetry env info
 echo "---\n"
 ls -lh
 echo "---"
+ls -lh "$(poetry env info --path)"/lib/*/site-packages/
+echo "---"
+python -c "import tests; print(tests.__file__)"
 echo "::endgroup::"
 
 python -m twisted.trial --jobs=2 tests
