@@ -68,13 +68,3 @@ echo "::endgroup::"
 echo "::group::Lockfile after patch"
 cat poetry.lock
 echo "::endgroup::"
-
-# Log some helpful info for debugging purposes.
-echo "::group::Env details"
-env | sort
-echo "---\n"
-poetry env info
-echo "---\n"
-ls -lh
-echo "---"
-echo "::endgroup::"
