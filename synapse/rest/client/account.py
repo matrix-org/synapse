@@ -845,10 +845,7 @@ class AccountStatusRestServlet(RestServlet):
     class PostBody(RequestBodyModel):
         # TODO: we could validate that each user id is an mxid here, and/or parse it
         #       as a UserID
-        if TYPE_CHECKING:
-            user_ids: List[StrictStr]
-        else:
-            user_ids: conlist(item_type=StrictStr, min_items=1)
+        user_ids: List[StrictStr]
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self._auth.get_user_by_req(request)
