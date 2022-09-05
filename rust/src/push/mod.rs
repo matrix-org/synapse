@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
-use log::{debug, info};
 use pyo3::prelude::*;
 use pythonize::pythonize;
 use regex::Regex;
@@ -15,6 +14,7 @@ lazy_static! {
     static ref INEQUALITY_EXPR: Regex = Regex::new(r"^([=<>]*)([0-9]*)$").expect("valid regex");
 }
 
+/// Called when registering modules with python.
 pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     let child_module = PyModule::new(py, "push")?;
     child_module.add_class::<PushRule>()?;
@@ -22,6 +22,9 @@ pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     child_module.add_class::<PushRuleEvaluator>()?;
     child_module.add_class::<FilteredPushRules>()?;
     m.add_submodule(child_module)?;
+
+    // We need to manually add the module to sys.modules to make `from
+    // synapse.synapse_rust import push` work.
     py.import("sys")?
         .getattr("modules")?
         .set_item("synapse.synapse_rust.push", child_module)?;
@@ -106,6 +109,8 @@ impl IntoPy<PyObject> for Action {
 pub struct SetTweak {
     set_tweak: Cow<'static, str>,
     value: Option<TweakValue>,
+    #[serde(flatten)]
+    other_keys: Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -471,21 +476,25 @@ impl PushRuleEvaluator {
 const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
     value: None,
+    other_keys: Value::Null,
 });
 
 const HIGHLIGHT_FALSE_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
     value: Some(TweakValue::Other(Value::Bool(false))),
+    other_keys: Value::Null,
 });
 
 const SOUND_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("sound"),
     value: Some(TweakValue::String(Cow::Borrowed("default"))),
+    other_keys: Value::Null,
 });
 
 const RING_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("sound"),
     value: Some(TweakValue::String(Cow::Borrowed("ring"))),
+    other_keys: Value::Null,
 });
 
 pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
