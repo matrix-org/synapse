@@ -1,12 +1,18 @@
 [package]
-name = "synapse-rust"
+# We name the package `synapse` so that things like logging have the right
+# logging target.
+name = "synapse"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.63.0"
 
 [lib]
-name = "synapse_rust"
+name = "synapse"
 crate-type = ["cdylib"]
+
+[package.metadata.maturin]
+# This is where we tell maturin where to place the built library.
+name = "synapse.synapse_rust"
 
 [dependencies]
 pyo3 = { version = "0.16.5", features = ["extension-module", "macros"] }

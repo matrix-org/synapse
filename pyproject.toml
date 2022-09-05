@@ -52,6 +52,10 @@ include_trailing_comma = true
 combine_as_imports = true
 skip_gitignore = true
 
+[tool.maturin]
+python-source = "../synapse"
+manifest-path = "rust/Cargo.toml"
+
 [tool.poetry]
 name = "matrix-synapse"
 version = "1.66.0"
