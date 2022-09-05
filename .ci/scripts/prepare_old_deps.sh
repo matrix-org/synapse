@@ -5,15 +5,7 @@
 # - creates a venv with these old versions using poetry; and finally
 # - invokes `trial` to run the tests with old deps.
 
-# Prevent tzdata from asking for user input
-export DEBIAN_FRONTEND=noninteractive
-
 set -ex
-
-sudo apt-get update
-sudo apt-get install -y libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
-
-export LANG="C.UTF-8"
 
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1

@@ -153,7 +153,9 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - run: sudo apt-get -qq install xmlsec1 build-essential libffi-dev python-dev
+      - run: |
+          sudo apt-get -qq install build-essential libffi-dev python-dev \
+          libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
       - uses: actions/setup-python@v4
         with:
           python-version: '3.7'
