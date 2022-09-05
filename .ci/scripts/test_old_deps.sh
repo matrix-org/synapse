@@ -88,7 +88,7 @@ echo "---"
 echo "::endgroup::"
 
 poetry install -v -E "all test"
-poetry shell
+poetry env use -n
 
 echo "::group::Env details2"
 env | sort
