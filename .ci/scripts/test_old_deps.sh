@@ -81,7 +81,9 @@ echo "::endgroup::"
 echo "::group::Env details"
 env | sort
 echo "---\n"
-echo ls -lh
+poetry env info
+echo "---\n"
+ls -lh
 echo "---"
 echo "::endgroup::"
 
