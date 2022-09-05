@@ -20,7 +20,11 @@ import os
 
 IS_PR = os.environ["GITHUB_REF"].startswith("refs/pull/")
 
-sqlite_tests = [
+# First calculate the various trial jobs.
+#
+# For each type of test we only run on Py3.7 on PRs
+
+trial_sqlite_tests = [
     {
         "python-version": "3.7",
         "database": "sqlite",
@@ -29,7 +33,7 @@ sqlite_tests = [
 ]
 
 if not IS_PR:
-    sqlite_tests.extend(
+    trial_sqlite_tests.extend(
         {
             "python-version": version,
             "database": "sqlite",
@@ -39,7 +43,7 @@ if not IS_PR:
     )
 
 
-postgres_tests = [
+trial_postgres_tests = [
     {
         "python-version": "3.7",
         "database": "postgres",
@@ -49,7 +53,7 @@ postgres_tests = [
 ]
 
 if not IS_PR:
-    postgres_tests.append(
+    trial_postgres_tests.append(
         {
             "python-version": "3.10",
             "database": "postgres",
@@ -58,7 +62,7 @@ if not IS_PR:
         }
     )
 
-no_extra_tests = [
+trial_no_extra_tests = [
     {
         "python-version": "3.7",
         "database": "sqlite",
@@ -66,9 +70,59 @@ no_extra_tests = [
     }
 ]
 
-print("::group::Calculated jobs")
-print(json.dumps(sqlite_tests + postgres_tests + no_extra_tests, indent=4))
+print("::group::Calculated trial jobs")
+print(
+    json.dumps(
+        trial_sqlite_tests + trial_postgres_tests + trial_no_extra_tests, indent=4
+    )
+)
 print("::endgroup::")
 
-test_matrix = json.dumps(sqlite_tests + postgres_tests + no_extra_tests)
-print(f"::set-output name=test_matrix::{test_matrix}")
+test_matrix = json.dumps(
+    trial_sqlite_tests + trial_postgres_tests + trial_no_extra_tests
+)
+print(f"::set-output name=trial_test_matrix::{test_matrix}")
+
+
+# First calculate the various sytest jobs.
+#
+# For each type of test we only run on focal on PRs
+
+
+sytest_tests = [
+    {
+        "sytest-tag": "focal",
+    },
+    {
+        "sytest-tag": "focal",
+        "postgres": "postgres",
+    },
+    {
+        "sytest-tag": "focal",
+        "postgres": "mulit-postgres",
+        "workers": "workers",
+    },
+]
+
+if not IS_PR:
+    sytest_tests.extend(
+        [
+            {
+                "sytest-tag": "testing",
+                "postgres": "postgres",
+            },
+            {
+                "sytest-tag": "buster",
+                "postgres": "mulit-postgres",
+                "workers": "workers",
+            },
+        ]
+    )
+
+
+print("::group::Calculated sytest jobs")
+print(json.dumps(sytest_tests, indent=4))
+print("::endgroup::")
+
+test_matrix = json.dumps(sytest_tests)
+print(f"::set-output name=sytest_test_matrix::{test_matrix}")

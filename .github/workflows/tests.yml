@@ -73,7 +73,7 @@ jobs:
     steps:
       - run: "true"
 
-  trial-calculate-jobs:
+  calculate-test-jobs:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
@@ -83,15 +83,16 @@ jobs:
       - id: get-matrix
         run: .ci/scripts/calculate_trial_jobs.py
     outputs:
-      test_matrix: ${{ steps.get-matrix.outputs.test_matrix }}
+      trial_test_matrix: ${{ steps.get-matrix.outputs.trial_test_matrix }}
+      sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
 
   trial:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: trial-calculate-jobs
+    needs: calculate-test-jobs
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        job:  ${{ fromJson(needs.trial-calculate-jobs.outputs.test_matrix) }}
+        job:  ${{ fromJson(needs.calculate-test-jobs.outputs.trial_test_matrix) }}
 
     steps:
       - uses: actions/checkout@v2
@@ -192,45 +193,26 @@ jobs:
 
   sytest:
     if: ${{ !failure() && !cancelled() }}
-    needs: linting-done
+    needs: calculate-test-jobs
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:${{ matrix.sytest-tag }}
+      image: matrixdotorg/sytest-synapse:${{ matrix.job.sytest-tag }}
       volumes:
         - ${{ github.workspace }}:/src
       env:
         SYTEST_BRANCH: ${{ github.head_ref }}
-        POSTGRES: ${{ matrix.postgres && 1}}
-        MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
-        WORKERS: ${{ matrix.workers && 1 }}
-        REDIS: ${{ matrix.redis && 1 }}
-        BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+        POSTGRES: ${{ matrix.job.postgres && 1}}
+        MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') && 1}}
+        WORKERS: ${{ matrix.job.workers && 1 }}
+        REDIS: 1
+        BLACKLIST: ${{ matrix.job.workers && 'synapse-blacklist-with-workers' }}
         TOP: ${{ github.workspace }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: focal
-
-          - sytest-tag: focal
-            postgres: postgres
-
-          - sytest-tag: testing
-            postgres: postgres
-
-          - sytest-tag: focal
-            postgres: multi-postgres
-            workers: workers
-
-          - sytest-tag: buster
-            postgres: multi-postgres
-            workers: workers
-
-          - sytest-tag: buster
-            postgres: postgres
-            workers: workers
-            redis: redis
+          job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
       - uses: actions/checkout@v2
@@ -246,7 +228,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.job.*, ', ') }})
           path: |
             /logs/results.tap
             /logs/**/*.log*
