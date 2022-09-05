@@ -1,3 +1,9 @@
+//! An implementation of Matrix push rules.
+//!
+//! The `Cow<_>` type is used extensively within this module to allow creating
+//! the base rules as constants (in Rust constants can't require explicit
+//! allocation atm).
+
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -9,6 +15,8 @@ use regex::Regex;
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+mod base_rules;
 
 lazy_static! {
     static ref INEQUALITY_EXPR: Regex = Regex::new(r"^([=<>]*)([0-9]*)$").expect("valid regex");
@@ -109,6 +117,9 @@ impl IntoPy<PyObject> for Action {
 pub struct SetTweak {
     set_tweak: Cow<'static, str>,
     value: Option<TweakValue>,
+
+    // This picks saves any other fields that may have been added as clients.
+    // These get added when we convert the `Action` to a python object.
     #[serde(flatten)]
     other_keys: Value,
 }
@@ -210,12 +221,12 @@ impl PushRules {
         let mut push_rules: PushRules = Default::default();
 
         for rule in rules {
-            if let Some(o) = BASE_RULES_BY_ID.get(&*rule.rule_id) {
+            if let Some(&o) = base_rules::BASE_RULES_BY_ID.get(&*rule.rule_id) {
                 push_rules.overridden_base_rules.insert(
                     rule.rule_id.clone(),
                     PushRule {
-                        actions: o.actions.clone(),
-                        ..rule
+                        actions: rule.actions.clone(),
+                        ..o.clone()
                     },
                 );
 
@@ -229,7 +240,11 @@ impl PushRules {
                 2 => push_rules.sender.push(rule),
                 1 => push_rules.underride.push(rule),
                 _ => {
-                    todo!()
+                    // TODO
+                    panic!(
+                        "Unrecognized priority class for rule {}: {}",
+                        rule.rule_id, rule.priority_class
+                    );
                 } // TODO: log
             }
         }
@@ -244,16 +259,16 @@ impl PushRules {
 
 impl PushRules {
     pub fn iter(&self) -> impl Iterator<Item = &PushRule> {
-        BASE_PREPEND_OVERRIDE_RULES
+        base_rules::BASE_PREPEND_OVERRIDE_RULES
             .iter()
             .chain(self.override_rules.iter())
-            .chain(BASE_APPEND_OVERRIDE_RULES.iter())
+            .chain(base_rules::BASE_APPEND_OVERRIDE_RULES.iter())
             .chain(self.content.iter())
-            .chain(BASE_APPEND_CONTENT_RULES.iter())
+            .chain(base_rules::BASE_APPEND_CONTENT_RULES.iter())
             .chain(self.room.iter())
             .chain(self.sender.iter())
             .chain(self.underride.iter())
-            .chain(BASE_APPEND_UNDERRIDE_RULES.iter())
+            .chain(base_rules::BASE_APPEND_UNDERRIDE_RULES.iter())
             .map(|rule| {
                 self.overridden_base_rules
                     .get(&*rule.rule_id)
@@ -471,269 +486,6 @@ impl PushRuleEvaluator {
 
         Ok(matches)
     }
-}
-
-const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
-    set_tweak: Cow::Borrowed("highlight"),
-    value: None,
-    other_keys: Value::Null,
-});
-
-const HIGHLIGHT_FALSE_ACTION: Action = Action::SetTweak(SetTweak {
-    set_tweak: Cow::Borrowed("highlight"),
-    value: Some(TweakValue::Other(Value::Bool(false))),
-    other_keys: Value::Null,
-});
-
-const SOUND_ACTION: Action = Action::SetTweak(SetTweak {
-    set_tweak: Cow::Borrowed("sound"),
-    value: Some(TweakValue::String(Cow::Borrowed("default"))),
-    other_keys: Value::Null,
-});
-
-const RING_ACTION: Action = Action::SetTweak(SetTweak {
-    set_tweak: Cow::Borrowed("sound"),
-    value: Some(TweakValue::String(Cow::Borrowed("ring"))),
-    other_keys: Value::Null,
-});
-
-pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
-    rule_id: Cow::Borrowed("global/override/.m.rule.master"),
-    priority_class: 5,
-    conditions: Cow::Borrowed(&[]),
-    actions: Cow::Borrowed(&[Action::DontNotify]),
-    default: true,
-    default_enabled: false,
-}];
-
-pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-            key: Cow::Borrowed("content.msgtype"),
-            pattern: Some(Cow::Borrowed("m.notice")),
-            pattern_type: None,
-        })]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.invite_for_me"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("type"),
-                pattern: Some(Cow::Borrowed("m.room.member")),
-                pattern_type: None,
-            }),
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("content.membership"),
-                pattern: Some(Cow::Borrowed("invite")),
-                pattern_type: None,
-            }),
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("state_key"),
-                pattern: None,
-                pattern_type: Some(Cow::Borrowed("user_id")),
-            }),
-        ]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION, SOUND_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.member_event"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-            key: Cow::Borrowed("type"),
-            pattern: Some(Cow::Borrowed("m.room.member")),
-            pattern_type: None,
-        })]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.contains_display_name"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::ContainsDisplayName]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.roomnotif"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[
-            Condition::SenderNotificationPermission {
-                key: Cow::Borrowed("room"),
-            },
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("content.body"),
-                pattern: Some(Cow::Borrowed("@room")),
-                pattern_type: None,
-            }),
-        ]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.tombstone"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("type"),
-                pattern: Some(Cow::Borrowed("m.room.tombstone")),
-                pattern_type: None,
-            }),
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("state_key"),
-                pattern: Some(Cow::Borrowed("")),
-                pattern_type: None,
-            }),
-        ]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.reaction"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-            key: Cow::Borrowed("type"),
-            pattern: Some(Cow::Borrowed("m.reaction")),
-            pattern_type: None,
-        })]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
-        default: true,
-        default_enabled: true,
-    },
-    // TODO: org.matrix.msc3786.rule.room.server_acl
-];
-
-pub const BASE_APPEND_CONTENT_RULES: &[PushRule] = &[PushRule {
-    rule_id: Cow::Borrowed("global/override/.m.rule.contains_user_name"),
-    priority_class: 4,
-    conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-        key: Cow::Borrowed("content.body"),
-        pattern: None,
-        pattern_type: Some(Cow::Borrowed("user_localpart")),
-    })]),
-    actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
-    default: true,
-    default_enabled: true,
-}];
-
-pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.call"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-            key: Cow::Borrowed("type"),
-            pattern: Some(Cow::Borrowed("m.call.invite")),
-            pattern_type: None,
-        })]),
-        actions: Cow::Borrowed(&[Action::Notify, RING_ACTION, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.room_one_to_one"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("type"),
-                pattern: Some(Cow::Borrowed("m.room.message")),
-                pattern_type: None,
-            }),
-            Condition::RoomMemberCount {
-                is: Some(Cow::Borrowed("2")),
-            },
-        ]),
-        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.encrypted_room_one_to_one"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("type"),
-                pattern: Some(Cow::Borrowed("m.room.encrypted")),
-                pattern_type: None,
-            }),
-            Condition::RoomMemberCount {
-                is: Some(Cow::Borrowed("2")),
-            },
-        ]),
-        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    // TODO: org.matrix.msc3772.thread_reply
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.message"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-            key: Cow::Borrowed("type"),
-            pattern: Some(Cow::Borrowed("m.room.message")),
-            pattern_type: None,
-        })]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.encrypted"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[Condition::EventMatch(EventMatchCondition {
-            key: Cow::Borrowed("type"),
-            pattern: Some(Cow::Borrowed("m.room.encrypted")),
-            pattern_type: None,
-        })]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.im.vector.jitsi"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("type"),
-                pattern: Some(Cow::Borrowed("im.vector.modular.widgets")),
-                pattern_type: None,
-            }),
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("content.type"),
-                pattern: Some(Cow::Borrowed("jitsi")),
-                pattern_type: None,
-            }),
-            Condition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("state_key"),
-                pattern: Some(Cow::Borrowed("*")),
-                pattern_type: None,
-            }),
-        ]),
-        actions: Cow::Borrowed(&[HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-];
-
-lazy_static! {
-    static ref BASE_RULES_BY_ID: HashMap<&'static str, &'static PushRule> =
-        BASE_PREPEND_OVERRIDE_RULES
-            .iter()
-            .chain(BASE_APPEND_OVERRIDE_RULES.iter())
-            .chain(BASE_APPEND_CONTENT_RULES.iter())
-            .chain(BASE_APPEND_UNDERRIDE_RULES.iter())
-            .map(|rule| { (&*rule.rule_id, rule) })
-            .collect();
 }
 
 #[test]
