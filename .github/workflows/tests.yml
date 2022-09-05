@@ -73,63 +73,47 @@ jobs:
     steps:
       - run: "true"
 
-  trial:
+  trial-calculate-jobs:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - id: get-matrix
+        run: .ci/scripts/calculate_trial_jobs.py
+    outputs:
+      test_matrix: ${{ steps.get-matrix.outputs.test_matrix }}
+
+  trial:
+    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
+    needs: trial-calculate-jobs
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
-        database: ["sqlite"]
-        extras: ["all"]
-        is_pr:
-          - ${{ startsWith(github.ref, 'refs/pull/') }}
-
-        # If we're a PR then we only test min and max python.
-        exclude:
-          - is_pr: true
-            python-version: 3.8
-          - is_pr: true
-            python-version: 3.9
-
-        include:
-          # Newest Python without optional deps
-          - python-version: "3.10"
-            extras: ""
-
-          # Oldest Python with PostgreSQL
-          - python-version: "3.7"
-            database: "postgres"
-            postgres-version: "10"
-            extras: "all"
-
-          # Newest Python with newest PostgreSQL
-          - python-version: "3.10"
-            database: "postgres"
-            postgres-version: "14"
-            extras: "all"
+        job:  ${{ fromJson(needs.trial-calculate-jobs.outputs.test_matrix) }}
 
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - name: Set up PostgreSQL ${{ matrix.postgres-version }}
-        if: ${{ matrix.postgres-version }}
+      - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
+        if: ${{ matrix.job.postgres-version }}
         run: |
           docker run -d -p 5432:5432 \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
-            postgres:${{ matrix.postgres-version }}
+            postgres:${{ matrix.job.postgres-version }}
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: ${{ matrix.python-version }}
-          extras: ${{ matrix.extras }}
+          python-version: ${{ matrix.job.python-version }}
+          extras: ${{ matrix.job.extras }}
       - name: Await PostgreSQL
-        if: ${{ matrix.postgres-version }}
+        if: ${{ matrix.job.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
       - run: poetry run trial --jobs=2 tests
         env:
-          SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
+          SYNAPSE_POSTGRES: ${{ matrix.job.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
