@@ -183,14 +183,14 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
-
+          extras: ["all"]
 
       - run: poetry run pip uninstall -y bcrypt
       - run: poetry run pip install -vvv bcrypt==3.1.0
 
       - run: ls -lh /home/runner/.cache/pypoetry/virtualenvs/matrix-synapse-pswDeSvb-py3.7/lib/python3.7/site-packages/bcrypt/
 
-      - run: poetry run trial tests
+      - run: poetry run trial -j 2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
