@@ -88,4 +88,15 @@ echo "---"
 echo "::endgroup::"
 
 poetry install -v -E "all test"
-poetry run trial --jobs=2 tests
+poetry shell
+
+echo "::group::Env details2"
+env | sort
+echo "---\n"
+poetry env info
+echo "---\n"
+ls -lh
+echo "---"
+echo "::endgroup::"
+
+python -m twisted.trial --jobs=2 tests
