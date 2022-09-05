@@ -104,4 +104,4 @@ echo "---"
 python -c "import tests; print(tests.__file__)"
 echo "::endgroup::"
 
-python -m twisted.trial --jobs=2 tests
+python -m twisted.trial tests
