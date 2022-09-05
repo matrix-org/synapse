@@ -2486,7 +2486,7 @@ report_stats_endpoint: https://example.com/report-usage-stats/push
 Config settings related to the client/server API
 
 ---
-### `room_prejoin_state:`
+### `room_prejoin_state`
 
 Controls for the state that is shared with users who receive an invite
 to a room. By default, the following state event types are shared with users who
@@ -2626,7 +2626,7 @@ Example configuration:
 key_refresh_interval: 2d
 ```
 ---
-### `trusted_key_servers:`
+### `trusted_key_servers`
 
 The trusted servers to download signing keys from.
 

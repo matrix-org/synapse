@@ -5,21 +5,7 @@
 # - creates a venv with these old versions using poetry; and finally
 # - invokes `trial` to run the tests with old deps.
 
-# Prevent tzdata from asking for user input
-export DEBIAN_FRONTEND=noninteractive
-
 set -ex
-
-apt-get update
-apt-get install -y \
-        curl python3 python3-dev python3-pip python3-venv \
-        libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
-
-# Install rust for building.
-curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-source "$HOME/.cargo/env"
-
-export LANG="C.UTF-8"
 
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1
@@ -59,7 +45,7 @@ sed -i \
 # toml file. This means we don't have to ensure compatibility between old deps and
 # dev tools.
 
-pip install --user toml
+pip install toml wheel
 
 REMOVE_DEV_DEPENDENCIES="
 import toml
@@ -73,8 +59,8 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
-pip install --user poetry==1.2.0
-~/.local/bin/poetry lock
+pip install poetry==1.2.0
+poetry lock
 
 echo "::group::Patched pyproject.toml"
 cat pyproject.toml
@@ -82,7 +68,3 @@ echo "::endgroup::"
 echo "::group::Lockfile after patch"
 cat poetry.lock
 echo "::endgroup::"
-
-~/.local/bin/poetry install -v -E "all test"
-
-~/.local/bin/poetry run python -m twisted.trial --jobs=2 tests
