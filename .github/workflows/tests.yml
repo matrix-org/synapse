@@ -168,19 +168,19 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
-      # - run: poetry run trial --jobs=2 tests
-      # - name: Dump logs
-      #   # Logs are most useful when the command fails, always include them.
-      #   if: ${{ always() }}
-      #   # Note: Dumps to workflow logs instead of using actions/upload-artifact
-      #   #       This keeps logs colocated with failing jobs
-      #   #       It also ignores find's exit code; this is a best effort affair
-      #   run: >-
-      #     find _trial_temp -name '*.log'
-      #     -exec echo "::group::{}" \;
-      #     -exec cat {} \;
-      #     -exec echo "::endgroup::" \;
-      #     || true
+      - run: poetry run trial --jobs=2 tests
+      - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
