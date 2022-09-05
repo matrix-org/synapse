@@ -73,7 +73,13 @@ class EmailRequestTokenBody(ThreePidRequestTokenBody):
     _email_validator = validator("email", allow_reuse=True)(validate_email)
 
 
+if TYPE_CHECKING:
+    ISO3116_1_Alpha_2 = StrictStr
+else:
+    # Per spec: two-letter uppercase ISO-3166-1-alpha-2
+    ISO3116_1_Alpha_2 = constr(regex="[A-Z]{2}", strict=True)
+
+
 class MsisdnRequestTokenBody(ThreePidRequestTokenBody):
-    # Two-letter uppercase ISO-3166-1-alpha-2
-    country: StrictStr
+    country: ISO3116_1_Alpha_2
     phone_number: StrictStr
