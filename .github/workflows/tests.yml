@@ -160,9 +160,9 @@ jobs:
         id: cache-poetry-old-deps
         name: Cache poetry.lock
         with:
-          path:
-            - poetry.lock
-            - pyproject.toml
+          path: |
+            poetry.lock
+            pyproject.toml
           key: poetry-old-deps2-${{ hashFiles('pyproject.toml') }}
       - name: Prepare old deps
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
