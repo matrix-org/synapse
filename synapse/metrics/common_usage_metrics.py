@@ -43,8 +43,6 @@ class CommonUsageMetricsManager:
         self._store = hs.get_datastores().main
         self._clock = hs.get_clock()
 
-        self._metrics: Optional[CommonUsageMetrics] = None
-
     async def get_metrics(self) -> CommonUsageMetrics:
         """Get the CommonUsageMetrics object. If no collection has happened yet, do it
         before returning the metrics.
@@ -52,50 +50,30 @@ class CommonUsageMetricsManager:
         Returns:
             The CommonUsageMetrics object to read common metrics from.
         """
-        if self._metrics is None:
-            await self._collect()
-
-        # self._collect should always set self._metrics to a non-None value.
-        assert self._metrics is not None
-
-        return self._metrics
+        return await self._collect()
 
     async def setup(self) -> None:
-        """Reads the current values for the shared usage metrics and starts a looping
-        call to keep them updated.
-        """
-        await self.update()
+        """Keep the gauges for common usage metrics up to date."""
+        await self._update_gauges()
         self._clock.looping_call(
             run_as_background_process,
             5 * 60 * 1000,
-            desc="update_shared_usage_metrics",
-            func=self.update,
+            desc="common_usage_metrics_update_gauges",
+            func=self._update_gauges,
         )
 
-    async def update(self) -> None:
-        """Updates the shared usage metrics."""
-        await self._collect()
-        await self._update_gauges()
-
-    async def _collect(self) -> None:
+    async def _collect(self) -> CommonUsageMetrics:
         """Collect the common metrics and either create the CommonUsageMetrics object to
         use if it doesn't exist yet, or update it.
         """
         dau_count = await self._store.count_daily_users()
 
-        if self._metrics is not None:
-            self._metrics.daily_active_users = dau_count
-        else:
-            self._metrics = CommonUsageMetrics(
-                daily_active_users=dau_count,
-            )
+        return CommonUsageMetrics(
+            daily_active_users=dau_count,
+        )
 
     async def _update_gauges(self) -> None:
         """Update the Prometheus gauges."""
-        if self._metrics is None:
-            await self._collect()
+        metrics = await self._collect()
 
-        # self._collect should always set self._metrics to a non-None value.
-        assert self._metrics is not None
-
-        current_dau_gauge.set(float(self._metrics.daily_active_users))
+        current_dau_gauge.set(float(metrics.daily_active_users))

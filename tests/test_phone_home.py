@@ -78,9 +78,7 @@ class CommonMetricsTestCase(HomeserverTestCase):
         tok = self.login("user", "password")
         self.make_request("GET", "/sync", access_token=tok)
 
-        self._assert_metric_value("daily_active_users", 0)
-
-        self.reactor.advance(3000)
+        self.pump(1)
 
         self._assert_metric_value("daily_active_users", 1)
 
