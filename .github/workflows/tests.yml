@@ -153,6 +153,11 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
 
       # There aren't wheels for some of the older deps, so we need to install
       # their build dependencies
