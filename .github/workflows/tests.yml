@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - id: get-matrix
-        run: .ci/scripts/calculate_trial_jobs.py
+        run: .ci/scripts/calculate_jobs.py
     outputs:
       trial_test_matrix: ${{ steps.get-matrix.outputs.trial_test_matrix }}
       sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
