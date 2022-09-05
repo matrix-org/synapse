@@ -156,6 +156,18 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.7'
+      - name: Cache poetry deps
+        id: cache-poetry-deps
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/poetry/cache
+          key: poetry-cache
+      - name: Cache pip
+        id: cache-pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-cache
       - name: Test with old deps
         run: .ci/scripts/test_old_deps.sh
       - name: Dump logs
