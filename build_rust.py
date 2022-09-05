@@ -10,7 +10,10 @@ def build(setup_kwargs):
     cargo_toml_path = os.path.join(original_project_dir, "rust", "Cargo.toml")
 
     extension = RustExtension(
-        target="synapse.synapse_rust", path=cargo_toml_path, binding=Binding.PyO3
+        target="synapse.synapse_rust",
+        path=cargo_toml_path,
+        binding=Binding.PyO3,
+        py_limited_api=True,
     )
     setup_kwargs.setdefault("rust_extensions", []).append(extension)
     setup_kwargs["zip_safe"] = False
