@@ -5475,7 +5475,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache_total{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5490,7 +5490,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache_total{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5598,7 +5598,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache_total{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5613,7 +5613,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache_total{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5719,7 +5719,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache_total{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5734,7 +5734,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache_total{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -7246,7 +7246,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{name}} {{job}}-{{index}}",
@@ -7447,7 +7447,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_cache_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -7547,7 +7547,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "topk(10, rate(synapse_util_caches_cache_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "topk(10, rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -7853,7 +7853,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_response_cache_hits{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])/rate(synapse_util_caches_response_cache_total{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_response_cache_hits{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])/rate(synapse_util_caches_response_cache{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "{{name}} {{job}}-{{index}}",
               "refId": "A"
