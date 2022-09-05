@@ -37,7 +37,7 @@ collectors_by_name: Dict[str, "CacheMetric"] = {}
 cache_size = Gauge("synapse_util_caches_cache_size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache_hits", "", ["name"])
 cache_evicted = Gauge("synapse_util_caches_cache_evicted_size", "", ["name", "reason"])
-cache_total = Gauge("synapse_util_caches_cache_total", "", ["name"])
+cache_total = Gauge("synapse_util_caches_cache", "", ["name"])
 cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
 cache_memory_usage = Gauge(
     "synapse_util_caches_cache_size_bytes",
@@ -50,7 +50,7 @@ response_cache_hits = Gauge("synapse_util_caches_response_cache_hits", "", ["nam
 response_cache_evicted = Gauge(
     "synapse_util_caches_response_cache_evicted_size", "", ["name", "reason"]
 )
-response_cache_total = Gauge("synapse_util_caches_response_cache_total", "", ["name"])
+response_cache_total = Gauge("synapse_util_caches_response_cache", "", ["name"])
 
 
 class EvictionReason(Enum):

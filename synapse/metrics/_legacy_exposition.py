@@ -88,11 +88,11 @@ LEGACY_METRIC_NAMES = {
     "synapse_util_caches_cache_hits": "synapse_util_caches_cache:hits",
     "synapse_util_caches_cache_size": "synapse_util_caches_cache:size",
     "synapse_util_caches_cache_evicted_size": "synapse_util_caches_cache:evicted_size",
-    "synapse_util_caches_cache_total": "synapse_util_caches_cache:total",
+    "synapse_util_caches_cache": "synapse_util_caches_cache:total",
     "synapse_util_caches_response_cache_size": "synapse_util_caches_response_cache:size",
     "synapse_util_caches_response_cache_hits": "synapse_util_caches_response_cache:hits",
     "synapse_util_caches_response_cache_evicted_size": "synapse_util_caches_response_cache:evicted_size",
-    "synapse_util_caches_response_cache_total": "synapse_util_caches_response_cache:total",
+    "synapse_util_caches_response_cache": "synapse_util_caches_response_cache:total",
 }
 
 
