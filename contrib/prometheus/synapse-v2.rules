@@ -20,18 +20,18 @@ groups:
     expr: 'sum(synapse_http_server_request_count:by_method) by (servlet)'
 
   - record: 'synapse_cache:hit_ratio_5m'
-    expr: 'rate(synapse_util_caches_cache:hits[5m]) / rate(synapse_util_caches_cache:total[5m])'
+    expr: 'rate(synapse_util_caches_cache_hits[5m]) / rate(synapse_util_caches_cache[5m])'
   - record: 'synapse_cache:hit_ratio_30s'
-    expr: 'rate(synapse_util_caches_cache:hits[30s]) / rate(synapse_util_caches_cache:total[30s])'
+    expr: 'rate(synapse_util_caches_cache_hits[30s]) / rate(synapse_util_caches_cache[30s])'
 
   - record: 'synapse_federation_client_sent'
     labels:
       type: "EDU"
-    expr: 'synapse_federation_client_sent_edus + 0'
+    expr: 'synapse_federation_client_sent_edus_total + 0'
   - record: 'synapse_federation_client_sent'
     labels:
       type: "PDU"
-    expr: 'synapse_federation_client_sent_pdu_destinations:count + 0'
+    expr: 'synapse_federation_client_sent_pdu_destinations_count_total + 0'
   - record: 'synapse_federation_client_sent'
     labels:
       type: "Query"
@@ -40,11 +40,11 @@ groups:
   - record: 'synapse_federation_server_received'
     labels:
       type: "EDU"
-    expr: 'synapse_federation_server_received_edus + 0'
+    expr: 'synapse_federation_server_received_edus_total + 0'
   - record: 'synapse_federation_server_received'
     labels:
       type: "PDU"
-    expr: 'synapse_federation_server_received_pdus + 0'
+    expr: 'synapse_federation_server_received_pdus_total + 0'
   - record: 'synapse_federation_server_received'
     labels:
       type: "Query"
@@ -60,19 +60,19 @@ groups:
     expr: 'synapse_federation_transaction_queue_pending_pdus + 0'
 
   - record: synapse_storage_events_persisted_by_source_type
-    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep{origin_type="remote"})
+    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep_total{origin_type="remote"})
     labels:
       type: remote
   - record: synapse_storage_events_persisted_by_source_type
-    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep{origin_entity="*client*",origin_type="local"})
+    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep_total{origin_entity="*client*",origin_type="local"})
     labels:
       type: local
   - record: synapse_storage_events_persisted_by_source_type
-    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep{origin_entity!="*client*",origin_type="local"})
+    expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep_total{origin_entity!="*client*",origin_type="local"})
     labels:
       type: bridges
   - record: synapse_storage_events_persisted_by_event_type
-    expr: sum without(origin_entity, origin_type) (synapse_storage_events_persisted_events_sep)
+    expr: sum without(origin_entity, origin_type) (synapse_storage_events_persisted_events_sep_total)
   - record: synapse_storage_events_persisted_by_origin
-    expr: sum without(type) (synapse_storage_events_persisted_events_sep)
+    expr: sum without(type) (synapse_storage_events_persisted_events_sep_total)
 
