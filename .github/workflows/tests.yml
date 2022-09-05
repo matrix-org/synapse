@@ -185,8 +185,8 @@ jobs:
           python-version: '3.7'
 
 
-      - run: pip uninstall -y bcrypt
-      - run: pip install -vvv bcrypt==3.1.0
+      - run: poetry run pip uninstall -y bcrypt
+      - run: poetry run pip install -vvv bcrypt==3.1.0
 
       - run: ls -lh /home/runner/.cache/pypoetry/virtualenvs/matrix-synapse-pswDeSvb-py3.7/lib/python3.7/site-packages/bcrypt/
 
