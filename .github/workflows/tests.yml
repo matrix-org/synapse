@@ -173,6 +173,7 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
+      - run: ls -lh /home/runner/.cache/pypoetry/virtualenvs/matrix-synapse-pswDeSvb-py3.7/lib/python3.7/site-packages/bcrypt/
       - run: poetry run trial tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
