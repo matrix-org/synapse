@@ -93,7 +93,7 @@ async def phone_stats_home(
     #
 
     store = hs.get_datastores().main
-    shared_metrics = await hs.get_common_usage_metrics_manager().get_metrics()
+    common_metrics = await hs.get_common_usage_metrics_manager().get_metrics()
 
     stats["homeserver"] = hs.config.server.server_name
     stats["server_context"] = hs.config.server.server_context
@@ -115,7 +115,7 @@ async def phone_stats_home(
     room_count = await store.get_room_count()
     stats["total_room_count"] = room_count
 
-    stats["daily_active_users"] = shared_metrics.daily_active_users
+    stats["daily_active_users"] = common_metrics.daily_active_users
     stats["monthly_active_users"] = await store.count_monthly_users()
     daily_active_e2ee_rooms = await store.count_daily_active_e2ee_rooms()
     stats["daily_active_e2ee_rooms"] = daily_active_e2ee_rooms
