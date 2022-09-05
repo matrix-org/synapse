@@ -5,9 +5,9 @@ non-interactive way. This is generally used for bootstrapping a Synapse
 instance with administrator accounts.
 
 To authenticate yourself to the server, you will need both the shared secret
-(`registration_shared_secret` in the homeserver configuration), and a
-one-time nonce. If the registration shared secret is not configured, this API
-is not enabled.
+([`registration_shared_secret`](../configuration/config_documentation.md#registration_shared_secret)
+in the homeserver configuration), and a one-time nonce. If the registration
+shared secret is not configured, this API is not enabled.
 
 To fetch the nonce, you need to request one from the API:
 
@@ -46,7 +46,24 @@ As an example:
 The MAC is the hex digest output of the HMAC-SHA1 algorithm, with the key being
 the shared secret and the content being the nonce, user, password, either the
 string "admin" or "notadmin", and optionally the user_type
-each separated by NULs. For an example of generation in Python:
+each separated by NULs.
+
+Here is an easy way to generate the HMAC digest if you have Bash and OpenSSL:
+
+```bash
+# Update these values and then paste this code block into a bash terminal
+nonce='thisisanonce'
+username='pepper_roni'
+password='pizza'
+admin='admin'
+secret='shared_secret'
+
+printf '%s\0%s\0%s\0%s' "$nonce" "$username" "$password" "$admin" |
+  openssl sha1 -hmac "$secret" |
+  awk '{print $2}'
+```
+
+For an example of generation in Python:
 
 ```python
 import hmac, hashlib

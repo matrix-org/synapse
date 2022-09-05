@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
 from typing import Collection
 
 from parameterized import parameterized
@@ -51,7 +50,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
     )
     def test_requester_is_no_admin(self, method: str, url: str) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         self.register_user("user", "pass", admin=False)
@@ -64,7 +63,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             access_token=other_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_invalid_parameter(self) -> None:
@@ -81,7 +80,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
         # job_name invalid
@@ -92,7 +91,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
     def _register_bg_update(self) -> None:
@@ -365,4 +364,4 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)

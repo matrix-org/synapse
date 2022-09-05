@@ -2,152 +2,70 @@
 Synapse |support| |development| |documentation| |license| |pypi| |python|
 =========================================================================
 
+Synapse is an open-source `Matrix <https://matrix.org/>`_ homeserver written and
+maintained by the Matrix.org Foundation. We began rapid development in 2014,
+reaching v1.0.0 in 2019. Development on Synapse and the Matrix protocol itself continues
+in earnest today.
+
+Briefly, Matrix is an open standard for communications on the internet, supporting
+federation, encryption and VoIP. Matrix.org has more to say about the `goals of the
+Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal specification
+<https://spec.matrix.org/>`_ describes the technical details.
+
 .. contents::
 
-Introduction
-============
+Installing and configuration
+============================
 
-Matrix is an ambitious new ecosystem for open federated Instant Messaging and
-VoIP.  The basics you need to know to get up and running are:
-
-- Everything in Matrix happens in a room.  Rooms are distributed and do not
-  exist on any single server.  Rooms can be located using convenience aliases
-  like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
-
-- Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
-  you will normally refer to yourself and others using a third party identifier
-  (3PID): email address, phone number, etc rather than manipulating Matrix user IDs)
-
-The overall architecture is::
-
-      client <----> homeserver <=====================> homeserver <----> client
-             https://somewhere.org/_matrix      https://elsewhere.net/_matrix
-
-``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
-via IRC bridge at irc://irc.libera.chat/matrix.
-
-Synapse is currently in rapid development, but as of version 0.5 we believe it
-is sufficiently stable to be run as an internet-facing service for real usage!
-
-About Matrix
-============
-
-Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard,
-which handle:
-
-- Creating and managing fully distributed chat rooms with no
-  single points of control or failure
-- Eventually-consistent cryptographically secure synchronisation of room
-  state across a global open network of federated servers and services
-- Sending and receiving extensible messages in a room with (optional)
-  end-to-end encryption
-- Inviting, joining, leaving, kicking, banning room members
-- Managing user accounts (registration, login, logout)
-- Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
-  Facebook accounts to authenticate, identify and discover users on Matrix.
-- Placing 1:1 VoIP and Video calls
-
-These APIs are intended to be implemented on a wide range of servers, services
-and clients, letting developers build messaging and VoIP functionality on top
-of the entirely open Matrix ecosystem rather than using closed or proprietary
-solutions. The hope is for Matrix to act as the building blocks for a new
-generation of fully open and interoperable messaging and VoIP apps for the
-internet.
-
-Synapse is a Matrix "homeserver" implementation developed by the matrix.org core
-team, written in Python 3/Twisted.
-
-In Matrix, every user runs one or more Matrix clients, which connect through to
-a Matrix homeserver. The homeserver stores all their personal chat history and
-user account information - much as a mail client connects through to an
-IMAP/SMTP server. Just like email, you can either run your own Matrix
-homeserver and control and own your own communications and history or use one
-hosted by someone else (e.g. matrix.org) - there is no single point of control
-or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
-etc.
-
-We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/docs/projects/try-matrix-now.html), run a homeserver, take a look
-at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
-`APIs <https://matrix.org/docs/api>`_ and `Client SDKs
-<https://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
-
-Thanks for using Matrix!
-
-Support
-=======
-
-For support installing or managing Synapse, please join |room|_ (from a matrix.org
-account if necessary) and ask questions there. We do not use GitHub issues for
-support requests, only for bug reports and feature requests.
-
-Synapse's documentation is `nicely rendered on GitHub Pages <https://matrix-org.github.io/synapse>`_,
-with its source available in |docs|_.
-
-.. |room| replace:: ``#synapse:matrix.org``
-.. _room: https://matrix.to/#/#synapse:matrix.org
-
-.. |docs| replace:: ``docs``
-.. _docs: docs
-
-Synapse Installation
-====================
+The Synapse documentation describes `how to install Synapse <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_. We recommend using
+`Docker images <https://matrix-org.github.io/synapse/latest/setup/installation.html#docker-images-and-ansible-playbooks>`_ or `Debian packages from Matrix.org
+<https://matrix-org.github.io/synapse/latest/setup/installation.html#matrixorg-packages>`_.
 
 .. _federation:
 
-* For details on how to install synapse, see
-  `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
-* For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
+Synapse has a variety of `config options
+<https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html>`_
+which can be used to customise its behaviour after installation.
+There are additional details on how to `configure Synapse for federation here
+<https://matrix-org.github.io/synapse/latest/federate.html>`_.
+
+.. _reverse-proxy:
+
+Using a reverse proxy with Synapse
+----------------------------------
+
+It is recommended to put a reverse proxy such as
+`nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
+`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
+`HAProxy <https://www.haproxy.org/>`_ or
+`relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
+doing so is that it means that you can expose the default https port (443) to
+Matrix clients without needing to run Synapse with root privileges.
+For information on configuring one, see `the reverse proxy docs
+<https://matrix-org.github.io/synapse/latest/reverse_proxy.html>`_.
+
+Upgrading an existing Synapse
+-----------------------------
+
+The instructions for upgrading Synapse are in `the upgrade notes`_.
+Please check these instructions as upgrading may require extra steps for some
+versions of Synapse.
+
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 
-Connecting to Synapse from a client
-===================================
+Platform dependencies
+---------------------
 
-The easiest way to try out your new Synapse installation is by connecting to it
-from a web client.
+Synapse uses a number of platform dependencies such as Python and PostgreSQL,
+and aims to follow supported upstream versions. See the
+`deprecation policy <https://matrix-org.github.io/synapse/latest/deprecation_policy.html>`_
+for more details.
 
-Unless you are running a test instance of Synapse on your local machine, in
-general, you will need to enable TLS support before you can successfully
-connect from a client: see
-`TLS certificates <https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates>`_.
-
-An easy way to get started is to login or register via Element at
-https://app.element.io/#/login or https://app.element.io/#/register respectively.
-You will need to change the server you are logging into from ``matrix.org``
-and instead specify a Homeserver URL of ``https://<server_name>:8448``
-(or just ``https://<server_name>`` if you are using a reverse proxy).
-If you prefer to use another client, refer to our
-`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
-
-If all goes well you should at least be able to log in, create a room, and
-start sending messages.
-
-.. _`client-user-reg`:
-
-Registering a new user from a client
-------------------------------------
-
-By default, registration of new users via Matrix clients is disabled. To enable
-it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
-
-Once ``enable_registration`` is set to ``true``, it is possible to register a
-user via a Matrix client.
-
-Your new user name will be formed partly from the ``server_name``, and partly
-from a localpart you specify when you create the account. Your name will take
-the form of::
-
-    @localpart:my.domain.name
-
-(pronounced "at localpart on my dot domain dot name").
-
-As when logging in, you will need to specify a "Custom server".  Specify your
-desired ``localpart`` in the 'User name' box.
 
 Security note
-=============
+-------------
 
 Matrix serves raw, user-supplied data in some APIs -- specifically the `content
 repository endpoints`_.
@@ -187,30 +105,76 @@ Following this advice ensures that even if an XSS is found in Synapse, the
 impact to other applications will be minimal.
 
 
-Upgrading an existing Synapse
-=============================
+Testing a new installation
+==========================
 
-The instructions for upgrading synapse are in `the upgrade notes`_.
-Please check these instructions as upgrading may require extra steps for some
-versions of synapse.
+The easiest way to try out your new Synapse installation is by connecting to it
+from a web client.
 
-.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
+Unless you are running a test instance of Synapse on your local machine, in
+general, you will need to enable TLS support before you can successfully
+connect from a client: see
+`TLS certificates <https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates>`_.
 
-.. _reverse-proxy:
+An easy way to get started is to login or register via Element at
+https://app.element.io/#/login or https://app.element.io/#/register respectively.
+You will need to change the server you are logging into from ``matrix.org``
+and instead specify a Homeserver URL of ``https://<server_name>:8448``
+(or just ``https://<server_name>`` if you are using a reverse proxy).
+If you prefer to use another client, refer to our
+`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
-Using a reverse proxy with Synapse
-==================================
+If all goes well you should at least be able to log in, create a room, and
+start sending messages.
 
-It is recommended to put a reverse proxy such as
-`nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
-`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
-`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
-`HAProxy <https://www.haproxy.org/>`_ or
-`relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
-doing so is that it means that you can expose the default https port (443) to
-Matrix clients without needing to run Synapse with root privileges.
+.. _`client-user-reg`:
 
-For information on configuring one, see `<docs/reverse_proxy.md>`_.
+Registering a new user from a client
+------------------------------------
+
+By default, registration of new users via Matrix clients is disabled. To enable
+it:
+
+1. In the
+   `registration config section <https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration>`_
+   set ``enable_registration: true`` in ``homeserver.yaml``.
+2. Then **either**:
+
+   a. set up a `CAPTCHA <https://matrix-org.github.io/synapse/latest/CAPTCHA_SETUP.html>`_, or
+   b. set ``enable_registration_without_verification: true`` in ``homeserver.yaml``.
+
+We **strongly** recommend using a CAPTCHA, particularly if your homeserver is exposed to
+the public internet. Without it, anyone can freely register accounts on your homeserver.
+This can be exploited by attackers to create spambots targetting the rest of the Matrix
+federation.
+
+Your new user name will be formed partly from the ``server_name``, and partly
+from a localpart you specify when you create the account. Your name will take
+the form of::
+
+    @localpart:my.domain.name
+
+(pronounced "at localpart on my dot domain dot name").
+
+As when logging in, you will need to specify a "Custom server".  Specify your
+desired ``localpart`` in the 'User name' box.
+
+Troubleshooting and support
+===========================
+
+The `Admin FAQ <https://matrix-org.github.io/synapse/latest/usage/administration/admin_faq.html>`_
+includes tips on dealing with some common problems. For more details, see
+`Synapse's wider documentation <https://matrix-org.github.io/synapse/latest/>`_.
+
+For additional support installing or managing Synapse, please ask in the community
+support room |room|_ (from a matrix.org account if necessary). We do not use GitHub
+issues for support requests, only for bug reports and feature requests.
+
+.. |room| replace:: ``#synapse:matrix.org``
+.. _room: https://matrix.to/#/#synapse:matrix.org
+
+.. |docs| replace:: ``docs``
+.. _docs: docs
 
 Identity Servers
 ================
@@ -242,34 +206,15 @@ an email address with your account, or send an invite to another user via their
 email address.
 
 
-Password reset
-==============
+Development
+===========
 
-Users can reset their password through their client. Alternatively, a server admin
-can reset a users password using the `admin API <docs/admin_api/user_admin_api.md#reset-password>`_
-or by directly editing the database as shown below.
-
-First calculate the hash of the new password::
-
-    $ ~/synapse/env/bin/hash_password
-    Password:
-    Confirm password:
-    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-Then update the ``users`` table in the database::
-
-    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-        WHERE name='@test:test.com';
-
-
-Synapse Development
-===================
-
+We welcome contributions to Synapse from the community!
 The best place to get started is our
 `guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_.
 This is part of our larger `documentation <https://matrix-org.github.io/synapse/latest>`_, which includes
-information for synapse developers as well as synapse administrators.
 
+information for Synapse developers as well as Synapse administrators.
 Developers might be particularly interested in:
 
 * `Synapse's database schema <https://matrix-org.github.io/synapse/latest/development/database_schema.html>`_,
@@ -279,187 +224,6 @@ Developers might be particularly interested in:
 Alongside all that, join our developer community on Matrix:
 `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_, featuring real humans!
 
-
-Quick start
------------
-
-Before setting up a development environment for synapse, make sure you have the
-system dependencies (such as the python header files) installed - see
-`Platform-specific prerequisites <https://matrix-org.github.io/synapse/latest/setup/installation.html#platform-specific-prerequisites>`_.
-
-To check out a synapse for development, clone the git repo into a working
-directory of your choice::
-
-    git clone https://github.com/matrix-org/synapse.git
-    cd synapse
-
-Synapse has a number of external dependencies. We maintain a fixed development
-environment using `Poetry <https://python-poetry.org/>`_. First, install poetry. We recommend::
-
-    pip install --user pipx
-    pipx install poetry
-
-as described `here <https://python-poetry.org/docs/#installing-with-pipx>`_.
-(See `poetry's installation docs <https://python-poetry.org/docs/#installation>`_
-for other installation methods.) Then ask poetry to create a virtual environment
-from the project and install Synapse's dependencies::
-
-    poetry install --extras "all test"
-
-This will run a process of downloading and installing all the needed
-dependencies into a virtual env.
-
-We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`::
-
-    poetry run ./demo/start.sh
-
-(to stop, you can use ``poetry run ./demo/stop.sh``)
-
-See the `demo documentation <https://matrix-org.github.io/synapse/develop/development/demo.html>`_
-for more information.
-
-If you just want to start a single instance of the app and run it directly::
-
-    # Create the homeserver.yaml config once
-    poetry run synapse_homeserver \
-      --server-name my.domain.name \
-      --config-path homeserver.yaml \
-      --generate-config \
-      --report-stats=[yes|no]
-
-    # Start the app
-    poetry run synapse_homeserver --config-path homeserver.yaml
-
-
-Running the unit tests
-----------------------
-
-After getting up and running, you may wish to run Synapse's unit tests to
-check that everything is installed correctly::
-
-    poetry run trial tests
-
-This should end with a 'PASSED' result (note that exact numbers will
-differ)::
-
-    Ran 1337 tests in 716.064s
-
-    PASSED (skips=15, successes=1322)
-
-For more tips on running the unit tests, like running a specific test or
-to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
-
-
-Running the Integration Tests
------------------------------
-
-Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
-a Matrix homeserver integration testing suite, which uses HTTP requests to
-access the API as a Matrix client would. It is able to run Synapse directly from
-the source tree, so installation of the server is not required.
-
-Testing with SyTest is recommended for verifying that changes related to the
-Client-Server API are functioning correctly. See the `SyTest installation
-instructions <https://github.com/matrix-org/sytest#installing>`_ for details.
-
-
-Platform dependencies
-=====================
-
-Synapse uses a number of platform dependencies such as Python and PostgreSQL,
-and aims to follow supported upstream versions. See the
-`<docs/deprecation_policy.md>`_ document for more details.
-
-
-Troubleshooting
-===============
-
-Need help? Join our community support room on Matrix:
-`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_
-
-Running out of File Handles
----------------------------
-
-If synapse runs out of file handles, it typically fails badly - live-locking
-at 100% CPU, and/or failing to accept new TCP connections (blocking the
-connecting client).  Matrix currently can legitimately use a lot of file handles,
-thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
-servers.  The first time a server talks in a room it will try to connect
-simultaneously to all participating servers, which could exhaust the available
-file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
-to respond. (We need to improve the routing algorithm used to be better than
-full mesh, but as of March 2019 this hasn't happened yet).
-
-If you hit this failure mode, we recommend increasing the maximum number of
-open file handles to be at least 4096 (assuming a default of 1024 or 256).
-This is typically done by editing ``/etc/security/limits.conf``
-
-Separately, Synapse may leak file handles if inbound HTTP requests get stuck
-during processing - e.g. blocked behind a lock or talking to a remote server etc.
-This is best diagnosed by matching up the 'Received request' and 'Processed request'
-log lines and looking for any 'Processed request' lines which take more than
-a few seconds to execute. Please let us know at #synapse:matrix.org if
-you see this failure mode so we can help debug it, however.
-
-Help!! Synapse is slow and eats all my RAM/CPU!
------------------------------------------------
-
-First, ensure you are running the latest version of Synapse, using Python 3
-with a PostgreSQL database.
-
-Synapse's architecture is quite RAM hungry currently - we deliberately
-cache a lot of recent room data and metadata in RAM in order to speed up
-common requests. We'll improve this in the future, but for now the easiest
-way to either reduce the RAM usage (at the risk of slowing things down)
-is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
-variable. The default is 0.5, which can be decreased to reduce RAM usage
-in memory constrained enviroments, or increased if performance starts to
-degrade.
-
-However, degraded performance due to a low cache factor, common on
-machines with slow disks, often leads to explosions in memory use due
-backlogged requests. In this case, reducing the cache factor will make
-things worse. Instead, try increasing it drastically. 2.0 is a good
-starting value.
-
-Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
-improvement in overall memory use, and especially in terms of giving back
-RAM to the OS. To use it, the library must simply be put in the
-LD_PRELOAD environment variable when launching Synapse. On Debian, this
-can be done by installing the ``libjemalloc1`` package and adding this
-line to ``/etc/default/matrix-synapse``::
-
-    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
-
-This can make a significant difference on Python 2.7 - it's unclear how
-much of an improvement it provides on Python 3.x.
-
-If you're encountering high CPU use by the Synapse process itself, you
-may be affected by a bug with presence tracking that leads to a
-massive excess of outgoing federation requests (see `discussion
-<https://github.com/matrix-org/synapse/issues/3971>`_). If metrics
-indicate that your server is also issuing far more outgoing federation
-requests than can be accounted for by your users' activity, this is a
-likely cause. The misbehavior can be worked around by setting
-the following in the Synapse config file:
-
-.. code-block:: yaml
-
-   presence:
-       enabled: false
-
-People can't accept room invitations from me
---------------------------------------------
-
-The typical failure mode here is that you send an invitation to someone
-to join a room or direct chat, but when they go to accept it, they get an
-error (typically along the lines of "Invalid signature"). They might see
-something like the following in their logs::
-
-    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
-
-This is normally caused by a misconfiguration in your reverse-proxy. See
-`<docs/reverse_proxy.md>`_ and double-check that your settings are correct.
 
 .. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
   :alt: (get support on #synapse:matrix.org)

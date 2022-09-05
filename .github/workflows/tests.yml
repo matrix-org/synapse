@@ -53,10 +53,22 @@ jobs:
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
+  lint-pydantic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          extras: "all"
+      - run: poetry run scripts-dev/check_pydantic_models.py
+
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig, check-schema-delta]
+    needs: [lint, lint-crlf, lint-newsfile, lint-pydantic, check-sampleconfig, check-schema-delta]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -70,6 +82,16 @@ jobs:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
         extras: ["all"]
+        is_pr:
+          - ${{ startsWith(github.ref, 'refs/pull/') }}
+
+        # If we're a PR then we only test min and max python.
+        exclude:
+          - is_pr: true
+            python-version: 3.8
+          - is_pr: true
+            python-version: 3.9
+
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
@@ -271,7 +293,6 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
 
@@ -342,7 +363,7 @@ jobs:
 
       - run: |
           set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
         name: Run Complement Tests
 
