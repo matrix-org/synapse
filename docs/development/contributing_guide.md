@@ -117,6 +117,11 @@ Some documentation also exists in [Synapse's GitHub
 Wiki](https://github.com/matrix-org/synapse/wiki), although this is primarily
 contributed to by community authors.
 
+When changes are made to any Rust code then you must call either `poetry install`
+(or `maturin develop` if installed) to rebuild the Rust code. Using [`maturin`](https://github.com/PyO3/maturin)
+is quicker than `poetry install`, so is recommended when making frequent
+changes to the Rust code.
+
 
 # 8. Test, test, test!
 <a name="test-test-test"></a>
