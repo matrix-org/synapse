@@ -178,13 +178,15 @@ jobs:
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
         run: .ci/scripts/prepare_old_deps.sh
 
-      - run: pip install -vvv bcrypt==3.1.0
-
       # We only now install poetry so that `setup-python-poetry` caches the
       # right poetry.lock's dependencies.
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
+
+
+      - run: pip uninstall -y bcrypt
+      - run: pip install -vvv bcrypt==3.1.0
 
       - run: ls -lh /home/runner/.cache/pypoetry/virtualenvs/matrix-synapse-pswDeSvb-py3.7/lib/python3.7/site-packages/bcrypt/
 
