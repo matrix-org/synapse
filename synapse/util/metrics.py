@@ -222,7 +222,7 @@ class DynamicCollectorRegistry(CollectorRegistry):
         super().__init__()
         self._pre_update_hooks: List[Callable[[], None]] = []
 
-    def collect(self) -> Generator[Metric]:
+    def collect(self) -> Generator[Metric, None, None]:
         """
         Collects metrics, calling pre-update hooks first.
         """
