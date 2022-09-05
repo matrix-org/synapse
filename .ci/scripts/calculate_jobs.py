@@ -99,7 +99,7 @@ sytest_tests = [
     },
     {
         "sytest-tag": "focal",
-        "postgres": "mulit-postgres",
+        "postgres": "multi-postgres",
         "workers": "workers",
     },
 ]
@@ -113,7 +113,7 @@ if not IS_PR:
             },
             {
                 "sytest-tag": "buster",
-                "postgres": "mulit-postgres",
+                "postgres": "multi-postgres",
                 "workers": "workers",
             },
         ]
