@@ -77,5 +77,13 @@ echo "::group::Lockfile after patch"
 cat poetry.lock
 echo "::endgroup::"
 
+# Log some helpful info for debugging purposes.
+echo "::group::Env details"
+env | sort
+echo "---\n"
+echo ls -lh
+echo "---"
+echo "::endgroup::"
+
 poetry install -v -E "all test"
 poetry run trial --jobs=2 tests
