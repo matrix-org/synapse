@@ -183,7 +183,7 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
-          extras: "all"
+          extras: "all test"
 
       - run: poetry run pip uninstall -y bcrypt
       - run: poetry run pip install -vvv bcrypt==3.1.0
