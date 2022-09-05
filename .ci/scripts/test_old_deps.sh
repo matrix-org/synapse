@@ -90,6 +90,7 @@ echo "::endgroup::"
 poetry install -v -E "all test"
 
 source "$(poetry env info --path)/bin/activate"
+pip uninstall -y tests
 
 echo "::group::Env details2"
 env | sort
