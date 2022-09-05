@@ -211,8 +211,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
+        job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
       - uses: actions/checkout@v2
