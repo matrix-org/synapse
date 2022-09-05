@@ -34,8 +34,6 @@ from prometheus_client.core import Sample
 from twisted.web.resource import Resource
 from twisted.web.server import Request
 
-from synapse.util import caches
-
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
@@ -101,11 +99,6 @@ def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> byt
     Generate metrics in legacy format. Modern metrics are generated directly
     by prometheus-client.
     """
-
-    # Trigger the cache metrics to be rescraped, which updates the common
-    # metrics but do not produce metrics themselves
-    for collector in caches.collectors_by_name.values():
-        collector.collect()
 
     output = []
 
