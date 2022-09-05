@@ -156,24 +156,31 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.7'
+      - uses: actions/cache@v3
+        id: cache-poetry-old-deps
+        name: Cache poetry.lock
+        with:
+          path: poetry.lock
+          key: poetry-old-deps-${{ hashFiles('pyproject.toml') }}
       - name: Prepare old deps
+        if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
         run: .ci/scripts/prepare_old_deps.sh
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
-      - run: poetry run trial --jobs=2 tests
-      - name: Dump logs
-        # Logs are most useful when the command fails, always include them.
-        if: ${{ always() }}
-        # Note: Dumps to workflow logs instead of using actions/upload-artifact
-        #       This keeps logs colocated with failing jobs
-        #       It also ignores find's exit code; this is a best effort affair
-        run: >-
-          find _trial_temp -name '*.log'
-          -exec echo "::group::{}" \;
-          -exec cat {} \;
-          -exec echo "::endgroup::" \;
-          || true
+      # - run: poetry run trial --jobs=2 tests
+      # - name: Dump logs
+      #   # Logs are most useful when the command fails, always include them.
+      #   if: ${{ always() }}
+      #   # Note: Dumps to workflow logs instead of using actions/upload-artifact
+      #   #       This keeps logs colocated with failing jobs
+      #   #       It also ignores find's exit code; this is a best effort affair
+      #   run: >-
+      #     find _trial_temp -name '*.log'
+      #     -exec echo "::group::{}" \;
+      #     -exec cat {} \;
+      #     -exec echo "::endgroup::" \;
+      #     || true
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
