@@ -165,7 +165,9 @@ jobs:
           python-version: '3.7'
 
       # Calculating the old-deps actually takes a bunch of time, so we cache the
-      # pyproject.toml / poetry.lock.
+      # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
+      # otherwise the `poetry install` step will error due to the poetry.lock
+      # file being outdated.
       - uses: actions/cache@v3
         id: cache-poetry-old-deps
         name: Cache poetry.lock
