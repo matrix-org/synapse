@@ -111,6 +111,15 @@ and remove the TCP `replication` listener from config of the master and
 The minimum supported version of poetry is now 1.2. This should only affect
 those installing from a source checkout.
 
+## Rust requirement in the next release
+
+From the next major release (v1.68.0) installing Synapse from a source checkout
+will require a recent Rust compiler. Those using packages or
+`pip install matrix-synapse` will not be affected.
+
+The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
+
+
 # Upgrading to v1.66.0
 
 ## Delegation of email validation no longer supported

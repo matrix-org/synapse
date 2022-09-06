@@ -1,6 +1,19 @@
 Synapse 1.67.0rc1 (2022-09-06)
 ==============================
 
+This release removes using the deprecated direct TCP replication configuration
+for workers. Server admins should use Redis instead. See the [upgrade
+notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v1670).
+
+The minimum version of `poetry` supported for managing source checkouts is now
+1.2.0.
+
+Notice: from the next major release (v1.68.0) installing Synapse from a source
+checkout will require a recent Rust compiler. Those using packages or
+`pip install matrix-synapse` will not be affected. See the [upgrade
+notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v1670).
+
+
 Features
 --------
 
