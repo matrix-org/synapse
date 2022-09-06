@@ -1618,6 +1618,18 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1670"><a class="header" href="#upgrading-to-v1670">Upgrading to v1.67.0</a></h1>
+<h2 id="direct-tcp-replication-is-no-longer-supported-migrate-to-redis"><a class="header" href="#direct-tcp-replication-is-no-longer-supported-migrate-to-redis">Direct TCP replication is no longer supported: migrate to Redis</a></h2>
+<p>Redis support was added in v1.13.0 with it becoming the recommended method in
+v1.18.0. It replaced the old direct TCP connections (which was deprecated as of
+v1.18.0) to the main process. With Redis, rather than all the workers connecting
+to the main process, all the workers and the main process connect to Redis,
+which relays replication commands between processes. This can give a significant
+CPU saving on the main process and is a prerequisite for upcoming
+performance improvements.</p>
+<p>To migrate to Redis add the <a href="./workers.html#shared-configuration"><code>redis</code> config</a>,
+and remove the TCP <code>replication</code> listener from config of the master and
+<code>worker_replication_port</code> from worker config. Note that a HTTP listener with a
+<code>replication</code> resource is still required.</p>
 <h2 id="minimum-version-of-poetry-is-now-v120"><a class="header" href="#minimum-version-of-poetry-is-now-v120">Minimum version of Poetry is now v1.2.0</a></h2>
 <p>The minimum supported version of poetry is now 1.2. This should only affect
 those installing from a source checkout.</p>
@@ -3504,9 +3516,6 @@ configuration.</p>
 </li>
 <li>
 <p><code>metrics</code>: (see the docs <a href="usage/configuration/../../metrics-howto.html">here</a>),</p>
-</li>
-<li>
-<p><code>replication</code>: (deprecated as of Synapse 1.18, see the docs <a href="usage/configuration/../../workers.html">here</a>).</p>
 </li>
 </ul>
 </li>
@@ -9683,13 +9692,8 @@ sync with the database state.</p>
 stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
 for a reply ─ such as sending an event.</p>
-<p>Redis support was added in v1.13.0 with it becoming the recommended method in
-v1.18.0. It replaced the old direct TCP connections (which is deprecated as of
-v1.18.0) to the main process. With Redis, rather than all the workers connecting
-to the main process, all the workers and the main process connect to Redis,
-which relays replication commands between processes. This can give a significant
-cpu saving on the main process and will be a prerequisite for upcoming
-performance improvements.</p>
+<p>All the workers and the main process connect to Redis, which relays replication
+commands between processes.</p>
 <p>If Redis support is enabled Synapse will use it as a shared cache, as well as a
 pub/sub mechanism.</p>
 <p>See the <a href="workers.html#architectural-diagram">Architectural diagram</a> section at the end for
@@ -9946,8 +9950,7 @@ of events, then a dedicated set of workers can be provisioned to limit the
 effects of bursts of events from that bridge on events sent by normal users.</p>
 <h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
 <p>Additionally, the writing of specific streams (such as events) can be moved off
-of the main process to a particular worker.
-(This is only supported with Redis-based replication.)</p>
+of the main process to a particular worker.</p>
 <p>To enable this, the worker must have a HTTP replication listener configured,
 have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
 can handle multiple streams, but unless otherwise documented, each stream can only
@@ -10160,14 +10163,9 @@ equivalent to <code>synapse.app.generic_worker</code>:</p>
 <li><code>synapse.app.synchrotron</code></li>
 </ul>
 <h2 id="migration-from-old-config"><a class="header" href="#migration-from-old-config">Migration from old config</a></h2>
-<p>There are two main independent changes that have been made: introducing Redis
-support and merging apps into <code>synapse.app.generic_worker</code>. Both these changes
-are backwards compatible and so no changes to the config are required, however
-server admins are encouraged to plan to migrate to Redis as the old style direct
-TCP replication config is deprecated.</p>
-<p>To migrate to Redis add the <code>redis</code> config as above, and optionally remove the
-TCP <code>replication</code> listener from master and <code>worker_replication_port</code> from worker
-config.</p>
+<p>A main change that has occurred is the merging of worker apps into
+<code>synapse.app.generic_worker</code>. This change is backwards compatible and so no
+changes to the config are required.</p>
 <p>To migrate apps to use <code>synapse.app.generic_worker</code> simply update the
 <code>worker_app</code> option in the worker configs, and where worker are started (e.g.
 in systemd service files, but not required for synctl).</p>
