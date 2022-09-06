@@ -1,1 +1,0 @@
-Add forgotten status to Room Details API.

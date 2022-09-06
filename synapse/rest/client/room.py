@@ -17,6 +17,7 @@
 import logging
 import re
 from enum import Enum
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
 
@@ -37,7 +38,7 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
-from synapse.http.server import HttpServer, cancellable
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -57,6 +58,7 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
+from synapse.util.cancellation import cancellable
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
 if TYPE_CHECKING:
@@ -116,9 +118,13 @@ messsages_response_timer = Histogram(
         2.5,
         5.0,
         10.0,
+        20.0,
         30.0,
         60.0,
+        80.0,
+        100.0,
         120.0,
+        150.0,
         180.0,
         "+Inf",
     ),
@@ -674,7 +680,7 @@ class RoomMessageListRestServlet(RestServlet):
         room_member_count = await make_deferred_yieldable(room_member_count_deferred)
         messsages_response_timer.labels(
             room_size=_RoomSize.from_member_count(room_member_count)
-        ).observe((processing_start_time - processing_end_time) / 1000)
+        ).observe((processing_end_time - processing_start_time) / 1000)
 
         return 200, msgs
 
@@ -942,7 +948,16 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if membership_action == "invite" and self._has_3pid_invite_keys(content):
+        if membership_action == "invite" and all(
+            key in content for key in ("medium", "address")
+        ):
+            if not all(key in content for key in ("id_server", "id_access_token")):
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "`id_server` and `id_access_token` are required when doing 3pid invite",
+                    Codes.MISSING_PARAM,
+                )
+
             try:
                 await self.room_member_handler.do_3pid_invite(
                     room_id,
@@ -952,7 +967,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                     content["id_server"],
                     requester,
                     txn_id,
-                    content.get("id_access_token"),
+                    content["id_access_token"],
                 )
             except ShadowBanError:
                 # Pretend the request succeeded.
@@ -988,12 +1003,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             return_value["room_id"] = room_id
 
         return 200, return_value
-
-    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
-        for key in {"id_server", "medium", "address"}:
-            if key not in content:
-                return False
-        return True
 
     def on_PUT(
         self, request: SynapseRequest, room_id: str, membership_action: str, txn_id: str

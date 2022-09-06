@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.13 where the [List Rooms admin API](https://matrix-org.github.io/synapse/develop/admin_api/rooms.html#list-room-api) would return integers instead of booleans for the `federatable` and `public` fields when using a Sqlite database.
