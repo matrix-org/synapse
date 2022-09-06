@@ -191,7 +191,7 @@ If you need to build the image from a Synapse checkout, use the following `docke
  build` command from the repo's root:
 
 ```
-docker build -t matrixdotorg/synapse -f docker/Dockerfile .
+DOCKER_BUILDKIT=1 docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 ```
 
 You can choose to build a different docker image by changing the value of the `-f` flag to
