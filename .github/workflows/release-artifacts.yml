@@ -132,7 +132,7 @@ jobs:
   build-sdist:
     name: Build sdist
     runs-on: ubuntu-latest
-    # if: ${{ !startsWith(github.ref, 'refs/pull/') }}
+    if: ${{ !startsWith(github.ref, 'refs/pull/') }}
 
     steps:
       - uses: actions/checkout@v3
