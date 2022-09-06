@@ -19,9 +19,9 @@ documented at [https://endoflife.date/python](https://endoflife.date/python) and
 
 
 A Rust compiler is required to build Synapse from source. For any given release
-the minimum required version may be bumped up to the latest released Rust
-version, and so people building from source must be able to fetch the latest
-version of Rust (e.g. by using [rustup](https://rustup.rs/)).
+the minimum required version may be bumped up to a recent Rust version, and so
+people building from source should ensure they can fetch recent versions of Rust
+(e.g. by using [rustup](https://rustup.rs/)).
 
 
 Context
@@ -40,6 +40,6 @@ to constantly update their platform dependencies to the latest versions.
 
 For Rust, the situation is a bit different given that a) the Rust foundation
 does not generally support older Rust versions, and b) the library ecosystem
-generally bump their minimum support Rust versions frequently. In general,
-Synapse will unlikely ever require the absolute latest Rust version, but
+generally bump their minimum support Rust versions frequently. In general, the
+Synapse team will try to avoid updating Rust to the absolute latest version, but
 introducing a formal policy is hard given the constraints of the ecosystem.
