@@ -48,7 +48,7 @@ struct LruCacheNodeInner {
     per_cache_list: Arc<Mutex<LinkedList<LruCacheNodeAdapterPerCache>>>,
     cache: Mutex<Option<PyObject>>,
     key: PyObject,
-    value: PyObject,
+    value: Arc<Mutex<PyObject>>,
     callbacks: Py<PySet>,
     memory: usize,
 }
@@ -73,7 +73,7 @@ impl LruCacheNode {
             per_cache_list: cache_list.0,
             cache: Mutex::new(Some(cache)),
             key,
-            value,
+            value: Arc::new(Mutex::new(value)),
             callbacks,
             memory,
         });
@@ -91,35 +91,34 @@ impl LruCacheNode {
         LruCacheNode(node)
     }
 
-    fn add_callbacks(&self, py: Python<'_>, callbacks: Py<PySet>) -> PyResult<()> {
-        let new_callbacks = callbacks.as_ref(py);
+    fn add_callbacks(&self, py: Python<'_>, new_callbacks: &PyAny) -> PyResult<()> {
+        if new_callbacks.len()? == 0 {
+            return Ok(());
+        }
+
         let current_callbacks = self.0.callbacks.as_ref(py);
 
-        for cb in new_callbacks {
-            current_callbacks.add(cb)?;
+        for cb in new_callbacks.iter()? {
+            current_callbacks.add(cb?)?;
         }
 
         Ok(())
     }
 
     fn run_and_clear_callbacks(&self, py: Python<'_>) {
-        let current_callbacks = self.0.callbacks.as_ref(py);
+        let callbacks = self.0.callbacks.as_ref(py);
 
-        if current_callbacks.len() == 0 {
+        if callbacks.is_empty() {
             return;
         }
 
-        // Swap out the stored callbacks with an empty list
-        let callbacks = std::mem::replace(&mut *callback_guard, Vec::new());
-
-        // Drop the lock
-        std::mem::drop(callback_guard);
-
         for callback in callbacks {
-            if let Err(err) = callback.call0(py) {
+            if let Err(err) = callback.call0() {
                 error!("LruCacheNode callback errored: {err}");
             }
         }
+
+        callbacks.clear();
     }
 
     fn drop_from_cache(&self) -> PyResult<()> {
@@ -195,8 +194,13 @@ impl LruCacheNode {
     }
 
     #[getter]
-    fn value(&self) -> &PyObject {
-        &self.0.value
+    fn value(&self) -> PyObject {
+        self.0.value.lock().expect("poisoned").clone()
+    }
+
+    #[setter]
+    fn set_value(&self, value: PyObject) {
+        *self.0.value.lock().expect("poisoned") = value
     }
 
     #[getter]

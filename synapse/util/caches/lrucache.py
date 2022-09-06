@@ -44,6 +44,7 @@ from twisted.internet.interfaces import IReactorTime
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import get_jemalloc_stats
+from synapse.synapse_rust.lru_cache import LruCacheNode, PerCacheLinkedList
 from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, EvictionReason, register_cache
 from synapse.util.caches.treecache import (
@@ -456,25 +457,21 @@ class LruCache(Generic[KT, VT]):
 
         list_root = ListNode[_Node[KT, VT]].create_root_node()
 
+        rust_linked_list = PerCacheLinkedList()
+
         lock = threading.Lock()
 
         def evict() -> None:
             while cache_len() > self.max_size:
                 # Get the last node in the list (i.e. the oldest node).
-                todelete = list_root.prev_node
+                todelete = rust_linked_list.get_back()
 
                 # The list root should always have a valid `prev_node` if the
                 # cache is not empty.
                 assert todelete is not None
 
-                # The node should always have a reference to a cache entry, as
-                # we only drop the cache entry when we remove the node from the
-                # list.
-                node = todelete.get_cache_entry()
-                assert node is not None
-
-                evicted_len = delete_node(node)
-                cache.pop(node.key, None)
+                evicted_len = delete_node(todelete)
+                cache.pop(todelete.key, None)
                 if metrics:
                     metrics.inc_evictions(EvictionReason.size, evicted_len)
 
@@ -502,14 +499,13 @@ class LruCache(Generic[KT, VT]):
         def add_node(
             key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
         ) -> None:
-            node: _Node[KT, VT] = _Node(
-                list_root,
+            node: _Node[KT, VT] = LruCacheNode(
+                self,
+                rust_linked_list,
                 key,
                 value,
-                weak_ref_to_self,
-                real_clock,
-                callbacks,
-                prune_unread_entries,
+                set(callbacks),
+                0,
             )
             cache[key] = node
 
@@ -520,7 +516,7 @@ class LruCache(Generic[KT, VT]):
                 metrics.inc_memory_usage(node.memory)
 
         def move_node_to_front(node: _Node[KT, VT]) -> None:
-            node.move_to_front(real_clock, list_root)
+            node.move_to_front()
 
         def delete_node(node: _Node[KT, VT]) -> int:
             node.drop_from_lists()

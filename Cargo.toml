@@ -3,3 +3,7 @@
 
 [workspace]
 members = ["rust"]
+
+
+[profile.release]
+debug = true
