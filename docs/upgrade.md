@@ -106,6 +106,11 @@ and remove the TCP `replication` listener from config of the master and
 `worker_replication_port` from worker config. Note that a HTTP listener with a
 `replication` resource is still required.
 
+## Minimum version of Poetry is now v1.2.0
+
+The minimum supported version of poetry is now 1.2. This should only affect
+those installing from a source checkout.
+
 # Upgrading to v1.66.0
 
 ## Delegation of email validation no longer supported

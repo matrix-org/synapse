@@ -140,13 +140,13 @@ USER_FILTER_SCHEMA = {
 
 
 @FormatChecker.cls_checks("matrix_room_id")
-def matrix_room_id_validator(room_id_str: str) -> RoomID:
-    return RoomID.from_string(room_id_str)
+def matrix_room_id_validator(room_id_str: str) -> bool:
+    return RoomID.is_valid(room_id_str)
 
 
 @FormatChecker.cls_checks("matrix_user_id")
-def matrix_user_id_validator(user_id_str: str) -> UserID:
-    return UserID.from_string(user_id_str)
+def matrix_user_id_validator(user_id_str: str) -> bool:
+    return UserID.is_valid(user_id_str)
 
 
 class Filtering:
