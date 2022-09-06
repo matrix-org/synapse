@@ -135,16 +135,47 @@ jobs:
     # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - name: Test with old deps
-        uses: docker://ubuntu:focal # For old python and sqlite
-        # Note: focal seems to be using 3.8, but the oldest is 3.7?
-        # See https://github.com/matrix-org/synapse/issues/12343
+
+      # There aren't wheels for some of the older deps, so we need to install
+      # their build dependencies
+      - run: |
+          sudo apt-get -qq install build-essential libffi-dev python-dev \
+          libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
+
+      - uses: actions/setup-python@v4
         with:
-          workdir: /github/workspace
-          entrypoint: .ci/scripts/test_old_deps.sh
+          python-version: '3.7'
+
+      # Calculating the old-deps actually takes a bunch of time, so we cache the
+      # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
+      # otherwise the `poetry install` step will error due to the poetry.lock
+      # file being outdated.
+      #
+      # This caches the output of `Prepare old deps`, which should generate the
+      # same `pyproject.toml` and `poetry.lock` for a given `pyproject.toml` input.
+      - uses: actions/cache@v3
+        id: cache-poetry-old-deps
+        name: Cache poetry.lock
+        with:
+          path: |
+            poetry.lock
+            pyproject.toml
+          key: poetry-old-deps2-${{ hashFiles('pyproject.toml') }}
+      - name: Prepare old deps
+        if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
+        run: .ci/scripts/prepare_old_deps.sh
+
+      # We only now install poetry so that `setup-python-poetry` caches the
+      # right poetry.lock's dependencies.
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: '3.7'
+          extras: "all test"
+
+      - run: poetry run trial -j 2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
