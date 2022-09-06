@@ -89,7 +89,7 @@ jobs:
           name: debs
           path: debs/*
 
-  build_wheels:
+  build-wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -132,7 +132,7 @@ jobs:
     if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build-debs
-      - build_wheels
+      - build-wheels
     runs-on: ubuntu-latest
     steps:
       - name: Download all workflow run artifacts
