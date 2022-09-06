@@ -18,4 +18,7 @@ crate-type = ["cdylib"]
 name = "synapse.synapse_rust"
 
 [dependencies]
+intrusive-collections = "0.9.4"
+lazy_static = "1.4.0"
+log = "0.4.17"
 pyo3 = { version = "0.16.5", features = ["extension-module", "macros", "abi3", "abi3-py37"] }
