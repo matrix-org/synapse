@@ -1,0 +1,471 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Templates - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html" class="active">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/templates.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="templates"><a class="header" href="#templates">Templates</a></h1>
+<p>Synapse uses parametrised templates to generate the content of emails it sends and
+webpages it shows to users.</p>
+<p>By default, Synapse will use the templates listed <a href="https://github.com/matrix-org/synapse/tree/master/synapse/res/templates">here</a>.
+Server admins can configure an additional directory for Synapse to look for templates
+in, allowing them to specify custom templates:</p>
+<pre><code class="language-yaml">templates:
+  custom_template_directory: /path/to/custom/templates/
+</code></pre>
+<p>If this setting is not set, or the files named below are not found within the directory,
+default templates from within the Synapse package will be used.</p>
+<p>Templates that are given variables when being rendered are rendered using <a href="https://jinja.palletsprojects.com/en/2.11.x/">Jinja 2</a>.
+Templates rendered by Jinja 2 can also access two functions on top of the functions
+already available as part of Jinja 2:</p>
+<pre><code class="language-python">format_ts(value: int, format: str) -&gt; str
+</code></pre>
+<p>Formats a timestamp in milliseconds.</p>
+<p>Example: <code>reason.last_sent_ts|format_ts(&quot;%c&quot;)</code></p>
+<pre><code class="language-python">mxc_to_http(value: str, width: int, height: int, resize_method: str = &quot;crop&quot;) -&gt; str
+</code></pre>
+<p>Turns a <code>mxc://</code> URL for media content into an HTTP(S) one using the homeserver's
+<code>public_baseurl</code> configuration setting as the URL's base.</p>
+<p>Example: <code>message.sender_avatar_url|mxc_to_http(32,32)</code></p>
+<pre><code class="language-python">localpart_from_email(address: str) -&gt; str
+</code></pre>
+<p>Returns the local part of an email address (e.g. <code>alice</code> in <code>alice@example.com</code>).</p>
+<p>Example: <code>user.email_address|localpart_from_email</code></p>
+<h2 id="email-templates"><a class="header" href="#email-templates">Email templates</a></h2>
+<p>Below are the templates Synapse will look for when generating the content of an email:</p>
+<ul>
+<li><code>notif_mail.html</code> and <code>notif_mail.txt</code>: The contents of email notifications of missed
+events.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>user_display_name</code>: the display name for the user receiving the notification</li>
+<li><code>unsubscribe_link</code>: the link users can click to unsubscribe from email notifications</li>
+<li><code>summary_text</code>: a summary of the notification(s). The text used can be customised
+by configuring the various settings in the <code>email.subjects</code> section of the
+configuration file.</li>
+<li><code>rooms</code>: a list of rooms containing events to include in the email. Each element is
+an object with the following attributes:
+<ul>
+<li><code>title</code>: a human-readable name for the room</li>
+<li><code>hash</code>: a hash of the ID of the room</li>
+<li><code>invite</code>: a boolean, which is <code>True</code> if the room is an invite the user hasn't
+accepted yet, <code>False</code> otherwise</li>
+<li><code>notifs</code>: a list of events, or an empty list if <code>invite</code> is <code>True</code>. Each element
+is an object with the following attributes:
+<ul>
+<li><code>link</code>: a <code>matrix.to</code> link to the event</li>
+<li><code>ts</code>: the time in milliseconds at which the event was received</li>
+<li><code>messages</code>: a list of messages containing one message before the event, the
+message in the event, and one message after the event. Each element is an
+object with the following attributes:
+<ul>
+<li><code>event_type</code>: the type of the event</li>
+<li><code>is_historical</code>: a boolean, which is <code>False</code> if the message is the one
+that triggered the notification, <code>True</code> otherwise</li>
+<li><code>id</code>: the ID of the event</li>
+<li><code>ts</code>: the time in milliseconds at which the event was sent</li>
+<li><code>sender_name</code>: the display name for the event's sender</li>
+<li><code>sender_avatar_url</code>: the avatar URL (as a <code>mxc://</code> URL) for the event's
+sender</li>
+<li><code>sender_hash</code>: a hash of the user ID of the sender</li>
+<li><code>msgtype</code>: the type of the message</li>
+<li><code>body_text_html</code>: html representation of the message</li>
+<li><code>body_text_plain</code>: plaintext representation of the message</li>
+<li><code>image_url</code>: mxc url of an image, when &quot;msgtype&quot; is &quot;m.image&quot;</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>link</code>: a <code>matrix.to</code> link to the room</li>
+<li><code>avator_url</code>: url to the room's avator</li>
+</ul>
+</li>
+<li><code>reason</code>: information on the event that triggered the email to be sent. It's an
+object with the following attributes:
+<ul>
+<li><code>room_id</code>: the ID of the room the event was sent in</li>
+<li><code>room_name</code>: a human-readable name for the room the event was sent in</li>
+<li><code>now</code>: the current time in milliseconds</li>
+<li><code>received_at</code>: the time in milliseconds at which the event was received</li>
+<li><code>delay_before_mail_ms</code>: the amount of time in milliseconds Synapse always waits
+before ever emailing about a notification (to give the user a chance to respond
+to other push or notice the window)</li>
+<li><code>last_sent_ts</code>: the time in milliseconds at which a notification was last sent
+for an event in this room</li>
+<li><code>throttle_ms</code>: the minimum amount of time in milliseconds between two
+notifications can be sent for this room</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>password_reset.html</code> and <code>password_reset.txt</code>: The contents of password reset emails
+sent by the homeserver.
+When rendering, these templates are given a <code>link</code> variable which contains the link the
+user must click in order to reset their password.</li>
+<li><code>registration.html</code> and <code>registration.txt</code>: The contents of address verification emails
+sent during registration.
+When rendering, these templates are given a <code>link</code> variable which contains the link the
+user must click in order to validate their email address.</li>
+<li><code>add_threepid.html</code> and <code>add_threepid.txt</code>: The contents of address verification emails
+sent when an address is added to a Matrix account.
+When rendering, these templates are given a <code>link</code> variable which contains the link the
+user must click in order to validate their email address.</li>
+</ul>
+<h2 id="html-page-templates-for-registration-and-password-reset"><a class="header" href="#html-page-templates-for-registration-and-password-reset">HTML page templates for registration and password reset</a></h2>
+<p>Below are the templates Synapse will look for when generating pages related to
+registration and password reset:</p>
+<ul>
+<li><code>password_reset_confirmation.html</code>: An HTML page that a user will see when they follow
+the link in the password reset email. The user will be asked to confirm the action
+before their password is reset.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>sid</code>: the session ID for the password reset</li>
+<li><code>token</code>: the token for the password reset</li>
+<li><code>client_secret</code>: the client secret for the password reset</li>
+</ul>
+</li>
+<li><code>password_reset_success.html</code> and <code>password_reset_failure.html</code>: HTML pages for success
+and failure that a user will see when they confirm the password reset flow using the
+page above.
+When rendering, <code>password_reset_success.html</code> is given no variable, and
+<code>password_reset_failure.html</code> is given a <code>failure_reason</code>, which contains the reason
+for the password reset failure. </li>
+<li><code>registration_success.html</code> and <code>registration_failure.html</code>: HTML pages for success and
+failure that a user will see when they follow the link in an address verification email
+sent during registration.
+When rendering, <code>registration_success.html</code> is given no variable, and
+<code>registration_failure.html</code> is given a <code>failure_reason</code>, which contains the reason
+for the registration failure.</li>
+<li><code>add_threepid_success.html</code> and <code>add_threepid_failure.html</code>: HTML pages for success and
+failure that a user will see when they follow the link in an address verification email
+sent when an address is added to a Matrix account.
+When rendering, <code>add_threepid_success.html</code> is given no variable, and
+<code>add_threepid_failure.html</code> is given a <code>failure_reason</code>, which contains the reason
+for the registration failure.</li>
+</ul>
+<h2 id="html-page-templates-for-single-sign-on-sso"><a class="header" href="#html-page-templates-for-single-sign-on-sso">HTML page templates for Single Sign-On (SSO)</a></h2>
+<p>Below are the templates Synapse will look for when generating pages related to SSO:</p>
+<ul>
+<li><code>sso_login_idp_picker.html</code>: HTML page to prompt the user to choose an
+Identity Provider during login.
+This is only used if multiple SSO Identity Providers are configured.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>redirect_url</code>: the URL that the user will be redirected to after
+login.</li>
+<li><code>server_name</code>: the homeserver's name.</li>
+<li><code>providers</code>: a list of available Identity Providers. Each element is
+an object with the following attributes:
+<ul>
+<li><code>idp_id</code>: unique identifier for the IdP</li>
+<li><code>idp_name</code>: user-facing name for the IdP</li>
+<li><code>idp_icon</code>: if specified in the IdP config, an MXC URI for an icon
+for the IdP</li>
+<li><code>idp_brand</code>: if specified in the IdP config, a textual identifier
+for the brand of the IdP
+The rendered HTML page should contain a form which submits its results
+back as a GET request, with the following query parameters:</li>
+</ul>
+</li>
+<li><code>redirectUrl</code>: the client redirect URI (ie, the <code>redirect_url</code> passed
+to the template)</li>
+<li><code>idp</code>: the 'idp_id' of the chosen IDP.</li>
+</ul>
+</li>
+<li><code>sso_auth_account_details.html</code>: HTML page to prompt new users to enter a
+userid and confirm other details. This is only shown if the
+SSO implementation (with any <code>user_mapping_provider</code>) does not return
+a localpart.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>server_name</code>: the homeserver's name.</li>
+<li><code>idp</code>: details of the SSO Identity Provider that the user logged in
+with: an object with the following attributes:
+<ul>
+<li><code>idp_id</code>: unique identifier for the IdP</li>
+<li><code>idp_name</code>: user-facing name for the IdP</li>
+<li><code>idp_icon</code>: if specified in the IdP config, an MXC URI for an icon
+for the IdP</li>
+<li><code>idp_brand</code>: if specified in the IdP config, a textual identifier
+for the brand of the IdP</li>
+</ul>
+</li>
+<li><code>user_attributes</code>: an object containing details about the user that
+we received from the IdP. May have the following attributes:
+<ul>
+<li><code>display_name</code>: the user's display name</li>
+<li><code>emails</code>: a list of email addresses</li>
+<li><code>localpart</code>: the local part of the Matrix user ID to register,
+if <code>localpart_template</code> is set in the mapping provider configuration (empty
+string if not)
+The template should render a form which submits the following fields:</li>
+</ul>
+</li>
+<li><code>username</code>: the localpart of the user's chosen user id</li>
+</ul>
+</li>
+<li><code>sso_new_user_consent.html</code>: HTML page allowing the user to consent to the
+server's terms and conditions. This is only shown for new users, and only if
+<code>user_consent.require_at_registration</code> is set.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>server_name</code>: the homeserver's name.</li>
+<li><code>user_id</code>: the user's matrix proposed ID.</li>
+<li><code>user_profile.display_name</code>: the user's proposed display name, if any.</li>
+<li>consent_version: the version of the terms that the user will be
+shown</li>
+<li><code>terms_url</code>: a link to the page showing the terms.
+The template should render a form which submits the following fields:</li>
+<li><code>accepted_version</code>: the version of the terms accepted by the user
+(ie, 'consent_version' from the input variables).</li>
+</ul>
+</li>
+<li><code>sso_redirect_confirm.html</code>: HTML page for a confirmation step before redirecting back
+to the client with the login token.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>redirect_url</code>: the URL the user is about to be redirected to.</li>
+<li><code>display_url</code>: the same as <code>redirect_url</code>, but with the query
+parameters stripped. The intention is to have a
+human-readable URL to show to users, not to use it as
+the final address to redirect to.</li>
+<li><code>server_name</code>: the homeserver's name.</li>
+<li><code>new_user</code>: a boolean indicating whether this is the user's first time
+logging in.</li>
+<li><code>user_id</code>: the user's matrix ID.</li>
+<li><code>user_profile.avatar_url</code>: an MXC URI for the user's avatar, if any.
+<code>None</code> if the user has not set an avatar.</li>
+<li><code>user_profile.display_name</code>: the user's display name. <code>None</code> if the user
+has not set a display name.</li>
+</ul>
+</li>
+<li><code>sso_auth_confirm.html</code>: HTML page which notifies the user that they are authenticating
+to confirm an operation on their account during the user interactive authentication
+process.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>redirect_url</code>: the URL the user is about to be redirected to.</li>
+<li><code>description</code>: the operation which the user is being asked to confirm</li>
+<li><code>idp</code>: details of the Identity Provider that we will use to confirm
+the user's identity: an object with the following attributes:
+<ul>
+<li><code>idp_id</code>: unique identifier for the IdP</li>
+<li><code>idp_name</code>: user-facing name for the IdP</li>
+<li><code>idp_icon</code>: if specified in the IdP config, an MXC URI for an icon
+for the IdP</li>
+<li><code>idp_brand</code>: if specified in the IdP config, a textual identifier
+for the brand of the IdP</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>sso_auth_success.html</code>: HTML page shown after a successful user interactive
+authentication session.
+Note that this page must include the JavaScript which notifies of a successful
+authentication (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
+This template has no additional variables.</li>
+<li><code>sso_auth_bad_user.html</code>: HTML page shown after a user-interactive authentication
+session which does not map correctly onto the expected user.
+When rendering, this template is given the following variables:
+<ul>
+<li><code>server_name</code>: the homeserver's name.</li>
+<li><code>user_id_to_verify</code>: the MXID of the user that we are trying to
+validate.</li>
+</ul>
+</li>
+<li><code>sso_account_deactivated.html</code>: HTML page shown during single sign-on if a deactivated
+user (according to Synapse's database) attempts to login.
+This template has no additional variables.</li>
+<li><code>sso_error.html</code>: HTML page to display to users if something goes wrong during the
+OpenID Connect authentication process.
+When rendering, this template is given two variables:
+<ul>
+<li><code>error</code>: the technical name of the error</li>
+<li><code>error_description</code>: a human-readable message for the error</li>
+</ul>
+</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="structured_logging.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="usage/configuration/user_authentication/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="structured_logging.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="usage/configuration/user_authentication/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

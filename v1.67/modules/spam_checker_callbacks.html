@@ -1,0 +1,541 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Spam checker callbacks - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html" class="active">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/modules/spam_checker_callbacks.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h1>
+<p>Spam checker callbacks allow module developers to implement spam mitigation actions for
+Synapse instances. Spam checker callbacks can be registered using the module API's
+<code>register_spam_checker_callbacks</code> method.</p>
+<h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
+<p>The available spam checker callbacks are:</p>
+<h3 id="check_event_for_spam"><a class="header" href="#check_event_for_spam"><code>check_event_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.60.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean or a string is now deprecated.</em> </p>
+<pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.module_api.EventBase&quot;) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, str, bool]
+</code></pre>
+<p>Called when receiving an event from a client or via federation. The callback must return one of:</p>
+<ul>
+<li><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</li>
+<li><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</li>
+<li>(deprecated) a non-<code>Codes</code> <code>str</code> to reject the operation and specify an error message. Note that clients
+typically will not localize the error message to the user's preferred locale.</li>
+<li>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</li>
+<li>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.61.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when a user is trying to join a room. The user is represented by their Matrix user ID (e.g.
+<code>@alice:example.com</code>) and the room is represented by its Matrix ID (e.g.
+<code>!room:example.com</code>). The module is also given a boolean to indicate whether the user
+currently has a pending invite in the room.</p>
+<p>This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.</p>
+<p>The callback must return one of:</p>
+<ul>
+<li><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</li>
+<li><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</li>
+<li>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</li>
+<li>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="user_may_invite"><a class="header" href="#user_may_invite"><code>user_may_invite</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when processing an invitation. Both inviter and invitee are
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<p>The callback must return one of:</p>
+<ul>
+<li>
+<p><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</p>
+</li>
+<li>
+<p><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</p>
+</li>
+<li>
+<p>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</p>
+</li>
+<li>
+<p>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</p>
+</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="user_may_send_3pid_invite"><a class="header" href="#user_may_send_3pid_invite"><code>user_may_send_3pid_invite</code></a></h3>
+<p><em>First introduced in Synapse v1.45.0</em></p>
+<p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def user_may_send_3pid_invite(
+    inviter: str,
+    medium: str,
+    address: str,
+    room_id: str,
+) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when processing an invitation using a third-party identifier (also called a 3PID,
+e.g. an email address or a phone number). </p>
+<p>The inviter is represented by their Matrix user ID (e.g. <code>@alice:example.com</code>), and the
+invitee is represented by its medium (e.g. &quot;email&quot;) and its address
+(e.g. <code>alice@example.com</code>). See <a href="https://matrix.org/docs/spec/appendices#pid-types">the Matrix specification</a>
+for more information regarding third-party identifiers.</p>
+<p>For example, a call to this callback to send an invitation to the email address
+<code>alice@example.com</code> would look like this:</p>
+<pre><code class="language-python">await user_may_send_3pid_invite(
+    &quot;@bob:example.com&quot;,  # The inviter's user ID
+    &quot;email&quot;,  # The medium of the 3PID to invite
+    &quot;alice@example.com&quot;,  # The address of the 3PID to invite
+    &quot;!some_room:example.com&quot;,  # The ID of the room to send the invite into
+)
+</code></pre>
+<p><strong>Note</strong>: If the third-party identifier is already associated with a matrix user ID,
+<a href="#user_may_invite"><code>user_may_invite</code></a> will be used instead.</p>
+<p>The callback must return one of:</p>
+<ul>
+<li>
+<p><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</p>
+</li>
+<li>
+<p><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</p>
+</li>
+<li>
+<p>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</p>
+</li>
+<li>
+<p>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</p>
+</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="user_may_create_room"><a class="header" href="#user_may_create_room"><code>user_may_create_room</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def user_may_create_room(user_id: str) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when processing a room creation request.</p>
+<p>The callback must return one of:</p>
+<ul>
+<li>
+<p><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</p>
+</li>
+<li>
+<p><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</p>
+</li>
+<li>
+<p>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</p>
+</li>
+<li>
+<p>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</p>
+</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="user_may_create_room_alias"><a class="header" href="#user_may_create_room_alias"><code>user_may_create_room_alias</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def user_may_create_room_alias(user_id: str, room_alias: &quot;synapse.module_api.RoomAlias&quot;) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when trying to associate an alias with an existing room.</p>
+<p>The callback must return one of:</p>
+<ul>
+<li>
+<p><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</p>
+</li>
+<li>
+<p><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</p>
+</li>
+<li>
+<p>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</p>
+</li>
+<li>
+<p>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</p>
+</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="user_may_publish_room"><a class="header" href="#user_may_publish_room"><code>user_may_publish_room</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def user_may_publish_room(user_id: str, room_id: str) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when trying to publish a room to the homeserver's public rooms directory.</p>
+<p>The callback must return one of:</p>
+<ul>
+<li>
+<p><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</p>
+</li>
+<li>
+<p><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</p>
+</li>
+<li>
+<p>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</p>
+</li>
+<li>
+<p>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</p>
+</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="check_username_for_spam"><a class="header" href="#check_username_for_spam"><code>check_username_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<pre><code class="language-python">async def check_username_for_spam(user_profile: synapse.module_api.UserProfile) -&gt; bool
+</code></pre>
+<p>Called when computing search results in the user directory. The module must return a
+<code>bool</code> indicating whether the given user should be excluded from user directory 
+searches. Return <code>True</code> to indicate that the user is spammy and exclude them from 
+search results; otherwise return <code>False</code>.</p>
+<p>The profile is represented as a dictionary with the following keys:</p>
+<ul>
+<li><code>user_id: str</code>. The Matrix ID for this user.</li>
+<li><code>display_name: Optional[str]</code>. The user's display name, or <code>None</code> if this user
+has not set a display name.</li>
+<li><code>avatar_url: Optional[str]</code>. The <code>mxc://</code> URL to the user's avatar, or <code>None</code>
+if this user has not set an avatar.</li>
+</ul>
+<p>The module is given a copy of the original dictionary, so modifying it from within the
+module cannot modify a user's profile when included in user directory search results.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
+<h3 id="check_registration_for_spam"><a class="header" href="#check_registration_for_spam"><code>check_registration_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<pre><code class="language-python">async def check_registration_for_spam(
+    email_threepid: Optional[dict],
+    username: Optional[str],
+    request_info: Collection[Tuple[str, str]],
+    auth_provider_id: Optional[str] = None,
+) -&gt; &quot;synapse.spam_checker_api.RegistrationBehaviour&quot;
+</code></pre>
+<p>Called when registering a new user. The module must return a <code>RegistrationBehaviour</code>
+indicating whether the registration can go through or must be denied, or whether the user
+may be allowed to register but will be shadow banned.</p>
+<p>The arguments passed to this callback are:</p>
+<ul>
+<li><code>email_threepid</code>: The email address used for registering, if any.</li>
+<li><code>username</code>: The username the user would like to register. Can be <code>None</code>, meaning that
+Synapse will generate one later.</li>
+<li><code>request_info</code>: A collection of tuples, which first item is a user agent, and which
+second item is an IP address. These user agents and IP addresses are the ones that were
+used during the registration process.</li>
+<li><code>auth_provider_id</code>: The identifier of the SSO authentication provider, if any.</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>RegistrationBehaviour.ALLOW</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>RegistrationBehaviour.ALLOW</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="check_media_file_for_spam"><a class="header" href="#check_media_file_for_spam"><code>check_media_file_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
+<pre><code class="language-python">async def check_media_file_for_spam(
+    file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
+    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
+) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
+</code></pre>
+<p>Called when storing a local or remote file.</p>
+<p>The callback must return one of:</p>
+<ul>
+<li>
+<p><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</p>
+</li>
+<li>
+<p><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</p>
+</li>
+<li>
+<p>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</p>
+</li>
+<li>
+<p>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</p>
+</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<h3 id="should_drop_federated_event"><a class="header" href="#should_drop_federated_event"><code>should_drop_federated_event</code></a></h3>
+<p><em>First introduced in Synapse v1.60.0</em></p>
+<pre><code class="language-python">async def should_drop_federated_event(event: &quot;synapse.events.EventBase&quot;) -&gt; bool
+</code></pre>
+<p>Called when checking whether a remote server can federate an event with us. <strong>Returning
+<code>True</code> from this function will silently drop a federated event and split-brain our view
+of a room's DAG, and thus you shouldn't use this callback unless you know what you are
+doing.</strong></p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
+<h2 id="example"><a class="header" href="#example">Example</a></h2>
+<p>The example below is a module that implements the spam checker callback
+<code>check_event_for_spam</code> to deny any message sent by users whose Matrix user IDs are
+mentioned in a configured list, and registers a web resource to the path
+<code>/_synapse/client/list_spam_checker/is_evil</code> that returns a JSON object indicating
+whether the provided user appears in that list.</p>
+<pre><code class="language-python">import json
+from typing import Union
+
+from twisted.web.resource import Resource
+from twisted.web.server import Request
+
+from synapse.module_api import ModuleApi
+
+
+class IsUserEvilResource(Resource):
+    def __init__(self, config):
+        super(IsUserEvilResource, self).__init__()
+        self.evil_users = config.get(&quot;evil_users&quot;) or []
+
+    def render_GET(self, request: Request):
+        user = request.args.get(b&quot;user&quot;)[0].decode()
+        request.setHeader(b&quot;Content-Type&quot;, b&quot;application/json&quot;)
+        return json.dumps({&quot;evil&quot;: user in self.evil_users}).encode()
+
+
+class ListSpamChecker:
+    def __init__(self, config: dict, api: ModuleApi):
+        self.api = api
+        self.evil_users = config.get(&quot;evil_users&quot;) or []
+
+        self.api.register_spam_checker_callbacks(
+            check_event_for_spam=self.check_event_for_spam,
+        )
+
+        self.api.register_web_resource(
+            path=&quot;/_synapse/client/list_spam_checker/is_evil&quot;,
+            resource=IsUserEvilResource(config),
+        )
+
+    async def check_event_for_spam(self, event: &quot;synapse.events.EventBase&quot;) -&gt; Union[Literal[&quot;NOT_SPAM&quot;], Codes]:
+        if event.sender in self.evil_users:
+          return Codes.FORBIDDEN
+        else:
+          return synapse.module_api.NOT_SPAM
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../modules/writing_a_module.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../modules/third_party_rules_callbacks.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../modules/writing_a_module.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../modules/third_party_rules_callbacks.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>
