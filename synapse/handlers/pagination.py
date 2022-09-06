@@ -572,12 +572,9 @@ class PaginationHandler:
                 state_dict = await self.store.get_events(list(state_ids.values()))
                 state = state_dict.values()
 
-        if not use_admin_priviledge:
-            aggregations = await self._relations_handler.get_bundled_aggregations(
-                events, user_id
-            )
-        else:
-            aggregations = None  # TODO: an admin might want aggregations
+        aggregations = await self._relations_handler.get_bundled_aggregations(
+            events, user_id
+        )
 
         time_now = self.clock.time_msec()
 
