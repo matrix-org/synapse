@@ -93,3 +93,8 @@ class ExperimentalConfig(Config):
 
         # MSC3852: Expose last seen user agent field on /_matrix/client/v3/devices.
         self.msc3852_enabled: bool = experimental.get("msc3852_enabled", False)
+
+        # MSC3882: Allow an existing session to sign in a new session
+        self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
+        self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)
+        self.msc3882_token_timeout = self.parse_duration(experimental.get("msc3882_token_timeout", "5m"))
