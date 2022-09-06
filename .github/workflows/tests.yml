@@ -139,6 +139,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+
       # There aren't wheels for some of the older deps, so we need to install
       # their build dependencies
       - run: |
@@ -175,7 +181,7 @@ jobs:
           python-version: '3.7'
           extras: "all test"
 
-      - run: poetry run trial -j 2 tests
+      - run: poetry run trial -j2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -247,6 +253,11 @@ jobs:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -352,6 +363,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: synapse
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
