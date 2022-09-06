@@ -104,8 +104,6 @@ openssl x509 -in /conf/server.tls.crt -noout -text | grep DNS:
 export SYNAPSE_TLS_CERT=/conf/server.tls.crt
 export SYNAPSE_TLS_KEY=/conf/server.tls.key
 
-pip install -U setuptools
-
 # Run the script that writes the necessary config files and starts supervisord, which in turn
 # starts everything else
 exec /configure_workers_and_start.py
