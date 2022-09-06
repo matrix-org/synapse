@@ -51,7 +51,6 @@ override_dh_shlibdeps:
 	    -X site-packages/PIL/.libs \
 	    -X site-packages/Pillow.libs \
 	    -X site-packages/psycopg2
-        # TODO: Do we need to add our rust package here?
 
 override_dh_virtualenv:
 	./debian/build_virtualenv
