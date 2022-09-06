@@ -51,6 +51,16 @@ async def phone_stats_home(
     stats: JsonDict,
     stats_process: List[Tuple[int, "resource.struct_rusage"]] = _stats_process,
 ) -> None:
+    """Collect usage statistics and send them to the configured endpoint.
+
+    Args:
+        hs: the HomeServer object to use for gathering usage data.
+        stats: the dict in which to store the statistics sent to the configured
+            endpoint. Mostly used in tests to figure out the data that is supposed to
+            be sent.
+        stats_process: statistics about resource usage of the process.
+    """
+
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
     # Ensure the homeserver has started.
@@ -83,6 +93,7 @@ async def phone_stats_home(
     #
 
     store = hs.get_datastores().main
+    common_metrics = await hs.get_common_usage_metrics_manager().get_metrics()
 
     stats["homeserver"] = hs.config.server.server_name
     stats["server_context"] = hs.config.server.server_context
@@ -104,7 +115,7 @@ async def phone_stats_home(
     room_count = await store.get_room_count()
     stats["total_room_count"] = room_count
 
-    stats["daily_active_users"] = await store.count_daily_users()
+    stats["daily_active_users"] = common_metrics.daily_active_users
     stats["monthly_active_users"] = await store.count_monthly_users()
     daily_active_e2ee_rooms = await store.count_daily_active_e2ee_rooms()
     stats["daily_active_e2ee_rooms"] = daily_active_e2ee_rooms

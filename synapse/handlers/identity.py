@@ -538,11 +538,7 @@ class IdentityHandler:
             raise SynapseError(400, "Error contacting the identity server")
 
     async def lookup_3pid(
-        self,
-        id_server: str,
-        medium: str,
-        address: str,
-        id_access_token: Optional[str] = None,
+        self, id_server: str, medium: str, address: str, id_access_token: str
     ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server.
 
@@ -557,60 +553,15 @@ class IdentityHandler:
         Returns:
             the matrix ID of the 3pid, or None if it is not recognized.
         """
-        if id_access_token is not None:
-            try:
-                results = await self._lookup_3pid_v2(
-                    id_server, id_access_token, medium, address
-                )
-                return results
 
-            except Exception as e:
-                # Catch HttpResponseExcept for a non-200 response code
-                # Check if this identity server does not know about v2 lookups
-                if isinstance(e, HttpResponseException) and e.code == 404:
-                    # This is an old identity server that does not yet support v2 lookups
-                    logger.warning(
-                        "Attempted v2 lookup on v1 identity server %s. Falling "
-                        "back to v1",
-                        id_server,
-                    )
-                else:
-                    logger.warning("Error when looking up hashing details: %s", e)
-                    return None
-
-        return await self._lookup_3pid_v1(id_server, medium, address)
-
-    async def _lookup_3pid_v1(
-        self, id_server: str, medium: str, address: str
-    ) -> Optional[str]:
-        """Looks up a 3pid in the passed identity server using v1 lookup.
-
-        Args:
-            id_server: The server name (including port, if required)
-                of the identity server to use.
-            medium: The type of the third party identifier (e.g. "email").
-            address: The third party identifier (e.g. "foo@example.com").
-
-        Returns:
-            the matrix ID of the 3pid, or None if it is not recognized.
-        """
         try:
-            data = await self.blacklisting_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
-                {"medium": medium, "address": address},
+            results = await self._lookup_3pid_v2(
+                id_server, id_access_token, medium, address
             )
-
-            if "mxid" in data:
-                # note: we used to verify the identity server's signature here, but no longer
-                # require or validate it. See the following for context:
-                # https://github.com/matrix-org/synapse/issues/5253#issuecomment-666246950
-                return data["mxid"]
-        except RequestTimedOutError:
-            raise SynapseError(500, "Timed out contacting identity server")
-        except OSError as e:
-            logger.warning("Error from v1 identity server lookup: %s" % (e,))
-
-        return None
+            return results
+        except Exception as e:
+            logger.warning("Error when looking up hashing details: %s", e)
+            return None
 
     async def _lookup_3pid_v2(
         self, id_server: str, id_access_token: str, medium: str, address: str
@@ -739,7 +690,7 @@ class IdentityHandler:
         room_type: Optional[str],
         inviter_display_name: str,
         inviter_avatar_url: str,
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
     ) -> Tuple[str, List[Dict[str, str]], Dict[str, str], str]:
         """
         Asks an identity server for a third party invite.
@@ -760,7 +711,7 @@ class IdentityHandler:
             inviter_display_name: The current display name of the
                 inviter.
             inviter_avatar_url: The URL of the inviter's avatar.
-            id_access_token (str|None): The access token to authenticate to the identity
+            id_access_token (str): The access token to authenticate to the identity
                 server with
 
         Returns:
@@ -792,71 +743,24 @@ class IdentityHandler:
             invite_config["org.matrix.web_client_location"] = self._web_client_location
 
         # Add the identity service access token to the JSON body and use the v2
-        # Identity Service endpoints if id_access_token is present
+        # Identity Service endpoints
         data = None
-        base_url = "%s%s/_matrix/identity" % (id_server_scheme, id_server)
 
-        if id_access_token:
-            key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
-                id_server_scheme,
-                id_server,
+        key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
+            id_server_scheme,
+            id_server,
+        )
+
+        url = "%s%s/_matrix/identity/v2/store-invite" % (id_server_scheme, id_server)
+        try:
+            data = await self.blacklisting_http_client.post_json_get_json(
+                url,
+                invite_config,
+                {"Authorization": create_id_access_token_header(id_access_token)},
             )
+        except RequestTimedOutError:
+            raise SynapseError(500, "Timed out contacting identity server")
 
-            # Attempt a v2 lookup
-            url = base_url + "/v2/store-invite"
-            try:
-                data = await self.blacklisting_http_client.post_json_get_json(
-                    url,
-                    invite_config,
-                    {"Authorization": create_id_access_token_header(id_access_token)},
-                )
-            except RequestTimedOutError:
-                raise SynapseError(500, "Timed out contacting identity server")
-            except HttpResponseException as e:
-                if e.code != 404:
-                    logger.info("Failed to POST %s with JSON: %s", url, e)
-                    raise e
-
-        if data is None:
-            key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-                id_server_scheme,
-                id_server,
-            )
-            url = base_url + "/api/v1/store-invite"
-
-            try:
-                data = await self.blacklisting_http_client.post_json_get_json(
-                    url, invite_config
-                )
-            except RequestTimedOutError:
-                raise SynapseError(500, "Timed out contacting identity server")
-            except HttpResponseException as e:
-                logger.warning(
-                    "Error trying to call /store-invite on %s%s: %s",
-                    id_server_scheme,
-                    id_server,
-                    e,
-                )
-
-            if data is None:
-                # Some identity servers may only support application/x-www-form-urlencoded
-                # types. This is especially true with old instances of Sydent, see
-                # https://github.com/matrix-org/sydent/pull/170
-                try:
-                    data = await self.blacklisting_http_client.post_urlencoded_get_json(
-                        url, invite_config
-                    )
-                except HttpResponseException as e:
-                    logger.warning(
-                        "Error calling /store-invite on %s%s with fallback "
-                        "encoding: %s",
-                        id_server_scheme,
-                        id_server,
-                        e,
-                    )
-                    raise e
-
-        # TODO: Check for success
         token = data["token"]
         public_keys = data.get("public_keys", [])
         if "public_key" in data:
