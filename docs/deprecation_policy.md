@@ -41,5 +41,5 @@ to constantly update their platform dependencies to the latest versions.
 For Rust, the situation is a bit different given that a) the Rust foundation
 does not generally support older Rust versions, and b) the library ecosystem
 generally bump their minimum support Rust versions frequently. In general, the
-Synapse team will try to avoid updating Rust to the absolute latest version, but
+Synapse team will try to avoid updating the dependency on Rust to the absolute latest version, but
 introducing a formal policy is hard given the constraints of the ecosystem.

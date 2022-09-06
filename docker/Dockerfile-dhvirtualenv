@@ -86,7 +86,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         libpq-dev \
         xmlsec1
 
-# Install rust and ensure its in the PATH
+# Install rust and ensure it's in the PATH
 ENV RUSTUP_HOME=/rust
 ENV CARGO_HOME=/cargo
 ENV PATH=/cargo/bin:/rust/bin:$PATH
