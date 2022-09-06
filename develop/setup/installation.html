@@ -277,6 +277,9 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <li>Python 3.7 or later, up to Python 3.10.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
+<p>If building on an uncommon architecture for which pre-built wheels are
+unavailable, you will need to have a recent Rust compiler installed. The easiest
+way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <p>To install the Synapse homeserver run:</p>
 <pre><code class="language-sh">mkdir -p ~/synapse
 virtualenv -p python3 ~/synapse/env
