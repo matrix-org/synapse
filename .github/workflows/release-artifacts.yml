@@ -135,6 +135,10 @@ jobs:
     # if: ${{ !startsWith(github.ref, 'refs/pull/') }}
 
     steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+      - run: pip install build
+
       - name: Build sdist
         run: python -m build --sdist
 
