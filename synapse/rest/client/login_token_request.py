@@ -73,7 +73,7 @@ class LoginTokenRequestServlet(RestServlet):
                 request,
                 body,
                 "issue a new access token for your account",
-                can_skip_ui_auth=False, # Don't allow skipping of UI auth
+                can_skip_ui_auth=False,  # Don't allow skipping of UI auth
             )
 
         token = random_string(24)

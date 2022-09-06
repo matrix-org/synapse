@@ -97,4 +97,6 @@ class ExperimentalConfig(Config):
         # MSC3882: Allow an existing session to sign in a new session
         self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
         self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)
-        self.msc3882_token_timeout = self.parse_duration(experimental.get("msc3882_token_timeout", "5m"))
+        self.msc3882_token_timeout = self.parse_duration(
+            experimental.get("msc3882_token_timeout", "5m")
+        )
