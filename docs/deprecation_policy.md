@@ -18,6 +18,12 @@ documented at [https://endoflife.date/python](https://endoflife.date/python) and
 [https://endoflife.date/postgresql](https://endoflife.date/postgresql).
 
 
+A Rust compiler is required to build Synapse from source. For any given release
+the minimum required version may be bumped up to a recent Rust version, and so
+people building from source should ensure they can fetch recent versions of Rust
+(e.g. by using [rustup](https://rustup.rs/)).
+
+
 Context
 -------
 
@@ -31,3 +37,10 @@ long process.
 By following the upstream support life cycles Synapse can ensure that its
 dependencies continue to get security patches, while not requiring system admins
 to constantly update their platform dependencies to the latest versions.
+
+For Rust, the situation is a bit different given that a) the Rust foundation
+does not generally support older Rust versions, and b) the library ecosystem
+generally bump their minimum support Rust versions frequently. In general, the
+Synapse team will try to avoid updating the dependency on Rust to the absolute
+latest version, but introducing a formal policy is hard given the constraints of
+the ecosystem.

@@ -12,6 +12,8 @@ override_dh_installsystemd:
 # we don't really want to strip the symbols from our object files.
 override_dh_strip:
 
+override_dh_auto_configure:
+
 # many libraries pulled from PyPI have allocatable sections after
 # non-allocatable ones on which dwz errors out. For those without the issue the
 # gains are only marginal
