@@ -97,10 +97,10 @@ jobs:
         os: [ubuntu-20.04, macos-10.15]
         is_pr: [${{ startsWith(github.ref, 'refs/pull/') }}]
 
-      exclude:
-        # Don't build macos wheels on PR CI.
-        - is_pr: true
-          os: "macos-10.15"
+        exclude:
+          # Don't build macos wheels on PR CI.
+          - is_pr: true
+            os: "macos-10.15"
 
     steps:
       - uses: actions/checkout@v3
