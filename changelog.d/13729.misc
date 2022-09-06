@@ -1,0 +1,1 @@
+Collect traces under the same service name instead of splitting across many services by instance name.
