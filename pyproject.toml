@@ -53,7 +53,6 @@ combine_as_imports = true
 skip_gitignore = true
 
 [tool.maturin]
-python-source = "../synapse"
 manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
