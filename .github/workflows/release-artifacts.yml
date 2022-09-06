@@ -129,8 +129,12 @@ jobs:
           name: Wheel
           path: ./wheelhouse/*.whl
 
+  build-sdist:
+    name: Build sdist
+    if: ${{ !startsWith(github.ref, 'refs/pull/') }}
+
+    steps:
       - name: Build sdist
-        if: matrix.os == 'ubuntu' && matrix.python-version == 'cp310'
         run: python -m build --sdist
 
       - uses: actions/upload-artifact@v2
@@ -146,6 +150,7 @@ jobs:
     needs:
       - build-debs
       - build-wheels
+      - build-sdist
     runs-on: ubuntu-latest
     steps:
       - name: Download all workflow run artifacts
