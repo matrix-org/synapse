@@ -168,6 +168,9 @@ jobs:
       # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
       # otherwise the `poetry install` step will error due to the poetry.lock
       # file being outdated.
+      #
+      # This caches the output of `Prepare old deps`, which should generate the
+      # same `pyproject.toml` and `poetry.lock` for a given `pyproject.toml` input.
       - uses: actions/cache@v3
         id: cache-poetry-old-deps
         name: Cache poetry.lock
