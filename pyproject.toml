@@ -319,7 +319,7 @@ before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain sta
 environment= { PATH = "$PATH:$HOME/.cargo/bin" }
 
 # For some reason if we don't manually clean the build directory we
-# can end up poluting the next build with a .so that is for the wrong
+# can end up polluting the next build with a .so that is for the wrong
 # Python version.
 before-build = "rm -rf {project}/build"
 build-frontend = "build"
