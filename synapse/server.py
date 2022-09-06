@@ -105,6 +105,7 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
 from synapse.notifier import Notifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
@@ -829,3 +830,8 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
+
+    @cache_in_self
+    def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:
+        """Usage metrics shared between phone home stats and the prometheus exporter."""
+        return CommonUsageMetricsManager(self)

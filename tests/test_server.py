@@ -228,7 +228,7 @@ class OptionsResourceTests(unittest.TestCase):
         site = SynapseSite(
             "test",
             "site_tag",
-            parse_listener_def({"type": "http", "port": 0}),
+            parse_listener_def(0, {"type": "http", "port": 0}),
             self.resource,
             "1.0",
             max_request_body_size=4096,
