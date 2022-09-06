@@ -142,7 +142,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
+            toolchain: 1.61.0
             override: true
 
       # There aren't wheels for some of the older deps, so we need to install
@@ -256,7 +256,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
+            toolchain: 1.61.0
             override: true
       - name: Run SyTest
         run: /bootstrap.sh synapse
@@ -367,7 +367,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
+            toolchain: 1.61.0
             override: true
 
       - name: Prepare Complement's Prerequisites
