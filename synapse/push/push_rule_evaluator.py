@@ -16,6 +16,7 @@
 import logging
 import re
 from typing import (
+    AbstractSet,
     Any,
     Dict,
     List,
@@ -23,7 +24,6 @@ from typing import (
     Optional,
     Pattern,
     Sequence,
-    Set,
     Tuple,
     Union,
 )
@@ -131,7 +131,7 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
-        relations: Dict[str, Set[Tuple[str, str]]],
+        relations: Dict[str, AbstractSet[Tuple[str, str]]],
         relations_match_enabled: bool,
     ):
         self._event = event

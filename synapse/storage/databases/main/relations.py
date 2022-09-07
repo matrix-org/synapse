@@ -14,12 +14,14 @@
 
 import logging
 from typing import (
+    AbstractSet,
     Collection,
     Dict,
     FrozenSet,
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -66,7 +68,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
+    ) -> Tuple[Sequence[_RelatedEvent], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
@@ -243,7 +245,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
         self, event_id: str, room_id: str, limit: int = 5
-    ) -> List[JsonDict]:
+    ) -> Sequence[JsonDict]:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
 
@@ -764,7 +766,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cached(iterable=True)
     async def get_mutual_event_relations_for_rel_type(
         self, event_id: str, relation_type: str
-    ) -> Set[Tuple[str, str]]:
+    ) -> AbstractSet[Tuple[str, str]]:
         raise NotImplementedError()
 
     @cachedList(
@@ -773,7 +775,7 @@ class RelationsWorkerStore(SQLBaseStore):
     )
     async def get_mutual_event_relations(
         self, event_id: str, relation_types: Collection[str]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
+    ) -> Dict[str, AbstractSet[Tuple[str, str]]]:
         """
         Fetch event metadata for events which related to the same event as the given event.
 
@@ -810,8 +812,20 @@ class RelationsWorkerStore(SQLBaseStore):
                 result[rel_type].add((sender, type))
             return result
 
-        return await self.db_pool.runInteraction(
-            "get_event_relations", _get_event_relations
+        # Cast the values from `Set`s to `AbstractSet`s.
+        return cast(
+            Dict[
+                str,
+                AbstractSet[
+                    Tuple[
+                        str,
+                        str,
+                    ]
+                ],
+            ],
+            await self.db_pool.runInteraction(
+                "get_event_relations", _get_event_relations
+            ),
         )
 
 

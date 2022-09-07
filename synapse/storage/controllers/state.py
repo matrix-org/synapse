@@ -23,6 +23,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
 )
 
@@ -523,7 +524,7 @@ class StateStorageController:
         )
         return state_map.get(key)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> List[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> Sequence[str]:
         """Get current hosts in room based on current state."""
 
         await self._partial_state_room_tracker.await_full_state(room_id)
@@ -532,7 +533,7 @@ class StateStorageController:
 
     async def get_users_in_room_with_profiles(
         self, room_id: str
-    ) -> Dict[str, ProfileInfo]:
+    ) -> Mapping[str, ProfileInfo]:
         """
         Get the current users in the room with their profiles.
         If the room is currently partial-stated, this will block until the room has

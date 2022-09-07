@@ -15,7 +15,7 @@ import logging
 import math
 import resource
 import sys
-from typing import TYPE_CHECKING, List, Sized, Tuple
+from typing import TYPE_CHECKING, List, Mapping, Sized, Tuple
 
 from prometheus_client import Gauge
 
@@ -194,7 +194,7 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
     @wrap_as_background_process("generate_monthly_active_users")
     async def generate_monthly_active_users() -> None:
         current_mau_count = 0
-        current_mau_count_by_service = {}
+        current_mau_count_by_service: Mapping[str, int] = {}
         reserved_users: Sized = ()
         store = hs.get_datastores().main
         if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:

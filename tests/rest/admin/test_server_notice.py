@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Sequence
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -558,7 +558,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
 
     def _check_invite_and_join_status(
         self, user_id: str, expected_invites: int, expected_memberships: int
-    ) -> List[RoomsForUser]:
+    ) -> Sequence[RoomsForUser]:
         """Check invite and room membership status of a user.
 
         Args

@@ -17,13 +17,13 @@ import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Collection,
     Dict,
     Iterable,
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
     Union,
 )
@@ -199,7 +199,7 @@ class BulkPushRuleEvaluator:
 
     async def _get_mutual_relations(
         self, event: EventBase, rules: Iterable[Tuple[PushRule, bool]]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
+    ) -> Dict[str, AbstractSet[Tuple[str, str]]]:
         """
         Fetch event metadata for events which related to the same event as the given event.
 

@@ -14,7 +14,7 @@
 
 import logging
 import string
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
@@ -483,6 +483,7 @@ class DirectoryHandler:
                 )
             )
             if canonical_alias:
+                room_aliases = list(room_aliases)
                 room_aliases.append(canonical_alias)
 
             if not self.config.roomdirectory.is_publishing_room_allowed(
@@ -525,7 +526,7 @@ class DirectoryHandler:
 
     async def get_aliases_for_room(
         self, requester: Requester, room_id: str
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """
         Get a list of the aliases that currently point to this room on this server
         """
