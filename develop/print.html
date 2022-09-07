@@ -4047,8 +4047,9 @@ on this homeserver.</p>
 <p>Options related to caching.</p>
 <hr />
 <h3 id="event_cache_size"><a class="header" href="#event_cache_size"><code>event_cache_size</code></a></h3>
-<p>The number of events to cache in memory. Not affected by
-<code>caches.global_factor</code> and is not part of the <code>caches</code> section. Defaults to 10K.</p>
+<p>The number of events to cache in memory. Defaults to 10K. Like other caches,
+this is affected by <code>caches.global_factor</code> (see below).</p>
+<p>Note that this option is not part of the <code>caches</code> section.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">event_cache_size: 15K
 </code></pre>
