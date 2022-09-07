@@ -43,6 +43,7 @@ from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.rest.client.models import (
     AuthenticationData,
+    ClientSecretType,
     EmailRequestTokenBody,
     MsisdnRequestTokenBody,
 )
@@ -627,6 +628,11 @@ class ThreepidAddRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    class PostBody(RequestBodyModel):
+        auth: Optional[AuthenticationData] = None
+        client_secret: ClientSecretType
+        sid: StrictStr
+
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
@@ -636,22 +642,17 @@ class ThreepidAddRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_dict(body, ["client_secret", "sid"])
-        sid = body["sid"]
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body,
+            body.dict(exclude_unset=True),
             "add a third-party identifier to your account",
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(
-            client_secret, sid
+            body.client_secret, body.sid
         )
         if validation_session:
             await self.auth_handler.add_threepid(
