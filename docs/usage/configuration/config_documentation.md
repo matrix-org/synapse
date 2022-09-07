@@ -1069,8 +1069,10 @@ Options related to caching.
 ---
 ### `event_cache_size`
 
-The number of events to cache in memory. Not affected by
-`caches.global_factor` and is not part of the `caches` section. Defaults to 10K.
+The number of events to cache in memory. Defaults to 10K. Like other caches,
+this is affected by `caches.global_factor` (see below).
+
+Note that this option is not part of the `caches` section.
 
 Example configuration:
 ```yaml
