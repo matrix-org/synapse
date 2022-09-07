@@ -677,23 +677,20 @@ class ThreepidBindRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_json_object_from_request(request)
+    class PostBody(RequestBodyModel):
+        client_secret: ClientSecretType
+        id_access_token: StrictStr
+        id_server: StrictStr
+        sid: StrictStr
 
-        assert_params_in_dict(
-            body, ["id_server", "sid", "id_access_token", "client_secret"]
-        )
-        id_server = body["id_server"]
-        sid = body["sid"]
-        id_access_token = body["id_access_token"]
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         await self.identity_handler.bind_threepid(
-            client_secret, sid, user_id, id_server, id_access_token
+            body.client_secret, body.sid, user_id, body.id_server, body.id_access_token
         )
 
         return 200, {}
