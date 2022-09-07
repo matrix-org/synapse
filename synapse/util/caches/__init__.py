@@ -205,7 +205,6 @@ def register_cache(
         add_resizable_cache(cache_name, resize_callback)
 
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
-    # TODO evil ??metric_name = "cache_%s_%s" % (cache_type, cache_name)
     caches_by_name[cache_name] = cache
     CACHE_METRIC_REGISTRY.register_hook(metric.collect)
     return metric
