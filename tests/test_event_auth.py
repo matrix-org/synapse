@@ -821,7 +821,7 @@ def _alias_event(room_version: RoomVersion, sender: str, **kwargs) -> EventBase:
 def _build_auth_dict_for_room_version(
     room_version: RoomVersion, auth_events: Iterable[EventBase]
 ) -> List:
-    if room_version.event_format == EventFormatVersions.V1:
+    if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
         return [(e.event_id, "not_used") for e in auth_events]
     else:
         return [e.event_id for e in auth_events]
@@ -871,7 +871,7 @@ event_count = 0
 
 def _maybe_get_event_id_dict_for_room_version(room_version: RoomVersion) -> dict:
     """If this room version needs it, generate an event id"""
-    if room_version.event_format != EventFormatVersions.V1:
+    if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
         return {}
 
     global event_count
