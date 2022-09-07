@@ -25,3 +25,6 @@ ALTER TABLE event_push_summary ADD COLUMN thread_id TEXT;
 -- Update the unique index for `event_push_summary`.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (7006, 'event_push_summary_unique_index2', '{}');
+
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
+  (7006, 'event_push_backfill_thread_id', '{}', 'event_push_summary_unique_index2');
