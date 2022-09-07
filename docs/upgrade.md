@@ -119,6 +119,21 @@ will require a recent Rust compiler. Those using packages or
 
 The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
 
+## SQLite version requirement in the next release
+
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+higher. Synapse v1.67.0 will be the last major release supporting SQLite
+versions 3.22 to 3.26.
+
+Those using docker images or packages from Matrix.org will not be
+affected. If you have installed from source, you should check the version of 
+SQLite used by Python with:
+
+```shell
+python -c "import sqlite3; print(sqlite3.sqlite_version)"
+```
+
+If this is too old, refer to your distribution for advice on upgrading.
 
 # Upgrading to v1.66.0
 
