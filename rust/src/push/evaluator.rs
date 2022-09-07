@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Error};
-use log::warn;
+use log::{info, warn};
 use pyo3::prelude::*;
 
 use super::{
@@ -14,10 +14,10 @@ pub struct PushRuleEvaluator {
     flattened_keys: BTreeMap<String, String>,
     body: String,
     room_member_count: u64,
-    power_levels: BTreeMap<String, BTreeMap<String, u64>>,
+    notification_power_levels: BTreeMap<String, i64>,
     relations: BTreeMap<String, BTreeSet<(String, String)>>,
     relation_match_enabled: bool,
-    sender_power_level: u64,
+    sender_power_level: i64,
 }
 
 #[pymethods]
@@ -26,8 +26,8 @@ impl PushRuleEvaluator {
     fn py_new(
         flattened_keys: BTreeMap<String, String>,
         room_member_count: u64,
-        sender_power_level: u64,
-        power_levels: BTreeMap<String, BTreeMap<String, u64>>,
+        sender_power_level: i64,
+        notification_power_levels: BTreeMap<String, i64>,
         relations: BTreeMap<String, BTreeSet<(String, String)>>,
         relation_match_enabled: bool,
     ) -> Result<Self, Error> {
@@ -40,7 +40,7 @@ impl PushRuleEvaluator {
             flattened_keys,
             body,
             room_member_count,
-            power_levels,
+            notification_power_levels,
             relations,
             relation_match_enabled,
             sender_power_level,
@@ -111,11 +111,15 @@ impl PushRuleEvaluator {
             }
             Condition::SenderNotificationPermission { key } => {
                 let required_level = self
-                    .power_levels
-                    .get("notifications")
-                    .and_then(|m| m.get(key.as_ref()))
+                    .notification_power_levels
+                    .get(key.as_ref())
                     .copied()
                     .unwrap_or(50);
+
+                info!(
+                    "Power level {required_level} vs {}",
+                    self.sender_power_level
+                );
 
                 self.sender_power_level >= required_level
             }

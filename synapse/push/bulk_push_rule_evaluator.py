@@ -290,8 +290,7 @@ class BulkPushRuleEvaluator:
             _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            # power_levels,
-            {},  # TODO
+            power_levels.get("notifications", {}),
             relations,
             self._relations_match_enabled,
         )

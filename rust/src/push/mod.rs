@@ -123,6 +123,8 @@ impl IntoPy<PyObject> for Action {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SetTweak {
     set_tweak: Cow<'static, str>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<TweakValue>,
 
     // This picks saves any other fields that may have been added as clients.

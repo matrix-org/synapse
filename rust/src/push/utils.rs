@@ -52,7 +52,10 @@ pub(crate) fn glob_to_regex(glob: &str, match_type: GlobMatchType) -> Result<Reg
 
     let regex_str = match match_type {
         GlobMatchType::Whole => format!(r"\A{joined}\z"),
-        GlobMatchType::Word => format!(r"\b{joined}\b"),
+
+        // `^|\W` and `\W|$` handle the case where `pattern` starts or ends with a non-word
+        // character.
+        GlobMatchType::Word => format!(r"(?:^|\W|\b){joined}(?:\b|\W|$)"),
     };
 
     Ok(RegexBuilder::new(&regex_str)
