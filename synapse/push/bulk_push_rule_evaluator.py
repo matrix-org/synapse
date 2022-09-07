@@ -281,7 +281,7 @@ class BulkPushRuleEvaluator:
         ) = await self._get_power_levels_and_sender_level(event, context)
 
         relations = await self._get_mutual_relations(
-            event, itertools.chain(*rules_by_user.values())
+            event, itertools.chain(*(r.rules() for r in rules_by_user.values()))
         )
 
         logger.info("Flatten map: %s", _flatten_dict(event))

@@ -16,9 +16,8 @@ import copy
 from typing import Any, Dict, List, Optional
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.types import UserID
-
-from .baserules import FilteredPushRules, PushRule
 
 
 def format_push_rules_for_user(
