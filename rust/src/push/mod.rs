@@ -293,15 +293,24 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
+    msc3786_enabled: bool,
+    msc3772_enabled: bool,
 }
 
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>) -> Self {
+    fn py_new(
+        push_rules: PushRules,
+        enabled_map: BTreeMap<String, bool>,
+        msc3786_enabled: bool,
+        msc3772_enabled: bool,
+    ) -> Self {
         Self {
             push_rules,
             enabled_map,
+            msc3786_enabled,
+            msc3772_enabled,
         }
     }
 
@@ -312,13 +321,31 @@ impl FilteredPushRules {
 
 impl FilteredPushRules {
     fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {
-        self.push_rules.iter().map(|r| {
-            let enabled = *self
-                .enabled_map
-                .get(&*r.rule_id)
-                .unwrap_or(&r.default_enabled);
-            (r, enabled)
-        })
+        self.push_rules
+            .iter()
+            .filter(|rule| {
+                // Ignore disabled experimental push rules
+                if !self.msc3786_enabled
+                    && rule.rule_id == "global/override/.org.matrix.msc3786.rule.room.server_acl"
+                {
+                    return false;
+                }
+
+                if !self.msc3772_enabled
+                    && rule.rule_id == "global/underride/.org.matrix.msc3772.thread_reply"
+                {
+                    return false;
+                }
+
+                true
+            })
+            .map(|r| {
+                let enabled = *self
+                    .enabled_map
+                    .get(&*r.rule_id)
+                    .unwrap_or(&r.default_enabled);
+                (r, enabled)
+            })
     }
 }
 
@@ -465,9 +492,13 @@ impl PushRuleEvaluator {
                     return Ok(false);
                 };
 
+                let sender_compiled_pattern = glob_to_regex(sender_pattern, GlobMatchType::Whole)?;
+                let rel_type_compiled_pattern = glob_to_regex(rel_type, GlobMatchType::Whole)?;
+
                 for (relation_sender, event_type) in relations {
-                    // TODO: glob
-                    if relation_sender == sender_pattern && rel_type == event_type {
+                    if sender_compiled_pattern.is_match(&relation_sender)
+                        && rel_type_compiled_pattern.is_match(event_type)
+                    {
                         return Ok(true);
                     }
                 }
@@ -494,7 +525,7 @@ impl PushRuleEvaluator {
             };
             match &**pattern_type {
                 "user_id" => user_id,
-                "user_localpart" => utils::get_localpart_from_id(user_id)?, // TODO
+                "user_localpart" => utils::get_localpart_from_id(user_id)?,
                 _ => return Ok(false),
             }
         } else {

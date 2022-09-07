@@ -81,10 +81,17 @@ def _load_rules(
         for rawrule in rawrules
     ]
 
-    push_rules = PushRules(ruleslist)
+    push_rules = PushRules(
+        ruleslist,
+    )
 
     # TODO: Experimental config
-    filtered_rules = FilteredPushRules(push_rules, enabled_map)
+    filtered_rules = FilteredPushRules(
+        push_rules,
+        enabled_map,
+        msc3786_enabled=experimental_config.msc3786_enabled,
+        msc3772_enabled=experimental_config.msc3772_enabled,
+    )
 
     return filtered_rules
 
