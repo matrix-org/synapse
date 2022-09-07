@@ -159,14 +159,14 @@ class BulkPushRuleEvaluator:
 
         rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
-        # logger.debug("Users in room: %s", local_users)
+        logger.debug("Users in room: %s", local_users)
 
-        # if logger.isEnabledFor(logging.DEBUG):
-        #     logger.debug(
-        #         "Returning push rules for %r %r",
-        #         event.room_id,
-        #         list(rules_by_user.keys()),
-        #     )
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Returning push rules for %r %r",
+                event.room_id,
+                list(rules_by_user.keys()),
+            )
 
         return rules_by_user
 
