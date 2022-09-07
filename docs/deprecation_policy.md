@@ -22,7 +22,8 @@ the minimum required version may be bumped up to a recent Rust version, and so
 people building from source should ensure they can fetch recent versions of Rust
 (e.g. by using [rustup](https://rustup.rs/)).
 
-The oldest supported version of SQLite is the version provided by
+The oldest supported version of SQLite is the version
+[provided](https://packages.debian.org/buster/libsqlite3-0) by
 [Debian oldstable](https://wiki.debian.org/DebianOldStable).
 
 Context
