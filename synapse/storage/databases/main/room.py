@@ -25,6 +25,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
@@ -1131,6 +1132,22 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         return await self.db_pool.runInteraction(
             "get_rooms_for_retention_period_in_range",
             get_rooms_for_retention_period_in_range_txn,
+        )
+
+    async def get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
+        """Gets the list of servers in a partial state room at the time we joined it.
+
+        Returns:
+            The `servers_in_room` list from the `/send_join` response for partial state
+            rooms. May not be accurate or complete, as it comes from a remote
+            homeserver.
+            An empty list for full state rooms.
+        """
+        return await self.db_pool.simple_select_onecol(
+            "partial_state_rooms_servers",
+            keyvalues={"room_id": room_id},
+            retcol="server_name",
+            desc="get_partial_state_servers_at_join",
         )
 
     async def get_partial_state_rooms_and_servers(
