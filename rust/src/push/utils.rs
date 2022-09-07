@@ -13,7 +13,7 @@ pub(crate) fn get_localpart_from_id(id: &str) -> Result<&str, Error> {
         .with_context(|| format!("ID does not contain colon: {id}"))?;
 
     // We need to strip off the first character, which is the ID type.
-    if localpart.len() == 0 {
+    if localpart.is_empty() {
         bail!("Invalid ID {id}");
     }
 

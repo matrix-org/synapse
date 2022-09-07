@@ -5,14 +5,14 @@
 //! allocation atm).
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
-use log::{info, warn};
+use log::warn;
 use pyo3::prelude::*;
 use pythonize::pythonize;
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -105,7 +105,7 @@ impl PushRule {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     DontNotify,
     Notify,
@@ -119,7 +119,7 @@ impl IntoPy<PyObject> for Action {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SetTweak {
     set_tweak: Cow<'static, str>,
     value: Option<TweakValue>,
@@ -130,7 +130,7 @@ pub struct SetTweak {
     other_keys: Value,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum TweakValue {
     String(Cow<'static, str>),
