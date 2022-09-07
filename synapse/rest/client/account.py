@@ -741,21 +741,25 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    class PostBody(RequestBodyModel):
+        address: StrictStr
+        id_server: Optional[StrictStr] = None
+        medium: ThreepidMedium
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["medium", "address"])
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         try:
             ret = await self.auth_handler.delete_threepid(
-                user_id, body["medium"], body["address"], body.get("id_server")
+                user_id, body.medium, body.address, body.id_server
             )
         except Exception:
             # NB. This endpoint should succeed if there is nothing to
