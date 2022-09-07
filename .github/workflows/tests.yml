@@ -144,6 +144,7 @@ jobs:
         with:
             toolchain: 1.61.0
             override: true
+      - uses: Swatinem/rust-cache@v2
 
       # There aren't wheels for some of the older deps, so we need to install
       # their build dependencies
@@ -253,11 +254,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
             toolchain: 1.61.0
             override: true
+      - uses: Swatinem/rust-cache@v2
+
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -369,6 +373,7 @@ jobs:
         with:
             toolchain: 1.61.0
             override: true
+      - uses: Swatinem/rust-cache@v2
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
