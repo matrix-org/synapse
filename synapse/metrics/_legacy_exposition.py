@@ -95,6 +95,9 @@ LEGACY_METRIC_NAMES = {
     "synapse_util_caches_response_cache": "synapse_util_caches_response_cache:total",
     "synapse_federation_client_sent_pdu_destinations": "synapse_federation_client_sent_pdu_destinations:total",
     "synapse_federation_client_sent_pdu_destinations_count": "synapse_federation_client_sent_pdu_destinations:count",
+    "synapse_admin_mau_current": "synapse_admin_mau:current",
+    "synapse_admin_mau_max": "synapse_admin_mau:max",
+    "synapse_admin_mau_registered_reserved_users": "synapse_admin_mau:registered_reserved_users",
 }
 
 
