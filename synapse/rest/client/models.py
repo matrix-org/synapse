@@ -36,18 +36,20 @@ class AuthenticationData(RequestBodyModel):
     type: Optional[StrictStr] = None
 
 
-class ThreepidRequestTokenBody(RequestBodyModel):
-    if TYPE_CHECKING:
-        client_secret: StrictStr
-    else:
-        # See also assert_valid_client_secret()
-        client_secret: constr(
-            regex="[0-9a-zA-Z.=_-]",  # noqa: F722
-            min_length=0,
-            max_length=255,
-            strict=True,
-        )
+if TYPE_CHECKING:
+    ClientSecretType = StrictStr
+else:
+    # See also assert_valid_client_secret()
+    ClientSecretType = constr(
+        regex="[0-9a-zA-Z.=_-]",  # noqa: F722
+        min_length=0,
+        max_length=255,
+        strict=True,
+    )
 
+
+class ThreepidRequestTokenBody(RequestBodyModel):
+    client_secret: ClientSecretType
     id_server: Optional[StrictStr]
     id_access_token: Optional[StrictStr]
     next_link: Optional[StrictStr]
