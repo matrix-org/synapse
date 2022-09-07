@@ -688,11 +688,15 @@ class DeviceHandler(DeviceWorkerHandler):
                     # Ignore any users that aren't ours
                     if self.hs.is_mine_id(user_id):
                         hosts = set(
-                            await self._storage_controllers.state.get_current_hosts_in_room(
+                            await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
                                 room_id
                             )
                         )
                         hosts.discard(self.server_name)
+                        # For rooms with partial state, `hosts` is merely an
+                        # approximation. When we transition to a full state room, we
+                        # will have to send out device list updates to any servers we
+                        # missed.
 
                     # Check if we've already sent this update to some hosts
                     if current_stream_id == stream_id:
