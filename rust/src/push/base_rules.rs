@@ -13,25 +13,25 @@ use crate::push::PushRule;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 
-pub(crate) const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
+const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
     value: None,
     other_keys: Value::Null,
 });
 
-pub(crate) const HIGHLIGHT_FALSE_ACTION: Action = Action::SetTweak(SetTweak {
+const HIGHLIGHT_FALSE_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
     value: Some(TweakValue::Other(Value::Bool(false))),
     other_keys: Value::Null,
 });
 
-pub(crate) const SOUND_ACTION: Action = Action::SetTweak(SetTweak {
+const SOUND_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("sound"),
     value: Some(TweakValue::String(Cow::Borrowed("default"))),
     other_keys: Value::Null,
 });
 
-pub(crate) const RING_ACTION: Action = Action::SetTweak(SetTweak {
+const RING_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("sound"),
     value: Some(TweakValue::String(Cow::Borrowed("ring"))),
     other_keys: Value::Null,
