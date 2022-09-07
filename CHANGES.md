@@ -8,10 +8,15 @@ notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v167
 The minimum version of `poetry` supported for managing source checkouts is now
 1.2.0.
 
-Notice: from the next major release (v1.68.0) installing Synapse from a source
+**Notice:** from the next major release (v1.68.0) installing Synapse from a source
 checkout will require a recent Rust compiler. Those using packages or
 `pip install matrix-synapse` will not be affected. See the [upgrade
 notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v1670).
+
+**Notice:** from the next major release (v1.68.0), running Synapse with a SQLite
+database will require SQLite version 3.27.0 or higher. (The [current minimum
+ version is SQLite 3.22.0](https://github.com/matrix-org/synapse/blob/release-v1.67/synapse/storage/engines/sqlite.py#L69-L78).)
+See [#12983](https://github.com/matrix-org/synapse/issues/12983) for more details.
 
 
 Features
