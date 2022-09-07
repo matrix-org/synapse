@@ -46,6 +46,7 @@ from synapse.rest.client.models import (
     ClientSecretType,
     EmailRequestTokenBody,
     MsisdnRequestTokenBody,
+    ThreepidMedium,
 )
 from synapse.rest.models import RequestBodyModel
 from synapse.types import JsonDict
@@ -706,23 +707,27 @@ class ThreepidUnbindRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.datastore = self.hs.get_datastores().main
 
+    class PostBody(RequestBodyModel):
+        address: StrictStr
+        id_server: Optional[StrictStr] = None
+        medium: ThreepidMedium
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Unbind the given 3pid from a specific identity server, or identity servers that are
         known to have this 3pid bound
         """
         requester = await self.auth.get_user_by_req(request)
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["medium", "address"])
-
-        medium = body.get("medium")
-        address = body.get("address")
-        id_server = body.get("id_server")
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # Attempt to unbind the threepid from an identity server. If id_server is None, try to
         # unbind from all identity servers this threepid has been added to in the past
         result = await self.identity_handler.try_unbind_threepid(
             requester.user.to_string(),
-            {"address": address, "medium": medium, "id_server": id_server},
+            {
+                "address": body.address,
+                "medium": body.medium,
+                "id_server": body.id_server,
+            },
         )
         return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
