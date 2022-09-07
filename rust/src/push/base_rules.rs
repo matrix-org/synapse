@@ -151,7 +151,25 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default: true,
         default_enabled: true,
     },
-    // TODO: org.matrix.msc3786.rule.room.server_acl
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3786.rule.room.server_acl"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+            Condition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("m.room.server_acl")),
+                pattern_type: None,
+            }),
+            Condition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("state_key"),
+                pattern: Some(Cow::Borrowed("")),
+                pattern_type: None,
+            }),
+        ]),
+        actions: Cow::Borrowed(&[]),
+        default: true,
+        default_enabled: true,
+    },
 ];
 
 pub const BASE_APPEND_CONTENT_RULES: &[PushRule] = &[PushRule {
@@ -214,7 +232,18 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
         default: true,
         default_enabled: true,
     },
-    // TODO: org.matrix.msc3772.thread_reply
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3772.thread_reply"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[Condition::RelationMatch {
+            rel_type: Cow::Borrowed("m.thread"),
+            sender: None,
+            sender_type: Some(Cow::Borrowed("user_id")),
+        }]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
     PushRule {
         rule_id: Cow::Borrowed("global/underride/.m.rule.message"),
         priority_class: 1,

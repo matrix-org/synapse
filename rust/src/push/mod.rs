@@ -9,17 +9,23 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
+use log::{info, warn};
 use pyo3::prelude::*;
 use pythonize::pythonize;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use self::utils::{glob_to_regex, GlobMatchType};
+
 mod base_rules;
+mod utils;
 
 lazy_static! {
     static ref INEQUALITY_EXPR: Regex = Regex::new(r"^([=<>]*)([0-9]*)$").expect("valid regex");
+    static ref WORD_BOUNDARY_EXPR: Regex = Regex::new(r"\W*\b\W*").expect("valid regex");
+    static ref WILDCARD_RUN: Regex = Regex::new(r"([^\?\*]*)([\?\*]*)").expect("valid regex");
 }
 
 /// Called when registering modules with python.
@@ -184,7 +190,13 @@ pub enum Condition {
         key: Cow<'static, str>,
     },
     #[serde(rename = "org.matrix.msc3772.relation_match")]
-    RelationMatch,
+    RelationMatch {
+        rel_type: Cow<'static, str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sender: Option<Cow<'static, str>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sender_type: Option<Cow<'static, str>>,
+    },
 }
 
 impl IntoPy<PyObject> for Condition {
@@ -240,12 +252,11 @@ impl PushRules {
                 2 => push_rules.sender.push(rule),
                 1 => push_rules.underride.push(rule),
                 _ => {
-                    // TODO
-                    panic!(
+                    warn!(
                         "Unrecognized priority class for rule {}: {}",
                         rule.rule_id, rule.priority_class
                     );
-                } // TODO: log
+                }
             }
         }
 
@@ -314,7 +325,7 @@ impl FilteredPushRules {
 #[pyclass]
 pub struct PushRuleEvaluator {
     flattened_keys: BTreeMap<String, String>,
-    split_body: HashSet<String>,
+    body: String,
     room_member_count: u64,
     power_levels: BTreeMap<String, BTreeMap<String, u64>>,
     relations: BTreeMap<String, BTreeSet<(String, String)>>,
@@ -330,22 +341,17 @@ impl PushRuleEvaluator {
         room_member_count: u64,
         sender_power_level: u64,
         power_levels: BTreeMap<String, BTreeMap<String, u64>>,
+        relations: BTreeMap<String, BTreeSet<(String, String)>>,
+        relation_match_enabled: bool,
     ) -> Result<Self, Error> {
-        let split_body = flattened_keys
+        let body = flattened_keys
             .get("content.body")
-            .map(|s| &**s)
-            .unwrap_or_default()
-            .split_whitespace()
-            .map(|s| s.to_owned())
-            .collect();
-
-        // TODO
-        let relations = BTreeMap::new();
-        let relation_match_enabled = false;
+            .cloned()
+            .unwrap_or_default();
 
         Ok(PushRuleEvaluator {
             flattened_keys,
-            split_body,
+            body,
             room_member_count,
             power_levels,
             relations,
@@ -367,8 +373,13 @@ impl PushRuleEvaluator {
             }
 
             for condition in push_rule.conditions.iter() {
-                if !self.match_condition(condition, user_id, display_name) {
-                    continue 'outer;
+                match self.match_condition(condition, user_id, display_name) {
+                    Ok(true) => {}
+                    Ok(false) => continue 'outer,
+                    Err(err) => {
+                        warn!("Condition match failed {err}");
+                        continue 'outer;
+                    }
                 }
             }
 
@@ -393,21 +404,20 @@ impl PushRuleEvaluator {
         condition: &Condition,
         user_id: Option<&str>,
         display_name: Option<&str>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let result = match condition {
-            Condition::EventMatch(event_match) => self
-                .match_event_match(event_match, user_id)
-                .unwrap_or(false),
+            Condition::EventMatch(event_match) => self.match_event_match(event_match, user_id)?,
             Condition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
-                    self.split_body.contains(dn)
+                    let matcher = glob_to_regex(dn, GlobMatchType::Word)?;
+                    matcher.is_match(&self.body)
                 } else {
                     false
                 }
             }
             Condition::RoomMemberCount { is } => {
                 if let Some(is) = is {
-                    self.match_member_count(is).unwrap_or(false)
+                    self.match_member_count(is)?
                 } else {
                     false
                 }
@@ -422,13 +432,51 @@ impl PushRuleEvaluator {
 
                 self.sender_power_level >= required_level
             }
-            Condition::RelationMatch => {
-                // TODO
+            Condition::RelationMatch {
+                rel_type,
+                sender,
+                sender_type,
+            } => {
+                if !self.relation_match_enabled {
+                    return Ok(false);
+                }
+
+                let sender_pattern = if let Some(sender) = sender {
+                    sender
+                } else if let Some(sender_type) = sender_type {
+                    if sender_type == "user_id" {
+                        if let Some(user_id) = user_id {
+                            user_id
+                        } else {
+                            return Ok(false);
+                        }
+                    } else {
+                        warn!("Unrecognized sender_type:  {sender_type}");
+                        return Ok(false);
+                    }
+                } else {
+                    warn!("relation_match condition missing sender or sender_type");
+                    return Ok(false);
+                };
+
+                let relations = if let Some(relations) = self.relations.get(&**rel_type) {
+                    relations
+                } else {
+                    return Ok(false);
+                };
+
+                for (relation_sender, event_type) in relations {
+                    // TODO: glob
+                    if relation_sender == sender_pattern && rel_type == event_type {
+                        return Ok(true);
+                    }
+                }
+
                 false
             }
         };
 
-        result
+        Ok(result)
     }
 
     fn match_event_match(
@@ -446,21 +494,19 @@ impl PushRuleEvaluator {
             };
             match &**pattern_type {
                 "user_id" => user_id,
-                "user_localpart" => user_id, // TODO
+                "user_localpart" => utils::get_localpart_from_id(user_id)?, // TODO
                 _ => return Ok(false),
             }
         } else {
             return Ok(false);
         };
 
-        let pattern = pattern.to_ascii_lowercase();
-
         if event_match.key == "content.body" {
-            // TODO: Handle globs
-            Ok(self.split_body.contains(&pattern))
+            let compiled_pattern = glob_to_regex(pattern, GlobMatchType::Word)?;
+            Ok(compiled_pattern.is_match(&self.body))
         } else if let Some(value) = self.flattened_keys.get(&*event_match.key) {
-            // TODO: Handle globs.
-            Ok(value.contains(&pattern))
+            let compiled_pattern = glob_to_regex(pattern, GlobMatchType::Whole)?;
+            Ok(compiled_pattern.is_match(value))
         } else {
             Ok(false)
         }
@@ -486,6 +532,16 @@ impl PushRuleEvaluator {
 
         Ok(matches)
     }
+}
+
+#[test]
+fn split_string() {
+    let split_body: Vec<_> = WORD_BOUNDARY_EXPR
+        .split("this is. A. TEST!!")
+        .filter(|s| *s != "")
+        .collect();
+
+    assert_eq!(split_body, ["this", "is", "A", "TEST"]);
 }
 
 #[test]
@@ -522,7 +578,15 @@ fn test_deserialize_action() {
 fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
-    let evaluator = PushRuleEvaluator::py_new(flattened_keys, 10, 0, BTreeMap::new()).unwrap();
+    let evaluator = PushRuleEvaluator::py_new(
+        flattened_keys,
+        10,
+        0,
+        BTreeMap::new(),
+        BTreeMap::new(),
+        true,
+    )
+    .unwrap();
 
     let result = evaluator.run(&FilteredPushRules::default(), None, Some("bob"));
     assert_eq!(result.len(), 3);

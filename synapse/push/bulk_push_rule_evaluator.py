@@ -292,8 +292,8 @@ class BulkPushRuleEvaluator:
             sender_power_level,
             # power_levels,
             {},  # TODO
-            # relations,
-            # self._relations_match_enabled,
+            relations,
+            self._relations_match_enabled,
         )
 
         users = rules_by_user.keys()
