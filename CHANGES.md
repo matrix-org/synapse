@@ -16,7 +16,7 @@ notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v167
 **Notice:** from the next major release (v1.68.0), running Synapse with a SQLite
 database will require SQLite version 3.27.0 or higher. (The [current minimum
  version is SQLite 3.22.0](https://github.com/matrix-org/synapse/blob/release-v1.67/synapse/storage/engines/sqlite.py#L69-L78).)
-See [#12983](https://github.com/matrix-org/synapse/issues/12983) for more details.
+See [#12983](https://github.com/matrix-org/synapse/issues/12983) and the [upgrade notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v1670). for more details.
 
 
 Features
