@@ -49,14 +49,6 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         return True
 
     @property
-    def can_native_upsert(self) -> bool:
-        """
-        Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
-        more work we haven't done yet to tell what was inserted vs updated.
-        """
-        return sqlite3.sqlite_version_info >= (3, 24, 0)
-
-    @property
     def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return False
