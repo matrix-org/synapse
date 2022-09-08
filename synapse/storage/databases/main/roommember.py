@@ -192,8 +192,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         (aka. with the lowest depth). This is done to match the sort in
         `get_current_hosts_in_room()` and so we can re-use the cache but it's
         not horrible to have here either.
-        """
 
+        Uses `m.room.member`s in the room state at the current forward extremities to
+        determine which users are in the room.
+
+        Will return inaccurate results for rooms with partial state, since the state for
+        the forward extremities of those rooms will exclude most members. We may also
+        calculate room state incorrectly for such rooms and believe that a member is or
+        is not in the room when the opposite is true.
+        """
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )
@@ -1021,6 +1028,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         The heuristic of sorting by servers who have been in the room the
         longest is good because they're most likely to have anything we ask
         about.
+
+        Uses `m.room.member`s in the room state at the current forward extremities to
+        determine which hosts are in the room.
+
+        Will return inaccurate results for rooms with partial state, since the state for
+        the forward extremities of those rooms will exclude most members. We may also
+        calculate room state incorrectly for such rooms and believe that a host is or
+        is not in the room when the opposite is true.
 
         Returns:
             Returns a list of servers sorted by longest in the room first. (aka.
