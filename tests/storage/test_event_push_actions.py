@@ -77,13 +77,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
             self.assertEqual(
-                counts,
+                counts.main_timeline,
                 NotifCounts(
                     notify_count=noitf_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
             )
+            self.assertEqual(counts.threads, {})
 
         def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
