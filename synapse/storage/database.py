@@ -1195,7 +1195,7 @@ class DatabasePool:
     ) -> bool:
         """
         Pick the UPSERT method which works best on the platform. Either the
-        native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
+        native one (Pg9.5+, SQLite >= 3.24), or fall back to an emulated method.
 
         Args:
             txn: The transaction to use.
@@ -1203,7 +1203,8 @@ class DatabasePool:
             keyvalues: The unique key tables and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
-            lock: True to lock the table when doing the upsert.
+            lock: True to lock the table when doing the upsert. Unused when performing
+                a native upsert.
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
             not empty then this always returns True)
@@ -1361,8 +1362,8 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
-            lock: True to lock the table when doing the upsert. Unused if the database engine
-                supports native upserts.
+            lock: True to lock the table when doing the upsert. Unused when performing
+                a native upsert.
         """
 
         # We can autocommit if it safe to upsert
@@ -1400,8 +1401,8 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
-            lock: True to lock the table when doing the upsert. Unused if the database engine
-                supports native upserts.
+            lock: True to lock the table when doing the upsert. Unused when performing
+                a native upsert.
         """
         if table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
