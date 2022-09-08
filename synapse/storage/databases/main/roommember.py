@@ -1044,6 +1044,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # We use a `Set` just for fast lookups
             domain_set: Set[str] = set()
             for u in users:
+                if ":" not in u:
+                    continue
                 domain = get_domain_from_id(u)
                 if domain not in domain_set:
                     domain_set.add(domain)
@@ -1077,7 +1079,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 ORDER BY min(e.depth) ASC;
             """
             txn.execute(sql, (room_id,))
-            return [d for d, in txn]
+            # `server_domain` will be `NULL` for malformed MXIDs with no colons.
+            return [d for d, in txn if d is not None]
 
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room", get_current_hosts_in_room_txn
