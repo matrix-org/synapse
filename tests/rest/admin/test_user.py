@@ -2580,6 +2580,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("appservice_id", content)
         self.assertIn("consent_server_notice_sent", content)
         self.assertIn("consent_version", content)
+        self.assertIn("consent_ts", content)
         self.assertIn("external_ids", content)
 
         # This key was removed intentionally. Ensure it is not accidentally re-included.
