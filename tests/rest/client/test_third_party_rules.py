@@ -407,6 +407,10 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         """
         self.helper.create_room_as(self.user_id, tok=self.tok, expect_code=403)
 
+    @unittest.skip_unless(
+        False,
+        "Beeper: parallel room event create limit = 1, cannot send additional events while handling an event",
+    )
     def test_sent_event_end_up_in_room_state(self) -> None:
         """Tests that a state event sent by a module while processing another state event
         doesn't get dropped from the state of the room. This is to guard against a bug
