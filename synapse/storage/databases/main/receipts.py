@@ -694,6 +694,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "stream_id": stream_id,
                 "event_id": event_id,
                 "data": json_encoder.encode(data),
+                "thread_id": None,
             },
             # receipts_linearized has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
@@ -841,6 +842,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             values={
                 "event_ids": json_encoder.encode(event_ids),
                 "data": json_encoder.encode(data),
+                "thread_id": None,
             },
             # receipts_graph has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
