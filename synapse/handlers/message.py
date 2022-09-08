@@ -497,7 +497,9 @@ class EventCreationHandler:
 
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
-        self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
+        # Beeper: limit changed from 5 -> 1, see:
+        # https://mau.dev/maunium/synapse/-/commit/d4ec0b6762852ce2e7e9a741db57ad459922c5a3
+        self.limiter = Linearizer(max_count=1, name="room_event_creation_limit")
 
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
