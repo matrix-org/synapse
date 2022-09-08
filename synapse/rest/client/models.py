@@ -49,7 +49,7 @@ else:
     # See also assert_valid_client_secret()
     ClientSecretType = constr(
         regex="[0-9a-zA-Z.=_-]",  # noqa: F722
-        min_length=0,
+        min_length=1,
         max_length=255,
         strict=True,
     )
