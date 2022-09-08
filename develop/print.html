@@ -12309,6 +12309,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api">Ad
     &quot;appservice_id&quot;: null,
     &quot;consent_server_notice_sent&quot;: null,
     &quot;consent_version&quot;: null,
+    &quot;consent_ts&quot;: null,
     &quot;external_ids&quot;: [
         {
             &quot;auth_provider&quot;: &quot;&lt;provider1&gt;&quot;,
@@ -12616,6 +12617,7 @@ is set to <code>true</code>:</p>
 <li>Remove the user's creation (registration) timestamp</li>
 <li><a href="admin_api/user_admin_api.html#override-ratelimiting-for-users">Remove rate limit overrides</a></li>
 <li>Remove from monthly active users</li>
+<li>Remove user's consent information (consent version and timestamp)</li>
 </ul>
 <h2 id="reset-password"><a class="header" href="#reset-password">Reset password</a></h2>
 <p>Changes the password of another user. This will automatically log the user out of all their devices.</p>
