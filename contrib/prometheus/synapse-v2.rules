@@ -39,7 +39,7 @@ groups:
       type: "PDU"
     expr: 'synapse_federation_transaction_queue_pending_pdus + 0'
 
-  # These 4 rules are used in the included Grafana dashboard
+  # These 3 rules are used in the included Grafana dashboard
   - record: synapse_storage_events_persisted_by_source_type
     expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep_total{origin_type="remote"})
     labels:
