@@ -203,6 +203,9 @@ if TYPE_CHECKING:
 
 # Helper class
 
+# Matches the number suffix in an instance name like "matrix.org client_reader-8"
+STRIP_INSTANCE_NUMBER_SUFFIX_REGEX = re.compile(r"[_-]?\d+$")
+
 
 class _DummyTagNames:
     """wrapper of opentracings tags. We need to have them if we
@@ -443,7 +446,9 @@ def init_tracer(hs: "HomeServer") -> None:
 
     config = JaegerConfig(
         config=hs.config.tracing.jaeger_config,
-        service_name=f"{hs.config.server.server_name} - Synapse",
+        service_name=re.sub(
+            STRIP_INSTANCE_NUMBER_SUFFIX_REGEX, "", hs.config.server.server_name
+        ),
         scope_manager=LogContextScopeManager(),
         metrics_factory=PrometheusMetricsFactory(),
     )
