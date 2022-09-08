@@ -5,7 +5,7 @@
 #
 # As an overview this workflow:
 # - checks out develop,
-# - installs from source, pulling in the dependencies like a fresh `pip install` would, and 
+# - installs from source, pulling in the dependencies like a fresh `pip install` would, and
 # - runs mypy and test suites in that checkout.
 #
 # Based on the twisted trunk CI job.
@@ -26,12 +26,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
       # The dev dependencies aren't exposed in the wheel metadata (at least with current
       # poetry-core versions), so we install with poetry.
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
-          poetry-version: "1.2.0b1"
+          poetry-version: "1.2.0"
           extras: "all"
       # Dump installed versions for debugging.
       - run: poetry run pip list > before.txt
@@ -53,6 +60,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.postgres-version }}
         if: ${{ matrix.postgres-version }}
@@ -69,6 +84,12 @@ jobs:
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
+
+      # We nuke the local copy, as we've installed synapse into the virtualenv
+      # (rather than use an editable install, which we no longer support). If we
+      # don't do this then python can't find the native lib.
+      - run: rm -rf synapse/
+
       - run: python -m twisted.trial --jobs=2 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
@@ -113,6 +134,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
       - name: Ensure sytest runs `pip install`
         # Delete the lockfile so sytest will `pip install` rather than `poetry install`
         run: rm /src/poetry.lock
@@ -187,4 +216,3 @@ jobs:
         with:
           update_existing: true
           filename: .ci/latest_deps_build_failed_issue_template.md
-

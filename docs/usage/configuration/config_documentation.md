@@ -431,8 +431,6 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (deprecated as of Synapse 1.18, see the docs [here](../../workers.md)).
-
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
@@ -1071,8 +1069,10 @@ Options related to caching.
 ---
 ### `event_cache_size`
 
-The number of events to cache in memory. Not affected by
-`caches.global_factor` and is not part of the `caches` section. Defaults to 10K.
+The number of events to cache in memory. Defaults to 10K. Like other caches,
+this is affected by `caches.global_factor` (see below).
+
+Note that this option is not part of the `caches` section.
 
 Example configuration:
 ```yaml
