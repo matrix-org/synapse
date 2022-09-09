@@ -102,6 +102,7 @@ SQLITE_DB=$TMPDIR/homeserver.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
+# TODO: the trap should also drop the temp postgres DB
 trap 'rm -rf $TMPDIR' EXIT
 
 cat > "$SQLITE_CONFIG" <<EOF
@@ -153,18 +154,12 @@ synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" -
 echo "Creating postgres database..."
 createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_DB_NAME"
 
-echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
-if [ -z "$COVERAGE" ]; then
-  # No coverage needed
-  synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
-else
-  # Coverage desired
-  coverage run synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
-fi
+echo "Running db background jobs..."
+synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
+
 
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
 # Also delete any shadow tables from fts4
-# This needs to be done after synapse_port_db is run
 echo "Dropping unwanted db tables..."
 SQL="
 DROP TABLE schema_version;
