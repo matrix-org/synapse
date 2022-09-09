@@ -53,6 +53,7 @@ from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
 
@@ -668,6 +669,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
         ...
 
     @trace
+    @cancellable
     async def get_user_devices_from_cache(
         self, query_list: List[Tuple[str, Optional[str]]]
     ) -> Tuple[Set[str], Dict[str, Dict[str, JsonDict]]]:
@@ -743,6 +745,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
 
         return self._device_list_stream_cache.get_all_entities_changed(from_key)
 
+    @cancellable
     async def get_users_whose_devices_changed(
         self,
         from_key: int,
@@ -1221,6 +1224,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             desc="get_min_device_lists_changes_in_room",
         )
 
+    @cancellable
     async def get_device_list_changes_in_rooms(
         self, room_ids: Collection[str], from_id: int
     ) -> Optional[Set[str]]:

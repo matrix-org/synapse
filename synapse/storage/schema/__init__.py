@@ -75,6 +75,7 @@ Changes in SCHEMA_VERSION = 71:
 Changes in SCHEMA_VERSION = 72:
     - event_edges.(room_id, is_state) are no longer written to.
     - Tables related to groups are dropped.
+    - Unused column application_services_state.last_txn is dropped
     - Rename column in `device_lists_outbound_pokes` and `device_lists_changes_in_room`
       from `opentracing_context` to generalized `tracing_context`.
 """

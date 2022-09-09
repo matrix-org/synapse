@@ -199,6 +199,9 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
+# Matches the number suffix in an instance name like "matrix.org client_reader-8"
+STRIP_INSTANCE_NUMBER_SUFFIX_REGEX = re.compile(r"[_-]?\d+$")
+
 
 class _DummyLookup(object):
     """This will always returns the fixed value given for any accessed property"""
@@ -264,6 +267,9 @@ class SynapseTags:
 
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
+
+    # The Synapse instance name
+    INSTANCE_NAME = "instance_name"
 
     # incoming HTTP request ID  (as written in the logs)
     REQUEST_ID = "request_id"
@@ -400,9 +406,17 @@ def init_tracer(hs: "HomeServer") -> None:
     # Pull out of the config if it was given. Otherwise set it to something sensible.
     set_homeserver_whitelist(hs.config.tracing.homeserver_whitelist)
 
+    # Instance names are opaque strings but by stripping off the number suffix,
+    # we can get something that looks like a "worker type", e.g.
+    # "client_reader-1" -> "client_reader" so we don't spread the traces across
+    # so many services.
+    instance_name_by_type = re.sub(
+        STRIP_INSTANCE_NUMBER_SUFFIX_REGEX, "", hs.get_instance_name()
+    )
+
     resource = opentelemetry.sdk.resources.Resource(
         attributes={
-            opentelemetry.sdk.resources.SERVICE_NAME: f"{hs.config.server.server_name} {hs.get_instance_name()}"
+            opentelemetry.sdk.resources.SERVICE_NAME: f"{hs.config.server.server_name} {instance_name_by_type}"
         }
     )
 
