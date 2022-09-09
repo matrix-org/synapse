@@ -30,14 +30,41 @@ def check_rust_lib_up_to_date() -> None:
         return
 
     synapse_dir = os.path.dirname(synapse.__file__)
-    hash = _hash_rust_files_in_directory(f"{synapse_dir}/../rust/src")
+    synapse_root = os.path.abspath(os.path.join(synapse_dir, ".."))
+
+    # Double check we've not gone into site-packages...
+    if os.path.basename(synapse_root) == "site-packages":
+        return
+
+    # ... and it looks like the root of a python project.
+    if not os.path.exists("pyproject.toml"):
+        return
+
+    # Get the hash of all Rust source files
+    hash = _hash_rust_files_in_directory(os.path.join(synapse_root, "rust", "src"))
 
     if hash != get_rust_file_digest():
         raise Exception("Rust module outdated. Please rebuild using `poetry install`")
 
 
 def _hash_rust_files_in_directory(directory: str) -> str:
-    paths = glob("**/*.rs", recursive=True, root_dir=directory)
+    """Get the hash of all files in a directory (recursively)"""
+
+    directory = os.path.abspath(directory)
+
+    paths = []
+
+    dirs = [directory]
+    while dirs:
+        dir = dirs.pop()
+        with os.scandir(dir) as d:
+            for f in d:
+                if f.is_dir():
+                    dirs.append(f.path)
+                else:
+                    paths.append(f.path)
+
+    # We sort to make sure that we get a consistent and well-defined ordering.
     paths.sort()
 
     hasher = blake2b()
