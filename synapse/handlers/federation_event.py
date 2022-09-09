@@ -864,7 +864,7 @@ class FederationEventHandler:
             logger.warning("Event %s failed sanity check: %s", event_id, err)
             if backfilled:
                 await self._store.record_event_failed_pull_attempt(
-                    event.room_id, event_id
+                    event.room_id, event_id, str(err)
                 )
             return
 
@@ -903,7 +903,7 @@ class FederationEventHandler:
         except FederationError as e:
             if backfilled:
                 await self._store.record_event_failed_pull_attempt(
-                    event.room_id, event_id
+                    event.room_id, event_id, str(e)
                 )
 
             if e.code == 403:

@@ -1296,7 +1296,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
     @trace
     async def record_event_failed_pull_attempt(
-        self, room_id: str, event_id: str
+        self, room_id: str, event_id: str, cause: str
     ) -> None:
         """
         Record when we fail to pull an event over federation.
@@ -1308,12 +1308,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         Args:
             room_id: The room where the event failed to pull from
             event_id: The event that failed to be fetched or processed
+            cause: The error message or reason that we failed to pull the event
         """
         await self.db_pool.runInteraction(
             "record_event_failed_pull_attempt",
             self._record_event_failed_pull_attempt_upsert_txn,
             room_id,
             event_id,
+            cause,
             db_autocommit=True,  # Safe as it's a single upsert
         )
 
@@ -1322,18 +1324,20 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         txn: LoggingTransaction,
         room_id: str,
         event_id: str,
+        cause: str,
     ) -> None:
         sql = """
             INSERT INTO event_failed_pull_attempts (
-                room_id, event_id, num_attempts, last_attempt_ts
+                room_id, event_id, num_attempts, last_attempt_ts, last_cause
             )
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
             ON CONFLICT (room_id, event_id) DO UPDATE SET
                 num_attempts=event_failed_pull_attempts.num_attempts + 1,
-                last_attempt_ts=EXCLUDED.last_attempt_ts;
+                last_attempt_ts=EXCLUDED.last_attempt_ts,
+                last_cause=EXCLUDED.last_cause;
         """
 
-        txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec()))
+        txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
 
     async def get_missing_events(
         self,

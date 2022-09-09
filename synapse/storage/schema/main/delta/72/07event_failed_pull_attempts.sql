@@ -24,5 +24,6 @@ CREATE TABLE IF NOT EXISTS event_failed_pull_attempts(
     event_id TEXT NOT NULL,
     num_attempts INT NOT NULL,
     last_attempt_ts BIGINT NOT NULL,
+    last_cause TEXT NOT NULL,
     PRIMARY KEY (room_id, event_id)
 );

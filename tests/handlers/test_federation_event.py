@@ -412,7 +412,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # if it's cleared out later on.
         self.get_success(
             main_store.record_event_failed_pull_attempt(
-                pulled_event.room_id, pulled_event.event_id
+                pulled_event.room_id, pulled_event.event_id, "fake cause"
             )
         )
         # Make sure we have a failed pull attempt recorded for the pulled event
