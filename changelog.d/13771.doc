@@ -1,0 +1,1 @@
+Document easy room purge benefit of using `(room_id, event_id)` in our database schemas.
