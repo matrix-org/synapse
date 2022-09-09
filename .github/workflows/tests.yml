@@ -448,7 +448,7 @@ jobs:
       - linting-done
       - changes
 
-        if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
       - uses: actions/checkout@v2
