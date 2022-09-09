@@ -1309,27 +1309,15 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id: The room where the event failed to backfill from
             event_id: The event that failed to be backfilled
         """
-        if (
-            self.database_engine.can_native_upsert
-            and "event_failed_backfill_attempts"
-            not in self.db_pool._unsafe_to_upsert_tables
-        ):
-            await self.db_pool.runInteraction(
-                "record_event_failed_backfill_attempt",
-                self._record_event_failed_backfill_attempt_upsert_native_txn,
-                room_id,
-                event_id,
-                db_autocommit=True,  # Safe as its a single upsert
-            )
-        else:
-            await self.db_pool.runInteraction(
-                "record_event_failed_backfill_attempt",
-                self._record_event_failed_backfill_attempt_upsert_emulated_txn,
-                room_id,
-                event_id,
-            )
+        await self.db_pool.runInteraction(
+            "record_event_failed_backfill_attempt",
+            self._record_event_failed_backfill_attempt_upsert_txn,
+            room_id,
+            event_id,
+            db_autocommit=True,  # Safe as it's a single upsert
+        )
 
-    def _record_event_failed_backfill_attempt_upsert_native_txn(
+    def _record_event_failed_backfill_attempt_upsert_txn(
         self,
         txn: LoggingTransaction,
         room_id: str,
@@ -1348,44 +1336,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec()))
-
-    def _record_event_failed_backfill_attempt_upsert_emulated_txn(
-        self,
-        txn: LoggingTransaction,
-        room_id: str,
-        event_id: str,
-    ) -> None:
-        self.database_engine.lock_table(txn, "event_failed_backfill_attempts")
-
-        prev_row = self.db_pool.simple_select_one_txn(
-            txn,
-            table="event_failed_backfill_attempts",
-            keyvalues={"room_id": room_id, "event_id": event_id},
-            retcols=("num_attempts"),
-            allow_none=True,
-        )
-
-        if not prev_row:
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="event_failed_backfill_attempts",
-                values={
-                    "room_id": room_id,
-                    "event_id": event_id,
-                    "num_attempts": 1,
-                    "last_attempt_ts": self._clock.time_msec(),
-                },
-            )
-        else:
-            self.db_pool.simple_update_one_txn(
-                txn,
-                table="event_failed_backfill_attempts",
-                keyvalues={"room_id": room_id, "event_id": event_id},
-                updatevalues={
-                    "num_attempts": prev_row["num_attempts"] + 1,
-                    "last_attempt_ts": self._clock.time_msec(),
-                },
-            )
 
     async def get_missing_events(
         self,
