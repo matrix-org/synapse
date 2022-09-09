@@ -31,7 +31,7 @@ from prometheus_client import Counter, Gauge
 
 from synapse.api.constants import MAX_DEPTH, EventTypes
 from synapse.api.errors import StoreError
-from synapse.api.room_versions import EventFormatVersions, RoomVersion
+from synapse.api.room_versions import EventFormatVersion, RoomVersion
 from synapse.events import EventBase, make_event_from_dict
 from synapse.logging.opentracing import tag_args, trace
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -1608,7 +1608,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 logger.info("Invalid prev_events for %s", event_id)
                 continue
 
-            if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
+            if room_version.event_format == EventFormatVersion.ROOM_V1_V2:
                 for prev_event_tuple in prev_events:
                     if (
                         not isinstance(prev_event_tuple, list)

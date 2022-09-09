@@ -20,7 +20,7 @@ from twisted.enterprise.adbapi import ConnectionPool
 from twisted.internet.defer import CancelledError, Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.room_versions import EventFormatVersions, RoomVersions
+from synapse.api.room_versions import EventFormatVersion, RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
 from synapse.rest import admin
@@ -254,7 +254,7 @@ class DatabaseOutageTestCase(unittest.HomeserverTestCase):
                         "room_id": self.room_id,
                         "json": json.dumps(event_json),
                         "internal_metadata": "{}",
-                        "format_version": EventFormatVersions.ROOM_V4_PLUS,
+                        "format_version": EventFormatVersion.ROOM_V4_PLUS,
                     },
                 )
             )

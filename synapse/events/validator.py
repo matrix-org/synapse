@@ -18,7 +18,7 @@ import jsonschema
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
-from synapse.api.room_versions import EventFormatVersions
+from synapse.api.room_versions import EventFormatVersion
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
@@ -45,7 +45,7 @@ class EventValidator:
         """
         self.validate_builder(event)
 
-        if event.format_version == EventFormatVersions.ROOM_V1_V2:
+        if event.format_version == EventFormatVersion.ROOM_V1_V2:
             EventID.from_string(event.event_id)
 
         required = [

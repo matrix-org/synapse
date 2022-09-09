@@ -42,7 +42,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
-    EventFormatVersions,
+    EventFormatVersion,
     RoomVersion,
     RoomVersions,
 )
@@ -147,7 +147,7 @@ class _EventRow:
     stream_ordering: int
     json: str
     internal_metadata: str
-    format_version: Optional[EventFormatVersions]
+    format_version: Optional[EventFormatVersion]
     room_version_id: Optional[str]
     rejected_reason: Optional[str]
     redactions: List[str]
@@ -1160,7 +1160,7 @@ class EventsWorkerStore(SQLBaseStore):
             if format_version is None:
                 # This means that we stored the event before we had the concept
                 # of a event format version, so it must be a V1 event.
-                format_version = EventFormatVersions.ROOM_V1_V2
+                format_version = EventFormatVersion.ROOM_V1_V2
 
             room_version_id = row.room_version_id
 
@@ -1190,10 +1190,10 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 # So, the following approximations should be adequate.
 
-                if format_version == EventFormatVersions.ROOM_V1_V2:
+                if format_version == EventFormatVersion.ROOM_V1_V2:
                     # if it's event format v1 then it must be room v1 or v2
                     room_version = RoomVersions.V1
-                elif format_version == EventFormatVersions.ROOM_V3:
+                elif format_version == EventFormatVersion.ROOM_V3:
                     # if it's event format v2 then it must be room v3
                     room_version = RoomVersions.V3
                 else:
@@ -1341,7 +1341,7 @@ class EventsWorkerStore(SQLBaseStore):
                     json=row[3],
                     # TODO is this the best way to do it?
                     format_version=(
-                        EventFormatVersions(row[4]) if row[4] is not None else None
+                        EventFormatVersion(row[4]) if row[4] is not None else None
                     ),
                     room_version_id=row[5],
                     rejected_reason=row[6],

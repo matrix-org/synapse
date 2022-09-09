@@ -38,7 +38,7 @@ from typing_extensions import Literal
 from unpaddedbase64 import encode_base64
 
 from synapse.api.constants import RelationTypes
-from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
+from synapse.api.room_versions import EventFormatVersion, RoomVersion, RoomVersions
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
@@ -293,7 +293,7 @@ class _EventInternalMetadata:
 class EventBase(metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
-    def format_version(self) -> EventFormatVersions:
+    def format_version(self) -> EventFormatVersion:
         """The EventFormatVersion implemented by this event"""
         ...
 
@@ -442,7 +442,7 @@ class EventBase(metaclass=abc.ABCMeta):
 
 
 class FrozenEvent(EventBase):
-    format_version = EventFormatVersions.ROOM_V1_V2  # All events of this type are V1
+    format_version = EventFormatVersion.ROOM_V1_V2  # All events of this type are V1
 
     def __init__(
         self,
@@ -490,7 +490,7 @@ class FrozenEvent(EventBase):
 
 
 class FrozenEventV2(EventBase):
-    format_version = EventFormatVersions.ROOM_V3  # All events of this type are V2
+    format_version = EventFormatVersion.ROOM_V3  # All events of this type are V2
 
     def __init__(
         self,
@@ -567,7 +567,7 @@ class FrozenEventV2(EventBase):
 class FrozenEventV3(FrozenEventV2):
     """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
 
-    format_version = EventFormatVersions.ROOM_V4_PLUS  # All events of this type are V3
+    format_version = EventFormatVersion.ROOM_V4_PLUS  # All events of this type are V3
 
     @property
     def event_id(self) -> str:
@@ -584,7 +584,7 @@ class FrozenEventV3(FrozenEventV2):
 
 
 def _event_type_from_format_version(
-    format_version: EventFormatVersions,
+    format_version: EventFormatVersion,
 ) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
@@ -597,11 +597,11 @@ def _event_type_from_format_version(
         `FrozenEvent`
     """
 
-    if format_version == EventFormatVersions.ROOM_V1_V2:
+    if format_version == EventFormatVersion.ROOM_V1_V2:
         return FrozenEvent
-    elif format_version == EventFormatVersions.ROOM_V3:
+    elif format_version == EventFormatVersion.ROOM_V3:
         return FrozenEventV2
-    elif format_version == EventFormatVersions.ROOM_V4_PLUS:
+    elif format_version == EventFormatVersion.ROOM_V4_PLUS:
         return FrozenEventV3
     else:
         raise Exception("No event format %r" % (format_version,))

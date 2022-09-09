@@ -49,7 +49,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
-    EventFormatVersions,
+    EventFormatVersion,
     RoomVersion,
     RoomVersions,
 )
@@ -1190,7 +1190,7 @@ class FederationClient(FederationBase):
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
             if self._is_unknown_endpoint(e, err):
-                if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
+                if room_version.event_format != EventFormatVersion.ROOM_V1_V2:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",
