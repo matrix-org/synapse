@@ -22,7 +22,7 @@ usage() {
   echo "  Username to connect to local postgres instance. The password will be requested"
   echo "  during script execution."
   echo "-c"
-  echo "  CI mode. Enables coverage tracking and prints every command that the script runs."
+  echo "  CI mode. Prints every command that the script runs."
   echo "-o <path>"
   echo "  Directory to output full schema files to."
   echo "-h"
@@ -37,11 +37,6 @@ while getopts "p:co:h" opt; do
     c)
       # Print all commands that are being executed
       set -x
-
-      # Modify required dependencies for coverage
-      REQUIRED_DEPS+=("coverage" "coverage-enable-subprocess")
-
-      COVERAGE=1
       ;;
     o)
       command -v realpath > /dev/null || (echo "The -o flag requires the 'realpath' binary to be installed" && exit 1)
