@@ -124,6 +124,7 @@ class ReceiptsHandler:
                 receipt.receipt_type,
                 receipt.user_id,
                 receipt.event_ids,
+                receipt.thread_id,
                 receipt.data,
             )
 
