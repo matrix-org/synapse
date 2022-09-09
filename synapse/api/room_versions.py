@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from enum import Enum
 from typing import Callable, Dict, Optional
 
 import attr
 
 
-class EventFormatVersions:
+class EventFormatVersions(Enum):
     """This is an internal enum for tracking the version of the event format,
     independently of the room version.
 
@@ -57,7 +57,7 @@ class RoomVersion:
 
     identifier: str  # the identifier for this version
     disposition: str  # one of the RoomDispositions
-    event_format: int  # one of the EventFormatVersions
+    event_format: EventFormatVersions  # one of the EventFormatVersions
     state_res: int  # one of the StateResolutionVersions
     enforce_key_validity: bool
 

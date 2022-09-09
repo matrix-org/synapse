@@ -147,7 +147,7 @@ class _EventRow:
     stream_ordering: int
     json: str
     internal_metadata: str
-    format_version: Optional[int]
+    format_version: Optional[EventFormatVersions]
     room_version_id: Optional[str]
     rejected_reason: Optional[str]
     redactions: List[str]
@@ -1339,7 +1339,10 @@ class EventsWorkerStore(SQLBaseStore):
                     stream_ordering=row[1],
                     internal_metadata=row[2],
                     json=row[3],
-                    format_version=row[4],
+                    # TODO is this the best way to do it?
+                    format_version=(
+                        EventFormatVersions(row[4]) if row[4] is not None else None
+                    ),
                     room_version_id=row[5],
                     rejected_reason=row[6],
                     redactions=[],

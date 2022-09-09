@@ -293,7 +293,7 @@ class _EventInternalMetadata:
 class EventBase(metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
-    def format_version(self) -> int:
+    def format_version(self) -> EventFormatVersions:
         """The EventFormatVersion implemented by this event"""
         ...
 
@@ -584,7 +584,7 @@ class FrozenEventV3(FrozenEventV2):
 
 
 def _event_type_from_format_version(
-    format_version: int,
+    format_version: EventFormatVersions,
 ) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
