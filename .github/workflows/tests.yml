@@ -444,11 +444,11 @@ jobs:
         name: Run Complement Tests
 
   cargo-test:
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
     needs:
       - linting-done
       - changes
-
-    if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
       - uses: actions/checkout@v2
