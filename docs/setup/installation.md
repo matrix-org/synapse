@@ -196,6 +196,10 @@ System requirements:
 - Python 3.7 or later, up to Python 3.10.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
+If building on an uncommon architecture for which pre-built wheels are
+unavailable, you will need to have a recent Rust compiler installed. The easiest
+way of installing the latest version is to use [rustup](https://rustup.rs/).
+
 To install the Synapse homeserver run:
 
 ```sh

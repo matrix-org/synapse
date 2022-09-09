@@ -52,6 +52,9 @@ include_trailing_comma = true
 combine_as_imports = true
 skip_gitignore = true
 
+[tool.maturin]
+manifest-path = "rust/Cargo.toml"
+
 [tool.poetry]
 name = "matrix-synapse"
 version = "1.66.0"
@@ -82,7 +85,16 @@ include = [
     { path = "sytest-blacklist", format = "sdist" },
     { path = "tests", format = "sdist" },
     { path = "UPGRADE.rst", format = "sdist" },
+    { path = "Cargo.toml", format = "sdist" },
+    { path = "rust/Cargo.toml", format = "sdist" },
+    { path = "rust/Cargo.lock", format = "sdist" },
+    { path = "rust/src/**", format = "sdist" },
 ]
+exclude = [
+    { path = "synapse/*.so", format = "sdist"}
+]
+
+build = "build_rust.py"
 
 [tool.poetry.scripts]
 synapse_homeserver = "synapse.app.homeserver:main"
@@ -126,7 +138,7 @@ pyOpenSSL = ">=16.0.0"
 PyYAML = ">=3.11"
 pyasn1 = ">=0.1.9"
 pyasn1-modules = ">=0.0.7"
-bcrypt = ">=3.1.0"
+bcrypt = ">=3.1.7"
 Pillow = ">=5.4.0"
 sortedcontainers = ">=1.4.4"
 pymacaroons = ">=0.13.0"
@@ -161,6 +173,15 @@ importlib_metadata = { version = ">=1.4", python = "<3.8" }
 # This is the most recent version of Pydantic with available on common distros.
 pydantic = ">=1.7.4"
 
+# This is for building the rust components during "poetry install", which
+# currently ignores the `build-system.requires` directive (c.f.
+# https://github.com/python-poetry/poetry/issues/6154). Both `pip install` and
+# `poetry build` do the right thing without this explicit dependency.
+#
+# This isn't really a dev-dependency, as `poetry install --no-dev` will fail,
+# but the alternative is to add it to the main list of deps where it isn't
+# needed.
+setuptools_rust = ">=1.3"
 
 
 # Optional Dependencies
@@ -285,5 +306,21 @@ twine = "*"
 towncrier = ">=18.6.0rc1"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.0.0", "setuptools_rust>=1.3"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.cibuildwheel]
+# Skip unsupported platforms (by us or by Rust).
+skip = "cp36* *-musllinux_i686"
+
+# We need a rust compiler
+before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
+environment= { PATH = "$PATH:$HOME/.cargo/bin" }
+
+# For some reason if we don't manually clean the build directory we
+# can end up polluting the next build with a .so that is for the wrong
+# Python version.
+before-build = "rm -rf {project}/build"
+build-frontend = "build"
+test-command = "python -c 'from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))'"

@@ -266,7 +266,12 @@ class BulkPushRuleEvaluator:
             # Push rules for events that aren't notifiable can't be processed by this
             return
 
-        count_as_unread = _should_count_as_unread(event, context)
+        # Disable counting as unread unless the experimental configuration is
+        # enabled, as it can cause additional (unwanted) rows to be added to the
+        # event_push_actions table.
+        count_as_unread = False
+        if self.hs.config.experimental.msc2654_enabled:
+            count_as_unread = _should_count_as_unread(event, context)
 
         rules_by_user = await self._get_rules_for_event(event)
         actions_by_user: Dict[str, Collection[Union[Mapping, str]]] = {}
