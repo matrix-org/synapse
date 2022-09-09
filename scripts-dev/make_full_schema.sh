@@ -9,8 +9,10 @@
 export PGHOST="localhost"
 POSTGRES_DB_NAME="synapse_full_schema.$$"
 
-SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
-POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
+SQLITE_SCHEMA_FILE="schema.sql.sqlite"
+SQLITE_ROWS_FILE="rows.sql.sqlite"
+POSTGRES_SCHEMA_FILE="full.sql.postgres"
+POSTGRES_ROWS_FILE="rows.sql.postgres"
 
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
@@ -174,11 +176,13 @@ DROP TABLE user_directory_search_stat;
 sqlite3 "$SQLITE_DB" <<< "$SQL"
 psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
 
-echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
-sqlite3 "$SQLITE_DB" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"
+echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_SCHEMA_FILE' and '$OUTPUT_DIR/$SQLITE_ROWS_FILE'..."
+sqlite3 "$SQLITE_DB" ".schema --indent" > "$OUTPUT_DIR/$SQLITE_SCHEMA_FILE"
+sqlite3 "$SQLITE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/$SQLITE_ROWS_FILE"
 
-echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE'..."
-pg_dump --format=plain --no-tablespaces --no-acl --no-owner $POSTGRES_DB_NAME | sed -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE"
+echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE' and '$OUTPUT_DIR/$POSTGRES_ROWS_FILE'..."
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_ROWS_FILE"
 
 echo "Cleaning up temporary Postgres database..."
 dropdb $POSTGRES_DB_NAME
