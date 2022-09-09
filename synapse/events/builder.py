@@ -18,11 +18,7 @@ import attr
 from signedjson.types import SigningKey
 
 from synapse.api.constants import MAX_DEPTH
-from synapse.api.room_versions import (
-    KNOWN_EVENT_FORMAT_VERSIONS,
-    EventFormatVersion,
-    RoomVersion,
-)
+from synapse.api.room_versions import EventFormatVersion, RoomVersion
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
@@ -245,7 +241,7 @@ def create_local_event_from_event_dict(
     """
 
     format_version = room_version.event_format
-    if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
+    if format_version not in EventFormatVersion:
         raise Exception("No event format defined for version %r" % (format_version,))
 
     if internal_metadata_dict is None:

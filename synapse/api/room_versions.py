@@ -32,13 +32,6 @@ class EventFormatVersion(Enum):
     ROOM_V4_PLUS = 3  # MSC1884-style $hash format: introduced for room v4
 
 
-KNOWN_EVENT_FORMAT_VERSIONS = {
-    EventFormatVersion.ROOM_V1_V2,
-    EventFormatVersion.ROOM_V3,
-    EventFormatVersion.ROOM_V4_PLUS,
-}
-
-
 class StateResolutionVersions:
     """Enum to identify the state resolution algorithms"""
 
