@@ -16,7 +16,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -59,6 +59,14 @@ class ReportEventRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST,
                 "Param 'score' must be an integer",
                 Codes.BAD_JSON,
+            )
+
+        event = await self.hs.get_event_handler().get_event(
+            requester.user, room_id, event_id, show_redacted=False
+        )
+        if event is None:
+            raise NotFoundError(
+                "Unable to report event: it does not exist or you aren't able to see it."
             )
 
         await self.store.add_event_report(
