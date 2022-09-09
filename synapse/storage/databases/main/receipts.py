@@ -857,7 +857,9 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
     async def _populate_receipt_event_stream_ordering(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        def _populate_receipt_event_stream_ordering_txn(txn: LoggingTransaction) -> bool:
+        def _populate_receipt_event_stream_ordering_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
 
             if "max_stream_id" in progress:
                 max_stream_id = progress["max_stream_id"]
