@@ -192,8 +192,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         (aka. with the lowest depth). This is done to match the sort in
         `get_current_hosts_in_room()` and so we can re-use the cache but it's
         not horrible to have here either.
-        """
 
+        Uses `m.room.member`s in the room state at the current forward extremities to
+        determine which users are in the room.
+
+        Will return inaccurate results for rooms with partial state, since the state for
+        the forward extremities of those rooms will exclude most members. We may also
+        calculate room state incorrectly for such rooms and believe that a member is or
+        is not in the room when the opposite is true.
+        """
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )
@@ -1022,6 +1029,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         longest is good because they're most likely to have anything we ask
         about.
 
+        Uses `m.room.member`s in the room state at the current forward extremities to
+        determine which hosts are in the room.
+
+        Will return inaccurate results for rooms with partial state, since the state for
+        the forward extremities of those rooms will exclude most members. We may also
+        calculate room state incorrectly for such rooms and believe that a host is or
+        is not in the room when the opposite is true.
+
         Returns:
             Returns a list of servers sorted by longest in the room first. (aka.
             sorted by join with the lowest depth first).
@@ -1044,6 +1059,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # We use a `Set` just for fast lookups
             domain_set: Set[str] = set()
             for u in users:
+                if ":" not in u:
+                    continue
                 domain = get_domain_from_id(u)
                 if domain not in domain_set:
                     domain_set.add(domain)
@@ -1077,7 +1094,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 ORDER BY min(e.depth) ASC;
             """
             txn.execute(sql, (room_id,))
-            return [d for d, in txn]
+            # `server_domain` will be `NULL` for malformed MXIDs with no colons.
+            return [d for d, in txn if d is not None]
 
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room", get_current_hosts_in_room_txn
