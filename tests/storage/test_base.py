@@ -54,7 +54,6 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         sqlite_config = {"name": "sqlite3"}
         engine = create_engine(sqlite_config)
         fake_engine = Mock(wraps=engine)
-        fake_engine.can_native_upsert = False
         fake_engine.in_transaction.return_value = False
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)

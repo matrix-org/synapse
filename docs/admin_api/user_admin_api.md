@@ -42,6 +42,7 @@ It returns a JSON body like the following:
     "appservice_id": null,
     "consent_server_notice_sent": null,
     "consent_version": null,
+    "consent_ts": null,
     "external_ids": [
         {
             "auth_provider": "<provider1>",
@@ -364,6 +365,7 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
 - Remove from monthly active users
+- Remove user's consent information (consent version and timestamp)
 
 ## Reset password
 
