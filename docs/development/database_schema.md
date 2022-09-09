@@ -208,10 +208,11 @@ But hash collisions are still possible, and by treating event IDs as room
 scoped, we can reduce the possibility of a hash collision. When scoping
 `event_id` in the database schema, it should be also accompanied by `room_id`
 (`PRIMARY KEY (room_id, event_id)`) and lookups should be done through the pair
-`(room_id, event_id)`.
+`(room_id, event_id)`. Another benefit of scoping `event_ids` to the room is
+that it makes it very easy to find and clean up everything in a room when it
+needs to be purged.
 
-There has been a lot of debate on this in places like
+`event_id` global uniqueness has had a lot debate in places like
 https://github.com/matrix-org/matrix-spec-proposals/issues/2779 and
 [MSC2848](https://github.com/matrix-org/matrix-spec-proposals/pull/2848) which
 has no resolution yet (as of 2022-09-01).
-
