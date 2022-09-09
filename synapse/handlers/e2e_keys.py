@@ -190,9 +190,6 @@ class E2eKeysHandler:
                 if invalid_cached_users:
                     # Fix up results. If we get here there may be bugs in device list
                     # tracking.
-                    # TODO: is this actually useful? it doesn't fix the case where a
-                    #       remote user rejoins a room and we query their device list
-                    #       after.
                     user_ids_not_in_cache.update(invalid_cached_users)
                     for invalid_user_id in invalid_cached_users:
                         remote_results.pop(invalid_user_id)
