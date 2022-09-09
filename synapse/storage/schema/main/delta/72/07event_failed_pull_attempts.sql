@@ -14,11 +14,12 @@
  */
 
 
--- Add a table that keeps track of when we failed to backfill an event. This
--- allows us to be more intelligent when we decide to retry (we don't need to
--- fail over and over) and we can process that event in the background so we
--- don't block on it each time.
-CREATE TABLE IF NOT EXISTS event_failed_backfill_attempts(
+-- Add a table that keeps track of when we failed to pull an event over
+-- federation (via /backfill, `/event`, `/get_missing_events`, etc). This allows
+-- us to be more intelligent when we decide to retry (we don't need to fail over
+-- and over) and we can process that event in the background so we don't block
+-- on it each time.
+CREATE TABLE IF NOT EXISTS event_failed_pull_attempts(
     room_id TEXT NOT NULL REFERENCES rooms (room_id),
     event_id TEXT NOT NULL,
     num_attempts INT NOT NULL,

@@ -1295,43 +1295,41 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return event_id_results
 
     @trace
-    async def record_event_failed_backfill_attempt(
+    async def record_event_failed_pull_attempt(
         self, room_id: str, event_id: str
     ) -> None:
         """
-        Record when we fail to backfill an event.
+        Record when we fail to pull an event over federation.
 
         This information allows us to be more intelligent when we decide to
         retry (we don't need to fail over and over) and we can process that
         event in the background so we don't block on it each time.
 
         Args:
-            room_id: The room where the event failed to backfill from
-            event_id: The event that failed to be backfilled
+            room_id: The room where the event failed to pull from
+            event_id: The event that failed to be fetched or processed
         """
         await self.db_pool.runInteraction(
-            "record_event_failed_backfill_attempt",
-            self._record_event_failed_backfill_attempt_upsert_txn,
+            "record_event_failed_pull_attempt",
+            self._record_event_failed_pull_attempt_upsert_txn,
             room_id,
             event_id,
             db_autocommit=True,  # Safe as it's a single upsert
         )
 
-    def _record_event_failed_backfill_attempt_upsert_txn(
+    def _record_event_failed_pull_attempt_upsert_txn(
         self,
         txn: LoggingTransaction,
         room_id: str,
         event_id: str,
     ) -> None:
-        assert self.database_engine.can_native_upsert
-
         sql = """
-            INSERT INTO event_failed_backfill_attempts (
+            INSERT INTO event_failed_pull_attempts (
                 room_id, event_id, num_attempts, last_attempt_ts
             )
                 VALUES (?, ?, ?, ?)
             ON CONFLICT (room_id, event_id) DO UPDATE SET
-                num_attempts=event_failed_backfill_attempts.num_attempts + 1,
+                num_attempts=event_failed_pull_attempts.num_attempts + 1,
                 last_attempt_ts=EXCLUDED.last_attempt_ts;
         """
 
