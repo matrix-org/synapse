@@ -298,6 +298,8 @@ class SynapseTags:
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
 
+    INSTANCE_NAME = "instance_name"
+
     # incoming HTTP request ID  (as written in the logs)
     REQUEST_ID = "request_id"
 
@@ -1043,11 +1045,11 @@ def trace_servlet(
             # with JsonResource).
             scope.span.set_operation_name(request.request_metrics.name)
 
-            # set the tags *after* the servlet completes, in case it decided to
-            # prioritise the span (tags will get dropped on unprioritised spans)
             request_tags[
                 SynapseTags.REQUEST_TAG
             ] = request.request_metrics.start_context.tag
 
+            # set the tags *after* the servlet completes, in case it decided to
+            # prioritise the span (tags will get dropped on unprioritised spans)
             for k, v in request_tags.items():
                 scope.span.set_tag(k, v)
