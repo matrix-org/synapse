@@ -14,7 +14,6 @@
 
 import os
 import sys
-from glob import glob
 from hashlib import blake2b
 
 import synapse
@@ -58,11 +57,11 @@ def _hash_rust_files_in_directory(directory: str) -> str:
     while dirs:
         dir = dirs.pop()
         with os.scandir(dir) as d:
-            for f in d:
-                if f.is_dir():
-                    dirs.append(f.path)
+            for entry in d:
+                if entry.is_dir():
+                    dirs.append(entry.path)
                 else:
-                    paths.append(f.path)
+                    paths.append(entry.path)
 
     # We sort to make sure that we get a consistent and well-defined ordering.
     paths.sort()
