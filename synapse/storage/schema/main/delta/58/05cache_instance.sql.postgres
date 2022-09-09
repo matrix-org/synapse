@@ -27,4 +27,7 @@ CREATE TABLE cache_invalidation_stream_by_instance (
 
 CREATE UNIQUE INDEX cache_invalidation_stream_by_instance_id ON cache_invalidation_stream_by_instance(stream_id);
 
-CREATE SEQUENCE cache_invalidation_stream_seq;
+-- The sequence needs to begin at 2 because a bunch of code assume that
+-- get_next_id_txn will return values >= 2, cf this comment:
+-- https://github.com/matrix-org/synapse/blob/b93bd95e8ab64d27ae26841020f62ee61272a5f2/synapse/storage/util/id_generators.py#L344
+CREATE SEQUENCE cache_invalidation_stream_seq MINVALUE 2;
