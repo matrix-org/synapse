@@ -91,13 +91,23 @@ class ReceiptsHandler:
                         )
                         continue
 
+                    # Check if these receipts apply to a thread.
+                    thread_id = None
+                    data = user_values.get("data", {})
+                    if isinstance(data, dict):
+                        thread_id = data.get("thread_id")
+                        # If the thread ID is invalid, consider it missing.
+                        if not isinstance(thread_id, str):
+                            thread_id = None
+
                     receipts.append(
                         ReadReceipt(
                             room_id=room_id,
                             receipt_type=receipt_type,
                             user_id=user_id,
                             event_ids=user_values["event_ids"],
-                            data=user_values.get("data", {}),
+                            thread_id=thread_id,
+                            data=data,
                         )
                     )
 
@@ -146,7 +156,12 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_id: str,
+        thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
@@ -156,6 +171,7 @@ class ReceiptsHandler:
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
+            thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
         )
 
