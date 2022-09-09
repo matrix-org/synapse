@@ -302,6 +302,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             for count, membership in txn:
                 res.setdefault(membership, MemberSummary([], count))
 
+            # we order by membership and then fairly arbitrarily by event_id so
+            # heroes are consistent
             # Note, rejected events will have a null membership field, so
             # we we manually filter them out.
             sql = """
@@ -553,6 +555,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     def _get_rooms_for_user_with_stream_ordering_txn(
         self, txn: LoggingTransaction, user_id: str
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
+        # We use `current_state_events` here and not `local_current_membership`
+        # as a) this gets called with remote users and b) this only gets called
+        # for rooms the server is participating in.
         sql = """
             SELECT room_id, e.instance_name, e.stream_ordering
             FROM current_state_events AS c
