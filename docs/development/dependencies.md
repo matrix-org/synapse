@@ -134,7 +134,7 @@ $ deactivate
 
 # Find the venv for poetry
 $ poetry env info --path
-# Remove all the files of the current environment
+# Remove all of the files from the current environment
 $ rm -rf $(poetry env info --path)
 
 # Reactivate Poetry shell
