@@ -161,7 +161,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type: The receipt types to fetch.
 
         Returns:
-            The latest receipt, if one exists.
+            The event ID and stream ordering of the latest receipt, if one exists.
         """
 
         clause, args = make_in_list_sql_clause(
@@ -812,7 +812,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
-        self.db_pool.simple_delete_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="receipts_graph",
             keyvalues={
@@ -820,17 +820,13 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "receipt_type": receipt_type,
                 "user_id": user_id,
             },
-        )
-        self.db_pool.simple_insert_txn(
-            txn,
-            table="receipts_graph",
             values={
-                "room_id": room_id,
-                "receipt_type": receipt_type,
-                "user_id": user_id,
                 "event_ids": json_encoder.encode(event_ids),
                 "data": json_encoder.encode(data),
             },
+            # receipts_graph has a unique constraint on
+            # (user_id, room_id, receipt_type), so no need to lock
+            lock=False,
         )
 
 

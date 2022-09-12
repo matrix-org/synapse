@@ -27,10 +27,10 @@ which is under the Unlicense licence.
         {{- . -}}{{- "\n" -}}
     {{- end -}}
     {{- with .TestCases -}}
-        {{- /* Failing tests are first */ -}}
+        {{- /* Passing tests are first */ -}}
         {{- range . -}}
-            {{- if and (ne .Result "PASS") (ne .Result "SKIP") -}}
-                ::group::{{ "\033" }}[0;31m❌{{ " " }}{{- .Name -}}
+            {{- if eq .Result "PASS" -}}
+                ::group::{{ "\033" }}[0;32m✅{{ " " }}{{- .Name -}}
                 {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
                 {{- with .Coverage -}}
                     , coverage: {{ . }}%
@@ -46,7 +46,6 @@ which is under the Unlicense licence.
                 ::endgroup::{{- "\n" -}}
             {{- end -}}
         {{- end -}}
-
 
         {{- /* Then skipped tests are second */ -}}
         {{- range . -}}
@@ -68,11 +67,10 @@ which is under the Unlicense licence.
             {{- end -}}
         {{- end -}}
 
-
-        {{- /* Then passing tests are last */ -}}
+        {{- /* and failing tests are last */ -}}
         {{- range . -}}
-            {{- if eq .Result "PASS" -}}
-                ::group::{{ "\033" }}[0;32m✅{{ " " }}{{- .Name -}}
+            {{- if and (ne .Result "PASS") (ne .Result "SKIP") -}}
+                ::group::{{ "\033" }}[0;31m❌{{ " " }}{{- .Name -}}
                 {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
                 {{- with .Coverage -}}
                     , coverage: {{ . }}%

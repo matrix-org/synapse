@@ -15,7 +15,18 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Mapping, Optional, Pattern, Set, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Pattern,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 from matrix_common.regex import glob_to_regex, to_word_pattern
 
@@ -32,14 +43,14 @@ INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
 def _room_member_count(
-    ev: EventBase, condition: Dict[str, Any], room_member_count: int
+    ev: EventBase, condition: Mapping[str, Any], room_member_count: int
 ) -> bool:
     return _test_ineq_condition(condition, room_member_count)
 
 
 def _sender_notification_permission(
     ev: EventBase,
-    condition: Dict[str, Any],
+    condition: Mapping[str, Any],
     sender_power_level: int,
     power_levels: Dict[str, Union[int, Dict[str, int]]],
 ) -> bool:
@@ -54,7 +65,7 @@ def _sender_notification_permission(
     return sender_power_level >= room_notif_level
 
 
-def _test_ineq_condition(condition: Dict[str, Any], number: int) -> bool:
+def _test_ineq_condition(condition: Mapping[str, Any], number: int) -> bool:
     if "is" not in condition:
         return False
     m = INEQUALITY_EXPR.match(condition["is"])
@@ -137,7 +148,7 @@ class PushRuleEvaluatorForEvent:
         self._condition_cache: Dict[str, bool] = {}
 
     def check_conditions(
-        self, conditions: List[dict], uid: str, display_name: Optional[str]
+        self, conditions: Sequence[Mapping], uid: str, display_name: Optional[str]
     ) -> bool:
         """
         Returns true if a user's conditions/user ID/display name match the event.
@@ -169,7 +180,7 @@ class PushRuleEvaluatorForEvent:
         return True
 
     def matches(
-        self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
+        self, condition: Mapping[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
         """
         Returns true if a user's condition/user ID/display name match the event.
@@ -204,7 +215,7 @@ class PushRuleEvaluatorForEvent:
             #     endpoint with an unknown kind, see _rule_tuple_from_request_object.
             return True
 
-    def _event_match(self, condition: dict, user_id: str) -> bool:
+    def _event_match(self, condition: Mapping, user_id: str) -> bool:
         """
         Check an "event_match" push rule condition.
 
@@ -269,7 +280,7 @@ class PushRuleEvaluatorForEvent:
 
         return bool(r.search(body))
 
-    def _relation_match(self, condition: dict, user_id: str) -> bool:
+    def _relation_match(self, condition: Mapping, user_id: str) -> bool:
         """
         Check an "relation_match" push rule condition.
 

@@ -15,7 +15,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 permissions:
   contents: write
 
@@ -89,9 +89,67 @@ jobs:
           name: debs
           path: debs/*
 
+  build-wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-10.15]
+        is_pr:
+          - ${{ startsWith(github.ref, 'refs/pull/') }}
+
+        exclude:
+          # Don't build macos wheels on PR CI.
+          - is_pr: true
+            os: "macos-10.15"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.9.0 poetry==1.2.0
+
+      # Only build a single wheel in CI.
+      - name: Set env vars.
+        run: |
+          echo "CIBW_BUILD="cp37-manylinux_x86_64"" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/pull/')
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          # Skip testing for platforms which various libraries don't have wheels
+          # for, and so need extra build deps.
+          CIBW_TEST_SKIP: pp39-* *i686* *musl* pp37-macosx*
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Wheel
+          path: ./wheelhouse/*.whl
+
   build-sdist:
-    name: "Build pypi distribution files"
-    uses: "matrix-org/backend-meta/.github/workflows/packaging.yml@v1"
+    name: Build sdist
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref, 'refs/pull/') }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - run: pip install build
+
+      - name: Build sdist
+        run: python -m build --sdist
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Sdist
+          path: dist/*.tar.gz
+
 
   # if it's a tag, create a release and attach the artifacts to it
   attach-assets:
@@ -99,6 +157,7 @@ jobs:
     if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build-debs
+      - build-wheels
       - build-sdist
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,1 @@
+Extend the release script to wait for GitHub Actions to finish and to be usable as a guide for the whole process.

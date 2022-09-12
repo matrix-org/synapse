@@ -10,6 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Job to detect what has changed so we don't run e.g. Rust checks on PRs that
+  # don't modify Rust code.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.rust }}
+    steps:
+    - uses: dorny/paths-filter@v2
+      id: filter
+      # We only check on PRs
+      if: startsWith(github.ref, 'refs/pull/')
+      with:
+        filters: |
+          rust:
+            - 'rust/**'
+            - 'Cargo.toml'
+
   check-sampleconfig:
     runs-on: ubuntu-latest
     steps:
@@ -53,61 +70,112 @@ jobs:
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
+  lint-pydantic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          extras: "all"
+      - run: poetry run scripts-dev/check_pydantic_models.py
+
+  lint-clippy:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+            components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo clippy
+
+  lint-rustfmt:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+            components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt --check
+
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig, check-schema-delta]
+    needs:
+      - lint
+      - lint-crlf
+      - lint-newsfile
+      - lint-pydantic
+      - check-sampleconfig
+      - check-schema-delta
+      - lint-clippy
+      - lint-rustfmt
     runs-on: ubuntu-latest
     steps:
       - run: "true"
 
-  trial:
+  calculate-test-jobs:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - id: get-matrix
+        run: .ci/scripts/calculate_jobs.py
+    outputs:
+      trial_test_matrix: ${{ steps.get-matrix.outputs.trial_test_matrix }}
+      sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
+
+  trial:
+    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
+    needs: calculate-test-jobs
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
-        database: ["sqlite"]
-        extras: ["all"]
-        include:
-          # Newest Python without optional deps
-          - python-version: "3.10"
-            extras: ""
-
-          # Oldest Python with PostgreSQL
-          - python-version: "3.7"
-            database: "postgres"
-            postgres-version: "10"
-            extras: "all"
-
-          # Newest Python with newest PostgreSQL
-          - python-version: "3.10"
-            database: "postgres"
-            postgres-version: "14"
-            extras: "all"
+        job:  ${{ fromJson(needs.calculate-test-jobs.outputs.trial_test_matrix) }}
 
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - name: Set up PostgreSQL ${{ matrix.postgres-version }}
-        if: ${{ matrix.postgres-version }}
+      - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
+        if: ${{ matrix.job.postgres-version }}
         run: |
           docker run -d -p 5432:5432 \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
-            postgres:${{ matrix.postgres-version }}
+            postgres:${{ matrix.job.postgres-version }}
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: ${{ matrix.python-version }}
-          extras: ${{ matrix.extras }}
+          python-version: ${{ matrix.job.python-version }}
+          extras: ${{ matrix.job.extras }}
       - name: Await PostgreSQL
-        if: ${{ matrix.postgres-version }}
+        if: ${{ matrix.job.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
       - run: poetry run trial --jobs=2 tests
         env:
-          SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
+          SYNAPSE_POSTGRES: ${{ matrix.job.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
@@ -128,16 +196,54 @@ jobs:
     # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - name: Test with old deps
-        uses: docker://ubuntu:focal # For old python and sqlite
-        # Note: focal seems to be using 3.8, but the oldest is 3.7?
-        # See https://github.com/matrix-org/synapse/issues/12343
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
-          workdir: /github/workspace
-          entrypoint: .ci/scripts/test_old_deps.sh
+            toolchain: 1.61.0
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
+      # There aren't wheels for some of the older deps, so we need to install
+      # their build dependencies
+      - run: |
+          sudo apt-get -qq install build-essential libffi-dev python-dev \
+          libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.7'
+
+      # Calculating the old-deps actually takes a bunch of time, so we cache the
+      # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
+      # otherwise the `poetry install` step will error due to the poetry.lock
+      # file being outdated.
+      #
+      # This caches the output of `Prepare old deps`, which should generate the
+      # same `pyproject.toml` and `poetry.lock` for a given `pyproject.toml` input.
+      - uses: actions/cache@v3
+        id: cache-poetry-old-deps
+        name: Cache poetry.lock
+        with:
+          path: |
+            poetry.lock
+            pyproject.toml
+          key: poetry-old-deps2-${{ hashFiles('pyproject.toml') }}
+      - name: Prepare old deps
+        if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
+        run: .ci/scripts/prepare_old_deps.sh
+
+      # We only now install poetry so that `setup-python-poetry` caches the
+      # right poetry.lock's dependencies.
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: '3.7'
+          extras: "all test"
+
+      - run: poetry run trial -j2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -186,50 +292,37 @@ jobs:
 
   sytest:
     if: ${{ !failure() && !cancelled() }}
-    needs: linting-done
+    needs: calculate-test-jobs
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:${{ matrix.sytest-tag }}
+      image: matrixdotorg/sytest-synapse:${{ matrix.job.sytest-tag }}
       volumes:
         - ${{ github.workspace }}:/src
       env:
         SYTEST_BRANCH: ${{ github.head_ref }}
-        POSTGRES: ${{ matrix.postgres && 1}}
-        MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
-        WORKERS: ${{ matrix.workers && 1 }}
-        REDIS: ${{ matrix.redis && 1 }}
-        BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+        POSTGRES: ${{ matrix.job.postgres && 1}}
+        MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') && 1}}
+        WORKERS: ${{ matrix.job.workers && 1 }}
+        BLACKLIST: ${{ matrix.job.workers && 'synapse-blacklist-with-workers' }}
         TOP: ${{ github.workspace }}
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - sytest-tag: focal
-
-          - sytest-tag: focal
-            postgres: postgres
-
-          - sytest-tag: testing
-            postgres: postgres
-
-          - sytest-tag: focal
-            postgres: multi-postgres
-            workers: workers
-
-          - sytest-tag: buster
-            postgres: multi-postgres
-            workers: workers
-
-          - sytest-tag: buster
-            postgres: postgres
-            workers: workers
-            redis: redis
+        job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -240,7 +333,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.job.*, ', ') }})
           path: |
             /logs/results.tap
             /logs/**/*.log*
@@ -271,7 +364,6 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
 
@@ -337,14 +429,40 @@ jobs:
         with:
           path: synapse
 
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
       - run: |
           set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
         name: Run Complement Tests
+
+  cargo-test:
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    needs:
+      - linting-done
+      - changes
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo test
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
@@ -360,6 +478,7 @@ jobs:
       - export-data
       - portdb
       - complement
+      - cargo-test
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
@@ -369,3 +488,4 @@ jobs:
           # The newsfile lint may be skipped on non PR builds
           skippable:
             lint-newsfile
+            cargo-test
