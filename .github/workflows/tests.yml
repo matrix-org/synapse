@@ -10,6 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Job to detect what has changed so we don't run e.g. Rust checks on PRs that
+  # don't modify Rust code.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.rust }}
+    steps:
+    - uses: dorny/paths-filter@v2
+      id: filter
+      # We only check on PRs
+      if: startsWith(github.ref, 'refs/pull/')
+      with:
+        filters: |
+          rust:
+            - 'rust/**'
+            - 'Cargo.toml'
+
   check-sampleconfig:
     runs-on: ubuntu-latest
     steps:
@@ -65,10 +82,54 @@ jobs:
           extras: "all"
       - run: poetry run scripts-dev/check_pydantic_models.py
 
+  lint-clippy:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+            components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo clippy
+
+  lint-rustfmt:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+            components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt --check
+
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, lint-pydantic, check-sampleconfig, check-schema-delta]
+    needs:
+      - lint
+      - lint-crlf
+      - lint-newsfile
+      - lint-pydantic
+      - check-sampleconfig
+      - check-schema-delta
+      - lint-clippy
+      - lint-rustfmt
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -384,6 +445,25 @@ jobs:
         shell: bash
         name: Run Complement Tests
 
+  cargo-test:
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    needs:
+      - linting-done
+      - changes
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.61.0
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo test
+
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
     if: ${{ always() }}
@@ -398,6 +478,7 @@ jobs:
       - export-data
       - portdb
       - complement
+      - cargo-test
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
@@ -407,3 +488,4 @@ jobs:
           # The newsfile lint may be skipped on non PR builds
           skippable:
             lint-newsfile
+            cargo-test
