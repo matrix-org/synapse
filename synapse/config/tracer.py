@@ -42,10 +42,7 @@ class TracerConfig(Config):
         # reverse proxy service like Cloudflare to protect your Synapse instance
         # in order to correlate and match up requests that timed out at the
         # Cloudflare layer to the Synapse traces.
-        self.request_headers_to_tag = opentracing_config.get(
-            "request_headers_to_tag",
-            [],
-        )
+        self.request_headers_to_tag = []
 
         if not self.opentracer_enabled:
             return
@@ -72,3 +69,13 @@ class TracerConfig(Config):
                     ("opentracing", "force_tracing_for_users", f"index {i}"),
                 )
             self.force_tracing_for_users.add(u)
+
+        request_headers_to_tag = opentracing_config.get(
+            "request_headers_to_tag",
+            [],
+        )
+        if not isinstance(request_headers_to_tag, list):
+            raise ConfigError(
+                "Expected a list", ("opentracing", "request_headers_to_tag")
+            )
+        self.request_headers_to_tag = request_headers_to_tag

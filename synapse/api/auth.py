@@ -182,7 +182,7 @@ class Auth:
                 # find the trace.
                 for header_key in self.hs.config.tracing.request_headers_to_tag:
                     headers = request.requestHeaders.getRawHeaders(header_key)
-                    if len(headers):
+                    if headers is not None:
                         parent_span.set_tag(
                             SynapseTags.REQUEST_HEADER_PREFIX + header_key, headers[0]
                         )
