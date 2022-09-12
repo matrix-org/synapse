@@ -20,17 +20,13 @@ fn main() -> Result<(), std::io::Error> {
 
         entries.sort();
 
-        let mut new_dirs = Vec::new();
-
         for entry in entries {
             if entry.is_dir() {
-                new_dirs.push(entry);
+                dirs.push(entry)
             } else {
                 paths.push(entry.to_str().expect("valid rust paths").to_string());
             }
         }
-
-        dirs.append(&mut new_dirs);
     }
 
     paths.sort();
