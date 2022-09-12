@@ -388,7 +388,7 @@ impl FilteredPushRules {
 }
 
 #[test]
-fn test_erialize_condition() {
+fn test_serialize_condition() {
     let condition = Condition::EventMatch(EventMatchCondition {
         key: "content.body".into(),
         pattern: Some("coffee".into()),
