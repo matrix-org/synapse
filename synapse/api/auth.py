@@ -180,11 +180,11 @@ class Auth:
                 # in that layer to a Synapse trace. ex. when Cloudflare times
                 # out it gives a `cf-ray` header which we can also tag here to
                 # find the trace.
-                for header_key in self.hs.config.tracing.request_headers_to_tag:
-                    headers = request.requestHeaders.getRawHeaders(header_key)
+                for header_name in self.hs.config.tracing.request_headers_to_tag:
+                    headers = request.requestHeaders.getRawHeaders(header_name)
                     if headers is not None:
                         parent_span.set_tag(
-                            SynapseTags.REQUEST_HEADER_PREFIX + header_key, headers[0]
+                            SynapseTags.REQUEST_HEADER_PREFIX + header_name, headers[0]
                         )
 
             return requester
