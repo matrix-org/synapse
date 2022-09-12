@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-ALTER TABLE receipts_linearized ADD COLUMN event_stream_ordering integer;
+ALTER TABLE receipts_linearized ADD COLUMN event_stream_ordering BIGINT;
 
 INSERT INTO background_updates (update_name, progress_json) VALUES
   ('populate_event_stream_ordering', '{}');
