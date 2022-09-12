@@ -162,16 +162,6 @@ SQL="
 DROP TABLE schema_version;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
-DROP TABLE event_search_content;
-DROP TABLE event_search_segments;
-DROP TABLE event_search_segdir;
-DROP TABLE event_search_docsize;
-DROP TABLE event_search_stat;
-DROP TABLE user_directory_search_content;
-DROP TABLE user_directory_search_segments;
-DROP TABLE user_directory_search_segdir;
-DROP TABLE user_directory_search_docsize;
-DROP TABLE user_directory_search_stat;
 "
 sqlite3 "$SQLITE_DB" <<< "$SQL"
 psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
