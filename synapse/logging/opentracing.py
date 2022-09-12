@@ -303,6 +303,10 @@ class SynapseTags:
     # incoming HTTP request ID  (as written in the logs)
     REQUEST_ID = "request_id"
 
+    # Tag a header from the incoming request. The name of the header should be
+    # appended to this prefix.
+    REQUEST_HEADER_PREFIX = "request_header."
+
     # HTTP request tag (used to distinguish full vs incremental syncs, etc)
     REQUEST_TAG = "request_tag"
 
