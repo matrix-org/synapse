@@ -37,6 +37,16 @@ class TracerConfig(Config):
 
         self.force_tracing_for_users: Set[str] = set()
 
+        # A list of headers to extract from the request and add to to the
+        # top-level servlet tracing span as tags. Useful when you're using a
+        # reverse proxy service like Cloudflare to protect your Synapse instance
+        # in order to correlate and match up requests that timed out at the
+        # Cloudflare layer to the Synapse traces.
+        self.request_headers_to_tag = opentracing_config.get(
+            "request_headers_to_tag",
+            [],
+        )
+
         if not self.opentracer_enabled:
             return
 

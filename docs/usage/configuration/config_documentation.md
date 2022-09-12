@@ -3612,6 +3612,11 @@ Sub-options include:
 * `jaeger_config`: Jaeger can be configured to sample traces at different rates.
    All configuration options provided by Jaeger can be set here. Jaeger's configuration is
    mostly related to trace sampling which is documented [here](https://www.jaegertracing.io/docs/latest/sampling/).
+* `request_headers_to_tag`: A list of headers to extract from the request and
+  add to to the top-level servlet tracing span as tags. Useful when you're using
+  a reverse proxy service like Cloudflare to protect your Synapse instance in
+  order to correlate and match up requests that timed out at the Cloudflare
+  layer to the Synapse traces.
 
 Example configuration:
 ```yaml
@@ -3629,6 +3634,9 @@ opentracing:
         param: 1
       logging:
         false
+
+    request_headers_to_tag:
+      - "cf-ray"
 ```
 ---
 ## Workers ##

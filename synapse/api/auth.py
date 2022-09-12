@@ -173,6 +173,20 @@ class Auth:
                     parent_span.set_tag("device_id", requester.device_id)
                 if requester.app_service is not None:
                     parent_span.set_tag("appservice_id", requester.app_service.id)
+
+                # Tag any headers that we need to extract from the request. This
+                # is useful to specify any headers that a reverse-proxy in front
+                # of Synapse may be sending to correlate and match up something
+                # in that layer to a Synapse trace. ex. when Cloudflare times
+                # out it gives a `cf-ray` header which we can also tag here to
+                # find the trace.
+                for header_key in self.hs.config.tracing.request_headers_to_tag:
+                    headers = request.requestHeaders.getRawHeaders(header_key)
+                    if len(headers):
+                        parent_span.set_tag(
+                            SynapseTags.REQUEST_HEADER_PREFIX + header_key, headers[0]
+                        )
+
             return requester
 
     @cancellable
