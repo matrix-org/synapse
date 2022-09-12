@@ -8,9 +8,6 @@
 
 export PGHOST="localhost"
 POSTGRES_DB_NAME="synapse_full_schema.$$"
-
-SQLITE_SCHEMA_FILE="schema.sql.sqlite"
-SQLITE_ROWS_FILE="rows.sql.sqlite"
 POSTGRES_SCHEMA_FILE="full.sql.postgres"
 POSTGRES_ROWS_FILE="rows.sql.postgres"
 
@@ -95,7 +92,8 @@ cd "$(dirname "$0")/.."
 TMPDIR=$(mktemp -d)
 KEY_FILE=$TMPDIR/test.signing.key # default Synapse signing key path
 SQLITE_CONFIG=$TMPDIR/sqlite.conf
-SQLITE_DB=$TMPDIR/homeserver.db
+SQLITE_MAIN_DB=$TMPDIR/main.db
+SQLITE_STATE_DB=$TMPDIR/state.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
@@ -110,10 +108,17 @@ macaroon_secret_key: "abcde"
 
 report_stats: false
 
-database:
-  name: "sqlite3"
-  args:
-    database: "$SQLITE_DB"
+databases:
+  main:
+    name: "sqlite3"
+    data_stores: ["main"]
+    args:
+      database: "$SQLITE_MAIN_DB"
+  state:
+    name: "sqlite3"
+    data_stores: ["state"]
+    args:
+      database: "$SQLITE_STATE_DB"
 
 # Suppress the key server warning.
 trusted_key_servers: []
@@ -160,15 +165,20 @@ synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG"
 echo "Dropping unwanted db tables..."
 SQL="
 DROP TABLE schema_version;
+DROP TABLE schema_compat_version;
+DROP TABLE background_updates;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
 "
-sqlite3 "$SQLITE_DB" <<< "$SQL"
+sqlite3 "$SQLITE_MAIN_DB" <<< "$SQL"
+sqlite3 "$SQLITE_STATE_DB" <<< "$SQL"
 psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
 
 echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_SCHEMA_FILE' and '$OUTPUT_DIR/$SQLITE_ROWS_FILE'..."
-sqlite3 "$SQLITE_DB" ".schema --indent" > "$OUTPUT_DIR/$SQLITE_SCHEMA_FILE"
-sqlite3 "$SQLITE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/$SQLITE_ROWS_FILE"
+sqlite3 "$SQLITE_MAIN_DB"  ".schema --indent"          > "$OUTPUT_DIR/schema_main.sql.sqlite"
+sqlite3 "$SQLITE_MAIN_DB"  ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_main.sql.sqlite"
+sqlite3 "$SQLITE_STATE_DB" ".schema --indent"          > "$OUTPUT_DIR/schema_state.sql.sqlite"
+sqlite3 "$SQLITE_STATE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_state.sql.sqlite"
 
 echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE' and '$OUTPUT_DIR/$POSTGRES_ROWS_FILE'..."
 pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE"
