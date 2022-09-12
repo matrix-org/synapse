@@ -664,14 +664,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
             self._receipts_stream_cache.entity_has_changed, room_id, stream_id
         )
 
-        upsert_values: Dict[str, Any] = {
-            "stream_id": stream_id,
-            "event_id": event_id,
-            "data": json_encoder.encode(data),
-        }
-        if stream_ordering is not None:
-            upsert_values["event_stream_ordering"] = stream_ordering
-
         self.db_pool.simple_upsert_txn(
             txn,
             table="receipts_linearized",
@@ -680,7 +672,12 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "receipt_type": receipt_type,
                 "user_id": user_id,
             },
-            values=upsert_values,
+            values={
+                "stream_id": stream_id,
+                "event_id": event_id,
+                "event_stream_ordering": stream_ordering,
+                "data": json_encoder.encode(data),
+            },
             # receipts_linearized has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
             lock=False,
