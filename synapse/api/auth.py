@@ -184,7 +184,8 @@ class Auth:
                     headers = request.requestHeaders.getRawHeaders(header_name)
                     if headers is not None:
                         parent_span.set_tag(
-                            SynapseTags.REQUEST_HEADER_PREFIX + header_name, headers[0]
+                            SynapseTags.REQUEST_HEADER_PREFIX + header_name,
+                            str(headers[0]),
                         )
 
             return requester
