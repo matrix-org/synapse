@@ -210,7 +210,8 @@ scoped, we can reduce the possibility of a hash collision. When scoping
 (`PRIMARY KEY (room_id, event_id)`) and lookups should be done through the pair
 `(room_id, event_id)`. Another benefit of scoping `event_ids` to the room is
 that it makes it very easy to find and clean up everything in a room when it
-needs to be purged.
+needs to be purged (no need to sub-`select` query or join from the `events`
+table).
 
 `event_id` global uniqueness has had a lot debate in places like
 https://github.com/matrix-org/matrix-spec-proposals/issues/2779 and
