@@ -488,3 +488,4 @@ jobs:
           # The newsfile lint may be skipped on non PR builds
           skippable:
             lint-newsfile
+            cargo-test
