@@ -1,4 +1,4 @@
-//! This build script is calculates the hash of all files in the `src/`
+//! This build script calculates the hash of all files in the `src/`
 //! directory and adds it as an environment variable during build time.
 //!
 //! This is used so that the python code can detect when the built native module
