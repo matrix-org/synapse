@@ -1394,7 +1394,7 @@ This option specifies several limits for login:
   client is attempting to log into. Defaults to `per_second: 0.17`,
   `burst_count: 3`.
 
-* `failted_attempts` ratelimits login requests based on the account the
+* `failed_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
   attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
 
