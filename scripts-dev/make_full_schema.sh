@@ -238,23 +238,27 @@ DROP TABLE user_directory_search_docsize;
 DROP TABLE user_directory_search_stat;
 "
 
-echo "Dumping SQLite3 schema to $OUTPUT_DIR"
-sqlite3 "$SQLITE_MAIN_DB"  ".schema --indent"          > "$OUTPUT_DIR/schema_main.sql.sqlite"
-sqlite3 "$SQLITE_MAIN_DB"  ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_main.sql.sqlite"
-sqlite3 "$SQLITE_STATE_DB" ".schema --indent"          > "$OUTPUT_DIR/schema_state.sql.sqlite"
-sqlite3 "$SQLITE_STATE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_state.sql.sqlite"
-# Debug: useful for inspecting the common-only part of the schema.
-# sqlite3 "$SQLITE_COMMON_DB" ".schema --indent"          > "$OUTPUT_DIR/schema_common.sql.sqlite"
-# sqlite3 "$SQLITE_COMMON_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_common.sql.sqlite"
+echo "Dumping SQLite3 schema..."
+
+mkdir -p "$OUTPUT_DIR/"{common,main,state}"/full_schema/$SCHEMA_NUMBER"
+sqlite3 "$SQLITE_COMMON_DB" ".schema --indent"           > "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_COMMON_DB" ".dump --data-only --nosys" >> "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_MAIN_DB"   ".schema --indent"           > "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_MAIN_DB"   ".dump --data-only --nosys" >> "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_STATE_DB"  ".schema --indent"           > "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_STATE_DB"  ".dump --data-only --nosys" >> "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
 
 cleanup_pg_schema() {
    sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d'
 }
 
-echo "Dumping Postgres schema to $OUTPUT_DIR"
-pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"  | cleanup_pg_schema > "$OUTPUT_DIR/schema_main.sql.postgres"
-pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"  | cleanup_pg_schema > "$OUTPUT_DIR/rows_main.sql.postgres"
-pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME" | cleanup_pg_schema > "$OUTPUT_DIR/schema_state.sql.postgres"
-pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME" | cleanup_pg_schema > "$OUTPUT_DIR/rows_state.sql.postgres"
+echo "Dumping Postgres schema..."
+
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_COMMON_DB_NAME" | cleanup_pg_schema  > "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_COMMON_DB_NAME" | cleanup_pg_schema >> "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"   | cleanup_pg_schema  > "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"   | cleanup_pg_schema >> "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema  > "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema >> "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
 
 echo "Done! Files dumped to: $OUTPUT_DIR"
