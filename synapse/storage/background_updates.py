@@ -285,7 +285,10 @@ class BackgroundUpdater:
         back_to_back_failures = 0
 
         try:
-            logger.info("Starting background schema updates")
+            logger.info(
+                "Starting background schema updates for database %s",
+                self._database_name,
+            )
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
