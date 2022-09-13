@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from pydantic import StrictBool, StrictStr, constr
+from typing_extensions import Literal
 
 from twisted.web.server import Request
 
@@ -46,7 +47,6 @@ from synapse.rest.client.models import (
     ClientSecretType,
     EmailRequestTokenBody,
     MsisdnRequestTokenBody,
-    ThreepidMedium,
 )
 from synapse.rest.models import RequestBodyModel
 from synapse.types import JsonDict
@@ -710,7 +710,7 @@ class ThreepidUnbindRestServlet(RestServlet):
     class PostBody(RequestBodyModel):
         address: StrictStr
         id_server: Optional[StrictStr] = None
-        medium: ThreepidMedium
+        medium: Literal["email", "msisdn"]
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Unbind the given 3pid from a specific identity server, or identity servers that are
@@ -744,7 +744,7 @@ class ThreepidDeleteRestServlet(RestServlet):
     class PostBody(RequestBodyModel):
         address: StrictStr
         id_server: Optional[StrictStr] = None
-        medium: ThreepidMedium
+        medium: Literal["email", "msisdn"]
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:

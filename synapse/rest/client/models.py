@@ -11,19 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from enum import Enum
 from typing import TYPE_CHECKING, Dict, Optional
 
 from pydantic import Extra, StrictInt, StrictStr, constr, validator
 
 from synapse.rest.models import RequestBodyModel
 from synapse.util.threepids import validate_email
-
-
-class ThreepidMedium(str, Enum):
-    # Per advice at https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
-    email = "email"
-    msisdn = "msisdn"
 
 
 class AuthenticationData(RequestBodyModel):

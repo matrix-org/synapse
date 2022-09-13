@@ -14,13 +14,14 @@
 import unittest as stdlib_unittest
 
 from pydantic import BaseModel, ValidationError
+from typing_extensions import Literal
 
-from synapse.rest.client.models import EmailRequestTokenBody, ThreepidMedium
+from synapse.rest.client.models import EmailRequestTokenBody
 
 
 class ThreepidMediumEnumTestCase(stdlib_unittest.TestCase):
     class Model(BaseModel):
-        medium: ThreepidMedium
+        medium: Literal["email", "msisdn"]
 
     def test_accepts_valid_medium_string(self) -> None:
         """Sanity check that Pydantic behaves sensibly with an enum-of-str
@@ -29,18 +30,7 @@ class ThreepidMediumEnumTestCase(stdlib_unittest.TestCase):
         simultaneously.
         """
         model = self.Model.parse_obj({"medium": "email"})
-        self.assertIsInstance(model.medium, str)
         self.assertEqual(model.medium, "email")
-        self.assertEqual(model.medium, ThreepidMedium.email)
-        self.assertIs(model.medium, ThreepidMedium.email)
-
-        self.assertNotEqual(model.medium, "msisdn")
-        self.assertNotEqual(model.medium, ThreepidMedium.msisdn)
-        self.assertIsNot(model.medium, ThreepidMedium.msisdn)
-
-    def test_accepts_valid_medium_enum(self) -> None:
-        model = self.Model.parse_obj({"medium": ThreepidMedium.email})
-        self.assertIs(model.medium, ThreepidMedium.email)
 
     def test_rejects_invalid_medium_value(self) -> None:
         with self.assertRaises(ValidationError):
