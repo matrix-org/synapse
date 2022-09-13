@@ -468,10 +468,6 @@ jobs:
   tests-done:
     if: ${{ always() }}
     needs:
-      - check-sampleconfig
-      - lint
-      - lint-crlf
-      - lint-newsfile
       - trial
       - trial-olddeps
       - sytest
@@ -486,6 +482,7 @@ jobs:
           needs: ${{ toJSON(needs) }}
 
           # The newsfile lint may be skipped on non PR builds
-          skippable:
+          # Cargo test is skipped if there is no changes on Rust code
+          skippable: |
             lint-newsfile
             cargo-test
