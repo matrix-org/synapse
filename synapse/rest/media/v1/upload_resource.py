@@ -101,6 +101,8 @@ class UploadResource(DirectServeJsonResource):
             # the default 404, as that would just be confusing.
             raise SynapseError(400, "Bad content")
 
-        logger.info("Uploaded content with URI %r", content_uri)
+        logger.info(f"Uploaded content with URI {content_uri}")
 
-        respond_with_json(request, 200, {"content_uri": content_uri}, send_cors=True)
+        respond_with_json(
+            request, 200, {"content_uri": str(content_uri)}, send_cors=True
+        )
