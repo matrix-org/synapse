@@ -7,10 +7,8 @@
 # synapse_port_db to convert it to Postgres. It then dumps the contents of both.
 
 export PGHOST="localhost"
-POSTGRES_DB_NAME="synapse_full_schema.$$"
-POSTGRES_SCHEMA_FILE="full.sql.postgres"
-POSTGRES_ROWS_FILE="rows.sql.postgres"
-
+POSTGRES_MAIN_DB_NAME="synapse_full_schema_main.$$"
+POSTGRES_STATE_DB_NAME="synapse_full_schema_state.$$"
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
 usage() {
@@ -132,13 +130,24 @@ macaroon_secret_key: "abcde"
 
 report_stats: false
 
-database:
-  name: "psycopg2"
-  args:
-    user: "$PGUSER"
-    host: "$PGHOST"
-    password: "$PGPASSWORD"
-    database: "$POSTGRES_DB_NAME"
+databases:
+  main:
+    name: "psycopg2"
+    data_stores: ["main"]
+    args:
+      user: "$PGUSER"
+      host: "$PGHOST"
+      password: "$PGPASSWORD"
+      database: "$POSTGRES_MAIN_DB_NAME"
+  state:
+    name: "psycopg2"
+    data_stores: ["state"]
+    args:
+      user: "$PGUSER"
+      host: "$PGHOST"
+      password: "$PGPASSWORD"
+      database: "$POSTGRES_STATE_DB_NAME"
+
 
 # Suppress the key server warning.
 trusted_key_servers: []
@@ -153,38 +162,63 @@ echo "Running db background jobs..."
 synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" --run-background-updates
 
 # Create the PostgreSQL database.
-echo "Creating postgres database..."
-createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_DB_NAME"
+echo "Creating postgres databases..."
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_MAIN_DB_NAME"
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_STATE_DB_NAME"
 
 echo "Running db background jobs..."
 synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
 
 
-# Delete schema_version, applied_schema_deltas and applied_module_schemas tables
-# Also delete any shadow tables from fts4
+# Don't include the `common` tables in the dumps.
 echo "Dropping unwanted db tables..."
-SQL="
+DROP_COMMON_TABLES="
 DROP TABLE schema_version;
 DROP TABLE schema_compat_version;
 DROP TABLE background_updates;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
 "
-sqlite3 "$SQLITE_MAIN_DB" <<< "$SQL"
-sqlite3 "$SQLITE_STATE_DB" <<< "$SQL"
-psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
 
-echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_SCHEMA_FILE' and '$OUTPUT_DIR/$SQLITE_ROWS_FILE'..."
+sqlite3 "$SQLITE_MAIN_DB" <<< "$DROP_COMMON_TABLES"
+sqlite3 "$SQLITE_STATE_DB" <<< "$DROP_COMMON_TABLES"
+psql "$POSTGRES_MAIN_DB_NAME" -w <<< "$DROP_COMMON_TABLES"
+psql "$POSTGRES_STATE_DB_NAME" -w <<< "$DROP_COMMON_TABLES"
+
+# For Reasons(TM), SQLite's `.schema` also dumps out "shadow tables", the implementation
+# details behind full text search tables. Omit these from the dumps.
+
+sqlite3 "$SQLITE_MAIN_DB" <<< "
+DROP TABLE event_search_content;
+DROP TABLE event_search_segments;
+DROP TABLE event_search_segdir;
+DROP TABLE event_search_docsize;
+DROP TABLE event_search_stat;
+DROP TABLE user_directory_search_content;
+DROP TABLE user_directory_search_segments;
+DROP TABLE user_directory_search_segdir;
+DROP TABLE user_directory_search_docsize;
+DROP TABLE user_directory_search_stat;
+"
+
+echo "Dumping SQLite3 schema to $OUTPUT_DIR"
 sqlite3 "$SQLITE_MAIN_DB"  ".schema --indent"          > "$OUTPUT_DIR/schema_main.sql.sqlite"
 sqlite3 "$SQLITE_MAIN_DB"  ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_main.sql.sqlite"
 sqlite3 "$SQLITE_STATE_DB" ".schema --indent"          > "$OUTPUT_DIR/schema_state.sql.sqlite"
 sqlite3 "$SQLITE_STATE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_state.sql.sqlite"
 
-echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE' and '$OUTPUT_DIR/$POSTGRES_ROWS_FILE'..."
-pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE"
-pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_ROWS_FILE"
+cleanup_pg_schema() {
+   sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d'
+}
+
+echo "Dumping Postgres schema to $OUTPUT_DIR"
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"  | cleanup_pg_schema > "$OUTPUT_DIR/schema_main.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"  | cleanup_pg_schema > "$OUTPUT_DIR/rows_main.sql.postgres"
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME" | cleanup_pg_schema > "$OUTPUT_DIR/schema_state.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME" | cleanup_pg_schema > "$OUTPUT_DIR/rows_state.sql.postgres"
 
 echo "Cleaning up temporary Postgres database..."
-dropdb $POSTGRES_DB_NAME
+dropdb "$POSTGRES_MAIN_DB_NAME"
+dropdb "$POSTGRES_STATE_DB_NAME"
 
 echo "Done! Files dumped to: $OUTPUT_DIR"
