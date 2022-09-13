@@ -95,8 +95,14 @@ SQLITE_STATE_DB=$TMPDIR/state.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
-# TODO: the trap should also drop the temp postgres DB
-trap 'rm -rf $TMPDIR' EXIT
+cleanup() {
+  echo "Cleaning up temporary sqlite database and config files..."
+  rm -r "$TMPDIR"
+  echo "Cleaning up temporary Postgres database..."
+  dropdb --if-exists "$POSTGRES_MAIN_DB_NAME"
+  dropdb --if-exists "$POSTGRES_STATE_DB_NAME"
+}
+trap 'cleanup' EXIT
 
 cat > "$SQLITE_CONFIG" <<EOF
 server_name: "test"
@@ -216,9 +222,5 @@ pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owne
 pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"  | cleanup_pg_schema > "$OUTPUT_DIR/rows_main.sql.postgres"
 pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME" | cleanup_pg_schema > "$OUTPUT_DIR/schema_state.sql.postgres"
 pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME" | cleanup_pg_schema > "$OUTPUT_DIR/rows_state.sql.postgres"
-
-echo "Cleaning up temporary Postgres database..."
-dropdb "$POSTGRES_MAIN_DB_NAME"
-dropdb "$POSTGRES_STATE_DB_NAME"
 
 echo "Done! Files dumped to: $OUTPUT_DIR"
