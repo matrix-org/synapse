@@ -167,7 +167,6 @@ class EventBuilder:
             "content": self.content,
             "unsigned": self.unsigned,
             "depth": depth,
-            "prev_state": [],
         }
 
         if self.is_state():
