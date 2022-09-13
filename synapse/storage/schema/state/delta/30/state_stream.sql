@@ -26,6 +26,10 @@
  * (event, state) pair, we can use that stream_ordering to identify when
  * the new state was assigned for the event.
  */
+
+/* NB: This table belongs to the `main` logical database; it should not be present
+ * in `state`.
+ */
 CREATE TABLE IF NOT EXISTS ex_outlier_stream(
     event_stream_ordering BIGINT PRIMARY KEY NOT NULL,
     event_id TEXT NOT NULL,
