@@ -106,6 +106,7 @@ class PusherPool:
         lang: Optional[str],
         data: JsonDict,
         profile_tag: str = "",
+        enabled: bool = True,
     ) -> Optional[Pusher]:
         """Creates a new pusher and adds it to the pool
 
@@ -147,6 +148,7 @@ class PusherPool:
                 last_stream_ordering=last_stream_ordering,
                 last_success=None,
                 failing_since=None,
+                enabled=enabled,
             )
         )
 
@@ -163,8 +165,9 @@ class PusherPool:
             data=data,
             last_stream_ordering=last_stream_ordering,
             profile_tag=profile_tag,
+            enabled=enabled,
         )
-        pusher = await self.start_pusher_by_id(app_id, pushkey, user_id)
+        pusher = await self.process_pusher_change_by_id(app_id, pushkey, user_id)
 
         return pusher
 
@@ -276,10 +279,13 @@ class PusherPool:
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 
-    async def start_pusher_by_id(
+    async def process_pusher_change_by_id(
         self, app_id: str, pushkey: str, user_id: str
     ) -> Optional[Pusher]:
-        """Look up the details for the given pusher, and start it
+        """Look up the details for the given pusher, and either start it if its
+        "enabled" flag is True, or try to stop it otherwise.
+
+        If the pusher is new and its "enabled" flag is False, the stop is a noop.
 
         Returns:
             The pusher started, if any
@@ -297,6 +303,10 @@ class PusherPool:
             if r.user_name == user_id:
                 pusher_config = r
 
+        if pusher_config and not pusher_config.enabled:
+            self.maybe_stop_pusher(app_id, pushkey, user_id)
+            return None
+
         pusher = None
         if pusher_config:
             pusher = await self._start_pusher(pusher_config)
@@ -305,7 +315,7 @@ class PusherPool:
 
     async def _start_pushers(self) -> None:
         """Start all the pushers"""
-        pushers = await self.store.get_all_pushers()
+        pushers = await self.store.get_enabled_pushers()
 
         # Stagger starting up the pushers so we don't completely drown the
         # process on start up.
@@ -363,6 +373,8 @@ class PusherPool:
 
         synapse_pushers.labels(type(pusher).__name__, pusher.app_id).inc()
 
+        logger.info("Starting pusher %s / %s", pusher.user_id, appid_pushkey)
+
         # Check if there *may* be push to process. We do this as this check is a
         # lot cheaper to do than actually fetching the exact rows we need to
         # push.
@@ -382,16 +394,7 @@ class PusherPool:
         return pusher
 
     async def remove_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
-        appid_pushkey = "%s:%s" % (app_id, pushkey)
-
-        byuser = self.pushers.get(user_id, {})
-
-        if appid_pushkey in byuser:
-            logger.info("Stopping pusher %s / %s", user_id, appid_pushkey)
-            pusher = byuser.pop(appid_pushkey)
-            pusher.on_stop()
-
-            synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()
+        self.maybe_stop_pusher(app_id, pushkey, user_id)
 
         # We can only delete pushers on master.
         if self._remove_pusher_client:
@@ -402,3 +405,22 @@ class PusherPool:
             await self.store.delete_pusher_by_app_id_pushkey_user_id(
                 app_id, pushkey, user_id
             )
+
+    def maybe_stop_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
+        """Stops a pusher with the given app ID and push key if one is running.
+
+        Args:
+            app_id: the pusher's app ID.
+            pushkey: the pusher's push key.
+            user_id: the user the pusher belongs to. Only used for logging.
+        """
+        appid_pushkey = "%s:%s" % (app_id, pushkey)
+
+        byuser = self.pushers.get(user_id, {})
+
+        if appid_pushkey in byuser:
+            logger.info("Stopping pusher %s / %s", user_id, appid_pushkey)
+            pusher = byuser.pop(appid_pushkey)
+            pusher.on_stop()
+
+            synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()
