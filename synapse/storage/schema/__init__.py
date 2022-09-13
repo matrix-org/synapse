@@ -77,6 +77,8 @@ Changes in SCHEMA_VERSION = 72:
     - Tables related to groups are dropped.
     - Unused column application_services_state.last_txn is dropped
     - Cache invalidation stream id sequence now begins at 2 to match code expectation.
+    - Add table `event_failed_pull_attempts` to keep track when we fail to pull
+      events over federation.
 """
 
 
