@@ -428,6 +428,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_auth(self) -> Auth:
+        if self.config.auth.oauth_delegation_enabled:
+            from synapse.api.auth.oauth_delegated import OAuthDelegatedAuth
+
+            return OAuthDelegatedAuth(self)
         return InternalAuth(self)
 
     @cache_in_self

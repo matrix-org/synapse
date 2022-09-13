@@ -14,9 +14,11 @@
 # limitations under the License.
 from typing import Any
 
+from authlib.jose.rfc7517 import JsonWebKey
+
 from synapse.types import JsonDict
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class AuthConfig(Config):
@@ -53,3 +55,29 @@ class AuthConfig(Config):
         self.ui_auth_session_timeout = self.parse_duration(
             ui_auth.get("session_timeout", 0)
         )
+
+        oauth_delegation = config.get("oauth_delegation", {})
+        self.oauth_delegation_enabled = oauth_delegation.get("enabled", False)
+        self.oauth_delegation_issuer = oauth_delegation.get("issuer", "")
+        self.oauth_delegation_issuer_metadata = oauth_delegation.get("issuer_metadata")
+        self.oauth_delegation_account = oauth_delegation.get("account", "")
+        self.oauth_delegation_client_id = oauth_delegation.get("client_id", "")
+        self.oauth_delegation_client_secret = oauth_delegation.get("client_secret", "")
+        self.oauth_delegation_client_auth_method = oauth_delegation.get(
+            "client_auth_method", "client_secret_post"
+        )
+
+        self.password_enabled = password_config.get(
+            "enabled", not self.oauth_delegation_enabled
+        )
+
+        if self.oauth_delegation_client_auth_method == "private_key_jwt":
+            self.oauth_delegation_client_secret = JsonWebKey.import_key(
+                self.oauth_delegation_client_secret
+            )
+
+        # If we are delegating via OAuth then password cannot be supported as well
+        if self.oauth_delegation_enabled and self.password_enabled:
+            raise ConfigError(
+                "Password auth cannot be enabled when OAuth delegation is enabled"
+            )
