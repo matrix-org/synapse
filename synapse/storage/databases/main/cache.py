@@ -253,6 +253,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self.get_applicable_edit.invalidate((relates_to,))
             self.get_thread_summary.invalidate((relates_to,))
             self.get_thread_participated.invalidate((relates_to,))
+            self.get_mutual_event_relations_for_rel_type.invalidate((relates_to,))
 
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
