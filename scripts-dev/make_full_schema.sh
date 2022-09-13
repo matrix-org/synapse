@@ -92,6 +92,8 @@ KEY_FILE=$TMPDIR/test.signing.key # default Synapse signing key path
 SQLITE_CONFIG=$TMPDIR/sqlite.conf
 SQLITE_MAIN_DB=$TMPDIR/main.db
 SQLITE_STATE_DB=$TMPDIR/state.db
+# Debug: useful for inspecting the common-only part of the schema.
+# SQLITE_COMMON_DB=$TMPDIR/common.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
@@ -113,6 +115,12 @@ macaroon_secret_key: "abcde"
 report_stats: false
 
 databases:
+#  Debug: useful for inspecting the common-only part of the schema.
+#  common:
+#    name: "sqlite3"
+#    data_stores: []
+#    args:
+#      database: "$SQLITE_COMMON_DB"
   main:
     name: "sqlite3"
     data_stores: ["main"]
@@ -212,6 +220,9 @@ sqlite3 "$SQLITE_MAIN_DB"  ".schema --indent"          > "$OUTPUT_DIR/schema_mai
 sqlite3 "$SQLITE_MAIN_DB"  ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_main.sql.sqlite"
 sqlite3 "$SQLITE_STATE_DB" ".schema --indent"          > "$OUTPUT_DIR/schema_state.sql.sqlite"
 sqlite3 "$SQLITE_STATE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_state.sql.sqlite"
+# Debug: useful for inspecting the common-only part of the schema.
+# sqlite3 "$SQLITE_COMMON_DB" ".schema --indent"          > "$OUTPUT_DIR/schema_common.sql.sqlite"
+# sqlite3 "$SQLITE_COMMON_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/rows_common.sql.sqlite"
 
 cleanup_pg_schema() {
    sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d'
