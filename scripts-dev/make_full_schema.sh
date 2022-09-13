@@ -2,9 +2,6 @@
 #
 # This script generates SQL files for creating a brand new Synapse DB with the latest
 # schema, on both SQLite3 and Postgres.
-#
-# It does so by having Synapse generate an up-to-date SQLite DB, then running
-# synapse_port_db to convert it to Postgres. It then dumps the contents of both.
 
 export PGHOST="localhost"
 POSTGRES_MAIN_DB_NAME="synapse_full_schema_main.$$"
