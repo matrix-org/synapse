@@ -188,11 +188,13 @@ class E2eKeysHandler:
                 )
                 invalid_cached_users = cached_users - valid_cached_users
                 if invalid_cached_users:
-                    # Fix up results. If we get here there may be bugs in device list
-                    # tracking.
+                    # Fix up results. If we get here, there is either a bug in device
+                    # list tracking, or we hit the race mentioned above.
                     user_ids_not_in_cache.update(invalid_cached_users)
                     for invalid_user_id in invalid_cached_users:
                         remote_results.pop(invalid_user_id)
+                    # This log message may be removed if it turns out it's almost
+                    # entirely triggered by races.
                     logger.error(
                         "Devices for %s were cached, but the server no longer shares "
                         "any rooms with them. The cached device lists are stale.",
