@@ -3,13 +3,18 @@ from typing import Any, Collection, Dict, Mapping, Sequence, Tuple, Union
 from synapse.types import JsonDict
 
 class PushRule:
-    rule_id: str
-    priority_class: int
-    conditions: Sequence[Mapping[str, str]]
-    actions: Sequence[Union[Mapping[str, Any], str]]
-    default: bool
-    default_enabled: bool
-
+    @property
+    def rule_id(self) -> str: ...
+    @property
+    def priority_class(self) -> int: ...
+    @property
+    def conditions(self) -> Sequence[Mapping[str, str]]: ...
+    @property
+    def actions(self) -> Sequence[Union[Mapping[str, Any], str]]: ...
+    @property
+    def default(self) -> bool: ...
+    @property
+    def default_enabled(self) -> bool: ...
     @staticmethod
     def from_db(
         rule_id: str, priority_class: int, conditions: str, actions: str

@@ -126,6 +126,9 @@ pub enum Action {
 
 impl IntoPy<PyObject> for Action {
     fn into_py(self, py: Python<'_>) -> PyObject {
+        // When we pass the `Action` struct to Python we want it to be converted
+        // to a dict. We use `pythonize`, which converts the struct using the
+        // `serde` serialization.
         pythonize(py, &self).expect("valid action")
     }
 }
