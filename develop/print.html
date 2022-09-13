@@ -433,8 +433,9 @@ sudo dnf groupinstall &quot;Development Tools&quot;
 <p>You may need to install the latest Xcode developer tools:</p>
 <pre><code class="language-sh">xcode-select --install
 </code></pre>
-<p>On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):</p>
-<pre><code class="language-sh"> brew install jpeg
+<p>On ARM-based Macs you may need to install libjpeg and libpq. 
+You can use Homebrew (https://brew.sh):</p>
+<pre><code class="language-sh"> brew install jpeg libpq
 </code></pre>
 <p>On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform <code>pip</code> about it so that <code>psycopg2</code> builds:</p>
