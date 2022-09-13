@@ -10,7 +10,7 @@ REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
 usage() {
   echo
-  echo "Usage: $0 -p <postgres_username> -o <path> [-c] [-n] [-h]"
+  echo "Usage: $0 -p <postgres_username> -o <path> [-c] [-n <schema number>] [-h]"
   echo
   echo "-p <postgres_username>"
   echo "  Username to connect to local postgres instance. The password will be requested"
@@ -19,11 +19,16 @@ usage() {
   echo "  CI mode. Prints every command that the script runs."
   echo "-o <path>"
   echo "  Directory to output full schema files to."
+  echo "-n <schema number>"
+  echo "  Schema number for the new snapshot. Used to set the location of files within "
+  echo "  the output directory, mimicking that of synapse/storage/schemas."
+  echo "  Defaults to 9999."
   echo "-h"
   echo "  Display this help text."
 }
 
-while getopts "p:co:h" opt; do
+SCHEMA_NUMBER="9999"
+while getopts "p:co:hn:" opt; do
   case $opt in
     p)
       export PGUSER=$OPTARG
@@ -39,6 +44,9 @@ while getopts "p:co:h" opt; do
     h)
       usage
       exit
+      ;;
+    n)
+      SCHEMA_NUMBER="$OPTARG"
       ;;
     \?)
       echo "ERROR: Invalid option: -$OPTARG" >&2
