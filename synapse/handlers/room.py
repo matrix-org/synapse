@@ -1057,13 +1057,16 @@ class RoomCreationHandler:
         creator_id = creator.user.to_string()
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
+
         # the last event sent/persisted to the db
         last_sent_event_id: Optional[str] = None
+
         # the most recently created event
         prev_event: List[str] = []
-        # a map of event types, state keys -> event_ids. We collect these mappings this as events are
-        # created (but not persisted to the db) to determine state for future created events
-        # (as this info can't be pulled from the db)
+
+        # a map of event types, state keys -> event_ids. We collect these mappings this
+        # as events are created (but not persisted to the db) to determine state for
+        # future created events (as this info can't be pulled from the db)
         state_map: dict = {}
 
         def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
@@ -1148,11 +1151,12 @@ class RoomCreationHandler:
             prev_event_ids=[last_sent_event_id],
             depth=depth,
         )
-        last_sent_event_id = member_event_id
+        # last_sent_event_id = member_event_id
         prev_event = [member_event_id]
 
-        # update the depth and state map here as these are otherwise updated in 'create_event'
-        # the membership event has been created through a different code path
+        # update the depth and state map here as these are otherwise updated in
+        # 'create_event' the membership event has been created through a different code
+        # path
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
@@ -1163,7 +1167,7 @@ class RoomCreationHandler:
             power_event = await create_event(EventTypes.PowerLevels, pl_content)
             power_context = await self.state.compute_event_context(power_event)
             current_state_group = power_context._state_group
-            last_sent_stream_id = await send(power_event, power_context, creator)
+            await send(power_event, power_context, creator)
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1212,7 +1216,7 @@ class RoomCreationHandler:
             )
             pl_context = await self.state.compute_event_context(pl_event)
             current_state_group = pl_context._state_group
-            last_sent_stream_id = await send(pl_event, pl_context, creator)
+            await send(pl_event, pl_context, creator)
 
         events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
@@ -1287,9 +1291,11 @@ class RoomCreationHandler:
             )
             events_to_send.append((encryption_event, encryption_context))
 
-        for event, context in events_to_send:
-            last_sent_stream_id = await send(event, context, creator)
-        return last_sent_stream_id, last_sent_event_id, depth
+        last_event = await self.event_creation_handler.handle_create_room_events(
+            creator, events_to_send
+        )
+        assert last_event.internal_metadata.stream_ordering is not None
+        return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.
