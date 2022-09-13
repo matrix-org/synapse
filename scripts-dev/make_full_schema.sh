@@ -5,6 +5,7 @@
 
 export PGHOST="localhost"
 POSTGRES_MAIN_DB_NAME="synapse_full_schema_main.$$"
+POSTGRES_COMMON_DB_NAME="synapse_full_schema_common.$$"
 POSTGRES_STATE_DB_NAME="synapse_full_schema_state.$$"
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
@@ -97,8 +98,7 @@ KEY_FILE=$TMPDIR/test.signing.key # default Synapse signing key path
 SQLITE_CONFIG=$TMPDIR/sqlite.conf
 SQLITE_MAIN_DB=$TMPDIR/main.db
 SQLITE_STATE_DB=$TMPDIR/state.db
-# Debug: useful for inspecting the common-only part of the schema.
-# SQLITE_COMMON_DB=$TMPDIR/common.db
+SQLITE_COMMON_DB=$TMPDIR/common.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
@@ -106,6 +106,7 @@ cleanup() {
   echo "Cleaning up temporary sqlite database and config files..."
   rm -r "$TMPDIR"
   echo "Cleaning up temporary Postgres database..."
+  dropdb --if-exists "$POSTGRES_COMMON_DB_NAME"
   dropdb --if-exists "$POSTGRES_MAIN_DB_NAME"
   dropdb --if-exists "$POSTGRES_STATE_DB_NAME"
 }
@@ -120,12 +121,11 @@ macaroon_secret_key: "abcde"
 report_stats: false
 
 databases:
-#  Debug: useful for inspecting the common-only part of the schema.
-#  common:
-#    name: "sqlite3"
-#    data_stores: []
-#    args:
-#      database: "$SQLITE_COMMON_DB"
+  common:
+    name: "sqlite3"
+    data_stores: []
+    args:
+      database: "$SQLITE_COMMON_DB"
   main:
     name: "sqlite3"
     data_stores: ["main"]
@@ -150,6 +150,14 @@ macaroon_secret_key: "abcde"
 report_stats: false
 
 databases:
+  common:
+    name: "psycopg2"
+    data_stores: []
+    args:
+      user: "$PGUSER"
+      host: "$PGHOST"
+      password: "$PGPASSWORD"
+      database: "$POSTGRES_COMMON_DB_NAME"
   main:
     name: "psycopg2"
     data_stores: ["main"]
@@ -182,6 +190,7 @@ synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" -
 
 # Create the PostgreSQL database.
 echo "Creating postgres databases..."
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_COMMON_DB_NAME"
 createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_MAIN_DB_NAME"
 createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_STATE_DB_NAME"
 
@@ -189,18 +198,27 @@ echo "Running db background jobs..."
 synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
 
 
-# Don't include the `common` tables in the dumps.
 echo "Dropping unwanted db tables..."
-DROP_COMMON_TABLES="
+
+# Some common tables are created and updated by Synapse itself and do not belong in the
+# schema.
+DROP_APP_MANAGED_TABLES="
 DROP TABLE schema_version;
 DROP TABLE schema_compat_version;
-DROP TABLE background_updates;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
 "
+# Other common tables are not created by Synapse and do belong in the schema.
+# TODO: we could derive DROP_COMMON_TABLES from the dump of the common-only DB. But
+#       since there's only one table there, I haven't bothered to do so.
+DROP_COMMON_TABLES="$DROP_APP_MANAGED_TABLES
+DROP TABLE background_updates;
+"
 
+sqlite3 "$SQLITE_COMMON_DB" <<< "$DROP_APP_MANAGED_TABLES"
 sqlite3 "$SQLITE_MAIN_DB" <<< "$DROP_COMMON_TABLES"
 sqlite3 "$SQLITE_STATE_DB" <<< "$DROP_COMMON_TABLES"
+psql "$POSTGRES_COMMON_DB_NAME" -w <<< "$DROP_APP_MANAGED_TABLES"
 psql "$POSTGRES_MAIN_DB_NAME" -w <<< "$DROP_COMMON_TABLES"
 psql "$POSTGRES_STATE_DB_NAME" -w <<< "$DROP_COMMON_TABLES"
 
