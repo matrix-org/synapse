@@ -68,6 +68,8 @@ class OAuthDelegatedAuth(BaseAuth):
         "private_key_jwt": PrivateKeyJWTWithKid(),
     }
 
+    EXTERNAL_ID_PROVIDER = "oauth-delegated"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
@@ -170,13 +172,42 @@ class OAuthDelegatedAuth(BaseAuth):
                 "Invalid access token",
             )
 
-        # TODO: claim mapping should be configurable
-        username: Optional[str] = introspection_result.get("username")
-        if username is None or not isinstance(username, str):
-            raise AuthError(
-                500,
-                "Invalid username claim in the introspection result",
+        # Match via the sub claim
+        sub: Optional[str] = introspection_result.get("sub")
+        if sub is None:
+            raise AuthError(500, "Invalid sub claim in the introspection result")
+
+        user_id_str = await self.store.get_user_by_external_id(
+            OAuthDelegatedAuth.EXTERNAL_ID_PROVIDER, sub
+        )
+        if user_id_str is None:
+            # If we could not find a user via the external_id, it either does not exist,
+            # or the external_id was never recorded
+
+            # TODO: claim mapping should be configurable
+            username: Optional[str] = introspection_result.get("username")
+            if username is None or not isinstance(username, str):
+                raise AuthError(
+                    500,
+                    "Invalid username claim in the introspection result",
+                )
+            user_id = UserID(username, self._hostname)
+
+            # First try to find a user from the username claim
+            user_info = await self.store.get_userinfo_by_id(user_id=user_id.to_string())
+            if user_info is None:
+                # If the user does not exist, we should create it on the fly
+                # TODO: we could use SCIM to provision users ahead of time and listen
+                # for SCIM SET events if those ever become standard:
+                # https://datatracker.ietf.org/doc/html/draft-hunt-scim-notify-00
+                await self.store.register_user(user_id=user_id.to_string())
+
+            # And record the sub as external_id
+            await self.store.record_user_external_id(
+                OAuthDelegatedAuth.EXTERNAL_ID_PROVIDER, sub, user_id.to_string()
             )
+        else:
+            user_id = UserID.from_string(user_id_str)
 
         # Let's look at the scope
         scope: List[str] = scope_to_list(introspection_result.get("scope", ""))
@@ -187,22 +218,6 @@ class OAuthDelegatedAuth(BaseAuth):
                 parts = tok.split(":")
                 if len(parts) == 5:
                     device_id = parts[4]
-
-        user_id = UserID(username, self._hostname)
-        user_info = await self.store.get_userinfo_by_id(user_id=user_id.to_string())
-
-        # If the user does not exist, we should create it on the fly
-        # TODO: we could use SCIM to provision users ahead of time and listen
-        # for SCIM SET events if those ever become standard:
-        # https://datatracker.ietf.org/doc/html/draft-hunt-scim-notify-00
-        if not user_info:
-            await self.store.register_user(user_id=user_id.to_string())
-            user_info = await self.store.get_userinfo_by_id(user_id=user_id.to_string())
-            if not user_info:
-                raise AuthError(
-                    500,
-                    "Could not create user on the fly",
-                )
 
         if device_id:
             # Create the device on the fly if it does not exist
