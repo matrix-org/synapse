@@ -174,10 +174,11 @@ class SynapseRequest(Request):
         self._opentracing_span = span
 
     def get_request_id(self) -> str:
+        request_id_value = None
         if self.request_id_header:
             request_id_value = self.getHeader(self.request_id_header)
 
-        if not request_id_value:
+        if request_id_value is None:
             request_id_value = str(self.request_seq)
 
         return "%s-%s" % (self.get_method(), request_id_value)
