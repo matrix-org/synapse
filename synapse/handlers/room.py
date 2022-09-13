@@ -1057,8 +1057,10 @@ class RoomCreationHandler:
         creator_id = creator.user.to_string()
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
+
         # the last event sent/persisted to the db
         last_sent_event_id: Optional[str] = None
+
         # the most recently created event
         prev_event: List[str] = []
         # a map of event types, state keys -> event_ids. We collect these mappings this as events are
@@ -1152,7 +1154,7 @@ class RoomCreationHandler:
             prev_event_ids=[last_sent_event_id],
             depth=depth,
         )
-        last_sent_event_id = member_event_id
+        # last_sent_event_id = member_event_id
         prev_event = [member_event_id]
 
         # update the depth and state map here as the membership event has been created
@@ -1168,7 +1170,7 @@ class RoomCreationHandler:
                 EventTypes.PowerLevels, pl_content, False
             )
             current_state_group = power_context._state_group
-            last_sent_stream_id = await send(power_event, power_context, creator)
+            await send(power_event, power_context, creator)
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1217,7 +1219,7 @@ class RoomCreationHandler:
                 False,
             )
             current_state_group = pl_context._state_group
-            last_sent_stream_id = await send(pl_event, pl_context, creator)
+            await send(pl_event, pl_context, creator)
 
         events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
@@ -1271,9 +1273,11 @@ class RoomCreationHandler:
             )
             events_to_send.append((encryption_event, encryption_context))
 
-        for event, context in events_to_send:
-            last_sent_stream_id = await send(event, context, creator)
-        return last_sent_stream_id, last_sent_event_id, depth
+        last_event = await self.event_creation_handler.handle_create_room_events(
+            creator, events_to_send
+        )
+        assert last_event.internal_metadata.stream_ordering is not None
+        return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.
