@@ -205,6 +205,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 self.get_rooms_for_user_with_stream_ordering.invalidate(
                     (data.state_key,)
                 )
+                self.get_rooms_for_user.invalidate(
+                    (data.state_key,)
+                )
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 
