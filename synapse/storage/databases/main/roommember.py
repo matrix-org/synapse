@@ -624,7 +624,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         participating in.
         """
         rooms = self.get_rooms_for_user_with_stream_ordering.cache.get_immediate(
-            (user_id,), None, update_metrics=False,
+            (user_id,),
+            None,
+            update_metrics=False,
         )
         if rooms:
             return frozenset(r.room_id for r in rooms)
