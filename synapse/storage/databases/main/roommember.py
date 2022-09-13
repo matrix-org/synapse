@@ -617,15 +617,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached(max_entries=500000, iterable=True)
-    async def get_rooms_for_user(
-        self, user_id: str
-    ) -> FrozenSet[str]:
+    async def get_rooms_for_user(self, user_id: str) -> FrozenSet[str]:
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
         participating in.
         """
-        rooms = self.get_rooms_for_user_with_stream_ordering.cache.get_immediate(user_id)
+        rooms = self.get_rooms_for_user_with_stream_ordering.cache.get_immediate(
+            user_id
+        )
         if rooms:
             return frozenset(r.room_id for r in rooms)
 
@@ -648,7 +648,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         txn.execute(sql, (user_id, Membership.JOIN))
-        return frozenset(txn)
+        return frozenset(row[0] for row in txn)
 
     @cachedList(
         cached_method_name="get_rooms_for_user",
@@ -656,7 +656,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     )
     async def get_rooms_for_users(
         self, user_ids: Collection[str]
-    ) -> Dict[str, FrozenSet[GetRoomsForUserWithStreamOrdering]]:
+    ) -> Dict[str, FrozenSet[str]]:
         """A batched version of `get_rooms_for_user`.
 
         Returns:
@@ -689,9 +689,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         txn.execute(sql, [Membership.JOIN] + args)
 
-        result: Dict[str, Set[str]] = {
-            user_id: set() for user_id in user_ids
-        }
+        result: Dict[str, Set[str]] = {user_id: set() for user_id in user_ids}
         for user_id, room_id in txn:
             result[user_id].add(room_id)
 

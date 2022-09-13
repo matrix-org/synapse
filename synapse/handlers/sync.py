@@ -1474,9 +1474,7 @@ class SyncHandler:
                 since_token.device_list_key
             )
             if changed_users is not None:
-                result = await self.store.get_rooms_for_users(
-                    changed_users
-                )
+                result = await self.store.get_rooms_for_users(changed_users)
 
                 for changed_user_id, entries in result.items():
                     # Check if the changed user shares any rooms with the user,
@@ -1517,11 +1515,7 @@ class SyncHandler:
                 newly_left_users.update(left_users)
 
             # Remove any users that we still share a room with.
-            left_users_rooms = (
-                await self.store.get_rooms_for_users(
-                    newly_left_users
-                )
-            )
+            left_users_rooms = await self.store.get_rooms_for_users(newly_left_users)
             for user_id, entries in left_users_rooms.items():
                 if any(rid in joined_rooms for rid in entries):
                     newly_left_users.discard(user_id)
