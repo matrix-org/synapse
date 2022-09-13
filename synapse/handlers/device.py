@@ -273,7 +273,7 @@ class DeviceWorkerHandler:
             # Double check if we still share rooms with the given user.
             users_rooms = await self.store.get_rooms_for_users(possibly_left)
             for changed_user_id, entries in users_rooms.items():
-                if any(room_id in room_ids for room_id in entries):
+                if any(rid in room_ids for rid in entries):
                     possibly_left.discard(changed_user_id)
                 else:
                     possibly_joined.discard(changed_user_id)
