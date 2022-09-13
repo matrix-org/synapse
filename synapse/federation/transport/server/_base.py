@@ -320,6 +320,7 @@ class BaseFederationServlet:
             if origin and whitelisted_homeserver(origin):
                 origin_context = context_from_request(request)
 
+            remote_parent_span = None
             if origin_context:
                 local_servlet_span = get_active_span()
                 # Create a span which uses the `origin_context` as a parent

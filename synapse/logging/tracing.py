@@ -487,17 +487,19 @@ def whitelisted_homeserver(destination: str) -> bool:
 
 
 def use_span(
-    span: "opentelemetry.trace.Span",
+    span: Optional["opentelemetry.trace.Span"],
     end_on_exit: bool = True,
-) -> ContextManager["opentelemetry.trace.Span"]:
-    if opentelemetry is None:
-        return contextlib.nullcontext()  # type: ignore[unreachable]
+) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
+    if opentelemetry is None or span is None:
+        return contextlib.nullcontext()
 
     return opentelemetry.trace.use_span(span=span, end_on_exit=end_on_exit)
 
 
-def create_non_recording_span() -> "opentelemetry.trace.Span":
+def create_non_recording_span() -> Optional["opentelemetry.trace.Span"]:
     """Create a no-op span that does not record or become part of a recorded trace"""
+    if opentelemetry is None:
+        return None  # type: ignore[unreachable]
 
     return opentelemetry.trace.NonRecordingSpan(
         opentelemetry.trace.INVALID_SPAN_CONTEXT
@@ -554,7 +556,7 @@ def start_active_span(
     end_on_exit: bool = True,
     # For testing only
     tracer: Optional["opentelemetry.trace.Tracer"] = None,
-) -> ContextManager["opentelemetry.trace.Span"]:
+) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
@@ -588,7 +590,7 @@ def start_active_span_from_edu(
     operation_name: str,
     *,
     edu_content: Dict[str, Any],
-) -> ContextManager["opentelemetry.trace.Span"]:
+) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
     """
     Extracts a span context from an edu and uses it to start a new active span
 
@@ -1003,17 +1005,20 @@ def trace_servlet(
         # finished sending the response to the client.
         end_on_exit=False,
     ) as span:
-        request.set_tracing_span(span)
+        if span:
+            request.set_tracing_span(span)
 
         inject_trace_id_into_response_headers(request.responseHeaders)
         try:
             yield
         finally:
-            # We set the operation name again in case its changed (which happens
-            # with JsonResource).
-            span.update_name(request.request_metrics.name)
+            if span:
+                # We set the operation name again in case its changed (which happens
+                # with JsonResource).
+                span.update_name(request.request_metrics.name)
 
-            if request.request_metrics.start_context.tag is not None:
-                span.set_attribute(
-                    SynapseTags.REQUEST_TAG, request.request_metrics.start_context.tag
-                )
+                if request.request_metrics.start_context.tag is not None:
+                    span.set_attribute(
+                        SynapseTags.REQUEST_TAG,
+                        request.request_metrics.start_context.tag,
+                    )
