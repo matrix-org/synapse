@@ -436,6 +436,12 @@ Sub-options for each listener include:
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
    behind a reverse-proxy.
 
+* `request_id_header`: The header used as the basis for the request ID which
+   is used in logs and tracing to correlate requests. Useful when Synapse is
+   behind a reverse-proxy. For example, if you use Cloudflare in front of
+   Synapse, you can set this to `"cf-ray"` to match up requests even when the
+   Cloudflare layer times out before Synapse is done.
+
 * `resources`: Only valid for an 'http' listener. A list of resources to host
    on this port. Sub-options for each resource are:
 

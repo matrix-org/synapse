@@ -206,6 +206,7 @@ class HttpListenerConfig:
     resources: List[HttpResourceConfig] = attr.Factory(list)
     additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
+    request_id_header: Optional[str] = None
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -887,7 +888,7 @@ def read_gc_thresholds(
         )
 
 
-def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
+def parse_listener_def(num: int, listener: JsonDict) -> ListenerConfig:
     """parse a listener config from the config file"""
     listener_type = listener["type"]
     # Raise a helpful error if direct TCP replication is still configured.
@@ -928,6 +929,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
             resources=resources,
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
+            request_id_header=listener.get("request_id_header"),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
