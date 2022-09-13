@@ -1,5 +1,5 @@
-Synapse 1.67.0rc1 (2022-09-06)
-==============================
+Synapse 1.67.0 (2022-09-13)
+===========================
 
 This release removes using the deprecated direct TCP replication configuration
 for workers. Server admins should use Redis instead. See the [upgrade
@@ -18,6 +18,12 @@ database will require SQLite version 3.27.0 or higher. (The [current minimum
  version is SQLite 3.22.0](https://github.com/matrix-org/synapse/blob/release-v1.67/synapse/storage/engines/sqlite.py#L69-L78).)
 See [#12983](https://github.com/matrix-org/synapse/issues/12983) and the [upgrade notes](https://matrix-org.github.io/synapse/v1.67/upgrade.html#upgrading-to-v1670). for more details.
 
+
+No significant changes since 1.67.0rc1.
+
+
+Synapse 1.67.0rc1 (2022-09-06)
+==============================
 
 Features
 --------
