@@ -248,6 +248,21 @@ and remove the TCP <code>replication</code> listener from config of the master a
 <h2 id="minimum-version-of-poetry-is-now-v120"><a class="header" href="#minimum-version-of-poetry-is-now-v120">Minimum version of Poetry is now v1.2.0</a></h2>
 <p>The minimum supported version of poetry is now 1.2. This should only affect
 those installing from a source checkout.</p>
+<h2 id="rust-requirement-in-the-next-release"><a class="header" href="#rust-requirement-in-the-next-release">Rust requirement in the next release</a></h2>
+<p>From the next major release (v1.68.0) installing Synapse from a source checkout
+will require a recent Rust compiler. Those using packages or
+<code>pip install matrix-synapse</code> will not be affected.</p>
+<p>The simplest way of installing Rust is via <a href="https://rustup.rs/">rustup.rs</a></p>
+<h2 id="sqlite-version-requirement-in-the-next-release"><a class="header" href="#sqlite-version-requirement-in-the-next-release">SQLite version requirement in the next release</a></h2>
+<p>From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+higher. Synapse v1.67.0 will be the last major release supporting SQLite
+versions 3.22 to 3.26.</p>
+<p>Those using docker images or Debian packages from Matrix.org will not be
+affected. If you have installed from source, you should check the version of 
+SQLite used by Python with:</p>
+<pre><code class="language-shell">python -c &quot;import sqlite3; print(sqlite3.sqlite_version)&quot;
+</code></pre>
+<p>If this is too old, refer to your distribution for advice on upgrading.</p>
 <h1 id="upgrading-to-v1660"><a class="header" href="#upgrading-to-v1660">Upgrading to v1.66.0</a></h1>
 <h2 id="delegation-of-email-validation-no-longer-supported"><a class="header" href="#delegation-of-email-validation-no-longer-supported">Delegation of email validation no longer supported</a></h2>
 <p>As of this version, Synapse no longer allows the tasks of verifying email address
