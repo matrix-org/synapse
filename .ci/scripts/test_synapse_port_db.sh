@@ -2,8 +2,11 @@
 #
 # Test script for 'synapse_port_db'.
 #   - configures synapse and a postgres server.
-#   - runs the port script on a prepopulated test sqlite db
-#   - also runs it against an new sqlite db
+#   - runs the port script on a prepopulated test sqlite db. Checks that the
+#     return code is zero.
+#   - reruns the port script on the same sqlite db, targetting the same postgres db.
+#     Checks that the return code is zero.
+#   - runs the port script against a new sqlite db. Checks the return code is zero.
 #
 # Expects Synapse to have been already installed with `poetry install --extras postgres`.
 # Expects `poetry` to be available on the `PATH`.
@@ -12,13 +15,10 @@ set -xe
 cd "$(dirname "$0")/../.."
 
 echo "--- Generate the signing key"
-
-# Generate the server's signing key.
 poetry run synapse_homeserver --generate-keys -c .ci/sqlite-config.yaml
 
 echo "--- Prepare test database"
-
-# Make sure the SQLite3 database is using the latest schema and has no pending background update.
+# Make sure the SQLite3 database is using the latest schema and has no pending background updates.
 poetry run update_synapse_database --database-config .ci/sqlite-config.yaml --run-background-updates
 
 # Create the PostgreSQL database.
