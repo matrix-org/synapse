@@ -1255,7 +1255,6 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             table="event_push_actions",
             columns=["highlight", "stream_ordering"],
             where_clause="highlight=0",
-            psql_only=True,
         )
 
     async def get_push_actions_for_user(
