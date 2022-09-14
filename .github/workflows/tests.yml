@@ -408,11 +408,21 @@ jobs:
           python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
+        id: run_tester_script
         env:
           PGHOST: localhost
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: postgres
+      - name: "Upload schema differences"
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() && !cancelled() && steps.run_tester_script.outcome == 'failure' }}
+        with:
+          name: Schema dumps
+          path: |
+            unported.sql
+            ported.sql
+            schema_diff
 
   complement:
     if: "${{ !failure() && !cancelled() }}"

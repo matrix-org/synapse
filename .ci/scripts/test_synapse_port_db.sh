@@ -11,7 +11,7 @@
 # Expects Synapse to have been already installed with `poetry install --extras postgres`.
 # Expects `poetry` to be available on the `PATH`.
 
-set -xe
+set -xe -o pipefail
 cd "$(dirname "$0")/../.."
 
 echo "--- Generate the signing key"
@@ -51,3 +51,17 @@ psql \
 
 echo "+++ Run synapse_port_db against empty database"
 poetry run synapse_port_db --sqlite-database .ci/test_db.db --postgres-config .ci/postgres-config.yaml
+
+echo "--- Create a brand new postgres database from schema"
+cp .ci/postgres-config.yaml .ci/postgres-config-unported.yaml
+sed -i -e 's/database: synapse/database: synapse_unported/' .ci/postgres-config-unported.yaml
+psql -c "CREATE DATABASE synapse_unported"
+poetry run update_synapse_database --database-config .ci/postgres-config-unported.yaml --run-background-updates
+
+echo "+++ Comparing ported schema with unported schema"
+# Ignore the tables that portdb creates. (Should it tidy them up when the porting is completed?)
+psql synapse -c "DROP TABLE port_from_sqlite3;"
+pg_dump --format=plain --schema-only --no-tablespaces --no-acl --no-owner synapse_unported > unported.sql
+pg_dump --format=plain --schema-only --no-tablespaces --no-acl --no-owner synapse          >   ported.sql
+# By default, `diff` returns zero if there are no changes and nonzero otherwise
+diff -u unported.sql ported.sql | tee schema_diff
