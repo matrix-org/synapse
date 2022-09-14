@@ -83,7 +83,7 @@ class FederationBase:
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
         except Exception as exc:
-            await self._store.record_event_failed_pull_attempt(
+            await self.store.record_event_failed_pull_attempt(
                 pdu.room_id, pdu.event_id, str(exc)
             )
             raise exc
@@ -122,7 +122,7 @@ class FederationBase:
                         "event_id": pdu.event_id,
                     }
                 )
-                await self._store.record_event_failed_pull_attempt(
+                await self.store.record_event_failed_pull_attempt(
                     pdu.room_id, pdu.event_id, "Event content has been tampered with"
                 )
             return redacted_event
