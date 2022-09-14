@@ -300,46 +300,39 @@ class HomeserverTestCase(TestCase):
         if hasattr(self, "user_id"):
             if self.hijack_auth:
                 assert self.helper.auth_user_id is not None
+                token = "some_fake_token"
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
                     self.hs.get_datastores().main.add_access_token_to_user(
                         self.helper.auth_user_id,
-                        "some_fake_token",
+                        token,
                         None,
                         None,
                     )
                 )
 
                 async def get_user_by_access_token(
-                    token: Optional[str] = None, allow_guest: bool = False
-                ) -> JsonDict:
+                    token: str, allow_guest: bool = False
+                ) -> Requester:
                     assert self.helper.auth_user_id is not None
-                    return {
-                        "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": token_id,
-                        "is_guest": False,
-                    }
+                    return create_requester(
+                        user_id=UserID.from_string(self.helper.auth_user_id),
+                        access_token_id=token_id,
+                    )
 
                 async def get_user_by_req(
                     request: SynapseRequest,
                     allow_guest: bool = False,
                     allow_expired: bool = False,
                 ) -> Requester:
-                    assert self.helper.auth_user_id is not None
-                    return create_requester(
-                        UserID.from_string(self.helper.auth_user_id),
-                        token_id,
-                        False,
-                        False,
-                        None,
-                    )
+                    return await get_user_by_access_token(token)
 
                 # Type ignore: mypy doesn't like us assigning to methods.
                 self.hs.get_auth().get_user_by_req = get_user_by_req  # type: ignore[assignment]
                 self.hs.get_auth().get_user_by_access_token = get_user_by_access_token  # type: ignore[assignment]
                 self.hs.get_auth().get_access_token_from_request = Mock(  # type: ignore[assignment]
-                    return_value="1234"
+                    return_value=token
                 )
 
         if self.needs_threadpool:
