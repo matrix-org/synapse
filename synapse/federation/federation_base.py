@@ -80,7 +80,13 @@ class FederationBase:
           InvalidEventSignatureError if the signature check failed. Nothing
              will be logged in this case.
         """
-        await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        try:
+            await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        except Exception as exc:
+            await self._store.record_event_failed_pull_attempt(
+                pdu.room_id, pdu.event_id, str(exc)
+            )
+            raise exc
 
         if not check_event_content_hash(pdu):
             # let's try to distinguish between failures because the event was
@@ -115,6 +121,9 @@ class FederationBase:
                         "message": "Event content has been tampered, redacting",
                         "event_id": pdu.event_id,
                     }
+                )
+                await self._store.record_event_failed_pull_attempt(
+                    pdu.room_id, pdu.event_id, "Event content has been tampered with"
                 )
             return redacted_event
 
