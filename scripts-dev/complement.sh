@@ -122,7 +122,14 @@ if [ -n "$skip_complement_run" ]; then
     exit
 fi
 
+PG_DATA_FOLDER=/tmp/postgres-data
+
+rm -rf $PG_DATA_FOLDER
+mkdir -p $PG_DATA_FOLDER
+chmod 777 $PG_DATA_FOLDER
+
 export COMPLEMENT_BASE_IMAGE=complement-synapse
+export COMPLEMENT_HOST_MOUNTS=$PG_DATA_FOLDER:/var/lib/postgresql/data
 
 extra_test_args=()
 
@@ -178,3 +185,5 @@ echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
 
 go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/...
+
+rm -rf $PG_DATA_FOLDER

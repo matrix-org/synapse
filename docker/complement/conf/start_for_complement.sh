@@ -25,7 +25,15 @@ case "$SYNAPSE_COMPLEMENT_DATABASE" in
     # Set postgres authentication details which will be placed in the homeserver config file
     export POSTGRES_PASSWORD=somesecret
     export POSTGRES_USER=postgres
+
     export POSTGRES_HOST=localhost
+
+    if [ ! -f "$PGDATA/PG_VERSION" ]; then
+      gosu postgres initdb --locale=C --encoding=UTF-8 --auth-host password
+
+      echo "ALTER USER postgres PASSWORD 'somesecret'" | gosu postgres postgres --single
+      echo "CREATE DATABASE synapse" | gosu postgres postgres --single
+    fi
 
     # configure supervisord to start postgres
     export START_POSTGRES=true
