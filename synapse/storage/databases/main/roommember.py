@@ -507,6 +507,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return membership == Membership.JOIN
 
     async def is_server_notice_room(self, room_id: str) -> bool:
+        """
+        Determines whether the given room is a 'Server Notices' room, used for
+        sending server notices to a user.
+
+        This is determined by seeing whether the server notices user is present
+        in the room.
+        """
         if self._server_notices_mxid is None:
             return False
         is_server_notices_room = await self.check_local_user_in_room(
