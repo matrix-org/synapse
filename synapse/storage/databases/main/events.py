@@ -2192,9 +2192,9 @@ class PersistEventsStore:
         sql = """
             INSERT INTO event_push_actions (
                 room_id, event_id, user_id, actions, stream_ordering,
-                topological_ordering, notif, highlight, unread
+                topological_ordering, notif, highlight, unread, thread_id
             )
-            SELECT ?, event_id, user_id, actions, ?, ?, notif, highlight, unread
+            SELECT ?, event_id, user_id, actions, ?, ?, notif, highlight, unread, thread_id
             FROM event_push_actions_staging
             WHERE event_id = ?
         """
@@ -2454,7 +2454,7 @@ class PersistEventsStore:
         # extremities, it also means that they won't be backfilled from again so
         # we no longer need to store the backfill attempts around it.
         query = """
-            DELETE FROM event_failed_backfill_attempts
+            DELETE FROM event_failed_pull_attempts
             WHERE event_id = ? and room_id = ?
         """
         txn.execute_batch(

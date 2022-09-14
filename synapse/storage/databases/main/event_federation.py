@@ -49,6 +49,7 @@ from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -1126,6 +1127,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
+    @cancellable
     async def get_forward_extremities_for_room_at_stream_ordering(
         self, room_id: str, stream_ordering: int
     ) -> List[str]:
@@ -1443,97 +1445,49 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return event_id_results
 
     @trace
-    async def record_event_failed_backfill_attempt(
-        self, room_id: str, event_id: str
+    async def record_event_failed_pull_attempt(
+        self, room_id: str, event_id: str, cause: str
     ) -> None:
         """
-        Record when we fail to backfill an event.
+        Record when we fail to pull an event over federation.
 
         This information allows us to be more intelligent when we decide to
         retry (we don't need to fail over and over) and we can process that
         event in the background so we don't block on it each time.
 
         Args:
-            room_id: The room where the event failed to backfill from
-            event_id: The event that failed to be backfilled
+            room_id: The room where the event failed to pull from
+            event_id: The event that failed to be fetched or processed
+            cause: The error message or reason that we failed to pull the event
         """
-        if (
-            self.database_engine.can_native_upsert
-            and "event_failed_backfill_attempts"
-            not in self.db_pool._unsafe_to_upsert_tables
-        ):
-            await self.db_pool.runInteraction(
-                "record_event_failed_backfill_attempt",
-                self._record_event_failed_backfill_attempt_upsert_native_txn,
-                room_id,
-                event_id,
-                db_autocommit=True,  # Safe as its a single upsert
-            )
-        else:
-            await self.db_pool.runInteraction(
-                "record_event_failed_backfill_attempt",
-                self._record_event_failed_backfill_attempt_upsert_emulated_txn,
-                room_id,
-                event_id,
-            )
-
-    def _record_event_failed_backfill_attempt_upsert_native_txn(
-        self,
-        txn: LoggingTransaction,
-        room_id: str,
-        event_id: str,
-    ) -> None:
-        assert self.database_engine.can_native_upsert
-
-        sql = """
-            INSERT INTO event_failed_backfill_attempts (
-                room_id, event_id, num_attempts, last_attempt_ts
-            )
-                VALUES (?, ?, ?, ?)
-            ON CONFLICT (room_id, event_id) DO UPDATE SET
-                num_attempts=event_failed_backfill_attempts.num_attempts + 1,
-                last_attempt_ts=EXCLUDED.last_attempt_ts;
-        """
-
-        txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec()))
-
-    def _record_event_failed_backfill_attempt_upsert_emulated_txn(
-        self,
-        txn: LoggingTransaction,
-        room_id: str,
-        event_id: str,
-    ) -> None:
-        self.database_engine.lock_table(txn, "event_failed_backfill_attempts")
-
-        prev_row = self.db_pool.simple_select_one_txn(
-            txn,
-            table="event_failed_backfill_attempts",
-            keyvalues={"room_id": room_id, "event_id": event_id},
-            retcols=("num_attempts"),
-            allow_none=True,
+        await self.db_pool.runInteraction(
+            "record_event_failed_pull_attempt",
+            self._record_event_failed_pull_attempt_upsert_txn,
+            room_id,
+            event_id,
+            cause,
+            db_autocommit=True,  # Safe as it's a single upsert
         )
 
-        if not prev_row:
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="event_failed_backfill_attempts",
-                values={
-                    "room_id": room_id,
-                    "event_id": event_id,
-                    "num_attempts": 1,
-                    "last_attempt_ts": self._clock.time_msec(),
-                },
+    def _record_event_failed_pull_attempt_upsert_txn(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        event_id: str,
+        cause: str,
+    ) -> None:
+        sql = """
+            INSERT INTO event_failed_pull_attempts (
+                room_id, event_id, num_attempts, last_attempt_ts, last_cause
             )
-        else:
-            self.db_pool.simple_update_one_txn(
-                txn,
-                table="event_failed_backfill_attempts",
-                keyvalues={"room_id": room_id, "event_id": event_id},
-                updatevalues={
-                    "num_attempts": prev_row["num_attempts"] + 1,
-                    "last_attempt_ts": self._clock.time_msec(),
-                },
-            )
+                VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (room_id, event_id) DO UPDATE SET
+                num_attempts=event_failed_pull_attempts.num_attempts + 1,
+                last_attempt_ts=EXCLUDED.last_attempt_ts,
+                last_cause=EXCLUDED.last_cause;
+        """
+
+        txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
 
     async def get_missing_events(
         self,
@@ -1854,7 +1808,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 logger.info("Invalid prev_events for %s", event_id)
                 continue
 
-            if room_version.event_format == EventFormatVersions.V1:
+            if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
                 for prev_event_tuple in prev_events:
                     if (
                         not isinstance(prev_event_tuple, list)

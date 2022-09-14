@@ -393,6 +393,151 @@ A response body like the following is returned:
 }
 ```
 
+# Room Messages API
+
+The Room Messages admin API allows server admins to get all messages
+sent to a room in a given timeframe. There are various parameters available
+that allow for filtering and ordering the returned list. This API supports pagination.
+
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
+This endpoint mirrors the [Matrix Spec defined Messages API](https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3roomsroomidmessages).
+
+The API is:
+```
+GET /_synapse/admin/v1/rooms/<room_id>/messages
+```
+
+**Parameters**
+
+The following path parameters are required:
+
+* `room_id` - The ID of the room you wish you fetch messages from.
+
+The following query parameters are available:
+
+* `from` (required) - The token to start returning events from. This token can be obtained from a prev_batch
+  or next_batch token returned by the /sync endpoint, or from an end token returned by a previous request to this endpoint.
+* `to` - The token to spot returning events at.
+* `limit` - The maximum number of events to return. Defaults to `10`.
+* `filter` - A JSON RoomEventFilter to filter returned events with.
+* `dir` - The direction to return events from. Either `f` for forwards or `b` for backwards. Setting
+  this value to `b` will reverse the above sort order. Defaults to `f`.
+
+**Response**
+
+The following fields are possible in the JSON response body:
+
+* `chunk` - A list of room events. The order depends on the dir parameter.
+          Note that an empty chunk does not necessarily imply that no more events are available. Clients should continue to paginate until no end property is returned.
+* `end` - A token corresponding to the end of chunk. This token can be passed back to this endpoint to request further events.
+          If no further events are available, this property is omitted from the response.
+* `start` - A token corresponding to the start of chunk.
+* `state` - A list of state events relevant to showing the chunk.
+
+**Example**
+
+For more details on each chunk, read [the Matrix specification](https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3roomsroomidmessages).
+
+```json
+{
+  "chunk": [
+    {
+      "content": {
+        "body": "This is an example text message",
+        "format": "org.matrix.custom.html",
+        "formatted_body": "<b>This is an example text message</b>",
+        "msgtype": "m.text"
+      },
+      "event_id": "$143273582443PhrSn:example.org",
+      "origin_server_ts": 1432735824653,
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "type": "m.room.message",
+      "unsigned": {
+        "age": 1234
+      }
+    },
+    {
+      "content": {
+        "name": "The room name"
+      },
+      "event_id": "$143273582443PhrSn:example.org",
+      "origin_server_ts": 1432735824653,
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "state_key": "",
+      "type": "m.room.name",
+      "unsigned": {
+        "age": 1234
+      }
+    },
+    {
+      "content": {
+        "body": "Gangnam Style",
+        "info": {
+          "duration": 2140786,
+          "h": 320,
+          "mimetype": "video/mp4",
+          "size": 1563685,
+          "thumbnail_info": {
+            "h": 300,
+            "mimetype": "image/jpeg",
+            "size": 46144,
+            "w": 300
+          },
+          "thumbnail_url": "mxc://example.org/FHyPlCeYUSFFxlgbQYZmoEoe",
+          "w": 480
+        },
+        "msgtype": "m.video",
+        "url": "mxc://example.org/a526eYUSFFxlgbQYZmo442"
+      },
+      "event_id": "$143273582443PhrSn:example.org",
+      "origin_server_ts": 1432735824653,
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "type": "m.room.message",
+      "unsigned": {
+        "age": 1234
+      }
+    }
+  ],
+  "end": "t47409-4357353_219380_26003_2265",
+  "start": "t47429-4392820_219380_26003_2265"
+}
+```
+
+# Room Timestamp to Event API
+
+The Room Timestamp to Event API endpoint fetches the `event_id` of the closest event to the given
+timestamp (`ts` query parameter) in the given direction (`dir` query parameter).
+
+Useful for cases like jump to date so you can start paginating messages from
+a given date in the archive.
+
+The API is:
+```
+  GET /_synapse/admin/v1/rooms/<room_id>/timestamp_to_event
+```
+
+**Parameters**
+
+The following path parameters are required:
+
+* `room_id` - The ID of the room you wish to check.
+
+The following query parameters are available:
+
+* `ts` - a timestamp in milliseconds where we will find the closest event in
+  the given direction.
+* `dir` - can be `f` or `b` to indicate forwards and backwards in time from the
+  given timestamp. Defaults to `f`.
+
+**Response**
+
+* `event_id` - converted from timestamp
+
 # Block Room API
 The Block Room admin API allows server admins to block and unblock rooms,
 and query to see if a given room is blocked.

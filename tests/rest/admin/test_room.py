@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
+import time
 import urllib.parse
 from typing import List, Optional
 from unittest.mock import Mock
@@ -22,10 +24,11 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
-from synapse.handlers.pagination import PaginationHandler
+from synapse.handlers.pagination import PaginationHandler, PurgeStatus
 from synapse.rest.client import directory, events, login, room
 from synapse.server import HomeServer
 from synapse.util import Clock
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 
@@ -1791,6 +1794,159 @@ class RoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", url.encode("ascii"), access_token=user_tok)
         self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+
+class RoomMessagesTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.user = self.register_user("foo", "pass")
+        self.user_tok = self.login("foo", "pass")
+        self.room_id = self.helper.create_room_as(self.user, tok=self.user_tok)
+
+    def test_timestamp_to_event(self) -> None:
+        """Test that providing the current timestamp can get the last event."""
+        self.helper.send(self.room_id, body="message 1", tok=self.user_tok)
+        second_event_id = self.helper.send(
+            self.room_id, body="message 2", tok=self.user_tok
+        )["event_id"]
+        ts = str(round(time.time() * 1000))
+
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/timestamp_to_event?dir=b&ts=%s"
+            % (self.room_id, ts),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code)
+        self.assertIn("event_id", channel.json_body)
+        self.assertEqual(second_event_id, channel.json_body["event_id"])
+
+    def test_topo_token_is_accepted(self) -> None:
+        """Test Topo Token is accepted."""
+        token = "t1-0_0_0_0_0_0_0_0_0"
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s" % (self.room_id, token),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code)
+        self.assertIn("start", channel.json_body)
+        self.assertEqual(token, channel.json_body["start"])
+        self.assertIn("chunk", channel.json_body)
+        self.assertIn("end", channel.json_body)
+
+    def test_stream_token_is_accepted_for_fwd_pagianation(self) -> None:
+        """Test that stream token is accepted for forward pagination."""
+        token = "s0_0_0_0_0_0_0_0_0"
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s" % (self.room_id, token),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code)
+        self.assertIn("start", channel.json_body)
+        self.assertEqual(token, channel.json_body["start"])
+        self.assertIn("chunk", channel.json_body)
+        self.assertIn("end", channel.json_body)
+
+    def test_room_messages_purge(self) -> None:
+        """Test room messages can be retrieved by an admin that isn't in the room."""
+        store = self.hs.get_datastores().main
+        pagination_handler = self.hs.get_pagination_handler()
+
+        # Send a first message in the room, which will be removed by the purge.
+        first_event_id = self.helper.send(
+            self.room_id, body="message 1", tok=self.user_tok
+        )["event_id"]
+        first_token = self.get_success(
+            store.get_topological_token_for_event(first_event_id)
+        )
+        first_token_str = self.get_success(first_token.to_string(store))
+
+        # Send a second message in the room, which won't be removed, and which we'll
+        # use as the marker to purge events before.
+        second_event_id = self.helper.send(
+            self.room_id, body="message 2", tok=self.user_tok
+        )["event_id"]
+        second_token = self.get_success(
+            store.get_topological_token_for_event(second_event_id)
+        )
+        second_token_str = self.get_success(second_token.to_string(store))
+
+        # Send a third event in the room to ensure we don't fall under any edge case
+        # due to our marker being the latest forward extremity in the room.
+        self.helper.send(self.room_id, body="message 3", tok=self.user_tok)
+
+        # Check that we get the first and second message when querying /messages.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s&dir=b&filter=%s"
+            % (
+                self.room_id,
+                second_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
+
+        # Purge every event before the second event.
+        purge_id = random_string(16)
+        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
+        self.get_success(
+            pagination_handler._purge_history(
+                purge_id=purge_id,
+                room_id=self.room_id,
+                token=second_token_str,
+                delete_local_events=True,
+            )
+        )
+
+        # Check that we only get the second message through /message now that the first
+        # has been purged.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s&dir=b&filter=%s"
+            % (
+                self.room_id,
+                second_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 1, [event["content"] for event in chunk])
+
+        # Check that we get no event, but also no error, when querying /messages with
+        # the token that was pointing at the first event, because we don't have it
+        # anymore.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?from=%s&dir=b&filter=%s"
+            % (
+                self.room_id,
+                first_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 0, [event["content"] for event in chunk])
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):

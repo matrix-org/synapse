@@ -36,6 +36,12 @@ from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
+DIRECT_TCP_ERROR = """
+Using direct TCP replication for workers is no longer supported.
+
+Please see https://matrix-org.github.io/synapse/latest/upgrade.html#direct-tcp-replication-is-no-longer-supported-migrate-to-redis
+"""
+
 # by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
 # (Windows, macOS, other BSD/Linux where net.ipv6.bindv6only is set) will only listen
 # on IPv6 when '::' is set.
@@ -165,7 +171,6 @@ KNOWN_LISTENER_TYPES = {
     "http",
     "metrics",
     "manhole",
-    "replication",
 }
 
 KNOWN_RESOURCES = {
@@ -515,7 +520,9 @@ class ServerConfig(Config):
         ):
             raise ConfigError("allowed_avatar_mimetypes must be a list")
 
-        self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
+        self.listeners = [
+            parse_listener_def(i, x) for i, x in enumerate(config.get("listeners", []))
+        ]
 
         # no_tls is not really supported any more, but let's grandfather it in
         # here.
@@ -880,9 +887,12 @@ def read_gc_thresholds(
         )
 
 
-def parse_listener_def(listener: Any) -> ListenerConfig:
+def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     """parse a listener config from the config file"""
     listener_type = listener["type"]
+    # Raise a helpful error if direct TCP replication is still configured.
+    if listener_type == "replication":
+        raise ConfigError(DIRECT_TCP_ERROR, ("listeners", str(num), "type"))
 
     port = listener.get("port")
     if not isinstance(port, int):
