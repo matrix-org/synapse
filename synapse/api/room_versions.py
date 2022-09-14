@@ -19,18 +19,23 @@ import attr
 
 class EventFormatVersions:
     """This is an internal enum for tracking the version of the event format,
-    independently from the room version.
+    independently of the room version.
+
+    To reduce confusion, the event format versions are named after the room
+    versions that they were used or introduced in.
+    The concept of an 'event format version' is specific to Synapse (the
+    specification does not mention this term.)
     """
 
-    V1 = 1  # $id:server event id format
-    V2 = 2  # MSC1659-style $hash event id format: introduced for room v3
-    V3 = 3  # MSC1884-style $hash format: introduced for room v4
+    ROOM_V1_V2 = 1  # $id:server event id format: used for room v1 and v2
+    ROOM_V3 = 2  # MSC1659-style $hash event id format: used for room v3
+    ROOM_V4_PLUS = 3  # MSC1884-style $hash format: introduced for room v4
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
-    EventFormatVersions.V1,
-    EventFormatVersions.V2,
-    EventFormatVersions.V3,
+    EventFormatVersions.ROOM_V1_V2,
+    EventFormatVersions.ROOM_V3,
+    EventFormatVersions.ROOM_V4_PLUS,
 }
 
 
@@ -92,7 +97,7 @@ class RoomVersions:
     V1 = RoomVersion(
         "1",
         RoomDisposition.STABLE,
-        EventFormatVersions.V1,
+        EventFormatVersions.ROOM_V1_V2,
         StateResolutionVersions.V1,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -110,7 +115,7 @@ class RoomVersions:
     V2 = RoomVersion(
         "2",
         RoomDisposition.STABLE,
-        EventFormatVersions.V1,
+        EventFormatVersions.ROOM_V1_V2,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -128,7 +133,7 @@ class RoomVersions:
     V3 = RoomVersion(
         "3",
         RoomDisposition.STABLE,
-        EventFormatVersions.V2,
+        EventFormatVersions.ROOM_V3,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -146,7 +151,7 @@ class RoomVersions:
     V4 = RoomVersion(
         "4",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -164,7 +169,7 @@ class RoomVersions:
     V5 = RoomVersion(
         "5",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=True,
@@ -182,7 +187,7 @@ class RoomVersions:
     V6 = RoomVersion(
         "6",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -200,7 +205,7 @@ class RoomVersions:
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
         RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -218,7 +223,7 @@ class RoomVersions:
     V7 = RoomVersion(
         "7",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -236,7 +241,7 @@ class RoomVersions:
     V8 = RoomVersion(
         "8",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -254,7 +259,7 @@ class RoomVersions:
     V9 = RoomVersion(
         "9",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -272,7 +277,7 @@ class RoomVersions:
     MSC3787 = RoomVersion(
         "org.matrix.msc3787",
         RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -290,7 +295,7 @@ class RoomVersions:
     V10 = RoomVersion(
         "10",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -308,7 +313,7 @@ class RoomVersions:
     MSC2716v4 = RoomVersion(
         "org.matrix.msc2716v4",
         RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,

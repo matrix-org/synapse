@@ -232,7 +232,7 @@ class StateHandler:
         logger.debug("calling resolve_state_groups from get_current_user_ids_in_room")
         entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         state = await entry.get_state(self._state_storage_controller, StateFilter.all())
-        return await self.store.get_joined_user_ids_from_state(room_id, state, entry)
+        return await self.store.get_joined_user_ids_from_state(room_id, state)
 
     async def get_hosts_in_room_at_events(
         self, room_id: str, event_ids: Collection[str]
