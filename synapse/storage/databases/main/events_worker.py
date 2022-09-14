@@ -592,7 +592,7 @@ class EventsWorkerStore(SQLBaseStore):
         self,
         event_ids: Iterable[str],
         allow_rejected: bool = False,
-        get_prev_content: bool = False
+        get_prev_content: bool = False,
     ) -> Dict[str, EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
 
