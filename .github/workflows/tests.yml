@@ -361,11 +361,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - run: sudo apt-get -qq install xmlsec1
+      - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+
 
   portdb:
     if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
@@ -396,12 +402,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - run: sudo apt-get -qq install xmlsec1
+      - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
 
   complement:
     if: "${{ !failure() && !cancelled() }}"
