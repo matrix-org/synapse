@@ -1,0 +1,28 @@
+name: Move new issues into the issue triage board
+
+on:
+  issues:
+    types: [ opened ]
+
+jobs:
+  add_new_issues:
+    name: Add new issues to the triage board
+    runs-on: ubuntu-latest
+    steps:
+      - uses: octokit/graphql-action@v2.x
+        id: add_to_project
+        with:
+          headers: '{"GraphQL-Features": "projects_next_graphql"}'
+          query: |
+              mutation add_to_project($projectid:ID!,$contentid:ID!) {
+                addProjectV2ItemById(input: {projectId: $projectid contentId: $contentid}) {
+                item {
+                  id
+                  }
+                }
+              }
+          projectid: ${{ env.PROJECT_ID }}
+          contentid: ${{ github.event.issue.node_id }}
+        env:
+          PROJECT_ID: "PVT_kwDOAIB0Bs4AFDdZ"
+          GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}

@@ -481,16 +481,12 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
         return config
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, hs: HomeServer
-    ) -> HomeServer:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.allowed_user_id = self.register_user(self.allowed_localpart, "pass")
         self.allowed_access_token = self.login(self.allowed_localpart, "pass")
 
         self.denied_user_id = self.register_user("denied", "pass")
         self.denied_access_token = self.login("denied", "pass")
-
-        return hs
 
     def test_denied_without_publication_permission(self) -> None:
         """
@@ -575,9 +571,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
     servlets = [directory.register_servlets, room.register_servlets]
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, hs: HomeServer
-    ) -> HomeServer:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         room_id = self.helper.create_room_as(self.user_id)
 
         channel = self.make_request(
@@ -587,8 +581,6 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         self.room_list_handler = hs.get_room_list_handler()
         self.directory_handler = hs.get_directory_handler()
-
-        return hs
 
     def test_disabling_room_list(self) -> None:
         self.room_list_handler.enable_room_list_search = True

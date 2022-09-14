@@ -26,12 +26,12 @@ from synapse.http.server import (
     DirectServeJsonResource,
     JsonResource,
     OptionsResource,
-    cancellable,
 )
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict
 from synapse.util import Clock
+from synapse.util.cancellation import cancellable
 
 from tests import unittest
 from tests.http.server._base import test_disconnect
@@ -104,7 +104,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"500")
+        self.assertEqual(channel.code, 500)
 
     def test_callback_indirect_exception(self) -> None:
         """
@@ -130,7 +130,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"500")
+        self.assertEqual(channel.code, 500)
 
     def test_callback_synapseerror(self) -> None:
         """
@@ -150,7 +150,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"403")
+        self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
@@ -174,7 +174,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foobar"
         )
 
-        self.assertEqual(channel.result["code"], b"400")
+        self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
@@ -203,7 +203,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"HEAD", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertNotIn("body", channel.result)
 
 
@@ -228,10 +228,10 @@ class OptionsResourceTests(unittest.TestCase):
         site = SynapseSite(
             "test",
             "site_tag",
-            parse_listener_def({"type": "http", "port": 0}),
+            parse_listener_def(0, {"type": "http", "port": 0}),
             self.resource,
             "1.0",
-            max_request_body_size=1234,
+            max_request_body_size=4096,
             reactor=self.reactor,
         )
 
@@ -242,7 +242,7 @@ class OptionsResourceTests(unittest.TestCase):
     def test_unknown_options_request(self) -> None:
         """An OPTIONS requests to an unknown URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/foo/")
-        self.assertEqual(channel.result["code"], b"204")
+        self.assertEqual(channel.code, 204)
         self.assertNotIn("body", channel.result)
 
         # Ensure the correct CORS headers have been added
@@ -262,7 +262,7 @@ class OptionsResourceTests(unittest.TestCase):
     def test_known_options_request(self) -> None:
         """An OPTIONS requests to an known URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/res/")
-        self.assertEqual(channel.result["code"], b"204")
+        self.assertEqual(channel.code, 204)
         self.assertNotIn("body", channel.result)
 
         # Ensure the correct CORS headers have been added
@@ -282,12 +282,12 @@ class OptionsResourceTests(unittest.TestCase):
     def test_unknown_request(self) -> None:
         """A non-OPTIONS request to an unknown URL should 404."""
         channel = self._make_request(b"GET", b"/foo/")
-        self.assertEqual(channel.result["code"], b"404")
+        self.assertEqual(channel.code, 404)
 
     def test_known_request(self) -> None:
         """A non-OPTIONS request to an known URL should query the proper resource."""
         channel = self._make_request(b"GET", b"/res/")
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"/res/")
 
 
@@ -314,7 +314,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         body = channel.result["body"]
         self.assertEqual(body, b"response")
 
@@ -334,7 +334,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"301")
+        self.assertEqual(channel.code, 301)
         headers = channel.result["headers"]
         location_headers = [v for k, v in headers if k == b"Location"]
         self.assertEqual(location_headers, [b"/look/an/eagle"])
@@ -357,7 +357,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"304")
+        self.assertEqual(channel.code, 304)
         headers = channel.result["headers"]
         location_headers = [v for k, v in headers if k == b"Location"]
         self.assertEqual(location_headers, [b"/no/over/there"])
@@ -378,7 +378,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"HEAD", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertNotIn("body", channel.result)
 
 

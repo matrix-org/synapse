@@ -1,1 +1,0 @@
-Faster room joins: fix race in recalculation of current room state.

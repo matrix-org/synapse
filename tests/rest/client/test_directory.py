@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 from http import HTTPStatus
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -97,8 +96,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         # We use deliberately a localpart under the length threshold so
         # that we can make sure that the check is done on the whole alias.
-        data = {"room_alias_name": random_string(256 - len(self.hs.hostname))}
-        request_data = json.dumps(data)
+        request_data = {"room_alias_name": random_string(256 - len(self.hs.hostname))}
         channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
@@ -110,8 +108,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         # Check with an alias of allowed length. There should already be
         # a test that ensures it works in test_register.py, but let's be
         # as cautious as possible here.
-        data = {"room_alias_name": random_string(5)}
-        request_data = json.dumps(data)
+        request_data = {"room_alias_name": random_string(5)}
         channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
@@ -144,8 +141,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         # Add an alias for the room, as the appservice
         alias = RoomAlias(f"asns-{random_string(5)}", self.hs.hostname).to_string()
-        data = {"room_id": self.room_id}
-        request_data = json.dumps(data)
+        request_data = {"room_id": self.room_id}
 
         channel = self.make_request(
             "PUT",
@@ -193,8 +189,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             self.hs.hostname,
         )
 
-        data = {"aliases": [self.random_alias(alias_length)]}
-        request_data = json.dumps(data)
+        request_data = {"aliases": [self.random_alias(alias_length)]}
 
         channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok
@@ -206,8 +201,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
     ) -> str:
         alias = self.random_alias(alias_length)
         url = "/_matrix/client/r0/directory/room/%s" % alias
-        data = {"room_id": self.room_id}
-        request_data = json.dumps(data)
+        request_data = {"room_id": self.room_id}
 
         channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok

@@ -16,7 +16,6 @@
 import gc
 import hashlib
 import hmac
-import json
 import logging
 import secrets
 import time
@@ -29,6 +28,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    NoReturn,
     Optional,
     Tuple,
     Type,
@@ -40,7 +40,7 @@ from unittest.mock import Mock, patch
 import canonicaljson
 import signedjson.key
 import unpaddedbase64
-from typing_extensions import Protocol
+from typing_extensions import Concatenate, ParamSpec, Protocol
 
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
@@ -68,7 +68,7 @@ from synapse.logging.context import (
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 
@@ -89,6 +89,10 @@ setup_logging()
 TV = TypeVar("TV")
 _ExcType = TypeVar("_ExcType", bound=BaseException, covariant=True)
 
+P = ParamSpec("P")
+R = TypeVar("R")
+S = TypeVar("S")
+
 
 class _TypedFailure(Generic[_ExcType], Protocol):
     """Extension to twisted.Failure, where the 'value' has a certain type."""
@@ -98,7 +102,7 @@ class _TypedFailure(Generic[_ExcType], Protocol):
         ...
 
 
-def around(target):
+def around(target: TV) -> Callable[[Callable[Concatenate[S, P], R]], None]:
     """A CLOS-style 'around' modifier, which wraps the original method of the
     given instance with another piece of code.
 
@@ -107,11 +111,11 @@ def around(target):
         return orig(*args, **kwargs)
     """
 
-    def _around(code):
+    def _around(code: Callable[Concatenate[S, P], R]) -> None:
         name = code.__name__
         orig = getattr(target, name)
 
-        def new(*args, **kwargs):
+        def new(*args: P.args, **kwargs: P.kwargs) -> R:
             return code(orig, *args, **kwargs)
 
         setattr(target, name, new)
@@ -132,7 +136,7 @@ class TestCase(unittest.TestCase):
         level = getattr(method, "loglevel", getattr(self, "loglevel", None))
 
         @around(self)
-        def setUp(orig):
+        def setUp(orig: Callable[[], R]) -> R:
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
             if current_context():
@@ -145,7 +149,7 @@ class TestCase(unittest.TestCase):
             if level is not None and old_level != level:
 
                 @around(self)
-                def tearDown(orig):
+                def tearDown(orig: Callable[[], R]) -> R:
                     ret = orig()
                     logging.getLogger().setLevel(old_level)
                     return ret
@@ -159,7 +163,7 @@ class TestCase(unittest.TestCase):
             return orig()
 
         @around(self)
-        def tearDown(orig):
+        def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
@@ -168,7 +172,7 @@ class TestCase(unittest.TestCase):
 
             return ret
 
-    def assertObjectHasAttributes(self, attrs, obj):
+    def assertObjectHasAttributes(self, attrs: Dict[str, object], obj: object) -> None:
         """Asserts that the given object has each of the attributes given, and
         that the value of each matches according to assertEqual."""
         for key in attrs.keys():
@@ -179,12 +183,12 @@ class TestCase(unittest.TestCase):
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
-    def assert_dict(self, required, actual):
+    def assert_dict(self, required: dict, actual: dict) -> None:
         """Does a partial assert of a dict.
 
         Args:
-            required (dict): The keys and value which MUST be in 'actual'.
-            actual (dict): The test result. Extra keys will not be checked.
+            required: The keys and value which MUST be in 'actual'.
+            actual: The test result. Extra keys will not be checked.
         """
         for key in required:
             self.assertEqual(
@@ -192,31 +196,31 @@ class TestCase(unittest.TestCase):
             )
 
 
-def DEBUG(target):
+def DEBUG(target: TV) -> TV:
     """A decorator to set the .loglevel attribute to logging.DEBUG.
     Can apply to either a TestCase or an individual test method."""
-    target.loglevel = logging.DEBUG
+    target.loglevel = logging.DEBUG  # type: ignore[attr-defined]
     return target
 
 
-def INFO(target):
+def INFO(target: TV) -> TV:
     """A decorator to set the .loglevel attribute to logging.INFO.
     Can apply to either a TestCase or an individual test method."""
-    target.loglevel = logging.INFO
+    target.loglevel = logging.INFO  # type: ignore[attr-defined]
     return target
 
 
-def logcontext_clean(target):
+def logcontext_clean(target: TV) -> TV:
     """A decorator which marks the TestCase or method as 'logcontext_clean'
 
     ... ie, any logcontext errors should cause a test failure
     """
 
-    def logcontext_error(msg):
+    def logcontext_error(msg: str) -> NoReturn:
         raise AssertionError("logcontext error: %s" % (msg))
 
     patcher = patch("synapse.logging.context.logcontext_error", new=logcontext_error)
-    return patcher(target)
+    return patcher(target)  # type: ignore[call-overload]
 
 
 class HomeserverTestCase(TestCase):
@@ -256,7 +260,7 @@ class HomeserverTestCase(TestCase):
         method = getattr(self, methodName)
         self._extra_config = getattr(method, "_extra_config", None)
 
-    def setUp(self):
+    def setUp(self) -> None:
         """
         Set up the TestCase by calling the homeserver constructor, optionally
         hijacking the authentication system to return a fixed user, and then
@@ -285,7 +289,7 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
-            max_request_body_size=1234,
+            max_request_body_size=4096,
             reactor=self.reactor,
         )
 
@@ -307,7 +311,9 @@ class HomeserverTestCase(TestCase):
                     )
                 )
 
-                async def get_user_by_access_token(token=None, allow_guest=False):
+                async def get_user_by_access_token(
+                    token: Optional[str] = None, allow_guest: bool = False
+                ) -> JsonDict:
                     assert self.helper.auth_user_id is not None
                     return {
                         "user": UserID.from_string(self.helper.auth_user_id),
@@ -315,7 +321,11 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
-                async def get_user_by_req(request, allow_guest=False):
+                async def get_user_by_req(
+                    request: SynapseRequest,
+                    allow_guest: bool = False,
+                    allow_expired: bool = False,
+                ) -> Requester:
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
@@ -340,11 +350,11 @@ class HomeserverTestCase(TestCase):
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Reset to not use frozen dicts.
         events.USE_FROZEN_DICTS = False
 
-    def wait_on_thread(self, deferred, timeout=10):
+    def wait_on_thread(self, deferred: Deferred, timeout: int = 10) -> None:
         """
         Wait until a Deferred is done, where it's waiting on a real thread.
         """
@@ -375,7 +385,7 @@ class HomeserverTestCase(TestCase):
             clock (synapse.util.Clock): The Clock, associated with the reactor.
 
         Returns:
-            A homeserver (synapse.server.HomeServer) suitable for testing.
+            A homeserver suitable for testing.
 
         Function to be overridden in subclasses.
         """
@@ -409,7 +419,7 @@ class HomeserverTestCase(TestCase):
             "/_synapse/admin": servlet_resource,
         }
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         """
         Get a default HomeServer config dict.
         """
@@ -422,7 +432,9 @@ class HomeserverTestCase(TestCase):
 
         return config
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         """
         Prepare for the test.  This involves things like mocking out parts of
         the homeserver, or building test data common across the whole test
@@ -520,7 +532,7 @@ class HomeserverTestCase(TestCase):
         config_obj.parse_config_dict(config, "", "")
         kwargs["config"] = config_obj
 
-        async def run_bg_updates():
+        async def run_bg_updates() -> None:
             with LoggingContext("run_bg_updates"):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
@@ -539,11 +551,7 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(
-        self,
-        d: Awaitable[TV],
-        by: float = 0.0,
-    ) -> TV:
+    def get_success(self, d: Awaitable[TV], by: float = 0.0) -> TV:
         deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
         self.pump(by=by)
         return self.successResultOf(deferred)
@@ -619,20 +627,16 @@ class HomeserverTestCase(TestCase):
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac_digest = want_mac.hexdigest()
 
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": username,
-                "displayname": displayname,
-                "password": password,
-                "admin": admin,
-                "mac": want_mac_digest,
-                "inhibit_login": True,
-            }
-        )
-        channel = self.make_request(
-            "POST", "/_synapse/admin/v1/register", body.encode("utf8")
-        )
+        body = {
+            "nonce": nonce,
+            "username": username,
+            "displayname": displayname,
+            "password": password,
+            "admin": admin,
+            "mac": want_mac_digest,
+            "inhibit_login": True,
+        }
+        channel = self.make_request("POST", "/_synapse/admin/v1/register", body)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -673,21 +677,34 @@ class HomeserverTestCase(TestCase):
         username: str,
         password: str,
         device_id: Optional[str] = None,
+        additional_request_fields: Optional[Dict[str, str]] = None,
         custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     ) -> str:
         """
-        Log in a user, and get an access token. Requires the Login API be
-        registered.
+        Log in a user, and get an access token. Requires the Login API be registered.
 
+        Args:
+            username: The localpart to assign to the new user.
+            password: The password to assign to the new user.
+            device_id: An optional device ID to assign to the new device created during
+                login.
+            additional_request_fields: A dictionary containing any additional /login
+                request fields and their values.
+            custom_headers: Custom HTTP headers and values to add to the /login request.
+
+        Returns:
+            The newly registered user's Matrix ID.
         """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
             body["device_id"] = device_id
+        if additional_request_fields:
+            body.update(additional_request_fields)
 
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            json.dumps(body).encode("utf8"),
+            body,
             custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -762,7 +779,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
     OTHER_SERVER_NAME = "other.example.com"
     OTHER_SERVER_SIGNATURE_KEY = signedjson.key.generate_signing_key("test")
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         super().prepare(reactor, clock, hs)
 
         # poke the other server's signing key into the key store, so that we don't
@@ -780,7 +797,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
                         verify_key_id,
                         FetchKeyResult(
                             verify_key=verify_key,
-                            valid_until_ts=clock.time_msec() + 1000,
+                            valid_until_ts=clock.time_msec() + 10000,
                         ),
                     )
                 ],
@@ -838,7 +855,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             client_ip=client_ip,
         )
 
-    def add_hashes_and_signatures(
+    def add_hashes_and_signatures_from_other_server(
         self,
         event_dict: JsonDict,
         room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
@@ -886,7 +903,7 @@ def _auth_header_for_request(
     )
 
 
-def override_config(extra_config):
+def override_config(extra_config: JsonDict) -> Callable[[TV], TV]:
     """A decorator which can be applied to test functions to give additional HS config
 
     For use
@@ -899,12 +916,13 @@ def override_config(extra_config):
                 ...
 
     Args:
-        extra_config(dict): Additional config settings to be merged into the default
+        extra_config: Additional config settings to be merged into the default
             config dict before instantiating the test homeserver.
     """
 
-    def decorator(func):
-        func._extra_config = extra_config
+    def decorator(func: TV) -> TV:
+        # This attribute is being defined.
+        func._extra_config = extra_config  # type: ignore[attr-defined]
         return func
 
     return decorator

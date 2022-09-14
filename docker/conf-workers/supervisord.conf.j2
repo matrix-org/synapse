@@ -19,7 +19,7 @@ username=www-data
 autorestart=true
 
 [program:redis]
-command=/usr/local/bin/prefix-log /usr/bin/redis-server /etc/redis/redis.conf --daemonize no
+command=/usr/local/bin/prefix-log /usr/local/bin/redis-server
 priority=1
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0

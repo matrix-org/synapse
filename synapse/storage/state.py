@@ -539,15 +539,6 @@ class StateFilter:
             is_mine_id: a callable which confirms if a given state_key matches a mxid
                of a local user
         """
-
-        # TODO(faster_joins): it's not entirely clear that this is safe. In particular,
-        #  there may be circumstances in which we return a piece of state that, once we
-        #  resync the state, we discover is invalid. For example: if it turns out that
-        #  the sender of a piece of state wasn't actually in the room, then clearly that
-        #  state shouldn't have been returned.
-        #  We should at least add some tests around this to see what happens.
-        #  https://github.com/matrix-org/synapse/issues/13006
-
         # if we haven't requested membership events, then it depends on the value of
         # 'include_others'
         if EventTypes.Member not in self.types:

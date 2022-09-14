@@ -135,7 +135,6 @@ def default_config(
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
         "password_providers": [],
-        "worker_replication_url": "",
         "worker_app": None,
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
@@ -167,6 +166,7 @@ def default_config(
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_joins_per_room": {"per_second": 10000, "burst_count": 10000},
         "rc_invites": {
             "per_room": {"per_second": 10000, "burst_count": 10000},
             "per_user": {"per_second": 10000, "burst_count": 10000},

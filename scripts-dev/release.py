@@ -18,10 +18,12 @@
 """
 
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
@@ -32,6 +34,7 @@ import click
 import commonmark
 import git
 from click.exceptions import ClickException
+from git import GitCommandError, Repo
 from github import Github
 from packaging import version
 
@@ -55,9 +58,12 @@ def run_until_successful(
 def cli() -> None:
     """An interactive script to walk through the parts of creating a release.
 
-    Requires the dev dependencies be installed, which can be done via:
+    Requirements:
+      - The dev dependencies be installed, which can be done via:
 
-        pip install -e .[dev]
+            pip install -e .[dev]
+
+      - A checkout of the sytest repository at ../sytest
 
     Then to use:
 
@@ -67,15 +73,20 @@ def cli() -> None:
 
         ./scripts-dev/release.py tag
 
-        # ... wait for assets to build ...
+        # wait for assets to build, either manually or with:
+        ./scripts-dev/release.py wait-for-actions
 
         ./scripts-dev/release.py publish
 
         ./scripts-dev/release.py upload
 
-        # Optional: generate some nice links for the announcement
+        ./scripts-dev/release.py merge-back
 
+        # Optional: generate some nice links for the announcement
         ./scripts-dev/release.py announce
+
+    Alternatively, `./scripts-dev/release.py full` will do all the above
+    as well as guiding you through the manual steps.
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.
@@ -84,15 +95,21 @@ def cli() -> None:
 
 @cli.command()
 def prepare() -> None:
+    _prepare()
+
+
+def _prepare() -> None:
     """Do the initial stages of creating a release, including creating release
     branch, updating changelog and pushing to GitHub.
     """
 
     # Make sure we're in a git repo.
-    repo = get_repo_and_check_clean_checkout()
+    synapse_repo = get_repo_and_check_clean_checkout()
+    sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
 
-    click.secho("Updating git repo...")
-    repo.remote().fetch()
+    click.secho("Updating Synapse and Sytest git repos...")
+    synapse_repo.remote().fetch()
+    sytest_repo.remote().fetch()
 
     # Get the current version and AST from root Synapse module.
     current_version = get_package_version()
@@ -166,12 +183,12 @@ def prepare() -> None:
     assert not parsed_new_version.is_postrelease
 
     release_branch_name = get_release_branch_name(parsed_new_version)
-    release_branch = find_ref(repo, release_branch_name)
+    release_branch = find_ref(synapse_repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():
             # If the release branch only exists on the remote we check it out
             # locally.
-            repo.git.checkout(release_branch_name)
+            synapse_repo.git.checkout(release_branch_name)
     else:
         # If a branch doesn't exist we create one. We ask which one branch it
         # should be based off, defaulting to sensible values depending on the
@@ -187,25 +204,34 @@ def prepare() -> None:
             "Which branch should the release be based on?", default=default
         )
 
-        base_branch = find_ref(repo, branch_name)
-        if not base_branch:
-            print(f"Could not find base branch {branch_name}!")
-            click.get_current_context().abort()
+        for repo_name, repo in {"synapse": synapse_repo, "sytest": sytest_repo}.items():
+            base_branch = find_ref(repo, branch_name)
+            if not base_branch:
+                print(f"Could not find base branch {branch_name} for {repo_name}!")
+                click.get_current_context().abort()
 
-        # Check out the base branch and ensure it's up to date
-        repo.head.set_reference(base_branch, "check out the base branch")
-        repo.head.reset(index=True, working_tree=True)
-        if not base_branch.is_remote():
-            update_branch(repo)
+            # Check out the base branch and ensure it's up to date
+            repo.head.set_reference(
+                base_branch, f"check out the base branch for {repo_name}"
+            )
+            repo.head.reset(index=True, working_tree=True)
+            if not base_branch.is_remote():
+                update_branch(repo)
 
-        # Create the new release branch
-        # Type ignore will no longer be needed after GitPython 3.1.28.
-        # See https://github.com/gitpython-developers/GitPython/pull/1419
-        repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            # Create the new release branch
+            # Type ignore will no longer be needed after GitPython 3.1.28.
+            # See https://github.com/gitpython-developers/GitPython/pull/1419
+            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+
+        # Special-case SyTest: we don't actually prepare any files so we may
+        # as well push it now (and only when we create a release branch;
+        # not on subsequent RCs or full releases).
+        if click.confirm("Push new SyTest branch?", default=True):
+            sytest_repo.git.push("-u", sytest_repo.remote().name, release_branch_name)
 
     # Switch to the release branch and ensure it's up to date.
-    repo.git.checkout(release_branch_name)
-    update_branch(repo)
+    synapse_repo.git.checkout(release_branch_name)
+    update_branch(synapse_repo)
 
     # Update the version specified in pyproject.toml.
     subprocess.check_output(["poetry", "version", new_version])
@@ -230,15 +256,15 @@ def prepare() -> None:
     run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
-    repo.git.add("-u")
+    synapse_repo.git.add("-u")
     subprocess.run("git diff --cached", shell=True)
 
     if click.confirm("Edit changelog?", default=False):
         click.edit(filename="CHANGES.md")
 
     # Commit the changes.
-    repo.git.add("-u")
-    repo.git.commit("-m", new_version)
+    synapse_repo.git.add("-u")
+    synapse_repo.git.commit("-m", new_version)
 
     # We give the option to bail here in case the user wants to make sure things
     # are OK before pushing.
@@ -246,23 +272,31 @@ def prepare() -> None:
         print("")
         print("Run when ready to push:")
         print("")
-        print(f"\tgit push -u {repo.remote().name} {repo.active_branch.name}")
+        print(
+            f"\tgit push -u {synapse_repo.remote().name} {synapse_repo.active_branch.name}"
+        )
         print("")
         sys.exit(0)
 
     # Otherwise, push and open the changelog in the browser.
-    repo.git.push("-u", repo.remote().name, repo.active_branch.name)
+    synapse_repo.git.push(
+        "-u", synapse_repo.remote().name, synapse_repo.active_branch.name
+    )
 
     print("Opening the changelog in your browser...")
     print("Please ask others to give it a check.")
     click.launch(
-        f"https://github.com/matrix-org/synapse/blob/{repo.active_branch.name}/CHANGES.md"
+        f"https://github.com/matrix-org/synapse/blob/{synapse_repo.active_branch.name}/CHANGES.md"
     )
 
 
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
 def tag(gh_token: Optional[str]) -> None:
+    _tag(gh_token)
+
+
+def _tag(gh_token: Optional[str]) -> None:
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
@@ -353,6 +387,10 @@ def tag(gh_token: Optional[str]) -> None:
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
 def publish(gh_token: str) -> None:
+    _publish(gh_token)
+
+
+def _publish(gh_token: str) -> None:
     """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
@@ -390,6 +428,10 @@ def publish(gh_token: str) -> None:
 
 @cli.command()
 def upload() -> None:
+    _upload()
+
+
+def _upload() -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -423,8 +465,152 @@ def upload() -> None:
     )
 
 
+def _merge_into(repo: Repo, source: str, target: str) -> None:
+    """
+    Merges branch `source` into branch `target`.
+    Pulls both before merging and pushes the result.
+    """
+
+    # Update our branches and switch to the target branch
+    for branch in [source, target]:
+        click.echo(f"Switching to {branch} and pulling...")
+        repo.heads[branch].checkout()
+        # Pull so we're up to date
+        repo.remote().pull()
+
+    assert repo.active_branch.name == target
+
+    try:
+        # TODO This seemed easier than using GitPython directly
+        click.echo(f"Merging {source}...")
+        repo.git.merge(source)
+    except GitCommandError as exc:
+        # If a merge conflict occurs, give some context and try to
+        # make it easy to abort if necessary.
+        click.echo(exc)
+        if not click.confirm(
+            f"Likely merge conflict whilst merging ({source} → {target}). "
+            f"Have you resolved it?"
+        ):
+            repo.git.merge("--abort")
+            return
+
+    # Push result.
+    click.echo("Pushing...")
+    repo.remote().push()
+
+
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def wait_for_actions(gh_token: Optional[str]) -> None:
+    _wait_for_actions(gh_token)
+
+
+def _wait_for_actions(gh_token: Optional[str]) -> None:
+    # Find out the version and tag name.
+    current_version = get_package_version()
+    tag_name = f"v{current_version}"
+
+    # Authentication is optional on this endpoint,
+    # but use a token if we have one to reduce the chance of being rate-limited.
+    url = f"https://api.github.com/repos/matrix-org/synapse/actions/runs?branch={tag_name}"
+    headers = {"Accept": "application/vnd.github+json"}
+    if gh_token is not None:
+        headers["authorization"] = f"token {gh_token}"
+    req = urllib.request.Request(url, headers=headers)
+
+    time.sleep(10 * 60)
+    while True:
+        time.sleep(5 * 60)
+        response = urllib.request.urlopen(req)
+        resp = json.loads(response.read())
+
+        if len(resp["workflow_runs"]) == 0:
+            continue
+
+        if all(
+            workflow["status"] != "in_progress" for workflow in resp["workflow_runs"]
+        ):
+            success = (
+                workflow["status"] == "completed" for workflow in resp["workflow_runs"]
+            )
+            if success:
+                _notify("Workflows successful. You can now continue the release.")
+            else:
+                _notify("Workflows failed.")
+                click.confirm("Continue anyway?", abort=True)
+
+            break
+
+
+def _notify(message: str) -> None:
+    # Send a bell character. Most terminals will play a sound or show a notification
+    # for this.
+    click.echo(f"\a{message}")
+
+    # Try and run notify-send, but don't raise an Exception if this fails
+    # (This is best-effort)
+    # TODO Support other platforms?
+    subprocess.run(
+        [
+            "notify-send",
+            "--app-name",
+            "Synapse Release Script",
+            "--expire-time",
+            "3600000",
+            message,
+        ]
+    )
+
+
+@cli.command()
+def merge_back() -> None:
+    _merge_back()
+
+
+def _merge_back() -> None:
+    """Merge the release branch back into the appropriate branches.
+    All branches will be automatically pulled from the remote and the results
+    will be pushed to the remote."""
+
+    synapse_repo = get_repo_and_check_clean_checkout()
+    branch_name = synapse_repo.active_branch.name
+
+    if not branch_name.startswith("release-v"):
+        raise RuntimeError("Not on a release branch. This does not seem sensible.")
+
+    # Pull so we're up to date
+    synapse_repo.remote().pull()
+
+    current_version = get_package_version()
+
+    if current_version.is_prerelease:
+        # Release candidate
+        if click.confirm(f"Merge {branch_name} → develop?", default=True):
+            _merge_into(synapse_repo, branch_name, "develop")
+    else:
+        # Full release
+        sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
+
+        if click.confirm(f"Merge {branch_name} → master?", default=True):
+            _merge_into(synapse_repo, branch_name, "master")
+
+        if click.confirm("Merge master → develop?", default=True):
+            _merge_into(synapse_repo, "master", "develop")
+
+        if click.confirm(f"On SyTest, merge {branch_name} → master?", default=True):
+            _merge_into(sytest_repo, branch_name, "master")
+
+        if click.confirm("On SyTest, merge master → develop?", default=True):
+            _merge_into(sytest_repo, "master", "develop")
+
+
 @cli.command()
 def announce() -> None:
+    _announce()
+
+
+def _announce() -> None:
     """Generate markdown to announce the release."""
 
     current_version = get_package_version()
@@ -454,8 +640,54 @@ Announce the release in
 - #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
 - #synapse:matrix.org (Synapse Admins), bumping the version in the topic
 - #synapse-dev:matrix.org
-- #synapse-package-maintainers:matrix.org"""
+- #synapse-package-maintainers:matrix.org
+
+Ask the designated people to do the blog and tweets."""
         )
+
+
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+def full(gh_token: str) -> None:
+    click.echo("1. If this is a security release, read the security wiki page.")
+    click.echo("2. Check for any release blockers before proceeding.")
+    click.echo("    https://github.com/matrix-org/synapse/labels/X-Release-Blocker")
+
+    click.confirm("Ready?", abort=True)
+
+    click.echo("\n*** prepare ***")
+    _prepare()
+
+    click.echo("Deploy to matrix.org and ensure that it hasn't fallen over.")
+    click.echo("Remember to silence the alerts to prevent alert spam.")
+    click.confirm("Deployed?", abort=True)
+
+    click.echo("\n*** tag ***")
+    _tag(gh_token)
+
+    click.echo("\n*** wait for actions ***")
+    _wait_for_actions(gh_token)
+
+    click.echo("\n*** publish ***")
+    _publish(gh_token)
+
+    click.echo("\n*** upload ***")
+    _upload()
+
+    click.echo("\n*** merge back ***")
+    _merge_back()
+
+    click.echo("\nUpdate the Debian repository")
+    click.confirm("Started updating Debian repository?", abort=True)
+
+    click.echo("\nWait for all release methods to be ready.")
+    # Docker should be ready because it was done by the workflows earlier
+    # PyPI should be ready because we just ran upload().
+    # TODO Automatically poll until the Debs have made it to packages.matrix.org
+    click.confirm("Debs ready?", abort=True)
+
+    click.echo("\n*** announce ***")
+    _announce()
 
 
 def get_package_version() -> version.Version:
@@ -469,14 +701,18 @@ def get_release_branch_name(version_number: version.Version) -> str:
     return f"release-v{version_number.major}.{version_number.minor}"
 
 
-def get_repo_and_check_clean_checkout() -> git.Repo:
+def get_repo_and_check_clean_checkout(
+    path: str = ".", name: str = "synapse"
+) -> git.Repo:
     """Get the project repo and check it's not got any uncommitted changes."""
     try:
-        repo = git.Repo()
+        repo = git.Repo(path=path)
     except git.InvalidGitRepositoryError:
-        raise click.ClickException("Not in Synapse repo.")
+        raise click.ClickException(
+            f"{path} is not a git repository (expecting a {name} repository)."
+        )
     if repo.is_dirty():
-        raise click.ClickException("Uncommitted changes exist.")
+        raise click.ClickException(f"Uncommitted changes exist in {path}.")
     return repo
 
 

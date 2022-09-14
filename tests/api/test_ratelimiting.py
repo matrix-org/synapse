@@ -314,3 +314,77 @@ class TestRatelimiter(unittest.HomeserverTestCase):
 
         # Check that we get rate limited after using that token.
         self.assertFalse(consume_at(11.1))
+
+    def test_record_action_which_doesnt_fill_bucket(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        # Observe two actions, leaving room in the bucket for one more.
+        limiter.record_action(requester=None, key="a", n_actions=2, _time_now_s=0.0)
+
+        # We should be able to take a new action now.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertTrue(success)
+
+        # ... but not two.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertFalse(success)
+
+    def test_record_action_which_fills_bucket(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        # Observe three actions, filling up the bucket.
+        limiter.record_action(requester=None, key="a", n_actions=3, _time_now_s=0.0)
+
+        # We should be unable to take a new action now.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertFalse(success)
+
+        # If we wait 10 seconds to leak a token, we should be able to take one action...
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=10.0)
+        )
+        self.assertTrue(success)
+
+        # ... but not two.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=10.0)
+        )
+        self.assertFalse(success)
+
+    def test_record_action_which_overfills_bucket(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        # Observe four actions, exceeding the bucket.
+        limiter.record_action(requester=None, key="a", n_actions=4, _time_now_s=0.0)
+
+        # We should be prevented from taking a new action now.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertFalse(success)
+
+        # If we wait 10 seconds to leak a token, we should be unable to take an action
+        # because the bucket is still full.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=10.0)
+        )
+        self.assertFalse(success)
+
+        # But after another 10 seconds we leak a second token, giving us room for
+        # action.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=20.0)
+        )
+        self.assertTrue(success)

@@ -42,6 +42,7 @@ It returns a JSON body like the following:
     "appservice_id": null,
     "consent_server_notice_sent": null,
     "consent_version": null,
+    "consent_ts": null,
     "external_ids": [
         {
             "auth_provider": "<provider1>",
@@ -364,6 +365,7 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
 - Remove from monthly active users
+- Remove user's consent information (consent version and timestamp)
 
 ## Reset password
 
@@ -544,7 +546,7 @@ Gets a list of all local media that a specific `user_id` has created.
 These are media that the user has uploaded themselves
 ([local media](../media_repository.md#local-media)), as well as
 [URL preview images](../media_repository.md#url-previews) requested by the user if the
-[feature is enabled](../development/url_previews.md).
+[feature is enabled](../usage/configuration/config_documentation.md#url_preview_enabled).
 
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -753,6 +755,7 @@ A response body like the following is returned:
       "device_id": "QBUAZIFURK",
       "display_name": "android",
       "last_seen_ip": "1.2.3.4",
+      "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
       "last_seen_ts": 1474491775024,
       "user_id": "<user_id>"
     },
@@ -760,6 +763,7 @@ A response body like the following is returned:
       "device_id": "AUIECTSRND",
       "display_name": "ios",
       "last_seen_ip": "1.2.3.5",
+      "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
       "last_seen_ts": 1474491775025,
       "user_id": "<user_id>"
     }
@@ -785,6 +789,8 @@ The following fields are returned in the JSON response body:
   - `display_name` - Display name set by the user for this device.
     Absent if no name has been set.
   - `last_seen_ip` - The IP address where this device was last seen.
+    (May be a few minutes out of date, for efficiency reasons).
+  - `last_seen_user_agent` - The user agent of the device when it was last seen.
     (May be a few minutes out of date, for efficiency reasons).
   - `last_seen_ts` - The timestamp (in milliseconds since the unix epoch) when this
     devices was last seen. (May be a few minutes out of date, for efficiency reasons).
@@ -837,6 +843,7 @@ A response body like the following is returned:
   "device_id": "<device_id>",
   "display_name": "android",
   "last_seen_ip": "1.2.3.4",
+  "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
   "last_seen_ts": 1474491775024,
   "user_id": "<user_id>"
 }
@@ -857,6 +864,8 @@ The following fields are returned in the JSON response body:
 - `display_name` - Display name set by the user for this device.
   Absent if no name has been set.
 - `last_seen_ip` - The IP address where this device was last seen.
+  (May be a few minutes out of date, for efficiency reasons).
+  - `last_seen_user_agent` - The user agent of the device when it was last seen.
   (May be a few minutes out of date, for efficiency reasons).
 - `last_seen_ts` - The timestamp (in milliseconds since the unix epoch) when this
   devices was last seen. (May be a few minutes out of date, for efficiency reasons).

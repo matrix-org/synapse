@@ -1,1 +1,0 @@
-Apply ratelimiting earlier in processing of /send request.
