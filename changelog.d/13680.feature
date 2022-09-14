@@ -1,0 +1,1 @@
+Cancel the processing of key query requests when they time out.

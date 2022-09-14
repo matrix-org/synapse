@@ -1,8 +1,18 @@
-matrix-synapse-py3 (1.66.0ubuntu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.67.0) stable; urgency=medium
 
+  * New Synapse release 1.67.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 13 Sep 2022 09:19:56 +0100
+
+matrix-synapse-py3 (1.67.0~rc1) stable; urgency=medium
+
+  [ Erik Johnston ]
   * Use stable poetry 1.2.0 version, rather than a prerelease.
 
- -- Erik Johnston <erik@matrix.org>  Thu, 01 Sep 2022 13:48:31 +0100
+  [ Synapse Packaging team ]
+  * New Synapse release 1.67.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 06 Sep 2022 09:01:06 +0100
 
 matrix-synapse-py3 (1.66.0) stable; urgency=medium
 
@@ -12,10 +22,14 @@ matrix-synapse-py3 (1.66.0) stable; urgency=medium
 
 matrix-synapse-py3 (1.66.0~rc2+nmu1) UNRELEASED; urgency=medium
 
+  [ Jörg Behrmann ]
   * Update debhelper to compatibility level 12.
   * Drop the preinst script stopping synapse.
   * Allocate a group for the system user.
   * Change dpkg-statoverride to --force-statoverride-add.
+
+  [ Erik Johnston ]
+  * Disable `dh_auto_configure` as it broke during Rust build.
 
  -- Jörg Behrmann <behrmann@physik.fu-berlin.de>  Tue, 23 Aug 2022 17:17:00 +0100
 
