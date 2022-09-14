@@ -15,7 +15,6 @@
 import inspect
 import itertools
 import logging
-from http import HTTPStatus
 from typing import (
     Any,
     Callable,
@@ -78,7 +77,7 @@ def test_disconnect(
         if expect_cancellation:
             expected_code = HTTP_STATUS_REQUEST_CANCELLED
         else:
-            expected_code = HTTPStatus.OK
+            expected_code = 200
 
     request = channel.request
     if channel.is_finished():
@@ -141,6 +140,8 @@ def make_request_with_cancellation_test(
     method: str,
     path: str,
     content: Union[bytes, str, JsonDict] = b"",
+    *,
+    token: Optional[str] = None,
 ) -> FakeChannel:
     """Performs a request repeatedly, disconnecting at successive `await`s, until
     one completes.
@@ -212,7 +213,13 @@ def make_request_with_cancellation_test(
                 with deferred_patch.patch():
                     # Start the request.
                     channel = make_request(
-                        reactor, site, method, path, content, await_result=False
+                        reactor,
+                        site,
+                        method,
+                        path,
+                        content,
+                        await_result=False,
+                        access_token=token,
                     )
                     request = channel.request
 

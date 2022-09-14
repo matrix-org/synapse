@@ -32,13 +32,8 @@ stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
 for a reply ─ such as sending an event.
 
-Redis support was added in v1.13.0 with it becoming the recommended method in
-v1.18.0. It replaced the old direct TCP connections (which is deprecated as of
-v1.18.0) to the main process. With Redis, rather than all the workers connecting
-to the main process, all the workers and the main process connect to Redis,
-which relays replication commands between processes. This can give a significant
-cpu saving on the main process and will be a prerequisite for upcoming
-performance improvements.
+All the workers and the main process connect to Redis, which relays replication
+commands between processes.
 
 If Redis support is enabled Synapse will use it as a shared cache, as well as a
 pub/sub mechanism.
@@ -117,23 +112,26 @@ redis:
     enabled: true
 ```
 
-See the sample config for the full documentation of each option.
+See the [configuration manual](usage/configuration/config_documentation.html) for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
-public internet; it has no authentication and is unencrypted.
+public internet; replication traffic is:
+
+* always unencrypted
+* unauthenticated, unless `worker_replication_secret` is configured
 
 
 ### Worker configuration
 
-In the config file for each worker, you must specify the type of worker
-application (`worker_app`), and you should specify a unique name for the worker
-(`worker_name`). The currently available worker applications are listed below.
-You must also specify the HTTP replication endpoint that it should talk to on
-the main synapse process.  `worker_replication_host` should specify the host of
-the main synapse and `worker_replication_http_port` should point to the HTTP
-replication port. If the worker will handle HTTP requests then the
-`worker_listeners` option should be set with a `http` listener, in the same way
-as the `listeners` option in the shared config.
+In the config file for each worker, you must specify:
+ * The type of worker (`worker_app`). The currently available worker applications are listed below.
+ * A unique name for the worker (`worker_name`).
+ * The HTTP replication endpoint that it should talk to on the main synapse process
+   (`worker_replication_host` and `worker_replication_http_port`)
+ * If handling HTTP requests, a `worker_listeners` option with an `http`
+   listener, in the same way as the `listeners` option in the shared config.
+ * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
+   the main process (`worker_main_http_uri`).
 
 For example:
 
@@ -217,10 +215,12 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
+    # Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
     ^/_matrix/client/(r0|v3|unstable)/keys/changes$
     ^/_matrix/client/(r0|v3|unstable)/keys/claim$
     ^/_matrix/client/(r0|v3|unstable)/room_keys/
+    ^/_matrix/client/(r0|v3|unstable)/keys/upload/
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
@@ -325,7 +325,6 @@ effects of bursts of events from that bridge on events sent by normal users.
 
 Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
-(This is only supported with Redis-based replication.)
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
@@ -581,52 +580,23 @@ handle it, and are online.
 If `update_user_directory` is set to `false`, and this worker is not running,
 the above endpoint may give outdated results.
 
-### `synapse.app.frontend_proxy`
-
-Proxies some frequently-requested client endpoints to add caching and remove
-load from the main synapse. It can handle REST endpoints matching the following
-regular expressions:
-
-    ^/_matrix/client/(r0|v3|unstable)/keys/upload
-
-If `use_presence` is False in the homeserver config, it can also handle REST
-endpoints matching the following regular expressions:
-
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/[^/]+/status
-
-This "stub" presence handler will pass through `GET` request but make the
-`PUT` effectively a no-op.
-
-It will proxy any requests it cannot handle to the main synapse instance. It
-must therefore be configured with the location of the main instance, via
-the `worker_main_http_uri` setting in the `frontend_proxy` worker configuration
-file. For example:
-
-```yaml
-worker_main_http_uri: http://127.0.0.1:8008
-```
-
 ### Historical apps
 
-*Note:* Historically there used to be more apps, however they have been
-amalgamated into a single `synapse.app.generic_worker` app. The remaining apps
-are ones that do specific processing unrelated to requests, e.g. the `pusher`
-that handles sending out push notifications for new events. The intention is for
-all these to be folded into the `generic_worker` app and to use config to define
-which processes handle the various proccessing such as push notifications.
+The following used to be separate worker application types, but are now
+equivalent to `synapse.app.generic_worker`:
+
+ * `synapse.app.client_reader`
+ * `synapse.app.event_creator`
+ * `synapse.app.federation_reader`
+ * `synapse.app.frontend_proxy`
+ * `synapse.app.synchrotron`
 
 
 ## Migration from old config
 
-There are two main independent changes that have been made: introducing Redis
-support and merging apps into `synapse.app.generic_worker`. Both these changes
-are backwards compatible and so no changes to the config are required, however
-server admins are encouraged to plan to migrate to Redis as the old style direct
-TCP replication config is deprecated.
-
-To migrate to Redis add the `redis` config as above, and optionally remove the
-TCP `replication` listener from master and `worker_replication_port` from worker
-config.
+A main change that has occurred is the merging of worker apps into
+`synapse.app.generic_worker`. This change is backwards compatible and so no
+changes to the config are required.
 
 To migrate apps to use `synapse.app.generic_worker` simply update the
 `worker_app` option in the worker configs, and where worker are started (e.g.

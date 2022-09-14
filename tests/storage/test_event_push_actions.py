@@ -67,9 +67,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         last_event_id: str
 
-        def _assert_counts(
-            noitf_count: int, unread_count: int, highlight_count: int
-        ) -> None:
+        def _assert_counts(noitf_count: int, highlight_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
@@ -82,7 +80,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 counts,
                 NotifCounts(
                     notify_count=noitf_count,
-                    unread_count=unread_count,
+                    unread_count=0,
                     highlight_count=highlight_count,
                 ),
             )
@@ -112,59 +110,74 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
 
-        _assert_counts(0, 0, 0)
+        _assert_counts(0, 0)
         _create_event()
-        _assert_counts(1, 1, 0)
+        _assert_counts(1, 0)
         _rotate()
-        _assert_counts(1, 1, 0)
+        _assert_counts(1, 0)
 
         event_id = _create_event()
-        _assert_counts(2, 2, 0)
+        _assert_counts(2, 0)
         _rotate()
-        _assert_counts(2, 2, 0)
+        _assert_counts(2, 0)
 
         _create_event()
         _mark_read(event_id)
-        _assert_counts(1, 1, 0)
+        _assert_counts(1, 0)
 
         _mark_read(last_event_id)
-        _assert_counts(0, 0, 0)
+        _assert_counts(0, 0)
 
         _create_event()
         _rotate()
-        _assert_counts(1, 1, 0)
+        _assert_counts(1, 0)
 
         # Delete old event push actions, this should not affect the (summarised) count.
+        #
+        # All event push actions are kept for 24 hours, so need to move forward
+        # in time.
+        self.pump(60 * 60 * 24)
         self.get_success(self.store._remove_old_push_actions_that_have_rotated())
-        _assert_counts(1, 1, 0)
+        # Double check that the event push actions have been cleared (i.e. that
+        # any results *must* come from the summary).
+        result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="event_push_actions",
+                keyvalues={"1": 1},
+                retcols=("event_id",),
+                desc="",
+            )
+        )
+        self.assertEqual(result, [])
+        _assert_counts(1, 0)
 
         _mark_read(last_event_id)
-        _assert_counts(0, 0, 0)
+        _assert_counts(0, 0)
 
         event_id = _create_event(True)
-        _assert_counts(1, 1, 1)
+        _assert_counts(1, 1)
         _rotate()
-        _assert_counts(1, 1, 1)
+        _assert_counts(1, 1)
 
         # Check that adding another notification and rotating after highlight
         # works.
         _create_event()
         _rotate()
-        _assert_counts(2, 2, 1)
+        _assert_counts(2, 1)
 
         # Check that sending read receipts at different points results in the
         # right counts.
         _mark_read(event_id)
-        _assert_counts(1, 1, 0)
+        _assert_counts(1, 0)
         _mark_read(last_event_id)
-        _assert_counts(0, 0, 0)
+        _assert_counts(0, 0)
 
         _create_event(True)
-        _assert_counts(1, 1, 1)
+        _assert_counts(1, 1)
         _mark_read(last_event_id)
-        _assert_counts(0, 0, 0)
+        _assert_counts(0, 0)
         _rotate()
-        _assert_counts(0, 0, 0)
+        _assert_counts(0, 0)
 
     def test_find_first_stream_ordering_after_ts(self) -> None:
         def add_event(so: int, ts: int) -> None:

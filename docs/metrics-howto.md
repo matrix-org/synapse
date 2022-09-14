@@ -7,7 +7,13 @@
 
 1.  Enable Synapse metrics:
 
-    There are two methods of enabling metrics in Synapse.
+    In `homeserver.yaml`, make sure `enable_metrics` is
+    set to `True`.
+
+1.  Enable the `/_synapse/metrics` Synapse endpoint that Prometheus uses to
+    collect data:
+
+    There are two methods of enabling the metrics endpoint in Synapse.
 
     The first serves the metrics as a part of the usual web server and
     can be enabled by adding the \"metrics\" resource to the existing
@@ -40,9 +46,6 @@
           bind_addresses:
             - '0.0.0.0'
     ```
-
-    For both options, you will need to ensure that `enable_metrics` is
-    set to `True`.
 
 1.  Restart Synapse.
 

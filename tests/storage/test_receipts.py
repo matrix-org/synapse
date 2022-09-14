@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from synapse.api.constants import ReceiptTypes
 from synapse.types import UserID, create_requester
 
@@ -23,7 +24,7 @@ OUR_USER_ID = "@our:test"
 
 
 class ReceiptTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor, clock, homeserver) -> None:
         super().prepare(reactor, clock, homeserver)
 
         self.store = homeserver.get_datastores().main
@@ -83,10 +84,14 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
 
-    def test_return_empty_with_no_data(self):
+    def test_return_empty_with_no_data(self) -> None:
         res = self.get_success(
             self.store.get_receipts_for_user(
-                OUR_USER_ID, [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
+                OUR_USER_ID,
+                [
+                    ReceiptTypes.READ,
+                    ReceiptTypes.READ_PRIVATE,
+                ],
             )
         )
         self.assertEqual(res, {})
@@ -94,7 +99,10 @@ class ReceiptTestCase(HomeserverTestCase):
         res = self.get_success(
             self.store.get_receipts_for_user_with_orderings(
                 OUR_USER_ID,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
+                [
+                    ReceiptTypes.READ,
+                    ReceiptTypes.READ_PRIVATE,
+                ],
             )
         )
         self.assertEqual(res, {})
@@ -103,12 +111,15 @@ class ReceiptTestCase(HomeserverTestCase):
             self.store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id1,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
+                [
+                    ReceiptTypes.READ,
+                    ReceiptTypes.READ_PRIVATE,
+                ],
             )
         )
         self.assertEqual(res, None)
 
-    def test_get_receipts_for_user(self):
+    def test_get_receipts_for_user(self) -> None:
         # Send some events into the first room
         event1_1_id = self.create_and_send_event(
             self.room_id1, UserID.from_string(OTHER_USER_ID)
@@ -179,7 +190,7 @@ class ReceiptTestCase(HomeserverTestCase):
         )
         self.assertEqual(res, {self.room_id1: event1_2_id, self.room_id2: event2_1_id})
 
-    def test_get_last_receipt_event_id_for_user(self):
+    def test_get_last_receipt_event_id_for_user(self) -> None:
         # Send some events into the first room
         event1_1_id = self.create_and_send_event(
             self.room_id1, UserID.from_string(OTHER_USER_ID)
