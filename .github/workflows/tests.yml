@@ -76,7 +76,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
       - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "all"
