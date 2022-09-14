@@ -683,7 +683,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         def populate_db(txn: LoggingTransaction):
             # Insert the room to satisfy the foreign key constraint of
-            # `event_failed_backfill_attempts`
+            # `event_failed_pull_attempts`
             self.store.db_pool.simple_insert_txn(
                 txn,
                 "rooms",
@@ -796,10 +796,18 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
         # haven't passed the backoff interval.
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b5"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b4"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b3"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b2"))
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b5", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b4", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b3", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b2", "fake cause")
+        )
 
         # No time has passed since we attempted to backfill ^
 
@@ -826,11 +834,21 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
         # haven't passed the backoff interval.
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b3"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
-        self.get_success(self.store.record_event_failed_backfill_attempt(room_id, "b1"))
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b3", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b1", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b1", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b1", "fake cause")
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(room_id, "b1", "fake cause")
+        )
 
         # Now advance time by 2 hours and we should only be able to see "b3"
         # because we have waited long enough for the single attempt (2^1 hours)
@@ -881,7 +899,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         def populate_db(txn: LoggingTransaction):
             # Insert the room to satisfy the foreign key constraint of
-            # `event_failed_backfill_attempts`
+            # `event_failed_pull_attempts`
             self.store.db_pool.simple_insert_txn(
                 txn,
                 "rooms",
@@ -983,7 +1001,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # `get_insertion_event_backward_extremities_in_room` exclude them
         # because we haven't passed the backoff interval.
         self.get_success(
-            self.store.record_event_failed_backfill_attempt(room_id, "insertion_eventA")
+            self.store.record_event_failed_pull_attempt(
+                room_id, "insertion_eventA", "fake cause"
+            )
         )
 
         # No time has passed since we attempted to backfill ^
@@ -1015,16 +1035,24 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # `get_backfill_points_in_room` exclude them because we
         # haven't passed the backoff interval.
         self.get_success(
-            self.store.record_event_failed_backfill_attempt(room_id, "insertion_eventA")
+            self.store.record_event_failed_pull_attempt(
+                room_id, "insertion_eventA", "fake cause"
+            )
         )
         self.get_success(
-            self.store.record_event_failed_backfill_attempt(room_id, "insertion_eventA")
+            self.store.record_event_failed_pull_attempt(
+                room_id, "insertion_eventA", "fake cause"
+            )
         )
         self.get_success(
-            self.store.record_event_failed_backfill_attempt(room_id, "insertion_eventA")
+            self.store.record_event_failed_pull_attempt(
+                room_id, "insertion_eventA", "fake cause"
+            )
         )
         self.get_success(
-            self.store.record_event_failed_backfill_attempt(room_id, "insertion_eventA")
+            self.store.record_event_failed_pull_attempt(
+                room_id, "insertion_eventA", "fake cause"
+            )
         )
 
         # Now advance time by 2 hours and we should only be able to see "b3"
