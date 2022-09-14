@@ -837,7 +837,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 old_membership == Membership.INVITE
                 and effective_membership_state == Membership.LEAVE
             ):
-                is_blocked = await self._is_server_notice_room(room_id)
+                is_blocked = await self.store.is_server_notice_room(room_id)
                 if is_blocked:
                     raise SynapseError(
                         HTTPStatus.FORBIDDEN,
@@ -1616,14 +1616,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 return True
 
         return False
-
-    async def _is_server_notice_room(self, room_id: str) -> bool:
-        if self._server_notices_mxid is None:
-            return False
-        is_server_notices_room = await self.store.check_local_user_in_room(
-            user_id=self._server_notices_mxid, room_id=room_id
-        )
-        return is_server_notices_room
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):
