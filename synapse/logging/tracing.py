@@ -216,7 +216,7 @@ class _DummyLookup(object):
 class DummyLink(ABC):
     """Dummy placeholder for `opentelemetry.trace.Link`"""
 
-    def __init__(self) -> None:
+    def __init__(self, *args: Any) -> None:
         self.not_implemented_message = (
             "opentelemetry isn't installed so this is just a dummy link placeholder"
         )
@@ -547,7 +547,7 @@ def start_active_span(
     name: str,
     *,
     context: Optional["opentelemetry.context.context.Context"] = None,
-    kind: Optional["opentelemetry.trace.SpanKind"] = SpanKind.INTERNAL,
+    kind: "opentelemetry.trace.SpanKind" = SpanKind.INTERNAL,
     attributes: "opentelemetry.util.types.Attributes" = None,
     links: Optional[Sequence["opentelemetry.trace.Link"]] = None,
     start_time: Optional[int] = None,
@@ -559,11 +559,6 @@ def start_active_span(
 ) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
-
-    # TODO: Why is this necessary to satisfy this error? It has a default?
-    #  ` error: Argument "kind" to "start_span" of "Tracer" has incompatible type "Optional[SpanKind]"; expected "SpanKind"  [arg-type]`
-    if kind is None:
-        kind = SpanKind.INTERNAL
 
     span = start_span(
         name=name,
