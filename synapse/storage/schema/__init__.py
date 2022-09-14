@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 72  # remember to update the list below when updating
+SCHEMA_VERSION = 73  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -79,6 +79,10 @@ Changes in SCHEMA_VERSION = 72:
     - Cache invalidation stream id sequence now begins at 2 to match code expectation.
     - Add table `event_failed_pull_attempts` to keep track when we fail to pull
       events over federation.
+
+Changes in SCHEMA_VERSION = 73;
+    - thread_id column is added to event_push_actions, event_push_actions_staging
+      event_push_summary, receipts_linearized, and receipts_graph.
 """
 
 
