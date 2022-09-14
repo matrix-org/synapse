@@ -89,6 +89,52 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.67.0
+
+## Direct TCP replication is no longer supported: migrate to Redis
+
+Redis support was added in v1.13.0 with it becoming the recommended method in
+v1.18.0. It replaced the old direct TCP connections (which was deprecated as of
+v1.18.0) to the main process. With Redis, rather than all the workers connecting
+to the main process, all the workers and the main process connect to Redis,
+which relays replication commands between processes. This can give a significant
+CPU saving on the main process and is a prerequisite for upcoming
+performance improvements.
+
+To migrate to Redis add the [`redis` config](./workers.md#shared-configuration),
+and remove the TCP `replication` listener from config of the master and
+`worker_replication_port` from worker config. Note that a HTTP listener with a
+`replication` resource is still required.
+
+## Minimum version of Poetry is now v1.2.0
+
+The minimum supported version of poetry is now 1.2. This should only affect
+those installing from a source checkout.
+
+## Rust requirement in the next release
+
+From the next major release (v1.68.0) installing Synapse from a source checkout
+will require a recent Rust compiler. Those using packages or
+`pip install matrix-synapse` will not be affected.
+
+The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
+
+## SQLite version requirement in the next release
+
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+higher. Synapse v1.67.0 will be the last major release supporting SQLite
+versions 3.22 to 3.26.
+
+Those using docker images or Debian packages from Matrix.org will not be
+affected. If you have installed from source, you should check the version of 
+SQLite used by Python with:
+
+```shell
+python -c "import sqlite3; print(sqlite3.sqlite_version)"
+```
+
+If this is too old, refer to your distribution for advice on upgrading.
+
 # Upgrading to v1.66.0
 
 ## Delegation of email validation no longer supported
@@ -1200,7 +1246,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](workers.md) for more details.
+the [worker documentation](https://matrix-org.github.io/synapse/v1.66/workers.html) for more details.
 
 # Upgrading to v1.14.0
 

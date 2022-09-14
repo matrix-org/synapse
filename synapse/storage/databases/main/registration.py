@@ -175,6 +175,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "is_guest",
                 "admin",
                 "consent_version",
+                "consent_ts",
                 "consent_server_notice_sent",
                 "appservice_id",
                 "creation_ts",
@@ -2227,7 +2228,10 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 txn,
                 table="users",
                 keyvalues={"name": user_id},
-                updatevalues={"consent_version": consent_version},
+                updatevalues={
+                    "consent_version": consent_version,
+                    "consent_ts": self._clock.time_msec(),
+                },
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 

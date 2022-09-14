@@ -31,12 +31,8 @@ from typing import (
 import attr
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.events import EventBase
 from synapse.metrics import LaterGauge
-from synapse.metrics.background_process_metrics import (
-    run_as_background_process,
-    wrap_as_background_process,
-)
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -56,6 +52,7 @@ from synapse.types import JsonDict, PersistedEventPosition, StateMap, get_domain
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -90,16 +87,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # Used by `_get_joined_hosts` to ensure only one thing mutates the cache
         # at a time. Keyed by room_id.
         self._joined_host_linearizer = Linearizer("_JoinedHostsCache")
-
-        # Is the current_state_events.membership up to date? Or is the
-        # background update still running?
-        self._current_state_events_membership_up_to_date = False
-
-        txn = db_conn.cursor(
-            txn_name="_check_safe_current_state_events_membership_updated"
-        )
-        self._check_safe_current_state_events_membership_updated_txn(txn)
-        txn.close()
 
         if (
             self.hs.config.worker.run_background_tasks
@@ -157,58 +144,41 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self._known_servers_count = max([count, 1])
         return self._known_servers_count
 
-    def _check_safe_current_state_events_membership_updated_txn(
-        self, txn: LoggingTransaction
-    ) -> None:
-        """Checks if it is safe to assume the new current_state_events
-        membership column is up to date
-        """
-
-        pending_update = self.db_pool.simple_select_one_txn(
-            txn,
-            table="background_updates",
-            keyvalues={"update_name": _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME},
-            retcols=["update_name"],
-            allow_none=True,
-        )
-
-        self._current_state_events_membership_up_to_date = not pending_update
-
-        # If the update is still running, reschedule to run.
-        if pending_update:
-            self._clock.call_later(
-                15.0,
-                run_as_background_process,
-                "_check_safe_current_state_events_membership_updated",
-                self.db_pool.runInteraction,
-                "_check_safe_current_state_events_membership_updated",
-                self._check_safe_current_state_events_membership_updated_txn,
-            )
-
     @cached(max_entries=100000, iterable=True)
     async def get_users_in_room(self, room_id: str) -> List[str]:
+        """
+        Returns a list of users in the room sorted by longest in the room first
+        (aka. with the lowest depth). This is done to match the sort in
+        `get_current_hosts_in_room()` and so we can re-use the cache but it's
+        not horrible to have here either.
+
+        Uses `m.room.member`s in the room state at the current forward extremities to
+        determine which users are in the room.
+
+        Will return inaccurate results for rooms with partial state, since the state for
+        the forward extremities of those rooms will exclude most members. We may also
+        calculate room state incorrectly for such rooms and believe that a member is or
+        is not in the room when the opposite is true.
+        """
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )
 
     def get_users_in_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[str]:
-        # If we can assume current_state_events.membership is up to date
-        # then we can avoid a join, which is a Very Good Thing given how
-        # frequently this function gets called.
-        if self._current_state_events_membership_up_to_date:
-            sql = """
-                SELECT state_key FROM current_state_events
-                WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
-            """
-        else:
-            sql = """
-                SELECT state_key FROM room_memberships as m
-                INNER JOIN current_state_events as c
-                ON m.event_id = c.event_id
-                AND m.room_id = c.room_id
-                AND m.user_id = c.state_key
-                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
-            """
+        """
+        Returns a list of users in the room sorted by longest in the room first
+        (aka. with the lowest depth). This is done to match the sort in
+        `get_current_hosts_in_room()` and so we can re-use the cache but it's
+        not horrible to have here either.
+        """
+        sql = """
+            SELECT c.state_key FROM current_state_events as c
+            /* Get the depth of the event from the events table */
+            INNER JOIN events AS e USING (event_id)
+            WHERE c.type = 'm.room.member' AND c.room_id = ? AND membership = ?
+            /* Sorted by lowest depth first */
+            ORDER BY e.depth ASC;
+        """
 
         txn.execute(sql, (room_id, Membership.JOIN))
         return [r[0] for r in txn]
@@ -325,28 +295,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # We do this all in one transaction to keep the cache small.
             # FIXME: get rid of this when we have room_stats
 
-            # If we can assume current_state_events.membership is up to date
-            # then we can avoid a join, which is a Very Good Thing given how
-            # frequently this function gets called.
-            if self._current_state_events_membership_up_to_date:
-                # Note, rejected events will have a null membership field, so
-                # we we manually filter them out.
-                sql = """
-                    SELECT count(*), membership FROM current_state_events
-                    WHERE type = 'm.room.member' AND room_id = ?
-                        AND membership IS NOT NULL
-                    GROUP BY membership
-                """
-            else:
-                sql = """
-                    SELECT count(*), m.membership FROM room_memberships as m
-                    INNER JOIN current_state_events as c
-                    ON m.event_id = c.event_id
-                    AND m.room_id = c.room_id
-                    AND m.user_id = c.state_key
-                    WHERE c.type = 'm.room.member' AND c.room_id = ?
-                    GROUP BY m.membership
-                """
+            # Note, rejected events will have a null membership field, so
+            # we we manually filter them out.
+            sql = """
+                SELECT count(*), membership FROM current_state_events
+                WHERE type = 'm.room.member' AND room_id = ?
+                    AND membership IS NOT NULL
+                GROUP BY membership
+            """
 
             txn.execute(sql, (room_id,))
             res: Dict[str, MemberSummary] = {}
@@ -355,30 +311,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             # we order by membership and then fairly arbitrarily by event_id so
             # heroes are consistent
-            if self._current_state_events_membership_up_to_date:
-                # Note, rejected events will have a null membership field, so
-                # we we manually filter them out.
-                sql = """
-                    SELECT state_key, membership, event_id
-                    FROM current_state_events
-                    WHERE type = 'm.room.member' AND room_id = ?
-                        AND membership IS NOT NULL
-                    ORDER BY
-                        CASE membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
-                        event_id ASC
-                    LIMIT ?
-                """
-            else:
-                sql = """
-                    SELECT c.state_key, m.membership, c.event_id
-                    FROM room_memberships as m
-                    INNER JOIN current_state_events as c USING (room_id, event_id)
-                    WHERE c.type = 'm.room.member' AND c.room_id = ?
-                    ORDER BY
-                        CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
-                        c.event_id ASC
-                    LIMIT ?
-                """
+            # Note, rejected events will have a null membership field, so
+            # we we manually filter them out.
+            sql = """
+                SELECT state_key, membership, event_id
+                FROM current_state_events
+                WHERE type = 'm.room.member' AND room_id = ?
+                    AND membership IS NOT NULL
+                ORDER BY
+                    CASE membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
+                    event_id ASC
+                LIMIT ?
+            """
 
             # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
             txn.execute(sql, (room_id, Membership.JOIN, Membership.INVITE, 6))
@@ -621,27 +565,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # We use `current_state_events` here and not `local_current_membership`
         # as a) this gets called with remote users and b) this only gets called
         # for rooms the server is participating in.
-        if self._current_state_events_membership_up_to_date:
-            sql = """
-                SELECT room_id, e.instance_name, e.stream_ordering
-                FROM current_state_events AS c
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE
-                    c.type = 'm.room.member'
-                    AND c.state_key = ?
-                    AND c.membership = ?
-            """
-        else:
-            sql = """
-                SELECT room_id, e.instance_name, e.stream_ordering
-                FROM current_state_events AS c
-                INNER JOIN room_memberships AS m USING (room_id, event_id)
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE
-                    c.type = 'm.room.member'
-                    AND c.state_key = ?
-                    AND m.membership = ?
-            """
+        sql = """
+            SELECT room_id, e.instance_name, e.stream_ordering
+            FROM current_state_events AS c
+            INNER JOIN events AS e USING (room_id, event_id)
+            WHERE
+                c.type = 'm.room.member'
+                AND c.state_key = ?
+                AND c.membership = ?
+        """
 
         txn.execute(sql, (user_id, Membership.JOIN))
         return frozenset(
@@ -679,27 +611,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_ids,
         )
 
-        if self._current_state_events_membership_up_to_date:
-            sql = f"""
-                SELECT c.state_key, room_id, e.instance_name, e.stream_ordering
-                FROM current_state_events AS c
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE
-                    c.type = 'm.room.member'
-                    AND c.membership = ?
-                    AND {clause}
-            """
-        else:
-            sql = f"""
-                SELECT c.state_key, room_id, e.instance_name, e.stream_ordering
-                FROM current_state_events AS c
-                INNER JOIN room_memberships AS m USING (room_id, event_id)
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE
-                    c.type = 'm.room.member'
-                    AND m.membership = ?
-                    AND {clause}
-            """
+        sql = f"""
+            SELECT c.state_key, room_id, e.instance_name, e.stream_ordering
+            FROM current_state_events AS c
+            INNER JOIN events AS e USING (room_id, event_id)
+            WHERE
+                c.type = 'm.room.member'
+                AND c.membership = ?
+                AND {clause}
+        """
 
         txn.execute(sql, [Membership.JOIN] + args)
 
@@ -750,6 +670,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _get_users_server_still_shares_room_with_txn,
         )
 
+    @cancellable
     async def get_rooms_for_user(
         self, user_id: str, on_invalidate: Optional[Callable[[], None]] = None
     ) -> FrozenSet[str]:
@@ -862,96 +783,51 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return shared_room_ids or frozenset()
 
     async def get_joined_user_ids_from_state(
-        self, room_id: str, state: StateMap[str], state_entry: "_StateCacheEntry"
+        self, room_id: str, state: StateMap[str]
     ) -> Set[str]:
-        state_group: Union[object, int] = state_entry.state_group
-        if not state_group:
-            # If state_group is None it means it has yet to be assigned a
-            # state group, i.e. we need to make sure that calls with a state_group
-            # of None don't hit previous cached calls with a None state_group.
-            # To do this we set the state_group to a new object as object() != object()
-            state_group = object()
+        """
+        For a given set of state IDs, get a set of user IDs in the room.
 
-        assert state_group is not None
-        with Measure(self._clock, "get_joined_users_from_state"):
-            return await self._get_joined_user_ids_from_context(
-                room_id, state_group, state, context=state_entry
+        This method checks the local event cache, before calling
+        `_get_user_ids_from_membership_event_ids` for any uncached events.
+        """
+
+        with Measure(self._clock, "get_joined_user_ids_from_state"):
+            users_in_room = set()
+            member_event_ids = [
+                e_id for key, e_id in state.items() if key[0] == EventTypes.Member
+            ]
+
+            # We check if we have any of the member event ids in the event cache
+            # before we ask the DB
+
+            # We don't update the event cache hit ratio as it completely throws off
+            # the hit ratio counts. After all, we don't populate the cache if we
+            # miss it here
+            event_map = self._get_events_from_local_cache(
+                member_event_ids, update_metrics=False
             )
 
-    @cached(num_args=2, iterable=True, max_entries=100000)
-    async def _get_joined_user_ids_from_context(
-        self,
-        room_id: str,
-        state_group: Union[object, int],
-        current_state_ids: StateMap[str],
-        event: Optional[EventBase] = None,
-        context: Optional["_StateCacheEntry"] = None,
-    ) -> Set[str]:
-        # We don't use `state_group`, it's there so that we can cache based
-        # on it. However, it's important that it's never None, since two current_states
-        # with a state_group of None are likely to be different.
-        assert state_group is not None
+            missing_member_event_ids = []
+            for event_id in member_event_ids:
+                ev_entry = event_map.get(event_id)
+                if ev_entry and not ev_entry.event.rejected_reason:
+                    if ev_entry.event.membership == Membership.JOIN:
+                        users_in_room.add(ev_entry.event.state_key)
+                else:
+                    missing_member_event_ids.append(event_id)
 
-        users_in_room = set()
-        member_event_ids = [
-            e_id
-            for key, e_id in current_state_ids.items()
-            if key[0] == EventTypes.Member
-        ]
-
-        if context is not None:
-            # If we have a context with a delta from a previous state group,
-            # check if we also have the result from the previous group in cache.
-            # If we do then we can reuse that result and simply update it with
-            # any membership changes in `delta_ids`
-            if context.prev_group and context.delta_ids:
-                prev_res = self._get_joined_user_ids_from_context.cache.get_immediate(
-                    (room_id, context.prev_group), None
+            if missing_member_event_ids:
+                event_to_memberships = (
+                    await self._get_user_ids_from_membership_event_ids(
+                        missing_member_event_ids
+                    )
                 )
-                if prev_res and isinstance(prev_res, set):
-                    users_in_room = prev_res
-                    member_event_ids = [
-                        e_id
-                        for key, e_id in context.delta_ids.items()
-                        if key[0] == EventTypes.Member
-                    ]
-                    for etype, state_key in context.delta_ids:
-                        if etype == EventTypes.Member:
-                            users_in_room.discard(state_key)
+                users_in_room.update(
+                    user_id for user_id in event_to_memberships.values() if user_id
+                )
 
-        # We check if we have any of the member event ids in the event cache
-        # before we ask the DB
-
-        # We don't update the event cache hit ratio as it completely throws off
-        # the hit ratio counts. After all, we don't populate the cache if we
-        # miss it here
-        event_map = self._get_events_from_local_cache(
-            member_event_ids, update_metrics=False
-        )
-
-        missing_member_event_ids = []
-        for event_id in member_event_ids:
-            ev_entry = event_map.get(event_id)
-            if ev_entry and not ev_entry.event.rejected_reason:
-                if ev_entry.event.membership == Membership.JOIN:
-                    users_in_room.add(ev_entry.event.state_key)
-            else:
-                missing_member_event_ids.append(event_id)
-
-        if missing_member_event_ids:
-            event_to_memberships = await self._get_user_ids_from_membership_event_ids(
-                missing_member_event_ids
-            )
-            users_in_room.update(
-                user_id for user_id in event_to_memberships.values() if user_id
-            )
-
-        if event is not None and event.type == EventTypes.Member:
-            if event.membership == Membership.JOIN:
-                if event.event_id in member_event_ids:
-                    users_in_room.add(event.state_key)
-
-        return users_in_room
+            return users_in_room
 
     @cached(
         max_entries=10000,
@@ -1037,37 +913,81 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return True
 
     @cached(iterable=True, max_entries=10000)
-    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
-        """Get current hosts in room based on current state."""
+    async def get_current_hosts_in_room(self, room_id: str) -> List[str]:
+        """
+        Get current hosts in room based on current state.
+
+        The heuristic of sorting by servers who have been in the room the
+        longest is good because they're most likely to have anything we ask
+        about.
+
+        Uses `m.room.member`s in the room state at the current forward extremities to
+        determine which hosts are in the room.
+
+        Will return inaccurate results for rooms with partial state, since the state for
+        the forward extremities of those rooms will exclude most members. We may also
+        calculate room state incorrectly for such rooms and believe that a host is or
+        is not in the room when the opposite is true.
+
+        Returns:
+            Returns a list of servers sorted by longest in the room first. (aka.
+            sorted by join with the lowest depth first).
+        """
 
         # First we check if we already have `get_users_in_room` in the cache, as
         # we can just calculate result from that
         users = self.get_users_in_room.cache.get_immediate(
             (room_id,), None, update_metrics=False
         )
-        if users is not None:
-            return {get_domain_from_id(u) for u in users}
-
-        if isinstance(self.database_engine, Sqlite3Engine):
+        if users is None and isinstance(self.database_engine, Sqlite3Engine):
             # If we're using SQLite then let's just always use
             # `get_users_in_room` rather than funky SQL.
             users = await self.get_users_in_room(room_id)
-            return {get_domain_from_id(u) for u in users}
+
+        if users is not None:
+            # Because `users` is sorted from lowest -> highest depth, the list
+            # of domains will also be sorted that way.
+            domains: List[str] = []
+            # We use a `Set` just for fast lookups
+            domain_set: Set[str] = set()
+            for u in users:
+                if ":" not in u:
+                    continue
+                domain = get_domain_from_id(u)
+                if domain not in domain_set:
+                    domain_set.add(domain)
+                    domains.append(domain)
+            return domains
 
         # For PostgreSQL we can use a regex to pull out the domains from the
         # joined users in `current_state_events` via regex.
 
-        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
+        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> List[str]:
+            # Returns a list of servers currently joined in the room sorted by
+            # longest in the room first (aka. with the lowest depth). The
+            # heuristic of sorting by servers who have been in the room the
+            # longest is good because they're most likely to have anything we
+            # ask about.
             sql = """
-                SELECT DISTINCT substring(state_key FROM '@[^:]*:(.*)$')
-                FROM current_state_events
+                SELECT
+                    /* Match the domain part of the MXID */
+                    substring(c.state_key FROM '@[^:]*:(.*)$') as server_domain
+                FROM current_state_events c
+                /* Get the depth of the event from the events table */
+                INNER JOIN events AS e USING (event_id)
                 WHERE
-                    type = 'm.room.member'
-                    AND membership = 'join'
-                    AND room_id = ?
+                    /* Find any join state events in the room */
+                    c.type = 'm.room.member'
+                    AND c.membership = 'join'
+                    AND c.room_id = ?
+                /* Group all state events from the same domain into their own buckets (groups) */
+                GROUP BY server_domain
+                /* Sorted by lowest depth first */
+                ORDER BY min(e.depth) ASC;
             """
             txn.execute(sql, (room_id,))
-            return {d for d, in txn}
+            # `server_domain` will be `NULL` for malformed MXIDs with no colons.
+            return [d for d, in txn if d is not None]
 
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room", get_current_hosts_in_room_txn
@@ -1151,7 +1071,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 # The cache doesn't match the state group or prev state group,
                 # so we calculate the result from first principles.
                 joined_user_ids = await self.get_joined_user_ids_from_state(
-                    room_id, state, state_entry
+                    room_id, state
                 )
 
                 cache.hosts_to_joined_users = {}

@@ -26,12 +26,12 @@ from synapse.http.server import (
     DirectServeJsonResource,
     JsonResource,
     OptionsResource,
-    cancellable,
 )
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict
 from synapse.util import Clock
+from synapse.util.cancellation import cancellable
 
 from tests import unittest
 from tests.http.server._base import test_disconnect
@@ -228,7 +228,7 @@ class OptionsResourceTests(unittest.TestCase):
         site = SynapseSite(
             "test",
             "site_tag",
-            parse_listener_def({"type": "http", "port": 0}),
+            parse_listener_def(0, {"type": "http", "port": 0}),
             self.resource,
             "1.0",
             max_request_body_size=4096,

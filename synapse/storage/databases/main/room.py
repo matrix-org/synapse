@@ -641,8 +641,10 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         "version": room[5],
                         "creator": room[6],
                         "encryption": room[7],
-                        "federatable": room[8],
-                        "public": room[9],
+                        # room_stats_state.federatable is an integer on sqlite.
+                        "federatable": bool(room[8]),
+                        # rooms.is_public is an integer on sqlite.
+                        "public": bool(room[9]),
                         "join_rules": room[10],
                         "guest_access": room[11],
                         "history_visibility": room[12],
@@ -1183,8 +1185,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             )
             return False
 
-    @staticmethod
-    def _clear_partial_state_room_txn(txn: LoggingTransaction, room_id: str) -> None:
+    def _clear_partial_state_room_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
         DatabasePool.simple_delete_txn(
             txn,
             table="partial_state_rooms_servers",
@@ -1195,7 +1198,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             table="partial_state_rooms",
             keyvalues={"room_id": room_id},
         )
+        self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
 
+    @cached()
     async def is_partial_state_room(self, room_id: str) -> bool:
         """Checks if this room has partial state.
 
@@ -1769,9 +1774,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             servers,
         )
 
-    @staticmethod
     def _store_partial_state_room_txn(
-        txn: LoggingTransaction, room_id: str, servers: Collection[str]
+        self, txn: LoggingTransaction, room_id: str, servers: Collection[str]
     ) -> None:
         DatabasePool.simple_insert_txn(
             txn,
@@ -1786,6 +1790,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             keys=("room_id", "server_name"),
             values=((room_id, s) for s in servers),
         )
+        self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
 
     async def maybe_store_room_on_outlier_membership(
         self, room_id: str, room_version: RoomVersion

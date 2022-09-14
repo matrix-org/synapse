@@ -19,6 +19,7 @@ from synapse.rest import admin
 from synapse.rest.client import keys, login
 
 from tests import unittest
+from tests.http.server._base import make_request_with_cancellation_test
 
 
 class KeyQueryTestCase(unittest.HomeserverTestCase):
@@ -89,3 +90,31 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
             Codes.BAD_JSON,
             channel.result,
         )
+
+    def test_key_query_cancellation(self) -> None:
+        """
+        Tests that /keys/query is cancellable and does not swallow the
+        CancelledError.
+        """
+        self.register_user("alice", "wonderland")
+        alice_token = self.login("alice", "wonderland")
+
+        bob = self.register_user("bob", "uncle")
+
+        channel = make_request_with_cancellation_test(
+            "test_key_query_cancellation",
+            self.reactor,
+            self.site,
+            "POST",
+            "/_matrix/client/r0/keys/query",
+            {
+                "device_keys": {
+                    # Empty list means we request keys for all bob's devices
+                    bob: [],
+                },
+            },
+            token=alice_token,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertIn(bob, channel.json_body["device_keys"])
