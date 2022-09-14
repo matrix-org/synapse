@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import datetime
-import logging
 from typing import Dict, List, Tuple, Union
 
 import attr
@@ -35,8 +34,6 @@ from synapse.util import Clock, json_encoder
 
 import tests.unittest
 import tests.utils
-
-logger = logging.getLogger(__name__)
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
@@ -994,8 +991,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
         depth_map = setup_info.depth_map
-
-        logger.info("depth_map=%s", depth_map)
 
         # Record some attempts to backfill these events which will make
         # `get_insertion_event_backward_extremities_in_room` exclude them
