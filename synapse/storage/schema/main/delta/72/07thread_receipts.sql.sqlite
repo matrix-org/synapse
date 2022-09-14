@@ -26,6 +26,7 @@ CREATE TABLE receipts_linearized_new (
     user_id TEXT NOT NULL,
     event_id TEXT NOT NULL,
     thread_id TEXT,
+    event_stream_ordering BIGINT,
     data TEXT NOT NULL,
     CONSTRAINT receipts_linearized_uniqueness UNIQUE (room_id, receipt_type, user_id),
     CONSTRAINT receipts_linearized_uniqueness_thread UNIQUE (room_id, receipt_type, user_id, thread_id)
@@ -48,8 +49,8 @@ DROP INDEX IF EXISTS receipts_linearized_room_stream;
 DROP INDEX IF EXISTS receipts_linearized_user;
 
 -- Copy the data.
-INSERT INTO receipts_linearized_new (stream_id, room_id, receipt_type, user_id, event_id, data)
-    SELECT stream_id, room_id, receipt_type, user_id, event_id, data
+INSERT INTO receipts_linearized_new (stream_id, room_id, receipt_type, user_id, event_id, event_stream_ordering, data)
+    SELECT stream_id, room_id, receipt_type, user_id, event_id, event_stream_ordering, data
     FROM receipts_linearized;
 INSERT INTO receipts_graph_new (room_id, receipt_type, user_id, event_ids, data)
     SELECT room_id, receipt_type, user_id, event_ids, data
