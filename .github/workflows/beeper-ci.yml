@@ -2,7 +2,7 @@ name: Beep
 
 on:
   push:
-    branches: ["beeper"]
+    branches: ["beeper", "beeper-*"]
   pull_request:
 
 
