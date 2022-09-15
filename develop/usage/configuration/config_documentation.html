@@ -488,7 +488,16 @@ configuration.</p>
 </li>
 <li>
 <p><code>x_forwarded</code>: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-behind a reverse-proxy.</p>
+behind a <a href="../../reverse_proxy.html">reverse-proxy</a>.</p>
+</li>
+<li>
+<p><code>request_id_header</code>: The header extracted from each incoming request that is
+used as the basis for the request ID. The request ID is used in
+<a href="../administration/request_log.html#request-log-format">logs</a> and tracing to
+correlate and match up requests. When unset, Synapse will automatically
+generate sequential request IDs. This option is useful when Synapse is behind
+a <a href="../../reverse_proxy.html">reverse-proxy</a>.</p>
+<p><em>Added in Synapse 1.68.0.</em></p>
 </li>
 <li>
 <p><code>resources</code>: Only valid for an 'http' listener. A list of resources to host

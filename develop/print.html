@@ -890,6 +890,10 @@ consider setting <code>bind_addresses: ['127.0.0.1']</code> so that the server o
 listens to traffic on localhost. (Do not change <code>bind_addresses</code> to <code>127.0.0.1</code> 
 when using a containerized Synapse, as that will prevent it from responding
 to proxied traffic.)</p>
+<p>Optionally, you can also set
+<a href="../usage/configuration/config_documentation.html#listeners"><code>request_id_header</code></a>
+so that the server extracts and re-uses the same request ID format that the
+reverse proxy is using.</p>
 <h2 id="reverse-proxy-configuration-examples"><a class="header" href="#reverse-proxy-configuration-examples">Reverse-proxy configuration examples</a></h2>
 <p><strong>NOTE</strong>: You only need one of these.</p>
 <h3 id="nginx"><a class="header" href="#nginx">nginx</a></h3>
@@ -3543,7 +3547,16 @@ configuration.</p>
 </li>
 <li>
 <p><code>x_forwarded</code>: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-behind a reverse-proxy.</p>
+behind a <a href="usage/configuration/../../reverse_proxy.html">reverse-proxy</a>.</p>
+</li>
+<li>
+<p><code>request_id_header</code>: The header extracted from each incoming request that is
+used as the basis for the request ID. The request ID is used in
+<a href="usage/configuration/../administration/request_log.html#request-log-format">logs</a> and tracing to
+correlate and match up requests. When unset, Synapse will automatically
+generate sequential request IDs. This option is useful when Synapse is behind
+a <a href="usage/configuration/../../reverse_proxy.html">reverse-proxy</a>.</p>
+<p><em>Added in Synapse 1.68.0.</em></p>
 </li>
 <li>
 <p><code>resources</code>: Only valid for an 'http' listener. A list of resources to host
