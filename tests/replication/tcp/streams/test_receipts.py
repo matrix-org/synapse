@@ -48,6 +48,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         self.assertEqual("m.read", row.receipt_type)
         self.assertEqual(USER_ID, row.user_id)
         self.assertEqual("$event:blue", row.event_id)
+        self.assertIsNone(row.thread_id)
         self.assertEqual({"a": 1}, row.data)
 
         # Now let's disconnect and insert some data.
