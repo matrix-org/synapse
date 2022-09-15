@@ -863,4 +863,4 @@ class HTTPPusherTests(HomeserverTestCase):
         channel = self.make_request("GET", "/pushers", access_token=access_token)
         self.assertEqual(channel.code, 200)
         self.assertEqual(len(channel.json_body["pushers"]), 1)
-        self.assertFalse(channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"])
+        self.assertTrue(channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"])
