@@ -37,10 +37,10 @@ class AuthenticationData(RequestBodyModel):
 
 
 if TYPE_CHECKING:
-    ClientSecretType = StrictStr
+    ClientSecretStr = StrictStr
 else:
     # See also assert_valid_client_secret()
-    ClientSecretType = constr(
+    ClientSecretStr = constr(
         regex="[0-9a-zA-Z.=_-]",  # noqa: F722
         min_length=1,
         max_length=255,
@@ -49,7 +49,7 @@ else:
 
 
 class ThreepidRequestTokenBody(RequestBodyModel):
-    client_secret: ClientSecretType
+    client_secret: ClientSecretStr
     id_server: Optional[StrictStr]
     id_access_token: Optional[StrictStr]
     next_link: Optional[StrictStr]

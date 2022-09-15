@@ -44,7 +44,7 @@ from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.rest.client.models import (
     AuthenticationData,
-    ClientSecretType,
+    ClientSecretStr,
     EmailRequestTokenBody,
     MsisdnRequestTokenBody,
 )
@@ -631,7 +631,7 @@ class ThreepidAddRestServlet(RestServlet):
 
     class PostBody(RequestBodyModel):
         auth: Optional[AuthenticationData] = None
-        client_secret: ClientSecretType
+        client_secret: ClientSecretStr
         sid: StrictStr
 
     @interactive_auth_handler
@@ -679,7 +679,7 @@ class ThreepidBindRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     class PostBody(RequestBodyModel):
-        client_secret: ClientSecretType
+        client_secret: ClientSecretStr
         id_access_token: StrictStr
         id_server: StrictStr
         sid: StrictStr
