@@ -80,7 +80,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 counts,
                 NotifCounts(
                     notify_count=noitf_count,
-                    unread_count=0,
+                    # Beeper change: we always count unreads currently, so just override this
+                    unread_count=noitf_count,
                     highlight_count=highlight_count,
                 ),
             )
