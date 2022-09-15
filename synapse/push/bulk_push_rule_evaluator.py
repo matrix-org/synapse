@@ -283,8 +283,13 @@ class BulkPushRuleEvaluator:
                 relation.parent_id,
                 itertools.chain(*(r.rules() for r in rules_by_user.values())),
             )
+            # Recursively attempt to find the thread this event relates to.
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
+            else:
+                # Since the event has not yet been persisted we check whether
+                # the parent is parent of a thread.
+                thread_id = await self.store.get_thread_id(relation.parent_id) or "main"
 
         evaluator = PushRuleEvaluatorForEvent(
             event,
