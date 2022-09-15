@@ -19,3 +19,7 @@ name = "synapse.synapse_rust"
 
 [dependencies]
 pyo3 = { version = "0.16.5", features = ["extension-module", "macros", "abi3", "abi3-py37"] }
+
+[build-dependencies]
+blake2 = "0.10.4"
+hex = "0.4.3"
