@@ -160,6 +160,27 @@ class EventAuthHandler:
         with Measure(self._clock, "check_host_in_room"):
             return await self._store.is_host_joined(room_id, host)
 
+    async def assert_host_in_room(
+        self, room_id: str, host: str, allow_partial_state_rooms: bool = False
+    ) -> None:
+        """
+        Asserts that the host is in the room, or raises an AuthError.
+
+        If the room is partial-stated, we raise an AuthError with the
+        UNABLE_DUE_TO_PARTIAL_STATE flag, unless `allow_partial_state_rooms` is true.
+        """
+        if not allow_partial_state_rooms and await self._store.is_partial_state_room(
+            room_id
+        ):
+            raise AuthError(
+                403,
+                "Unable to authorise you right now; room is partial-stated here.",
+                errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
+            )
+
+        if not await self.check_host_in_room(room_id, host):
+            raise AuthError(403, "Host not in room.")
+
     async def check_restricted_join_rules(
         self,
         state_ids: StateMap[str],
