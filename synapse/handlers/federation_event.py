@@ -955,6 +955,12 @@ class FederationEventHandler:
         seen = await self._store.have_events_in_timeline(prevs)
         missing_prevs = prevs - seen
 
+        # Filter out events we've tried to pull recently
+        prevs_to_ignore = await self.store.filter_events_with_pull_attempt_backoff(
+            room_id, missing_prevs
+        )
+        missing_prevs = missing_prevs - prevs_to_ignore
+
         if not missing_prevs:
             return await self._state_handler.compute_event_context(event)
 

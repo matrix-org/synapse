@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import itertools
 import logging
 from queue import Empty, PriorityQueue
@@ -21,6 +22,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
     cast,
@@ -43,7 +45,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -72,6 +74,12 @@ pdus_pruned_from_federation_queue = Counter(
 
 logger = logging.getLogger(__name__)
 
+PULLED_EVENT_BACKOFF_UPPER_BOUND_SECONDS: int = int(
+    datetime.timedelta(days=7).total_seconds()
+)
+PULLED_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS: int = int(
+    datetime.timedelta(hours=1).total_seconds()
+)
 
 # All the info we need while iterating the DAG while backfilling
 @attr.s(frozen=True, slots=True, auto_attribs=True)
@@ -1338,6 +1346,78 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
+
+    @trace
+    async def filter_events_with_pull_attempt_backoff(
+        self,
+        room_id: str,
+        event_ids: Sequence[str],
+    ) -> List[str]:
+        """
+        Filter out events that we've failed to pull before
+        recently. Uses exponential backoff.
+
+        Args:
+            room_id: The room that the events belong to
+            event_ids: A list of events to filter down
+
+        Returns:
+            List of event_ids that can be attempted to be pulled
+        """
+        return await self.db_pool.runInteraction(
+            "filter_events_with_pull_attempt_backoff",
+            self._filter_events_with_pull_attempt_backoff_txn,
+            room_id,
+            event_ids,
+        )
+
+    def _filter_events_with_pull_attempt_backoff_txn(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        event_ids: Sequence[str],
+    ) -> None:
+        where_event_ids_match_clause, values = make_in_list_sql_clause(
+            txn.database_engine, "event_id", event_ids
+        )
+
+        sql = """
+            SELECT event_id FROM event_failed_pull_attempts
+            WHERE
+                room_id = ?
+                %s /* where_event_ids_match_clause */
+                /**
+                * Exponential back-off (up to the upper bound) so we don't try to
+                * pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+                *
+                * We use `1 << n` as a power of 2 equivalent for compatibility
+                * with older SQLites. The left shift equivalent only works with
+                * powers of 2 because left shift is a binary operation (base-2).
+                * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
+                */
+                AND (
+                    event_id IS NULL
+                    OR ? /* current_time */ >= last_attempt_ts + /*least*/%s((1 << num_attempts) * ? /* step */, ? /* upper bound */)
+                )
+        """
+
+        if isinstance(self.database_engine, PostgresEngine):
+            least_function = "least"
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            least_function = "min"
+        else:
+            raise RuntimeError("Unknown database engine")
+
+        txn.execute(
+            sql % (where_event_ids_match_clause, least_function),
+            (
+                room_id,
+                *values,
+                self._clock.time_msec(),
+                1000 * PULLED_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
+                1000 * PULLED_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+            ),
+        )
 
     async def get_missing_events(
         self,
