@@ -521,9 +521,11 @@ class ServerConfig(Config):
         ):
             raise ConfigError("allowed_avatar_mimetypes must be a list")
 
-        self.listeners = [
-            parse_listener_def(i, x) for i, x in enumerate(config.get("listeners", []))
-        ]
+        listeners = config.get("listeners", [])
+        if not isinstance(listeners, list):
+            raise ConfigError("Expected a list", ("listeners",))
+
+        self.listeners = [parse_listener_def(i, x) for i, x in enumerate(listeners)]
 
         # no_tls is not really supported any more, but let's grandfather it in
         # here.
@@ -891,7 +893,7 @@ def read_gc_thresholds(
 def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     """parse a listener config from the config file"""
     if not isinstance(listener, dict):
-        raise ConfigError(f"listeners[{num}] must be a dictionary")
+        raise ConfigError("Expected a dictionary", ("listeners", str(num)))
 
     listener_type = listener["type"]
     # Raise a helpful error if direct TCP replication is still configured.
