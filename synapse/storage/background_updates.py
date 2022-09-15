@@ -533,7 +533,7 @@ class BackgroundUpdater:
             index_name: name of index to add
             table: table to add index to
             columns: columns/expressions to include in index
-            where_clause: A where clause to apply to the index.
+            where_clause: A WHERE clause to specify a partial unique index.
             unique: true to make a UNIQUE index
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)
