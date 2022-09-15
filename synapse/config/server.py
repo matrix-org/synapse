@@ -888,8 +888,11 @@ def read_gc_thresholds(
         )
 
 
-def parse_listener_def(num: int, listener: JsonDict) -> ListenerConfig:
+def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     """parse a listener config from the config file"""
+    if not isinstance(listener, dict):
+        raise ConfigError(f"listeners[{num}] must be a dictionary")
+
     listener_type = listener["type"]
     # Raise a helpful error if direct TCP replication is still configured.
     if listener_type == "replication":
