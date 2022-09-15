@@ -524,11 +524,11 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "matrix-common"
-version = "1.2.1"
+version = "1.3.0"
 description = "Common utilities for Synapse, Sydent and Sygnal"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 attrs = "*"
@@ -1625,7 +1625,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "79cfa09d59f9f8b5ef24318fb860df1915f54328692aa56d04331ecbdd92a8cb"
+content-hash = "1b14fc274d9e2a495a7f864150f3ffcf4d9f585e09a67e53301ae4ef3c2f3e48"
 
 [metadata.files]
 attrs = [
@@ -2113,8 +2113,8 @@ markupsafe = [
     {file = "MarkupSafe-2.1.0.tar.gz", hash = "sha256:80beaf63ddfbc64a0452b841d8036ca0611e049650e20afcb882f5d3c266d65f"},
 ]
 matrix-common = [
-    {file = "matrix_common-1.2.1-py3-none-any.whl", hash = "sha256:946709c405944a0d4b1d73207b77eb064b6dbfc5d70a69471320b06d8ce98b20"},
-    {file = "matrix_common-1.2.1.tar.gz", hash = "sha256:a99dcf02a6bd95b24a5a61b354888a2ac92bf2b4b839c727b8dd9da2cdfa3853"},
+    {file = "matrix_common-1.3.0-py3-none-any.whl", hash = "sha256:524e2785b9b03be4d15f3a8a6b857c5b6af68791ffb1b9918f0ad299abc4db20"},
+    {file = "matrix_common-1.3.0.tar.gz", hash = "sha256:62e121cccd9f243417b57ec37a76dc44aeb198a7a5c67afd6b8275992ff2abd1"},
 ]
 matrix-synapse-ldap3 = [
     {file = "matrix-synapse-ldap3-0.2.2.tar.gz", hash = "sha256:b388d95693486eef69adaefd0fd9e84463d52fe17b0214a00efcaa669b73cb74"},
