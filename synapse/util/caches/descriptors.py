@@ -507,9 +507,14 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     cache_key_to_arg(key) for key in missing
                 }
 
+                try:
+                    orig = self.redis_cached_orig
+                except AttributeError:
+                    orig = self.orig
+
                 # dispatch the call, and attach the two handlers
                 missing_d = defer.maybeDeferred(
-                    preserve_fn(self.orig), **args_to_call
+                    preserve_fn(orig), **args_to_call
                 ).addCallbacks(complete_all, errback_all)
                 cached_defers.append(missing_d)
 
@@ -530,7 +535,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
             if getattr(cached_method, "redis_enabled", False):
                 return
 
-            self.orig = redisCachedList(
+            self.redis_cached_orig = redisCachedList(
                 external_sharded_cache,
                 self.cached_method_name,
                 self.list_name,
