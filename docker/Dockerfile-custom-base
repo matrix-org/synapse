@@ -70,14 +70,17 @@ RUN \
 # pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/poetry" --no-warn-script-location \
-    "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
+    "poetry==1.2.0"
 
 WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
 
-RUN PYTHONPATH=$(echo /poetry/lib/*/site-packages/) /poetry/bin/poetry export --extras all -o /synapse/requirements.txt
+# For some utterly stupid reasons pip doesn't seem capable of upgrading setuptools at the same time as
+# installing packages that use it, so we just hack past it by ignoring the pinned setuptools version. Ugh.
+RUN PYTHONPATH=$(echo /poetry/lib/*/site-packages/) /poetry/bin/poetry export --extras all -o /synapse/requirements-with-setuptools.txt
+RUN cat /synapse/requirements-with-setuptools.txt | grep -v "setuptools==" > /synapse/requirements.txt
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
