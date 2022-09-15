@@ -733,10 +733,6 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Running url preview cache expiry")
 
-        if not (await self.store.db_pool.updates.has_completed_background_updates()):
-            logger.debug("Still running DB updates; skipping url preview cache expiry")
-            return
-
         def try_remove_parent_dirs(dirs: Iterable[str]) -> None:
             """Attempt to remove the given chain of parent directories
 

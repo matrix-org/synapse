@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Synapse Packaging team <packages@matrix.org>
 # keep this list in sync with the build dependencies in docker/Dockerfile-dhvirtualenv.
 Build-Depends:
- debhelper (>= 10),
+ debhelper-compat (= 12),
  dh-virtualenv (>= 1.1),
  libsystemd-dev,
  libpq-dev,

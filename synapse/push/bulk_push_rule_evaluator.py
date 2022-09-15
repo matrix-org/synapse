@@ -315,7 +315,7 @@ class BulkPushRuleEvaluator:
                 event, context, non_bot_room_member_count, uid, related_event
             )
 
-            if count_as_unread_by_user[uid]:
+            if self.hs.config.experimental.msc2654_enabled and count_as_unread_by_user[uid]:
                 # Add an element for the current user if the event needs to be marked as
                 # unread, so that add_push_actions_to_staging iterates over it.
                 # If the event shouldn't be marked as unread but should notify the

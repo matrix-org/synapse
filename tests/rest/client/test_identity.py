@@ -25,7 +25,6 @@ from tests import unittest
 
 
 class IdentityTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -33,7 +32,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["enable_3pid_lookup"] = False
         self.hs = self.setup_test_homeserver(config=config)
@@ -54,6 +52,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
+            "id_access_token": tok,
         }
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
         channel = self.make_request(
