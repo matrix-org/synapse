@@ -1196,16 +1196,16 @@ class FederationHandler:
             event_id, allow_none=True, allow_rejected=True
         )
 
-        if event:
-            await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
-
-            events = await filter_events_for_server(
-                self._storage_controllers, origin, [event]
-            )
-            event = events[0]
-            return event
-        else:
+        if not event:
             return None
+
+        await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
+
+        events = await filter_events_for_server(
+            self._storage_controllers, origin, [event]
+        )
+        event = events[0]
+        return event
 
     async def on_get_missing_events(
         self,
