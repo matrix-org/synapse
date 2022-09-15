@@ -132,14 +132,14 @@ poetry install --extras all --remove-untracked
 # Stop the current virtualenv if active
 $ deactivate
 
-# Find the venv for poetry
-$ poetry env info --path
-# Remove all of the files from the current environment
-$ rm -rf $(poetry env info --path)
+# Remove all of the files from the current environment.
+# Don't worry, even though it says "all", this will only
+# remove the Poetry virtualenvs for the current project.
+$ poetry env remove --all
 
-# Reactivate Poetry shell
+# Reactivate Poetry shell to create the virtualenv again
 $ poetry shell
-# Install everything
+# Install everything again
 $ poetry install --extras all
 ```
 
