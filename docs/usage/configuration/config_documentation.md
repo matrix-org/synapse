@@ -437,10 +437,11 @@ Sub-options for each listener include:
    behind a [reverse-proxy](../../reverse_proxy.md).
 
 * `request_id_header`: The header extracted from each incoming request that is
-   used as the basis for the request ID. The request ID is used in logs and
-   tracing to correlate and match up requests. When unset, Synapse will
-   automatically generate sequential request IDs. This option is useful when
-   Synapse is behind a [reverse-proxy](../../reverse_proxy.md).
+   used as the basis for the request ID. The request ID is used in
+   [logs](../administration/request_log.md#request-log-format) and tracing to
+   correlate and match up requests. When unset, Synapse will automatically
+   generate sequential request IDs. This option is useful when Synapse is behind
+   a [reverse-proxy](../../reverse_proxy.md).
 
    _Added in Synapse 1.68.0._
 
