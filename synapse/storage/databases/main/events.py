@@ -2184,7 +2184,9 @@ class PersistEventsStore:
         # so let's filter them out. (This makes joining large rooms faster, as
         # these queries took seconds to process all the state events).
         notifiable_events = [
-            event for event, _ in events_and_contexts if event.is_notifiable
+            event
+            for event, _ in events_and_contexts
+            if event.internal_metadata.is_notifiable()
         ]
 
         sql = """

@@ -37,7 +37,7 @@ import attr
 from typing_extensions import Literal
 from unpaddedbase64 import encode_base64
 
-from synapse.api.constants import Membership, RelationTypes
+from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches import intern_dict
@@ -289,6 +289,10 @@ class _EventInternalMetadata:
         """
         return self._dict.get("historical", False)
 
+    def is_notifiable(self) -> bool:
+        """Whether this event can trigger a push notification"""
+        return not self.is_outlier() or self.is_out_of_band_membership()
+
 
 class EventBase(metaclass=abc.ABCMeta):
     @property
@@ -344,13 +348,6 @@ class EventBase(metaclass=abc.ABCMeta):
 
     def is_state(self) -> bool:
         return self.get_state_key() is not None
-
-    @property
-    def is_notifiable(self) -> bool:
-        return (
-            self.membership == Membership.INVITE
-            or not self.internal_metadata.is_outlier()
-        )
 
     def get_state_key(self) -> Optional[str]:
         """Get the state key of this event, or None if it's not a state event"""

@@ -262,7 +262,7 @@ class BulkPushRuleEvaluator:
         should increment the unread count, and insert the results into the
         event_push_actions_staging table.
         """
-        if not event.is_notifiable:
+        if not event.internal_metadata.is_notifiable():
             # Push rules for events that aren't notifiable can't be processed by this
             return
 
