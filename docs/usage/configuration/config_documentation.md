@@ -434,15 +434,15 @@ Sub-options for each listener include:
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-   behind a reverse-proxy.
+   behind a [reverse-proxy](../../reverse_proxy.md).
 
 * `request_id_header`: The header extracted from each incoming request that is
-   used as the basis for the request ID. The request ID used in logs and tracing to
-   correlate and match up requests. When unset, Synapse will generate automatic
-   sequential request IDs. This option is useful when Synapse is behind a
-   reverse-proxy. For example, if you use Cloudflare in front of Synapse, you
-   can set this as `"cf-ray"` to match up requests even when the Cloudflare
-   layer times out before Synapse is done.
+   used as the basis for the request ID. The request ID is used in logs and
+   tracing to correlate and match up requests. When unset, Synapse will
+   automatically generate sequential request IDs. This option is useful when
+   Synapse is behind a [reverse-proxy](../../reverse_proxy.md).
+
+   _Added in Synapse 1.68.0._
 
 * `resources`: Only valid for an 'http' listener. A list of resources to host
    on this port. Sub-options for each resource are:
