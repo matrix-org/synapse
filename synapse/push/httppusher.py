@@ -322,7 +322,7 @@ class HttpPusher(Pusher):
     async def _build_notification_dict(
         self, event: EventBase, tweaks: Dict[str, bool], badge: int
     ) -> Dict[str, Any]:
-        priority = "low"
+        priority = "high"  # Beeper: always use high priority notifications
         if (
             event.type == EventTypes.Encrypted
             or tweaks.get("highlight")
