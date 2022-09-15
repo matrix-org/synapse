@@ -1150,9 +1150,7 @@ class FederationHandler:
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
     ) -> List[EventBase]:
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
 
         # Synapse asks for 100 events per backfill request. Do not allow more.
         limit = min(limit, 100)
@@ -1199,11 +1197,7 @@ class FederationHandler:
         )
 
         if event:
-            in_room = await self._event_auth_handler.check_host_in_room(
-                event.room_id, origin
-            )
-            if not in_room:
-                raise AuthError(403, "Host not in room.")
+            await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
 
             events = await filter_events_for_server(
                 self._storage_controllers, origin, [event]
@@ -1221,9 +1215,7 @@ class FederationHandler:
         latest_events: List[str],
         limit: int,
     ) -> List[EventBase]:
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
 
         # Only allow up to 20 events to be retrieved per request.
         limit = min(limit, 20)
