@@ -121,7 +121,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
 
         external_sharded_cache = self.hs.get_external_sharded_cache()
-        self._get_joined_profiles_from_event_ids.enable_redis_cache(  # type: ignore
+        self._get_user_ids_from_membership_event_ids.enable_redis_cache(  # type: ignore
             external_sharded_cache
         )
 
