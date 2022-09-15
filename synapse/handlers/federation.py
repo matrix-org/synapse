@@ -804,7 +804,7 @@ class FederationHandler:
             )
 
         # now check that we are *still* in the room
-        is_in_room = await self._event_auth_handler.check_host_in_room(
+        is_in_room = await self._event_auth_handler.is_host_in_room(
             room_id, self.server_name
         )
         if not is_in_room:
@@ -1249,7 +1249,7 @@ class FederationHandler:
             "state_key": target_user_id,
         }
 
-        if await self._event_auth_handler.check_host_in_room(room_id, self.hs.hostname):
+        if await self._event_auth_handler.is_host_in_room(room_id, self.hs.hostname):
             room_version_obj = await self.store.get_room_version(room_id)
             builder = self.event_builder_factory.for_room_version(
                 room_version_obj, event_dict

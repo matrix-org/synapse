@@ -156,7 +156,7 @@ class EventAuthHandler:
             Codes.UNABLE_TO_GRANT_JOIN,
         )
 
-    async def check_host_in_room(self, room_id: str, host: str) -> bool:
+    async def is_host_in_room(self, room_id: str, host: str) -> bool:
         with Measure(self._clock, "check_host_in_room"):
             return await self._store.is_host_joined(room_id, host)
 
@@ -178,7 +178,7 @@ class EventAuthHandler:
                 errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
             )
 
-        if not await self.check_host_in_room(room_id, host):
+        if not await self.is_host_in_room(room_id, host):
             raise AuthError(403, "Host not in room.")
 
     async def check_restricted_join_rules(
