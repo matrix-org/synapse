@@ -80,6 +80,11 @@ server {
         # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
         client_max_body_size 50M;
     }
+    location /.well-known/matrix/client {
+        return 200 '{"m.homeserver": {"base_url": "https://<matrix.example.com>"}}';
+        default_type application/json;
+        add_header Access-Control-Allow-Origin *;
+    }
 }
 ```
 
@@ -119,6 +124,13 @@ matrix.example.com {
     SSLEngine on
     ServerName matrix.example.com
 
+    # for .well-known/matrix/client
+    DocumentRoot /var/www/html/
+    <Location /.well-known/matrix/client>
+        ForceType application/json
+        Header set Access-Control-Allow-Origin "*"
+    </Location>
+
     RequestHeader set "X-Forwarded-Proto" expr=%{REQUEST_SCHEME}
     AllowEncodedSlashes NoDecode
     ProxyPreserveHost on
@@ -137,6 +149,18 @@ matrix.example.com {
     ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
     ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
 </VirtualHost>
+```
+
+Create the file `/var/www/html/.well-known/matrix/client` with the following content:
+```json
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  },
+  "m.identity_server": {
+    "base_url": "https://<identity.example.com>"
+  }
+}
 ```
 
 **NOTE**: ensure the  `nocanon` options are included.

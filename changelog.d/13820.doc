@@ -1,0 +1,1 @@
+Add missing .well-known paths to Apache and nginx sample config. Contributed by Intevation GmbH.
