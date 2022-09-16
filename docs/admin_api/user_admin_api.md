@@ -1164,7 +1164,7 @@ The API is:
 GET /_synapse/admin/v1/auth_providers/$provider/users/$external_id
 ```
 
-A response body like the following is returned:
+When a user matched the given ID for the given provider, an HTTP code `200` with a response body like the following is returned:
 
 ```json
 {
@@ -1179,3 +1179,15 @@ The following parameters should be set in the URL:
 - `provider` - The ID of the authentication provider, as advertised by the [`GET /_matrix/client/v3/login`](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login) API in the `m.login.sso` authentication method.
 - `external_id` - The user ID from the authentication provider. Usually corresponds to the `sub` claim for OIDC providers, or to the `uid` attestation for SAML2 providers.
 
+The `external_id` may have characters that are not URL-safe (typically `/`, `:` or `@`), so it is advised to URL-encode those parameters.
+
+**Errors**
+
+Returns a `404` HTTP status code if no user was found, with a response body like this:
+
+```json
+{
+    "errcode":"M_NOT_FOUND",
+    "error":"User not found"
+}
+```
