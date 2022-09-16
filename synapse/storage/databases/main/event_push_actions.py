@@ -476,7 +476,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     notify_count=notif_count, unread_count=unread_count
                 )
 
-            # XXX All threads should have the same stream ordering?
+            # Summaries will only be used if they have not been invalidated by
+            # a recent receipt; track the latest stream ordering or a valid summary.
+            #
+            # Note that since there's only one read receipt in the room per user,
+            # valid summaries are contiguous.
             max_summary_stream_ordering = max(
                 summary_stream_ordering, max_summary_stream_ordering
             )
