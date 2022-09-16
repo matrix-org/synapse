@@ -1,14 +1,30 @@
+import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, Union, cast
 
 from synapse.util.caches.lrucache import KT, VT, AsyncLruCache, T
 
 if TYPE_CHECKING:
+    from synapse.util.caches.descriptors import _CachedFunction
     from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
+
+logger = logging.getLogger(__name__)
+
+sentinel = object()
+
+
+def _redis_key(key: KT) -> str:
+    if isinstance(key, tuple):
+        if len(key) == 1:
+            return key[0]
+        return "".join(map(str, key))
+    return f"{key}"
 
 
 def redisCachedList(
-    redis_shard_cache: "ExternalShardedCache", cache_name: str, list_name: str
+    redis_shard_cache: "ExternalShardedCache",
+    cache_name: str,
+    list_name: str,
 ) -> Callable:
     def decorator(f: Callable) -> Callable:
         @wraps(f)
@@ -25,14 +41,39 @@ def redisCachedList(
             return values
 
         return _wrapped
-
     return decorator
 
 
-def _redis_key(key: KT) -> str:
-    if isinstance(key, tuple):
-        return key[0]
-    return f"{key}"
+def redisCached(
+    redis_shard_cache: "ExternalShardedCache",
+    get_cache_key: Callable,
+    cache_name: str,
+) -> Callable:
+    def decorator(f: Callable) -> "_CachedFunction":
+        @wraps(f)
+        async def _wrapped(self, *args: Any, **kwargs: Any) -> Any:
+            cache_key = _redis_key(get_cache_key(args, kwargs))
+            value = await redis_shard_cache.get(
+                cache_name,
+                cache_key,
+                default=sentinel,
+            )
+
+            if value is sentinel:
+                value = await f(self, *args, **kwargs)
+                await redis_shard_cache.set(cache_name, cache_key, value)
+            return value
+
+        async def _invalidate(key: KT) -> None:
+            return await redis_shard_cache.delete(
+                cache_name,
+                _redis_key(key),
+            )
+
+        wrapped = cast("_CachedFunction", _wrapped)
+        wrapped.invalidate = _invalidate
+        return wrapped
+    return decorator
 
 
 class RedisLruCache(AsyncLruCache, Generic[KT, VT]):

@@ -46,7 +46,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.caches.deferred_cache import DeferredCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.redis_caches import redisCachedList
+from synapse.util.caches.redis_caches import redisCached, redisCachedList
 
 if TYPE_CHECKING:
     from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
@@ -61,10 +61,12 @@ F = TypeVar("F", bound=Callable[..., Any])
 class _CachedFunction(Generic[F]):
     invalidate: Any = None
     invalidate_all: Any = None
+    invalidate_external: Any = None
     prefill: Any = None
     cache: Any = None
     num_args: Any = None
     tree: bool = False
+    redis_enabled: bool = False
 
     __name__: str
 
@@ -359,7 +361,12 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
                         cache, cache_key
                     )
 
-                ret = defer.maybeDeferred(preserve_fn(self.orig), obj, *args, **kwargs)
+                try:
+                    orig = self.redis_cached_orig
+                except AttributeError:
+                    orig = self.orig
+
+                ret = defer.maybeDeferred(preserve_fn(orig), obj, *args, **kwargs)
                 ret = cache.set(cache_key, ret, callback=invalidate_callback)
 
                 # We started a new call to `self.orig`, so we must always wait for it to
@@ -384,6 +391,25 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         wrapped.num_args = self.num_args
         wrapped.tree = self.tree
 
+        def enable_redis_cache(external_sharded_cache: "ExternalShardedCache") -> None:
+            # Tree caches cannot be backed by Redis
+            assert not self.tree
+            # Cache context is not supported yet
+            assert not self.add_cache_context
+
+            if getattr(self.orig, "redis_enabled", False):
+                return
+
+            self.redis_cached_orig = redisCached(
+                external_sharded_cache,
+                get_cache_key,
+                self.name,
+            )(self.orig)
+
+            wrapped.invalidate_external = self.redis_cached_orig.invalidate
+            wrapped.redis_enabled = True
+
+        wrapped.enable_redis_cache = enable_redis_cache  # type: ignore
         obj.__dict__[self.name] = wrapped
 
         return wrapped
@@ -532,6 +558,11 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 return defer.succeed(results)
 
         def enable_redis_cache(external_sharded_cache: "ExternalShardedCache") -> None:
+            # Tree caches cannot be backed by Redis
+            assert not cached_method.tree
+            # Cache context is not supported yet
+            assert not self.add_cache_context
+
             if getattr(cached_method, "redis_enabled", False):
                 return
 
@@ -540,11 +571,6 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 self.cached_method_name,
                 self.list_name,
             )(self.orig)
-
-            # Tree caches cannot be backed by Redis
-            assert not cached_method.tree
-            # Cache context is not supported yet
-            assert not self.add_cache_context
 
             # Cache invalidations are not allowed with Redis backed caches (currently)
             def block_invalidate() -> None:
