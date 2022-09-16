@@ -37,8 +37,6 @@ class RedisConfig(Config):
 
         cache_shard_config = redis_config.get("cache_shards", {})
         self.cache_shard_hosts = cache_shard_config.get("hosts", [])
-        self.cache_shard_expire = cache_shard_config.get("expire_caches", False)
-        self.cache_shard_ttl = cache_shard_config.get("cache_entry_ttl", False)
 
     def generate_config_section(self, **kwargs: Any) -> str:
         return """\
