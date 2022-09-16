@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncio
 import gc
 import hashlib
 import hmac
@@ -80,7 +79,7 @@ from tests.server import (
     make_request,
     setup_test_homeserver,
 )
-from tests.test_utils import event_injection, setup_awaitable_errors
+from tests.test_utils import event_injection, make_awaitable, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -318,13 +317,10 @@ class HomeserverTestCase(TestCase):
                     access_token_id=token_id,
                 )
 
-                requester_future = asyncio.Future()
-                requester_future.set_result(requester)
-
                 patch.object(
                     self.hs.get_auth(),
                     "get_user_by_req",
-                    return_value=requester_future,
+                    return_value=make_awaitable(requester),
                     autospec=True,
                     new_callable=MagicMock,
                 )
@@ -332,7 +328,7 @@ class HomeserverTestCase(TestCase):
                 patch.object(
                     self.hs.get_auth(),
                     "get_user_by_access_token",
-                    return_value=requester_future,
+                    return_value=make_awaitable(requester),
                     autospec=True,
                     new_callable=MagicMock,
                 )
