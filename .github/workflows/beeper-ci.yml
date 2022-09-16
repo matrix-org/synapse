@@ -68,6 +68,26 @@ jobs:
             /logs/results.tap
             /logs/**/*.log*
 
+  test-complement:
+    needs: [lint-style, lint-types]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install complement dependencies
+        run: |-
+          sudo apt-get -qq update
+          sudo apt-get install -qqy libolm3 libolm-dev
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: git@github.com:beeper/complement.git
+          path: complement
+      - name: Run Complement
+        run: ./scripts-dev/complement.sh
+        env:
+          COMPLEMENT_DIR: complement
+          POSTGRES: 1
+          WORKERS: 1
+
   # Builds
   # Note: not dependent on tests because they are slow
 
