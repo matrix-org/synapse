@@ -1,0 +1,1 @@
+Fix a long-standing bug where previously rejected events could end up in room state because they pass auth checks given the current state of the room.
