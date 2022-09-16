@@ -1333,7 +1333,14 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
     async def _remove_old_push_actions_that_have_rotated(self) -> None:
-        """Clear out old push actions that have been summarised."""
+        """
+        Performs two clean-ups:
+
+        1. Clear out old push actions that have been summarised (and are older
+           than 1 day ago).
+        2. Clear out old push summaries that are empty (and are older than 30
+           days ago).
+        """
 
         # We want to clear out anything that is older than a day that *has* already
         # been rotated.
@@ -1343,7 +1350,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             retcol="stream_ordering",
         )
 
-        max_stream_ordering_to_delete = min(
+        max_action_stream_ordering_to_delete = min(
             rotated_upto_stream_ordering, self.stream_ordering_day_ago
         )
 
@@ -1361,7 +1368,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
                 """,
                 (
-                    max_stream_ordering_to_delete,
+                    max_action_stream_ordering_to_delete,
                     batch_size,
                 ),
             )
@@ -1370,7 +1377,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             if stream_row:
                 (stream_ordering,) = stream_row
             else:
-                stream_ordering = max_stream_ordering_to_delete
+                stream_ordering = max_action_stream_ordering_to_delete
 
             # We need to use a inclusive bound here to handle the case where a
             # single stream ordering has more than `batch_size` rows.
@@ -1386,10 +1393,59 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             return txn.rowcount < batch_size
 
+        max_summary_stream_ordering_to_delete = self.stream_ordering_month_ago
+
+        def remove_old_read_push_summaries_txn(txn: LoggingTransaction) -> bool:
+            # We don't want to clear out too much at a time, so we bound our
+            # deletes.
+            batch_size = self._rotate_count
+
+            txn.execute(
+                """
+                SELECT stream_ordering FROM event_push_summary
+                WHERE stream_ordering <= ? AND notif_count = 0 AND COALESCE(unread_count, 0) = 0
+                ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
+                """,
+                (
+                    max_summary_stream_ordering_to_delete,
+                    batch_size,
+                ),
+            )
+            stream_row = txn.fetchone()
+
+            if stream_row:
+                (stream_ordering,) = stream_row
+            else:
+                stream_ordering = max_summary_stream_ordering_to_delete
+
+            # We need to use a inclusive bound here to handle the case where a
+            # single stream ordering has more than `batch_size` rows.
+            txn.execute(
+                """
+                DELETE FROM event_push_summary
+                WHERE stream_ordering <= ? AND notif_count = 0 AND COALESCE(unread_count, 0) = 0
+                """,
+                (stream_ordering,),
+            )
+
+            logger.info(
+                "Rotating notifications, deleted %s push summaries", txn.rowcount
+            )
+
+            return txn.rowcount < batch_size
+
         while True:
             done = await self.db_pool.runInteraction(
                 "_remove_old_push_actions_that_have_rotated",
                 remove_old_push_actions_that_have_rotated_txn,
+            )
+            if done:
+                break
+
+        while True:
+            done = await self.db_pool.runInteraction(
+                "_remove_old_read_push_summaries_txn",
+                remove_old_read_push_summaries_txn,
             )
             if done:
                 break
