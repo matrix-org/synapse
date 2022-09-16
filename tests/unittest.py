@@ -35,7 +35,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import canonicaljson
 import signedjson.key
@@ -68,7 +68,7 @@ from synapse.logging.context import (
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
-from synapse.types import JsonDict, Requester, UserID, create_requester
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 
@@ -312,27 +312,30 @@ class HomeserverTestCase(TestCase):
                     )
                 )
 
-                async def get_user_by_access_token(
-                    token: str, allow_guest: bool = False
-                ) -> Requester:
-                    assert self.helper.auth_user_id is not None
-                    return create_requester(
-                        user_id=UserID.from_string(self.helper.auth_user_id),
-                        access_token_id=token_id,
-                    )
+                requester = create_requester(
+                    user_id=UserID.from_string(self.helper.auth_user_id),
+                    access_token_id=token_id,
+                )
 
-                async def get_user_by_req(
-                    request: SynapseRequest,
-                    allow_guest: bool = False,
-                    allow_expired: bool = False,
-                ) -> Requester:
-                    return await get_user_by_access_token(token)
+                patch.object(
+                    self.hs.get_auth(),
+                    "get_user_by_req",
+                    return_value=requester,
+                    autospec=True,
+                )
 
-                # Type ignore: mypy doesn't like us assigning to methods.
-                self.hs.get_auth().get_user_by_req = get_user_by_req  # type: ignore[assignment]
-                self.hs.get_auth().get_user_by_access_token = get_user_by_access_token  # type: ignore[assignment]
-                self.hs.get_auth().get_access_token_from_request = Mock(  # type: ignore[assignment]
-                    return_value=token
+                patch.object(
+                    self.hs.get_auth(),
+                    "get_user_by_access_token",
+                    return_value=requester,
+                    autospec=True,
+                )
+
+                patch.object(
+                    self.hs.get_auth(),
+                    "get_access_token_from_request",
+                    return_value=token,
+                    autospec=True,
                 )
 
         if self.needs_threadpool:
