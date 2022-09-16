@@ -13,4 +13,8 @@
  * limitations under the License.
  */
 
+-- Add a device_id column to track the device ID that created the pusher. It's NULLable
+-- on purpose, because a) it might not be possible to track down the device that created
+-- old pushers (pushers.access_token and access_tokens.device_id are both NULLable), and
+-- b) access tokens retrieved via the admin API don't have a device associated to them.
 ALTER TABLE pushers ADD COLUMN device_id TEXT;
