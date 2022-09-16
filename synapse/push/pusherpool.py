@@ -152,6 +152,16 @@ class PusherPool:
             )
         )
 
+        # Before we actually create the pusher, we check if the user already has one for
+        # this app ID and pushkey. If so, we want to keep the access token in place,
+        # since this could be one device modifying (e.g. enabling/disabling) another
+        # device's pusher.
+        existing_config = await self._get_pusher_config_for_user_by_app_id_and_pushkey(
+            user_id, app_id, pushkey
+        )
+        if existing_config:
+            access_token = existing_config.access_token
+
         await self.store.add_pusher(
             user_id=user_id,
             access_token=access_token,
@@ -279,6 +289,18 @@ class PusherPool:
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 
+    async def _get_pusher_config_for_user_by_app_id_and_pushkey(
+        self, user_id: str, app_id: str, pushkey: str
+    ) -> Optional[PusherConfig]:
+        resultlist = await self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
+
+        pusher_config = None
+        for r in resultlist:
+            if r.user_name == user_id:
+                pusher_config = r
+
+        return pusher_config
+
     async def process_pusher_change_by_id(
         self, app_id: str, pushkey: str, user_id: str
     ) -> Optional[Pusher]:
@@ -296,12 +318,9 @@ class PusherPool:
         if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
             return None
 
-        resultlist = await self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
-
-        pusher_config = None
-        for r in resultlist:
-            if r.user_name == user_id:
-                pusher_config = r
+        pusher_config = await self._get_pusher_config_for_user_by_app_id_and_pushkey(
+            user_id, app_id, pushkey
+        )
 
         if pusher_config and not pusher_config.enabled:
             self.maybe_stop_pusher(app_id, pushkey, user_id)
