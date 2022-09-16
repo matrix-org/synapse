@@ -56,7 +56,7 @@ class PushersRestServlet(RestServlet):
 
         for pusher in filtered_pushers:
             if self._msc3881_enabled:
-                pusher["org.matrix.msc3881.enabled"] = bool(pusher["enabled"])
+                pusher["org.matrix.msc3881.enabled"] = pusher["enabled"]
             del pusher["enabled"]
 
         return 200, {"pushers": filtered_pushers}

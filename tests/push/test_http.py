@@ -836,7 +836,10 @@ class HTTPPusherTests(HomeserverTestCase):
         channel = self.make_request("GET", "/pushers", access_token=access_token)
         self.assertEqual(channel.code, 200)
         self.assertEqual(len(channel.json_body["pushers"]), 1)
-        self.assertFalse(channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"])
+
+        enabled = channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"]
+        self.assertFalse(enabled)
+        self.assertTrue(isinstance(enabled, bool))
 
     @override_config({"experimental_features": {"msc3881_enabled": True}})
     def test_enable(self) -> None:
@@ -860,6 +863,23 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.push_attempts), 1)
 
         # Get the pushers for the user and check that it is marked as enabled.
+        channel = self.make_request("GET", "/pushers", access_token=access_token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["pushers"]), 1)
+
+        enabled = channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"]
+        self.assertTrue(enabled)
+        self.assertTrue(isinstance(enabled, bool))
+
+    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    def test_null_enabled(self) -> None:
+        """Tests that a pusher that has an 'enabled' column set to NULL (eg pushers
+        created before the column was introduced) is considered enabled.
+        """
+        # We intentionally set 'enabled' to None so that it's stored as NULL in the
+        # database.
+        user_id, access_token = self._make_user_with_pusher("user", enabled=None)  # type: ignore[arg-type]
+
         channel = self.make_request("GET", "/pushers", access_token=access_token)
         self.assertEqual(channel.code, 200)
         self.assertEqual(len(channel.json_body["pushers"]), 1)

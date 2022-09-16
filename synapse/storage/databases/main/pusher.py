@@ -89,6 +89,19 @@ class PusherWorkerStore(SQLBaseStore):
                 )
                 continue
 
+            # Pushers created while support for the 'enabled' field is not active
+            # (either because they were created before said support existed or because
+            # they were created while the experimental implementation is turned off)
+            # will have the 'enabled' column set to NULL, which needs to be interpreted
+            # as True.
+            if r["enabled"] is None:
+                r["enabled"] = True
+
+            # If we're using SQLite, then boolean values are integers. This is
+            # troublesome since some code using the return value of this method might
+            # expect it to be a boolean, or will expose it to clients (in responses).
+            r["enabled"] = bool(r["enabled"])
+
             yield PusherConfig(**r)
 
     async def get_pushers_by_app_id_and_pushkey(
