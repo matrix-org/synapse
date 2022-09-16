@@ -1191,3 +1191,5 @@ Returns a `404` HTTP status code if no user was found, with a response body like
     "error":"User not found"
 }
 ```
+
+_Added in Synapse 1.68.0._
