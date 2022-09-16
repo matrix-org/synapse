@@ -1,4 +1,4 @@
-# Copyright 2020 Quentin Gliech
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,12 +15,8 @@
 import logging
 from typing import TYPE_CHECKING
 
-from twisted.web.resource import Resource
-
-from synapse.rest.synapse.client.oidc.backchannel_logout_resource import (
-    OIDCBackchannelLogoutResource,
-)
-from synapse.rest.synapse.client.oidc.callback_resource import OIDCCallbackResource
+from synapse.http.server import DirectServeJsonResource
+from synapse.http.site import SynapseRequest
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -28,11 +24,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class OIDCResource(Resource):
+class OIDCBackchannelLogoutResource(DirectServeJsonResource):
+    isLeaf = 1
+
     def __init__(self, hs: "HomeServer"):
-        Resource.__init__(self)
-        self.putChild(b"callback", OIDCCallbackResource(hs))
-        self.putChild(b"backchannel_logout", OIDCBackchannelLogoutResource(hs))
+        super().__init__()
+        self._oidc_handler = hs.get_oidc_handler()
 
-
-__all__ = ["OIDCResource"]
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
+        await self._oidc_handler.handle_backchannel_logout(request)
