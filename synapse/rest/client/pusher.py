@@ -52,14 +52,14 @@ class PushersRestServlet(RestServlet):
             user.to_string()
         )
 
-        filtered_pushers = [p.as_dict() for p in pushers]
+        pusher_dicts = [p.as_dict() for p in pushers]
 
-        for pusher in filtered_pushers:
+        for pusher in pusher_dicts:
             if self._msc3881_enabled:
                 pusher["org.matrix.msc3881.enabled"] = pusher["enabled"]
             del pusher["enabled"]
 
-        return 200, {"pushers": filtered_pushers}
+        return 200, {"pushers": pusher_dicts}
 
 
 class PushersSetRestServlet(RestServlet):
