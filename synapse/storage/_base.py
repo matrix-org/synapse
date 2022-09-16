@@ -163,6 +163,10 @@ class SQLBaseStore(metaclass=ABCMeta):
     async def _invalidate_external_state_caches(
         self, room_id: str, members_changed: Collection[str]
     ) -> None:
+        external_cache = self.hs.get_external_sharded_cache()
+        if not external_cache.is_enabled():
+            return
+
         if members_changed:
             await self._attempt_to_invalidate_external_cache(
                 "get_users_in_room", (room_id,)
