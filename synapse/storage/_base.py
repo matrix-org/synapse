@@ -46,6 +46,8 @@ class SQLBaseStore(metaclass=ABCMeta):
         self._clock = hs.get_clock()
         self.database_engine = database.engine
         self.db_pool = database
+        # Beeper: setup the external caches
+        self._enable_external_caches()
 
     def process_replication_rows(
         self,
@@ -124,6 +126,58 @@ class SQLBaseStore(metaclass=ABCMeta):
             # cache must be be done before this.
             invalidate_method = getattr(cache, "invalidate_local", cache.invalidate)
             invalidate_method(tuple(key))
+
+    # Beeper: externalised caches in Redis
+    # It is *critical* that all cache invalidations happe here, something we'll have to keep
+    # an eye on when merging upstream changes (until we upstream it!).
+
+    # Currently we're only doing a subset of the state caches, aiming for the ones that cause
+    # most pain and avoiding tree caches (not so easily supported in Redis). This list
+    # should be a subset of the non-async invalidation method above.
+
+    def _enable_external_caches(self):
+        external_cache = self.hs.get_external_sharded_cache()
+        if external_cache.is_enabled():
+            self._attempt_to_enable_redis_cache("_get_user_ids_from_membership_event_ids")
+            self._attempt_to_enable_redis_cache("get_users_in_room")
+            self._attempt_to_enable_redis_cache("get_current_hosts_in_room")
+            self._attempt_to_enable_redis_cache("get_local_users_in_room")
+            self._attempt_to_enable_redis_cache("get_rooms_for_user_with_stream_ordering")
+
+    def _attempt_to_enable_redis_cache(self, cache_name: str):
+        external_cache = self.hs.get_external_sharded_cache()
+        if not external_cache.is_enabled():
+            return
+
+        try:
+            cache_method = getattr(self, cache_name)
+        except AttributeError:
+            return
+
+        cache_method.enable_redis_cache(external_cache)
+
+    async def _invalidate_external_state_caches(
+        self, room_id: str, members_changed: Collection[str]
+    ) -> None:
+        if members_changed:
+            await self._attempt_to_invalidate_external_cache("get_users_in_room", (room_id,))
+            await self._attempt_to_invalidate_external_cache("get_current_hosts_in_room", (room_id,))
+            await self._attempt_to_invalidate_external_cache("get_local_users_in_room", (room_id,))
+
+        for user_id in members_changed:
+            await self._attempt_to_invalidate_external_cache(
+                "get_rooms_for_user_with_stream_ordering", (user_id,)
+            )
+
+    async def _attempt_to_invalidate_external_cache(
+        self, cache_name: str, key: Collection[Any],
+    ) -> None:
+        try:
+            cache = getattr(self, cache_name)
+        except AttributeError:
+            return
+
+        await cache.invalidate_external(tuple(key))
 
 
 def db_to_json(db_content: Union[memoryview, bytes, bytearray, str]) -> Any:

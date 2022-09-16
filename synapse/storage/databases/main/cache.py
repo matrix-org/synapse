@@ -316,6 +316,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             members_changed: The user_ids of members that have changed
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
+        txn.async_call_after(self._invalidate_external_state_caches, room_id, members_changed)
 
         if members_changed:
             # We need to be careful that the size of the `members_changed` list
