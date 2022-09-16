@@ -1198,13 +1198,6 @@ class PersistEventsStore:
             )
 
             # Invalidate the various caches
-
-            for member in members_changed:
-                txn.call_after(
-                    self.store.get_rooms_for_user_with_stream_ordering.invalidate,
-                    (member,),
-                )
-
             self.store._invalidate_state_caches_and_stream(
                 txn, room_id, members_changed
             )
