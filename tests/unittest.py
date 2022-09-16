@@ -35,7 +35,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import canonicaljson
 import signedjson.key
@@ -322,6 +322,7 @@ class HomeserverTestCase(TestCase):
                     "get_user_by_req",
                     return_value=requester,
                     autospec=True,
+                    new_callable=AsyncMock,
                 )
 
                 patch.object(
@@ -329,6 +330,7 @@ class HomeserverTestCase(TestCase):
                     "get_user_by_access_token",
                     return_value=requester,
                     autospec=True,
+                    new_callable=AsyncMock,
                 )
 
                 patch.object(
