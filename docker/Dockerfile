@@ -31,6 +31,8 @@ ARG PYTHON_VERSION=3.9
 ###
 ### Stage 0: generate requirements.txt
 ###
+# We hardcode the use of Debian bullseye here because this could change upstream
+# and other Dockerfiles used for testing are expecting bullseye.
 FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye as requirements
 
 # RUN --mount is specific to buildkit and is documented at
