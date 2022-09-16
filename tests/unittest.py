@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import gc
 import hashlib
 import hmac
@@ -35,7 +36,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import canonicaljson
 import signedjson.key
@@ -317,20 +318,23 @@ class HomeserverTestCase(TestCase):
                     access_token_id=token_id,
                 )
 
+                requester_future = asyncio.Future()
+                requester_future.set_result(requester)
+
                 patch.object(
                     self.hs.get_auth(),
                     "get_user_by_req",
-                    return_value=requester,
+                    return_value=requester_future,
                     autospec=True,
-                    new_callable=AsyncMock,
+                    new_callable=MagicMock,
                 )
 
                 patch.object(
                     self.hs.get_auth(),
                     "get_user_by_access_token",
-                    return_value=requester,
+                    return_value=requester_future,
                     autospec=True,
-                    new_callable=AsyncMock,
+                    new_callable=MagicMock,
                 )
 
                 patch.object(
