@@ -32,9 +32,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - run: pip install .
-      - run: scripts-dev/generate_sample_config.sh --check
-      - run: scripts-dev/config-lint.sh
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          extras: "all"
+      - run: poetry run scripts-dev/generate_sample_config.sh --check
+      - run: poetry run scripts-dev/config-lint.sh
 
   check-schema-delta:
     runs-on: ubuntu-latest
@@ -76,7 +78,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
       - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "all"
