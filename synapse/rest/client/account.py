@@ -534,6 +534,11 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         "/add_threepid/msisdn/submit_token$", releases=(), unstable=True
     )
 
+    class PostBody(RequestBodyModel):
+        client_secret: ClientSecretStr
+        sid: StrictStr
+        token: StrictStr
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.config = hs.config
@@ -549,16 +554,14 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
                 "instead.",
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["client_secret", "sid", "token"])
-        assert_valid_client_secret(body["client_secret"])
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # Proxy submit_token request to msisdn threepid delegate
         response = await self.identity_handler.proxy_msisdn_submit_token(
             self.config.registration.account_threepid_delegate_msisdn,
-            body["client_secret"],
-            body["sid"],
-            body["token"],
+            body.client_secret,
+            body.sid,
+            body.token,
         )
         return 200, response
 
