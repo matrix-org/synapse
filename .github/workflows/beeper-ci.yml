@@ -7,22 +7,30 @@ on:
 
 
 jobs:
-  lint:
+  lint-style:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - run: pip install poetry
-      - run: poetry install --extras all
+      - run: poetry install
       - run: poetry run isort --check synapse
       - run: poetry run black --check synapse
+
+  lint-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install poetry
+      - run: poetry install
       - run: poetry run mypy
 
   # Tests
 
   test-trial:
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [lint-style, lint-types]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -31,7 +39,7 @@ jobs:
       - run: poetry run trial -j4 tests
 
   test-sytest:
-    needs: lint
+    needs: [lint-style, lint-types]
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:buster
