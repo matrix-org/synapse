@@ -1,0 +1,1 @@
+typing: check origin server of typing event against servers currently in the room. We also use a method that do not block on partial state so the transaction doesn't get stuck during a fast join.
