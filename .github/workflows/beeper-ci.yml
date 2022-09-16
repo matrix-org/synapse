@@ -40,7 +40,9 @@ jobs:
       env:
         SYTEST_BRANCH: ${{ github.head_ref }}
         TOP: ${{ github.workspace }}
-
+        POSTGRES: 1
+        MULTI_POSTGRES: 1
+        WOKRERS: 1
     steps:
       - uses: actions/checkout@v2
       - name: Run SyTest
