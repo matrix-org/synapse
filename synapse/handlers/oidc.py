@@ -16,7 +16,17 @@ import binascii
 import inspect
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
 from urllib.parse import urlencode, urlparse
 
 import attr
@@ -94,6 +104,8 @@ class Token(TypedDict):
 #: A JWK, as per RFC7517 sec 4. The type could be more precise than that, but
 #: there is no real point of doing this in our case.
 JWK = Dict[str, str]
+
+C = TypeVar("C")
 
 
 #: A JWK Set, as per RFC7517 sec 5.
@@ -258,7 +270,7 @@ class OidcHandler:
         """Handle an incoming request to /_synapse/client/oidc/backchannel_logout
 
         This extracts the logout_token from the request and tries to figure out
-        which account it is associated with. This works by matching the iss claim
+        which OpenID Provider it is comming from. This works by matching the iss claim
         with the issuer and the aud claim with the client_id.
 
         Since at this point we don't know who signed the JWT, we can't just
@@ -268,7 +280,6 @@ class OidcHandler:
         Args:
             request: the incoming request from the browser.
         """
-        logger.warn("OHAI")
         logout_token = parse_string(request, "logout_token")
         if logout_token is None:
             raise SynapseError(400, "Missing logout_token in request")
@@ -495,6 +506,22 @@ class OidcProvider:
                     "OIDC Back-Channel Logout is enabled and supported "
                     "by issuer %r but it might not send session ID with "
                     "logout tokens, which is required for the logouts to work",
+                    self.issuer,
+                )
+
+            # If OIDC backchannel logouts are enabled, the provider mapping provider
+            # should use the `sub` claim. We verify that by mapping a dumb user and see
+            # if we get back the sub claim
+            user = UserInfo({"sub": "thisisasubject"})
+            try:
+                subject = self._user_mapping_provider.get_remote_user_id(user)
+                if subject != user["sub"]:
+                    raise Exception()
+            except Exception:
+                logger.warning(
+                    "OIDC Back-Channel Logout is enabled for issuer %r but it looks "
+                    "like the configured `user_mapping_provider` does not use the "
+                    "`sub` claim as subject, which may be resuired for logouts to work",
                     self.issuer,
                 )
 
@@ -770,6 +797,59 @@ class OidcProvider:
 
         return UserInfo(resp)
 
+    async def _verify_jwt(
+        self,
+        alg_values: List[str],
+        token: str,
+        claims_cls: Type[C],
+        claims_options: Optional[dict] = None,
+        claims_params: Optional[dict] = None,
+    ) -> C:
+        """Decode and validate a JWT, re-fetching the JWKS as needed.
+
+        Args:
+            alg_values: list of `alg` values allowed when verifying the JWT.
+            token: the JWT.
+            claims_cls: the JWTClaims class to use to validate the claims.
+            claims_options: dict of options passed to the `claims_cls` constructor.
+            claims_params: dict of params passed to the `claims_cls` constructor.
+
+        Returns:
+            The decoded claims in the JWT.
+        """
+        jwt = JsonWebToken(alg_values)
+
+        logger.debug("Attempting to decode JWT (%s) %r", claims_cls.__name__, token)
+
+        # Try to decode the keys in cache first, then retry by forcing the keys
+        # to be reloaded
+        jwk_set = await self.load_jwks()
+        try:
+            claims = jwt.decode(
+                token,
+                key=jwk_set,
+                claims_cls=claims_cls,
+                claims_options=claims_options,
+                claims_params=claims_params,
+            )
+        except ValueError:
+            logger.info("Reloading JWKS after decode error")
+            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
+            claims = jwt.decode(
+                token,
+                key=jwk_set,
+                claims_cls=claims_cls,
+                claims_options=claims_options,
+                claims_params=claims_params,
+            )
+
+        logger.debug("Decoded JWT (%s) %r; validating", claims_cls.__name__, claims)
+
+        claims.validate(
+            now=self._clock.time(), leeway=120
+        )  # allows 2 min of clock skew
+        return claims
+
     async def _parse_id_token(self, token: Token, nonce: str) -> CodeIDToken:
         """Return an instance of UserInfo from token's ``id_token``.
 
@@ -783,13 +863,13 @@ class OidcProvider:
             The decoded claims in the ID token.
         """
         id_token = token.get("id_token")
-        logger.debug("Attempting to decode JWT id_token %r", id_token)
 
         # That has been theoritically been checked by the caller, so even though
         # assertion are not enabled in production, it is mainly here to appease mypy
         assert id_token is not None
 
         metadata = await self.load_metadata()
+
         claims_params = {
             "nonce": nonce,
             "client_id": self._client_auth.client_id,
@@ -799,38 +879,17 @@ class OidcProvider:
             # in the `id_token` that we can check against.
             claims_params["access_token"] = token["access_token"]
 
+        claims_options = {"iss": {"values": [metadata["issuer"]]}}
+
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
-        jwt = JsonWebToken(alg_values)
 
-        claim_options = {"iss": {"values": [metadata["issuer"]]}}
-
-        # Try to decode the keys in cache first, then retry by forcing the keys
-        # to be reloaded
-        jwk_set = await self.load_jwks()
-        try:
-            claims = jwt.decode(
-                id_token,
-                key=jwk_set,
-                claims_cls=CodeIDToken,
-                claims_options=claim_options,
-                claims_params=claims_params,
-            )
-        except ValueError:
-            logger.info("Reloading JWKS after decode error")
-            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
-            claims = jwt.decode(
-                id_token,
-                key=jwk_set,
-                claims_cls=CodeIDToken,
-                claims_options=claim_options,
-                claims_params=claims_params,
-            )
-
-        logger.debug("Decoded id_token JWT %r; validating", claims)
-
-        claims.validate(
-            now=self._clock.time(), leeway=120
-        )  # allows 2 min of clock skew
+        claims = await self._verify_jwt(
+            alg_values=alg_values,
+            token=id_token,
+            claims_cls=CodeIDToken,
+            claims_options=claims_options,
+            claims_params=claims_params,
+        )
 
         return claims
 
@@ -1187,42 +1246,23 @@ class OidcProvider:
         #   iss (issuer) claim in the JWT Header Parameters, as specified in
         #   Section 5.3 of [JWT].
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
-        jwt = JsonWebToken(alg_values)
 
         # As per sec. 2.6:
         #    3. Validate the iss, aud, and iat Claims in the same way they are
         #       validated in ID Tokens.
         # Which means the audience should contain Synapse's client_id and the
         # issuer should be the IdP issuer
-        claim_options = {
+        claims_options = {
             "iss": {"values": [self.issuer]},
             "aud": {"values": [self.client_id]},
         }
 
-        logger.debug("Attempting to decode JWT logout_token %r", logout_token)
-
-        # Try to decode the keys in cache first, then retry by forcing the keys
-        # to be reloaded
-        jwk_set = await self.load_jwks()
-        try:
-            claims = jwt.decode(
-                logout_token,
-                key=jwk_set,
-                claims_cls=LogoutToken,
-                claims_options=claim_options,
-            )
-        except ValueError:
-            logger.info("Reloading JWKS after decode error")
-            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
-            claims = jwt.decode(
-                logout_token,
-                key=jwk_set,
-                claims_cls=LogoutToken,
-                claims_options=claim_options,
-            )
-
-        logger.debug("Decoded logout_token JWT %r; validating", claims)
-        claims.validate(leeway=120)  # allows 2 min of clock skew
+        claims = await self._verify_jwt(
+            alg_values=alg_values,
+            token=logout_token,
+            claims_cls=LogoutToken,
+            claims_options=claims_options,
+        )
 
         # As per sec. 2.6:
         #    4. Verify that the Logout Token contains a sub Claim, a sid Claim,
@@ -1240,6 +1280,10 @@ class OidcProvider:
             auth_provider_id=self.idp_id,
             auth_provider_session_id=sid,
         )
+
+        # We have no guarantee that all the devices of that session are for the same
+        # `user_id`. Hence, we have to iterate over the list of devices and log them out
+        # one by one.
         for device in devices:
             user_id = device["user_id"]
             device_id = device["device_id"]
@@ -1380,9 +1424,6 @@ class UserAttributeDict(TypedDict):
     confirm_localpart: bool
     display_name: Optional[str]
     emails: List[str]
-
-
-C = TypeVar("C")
 
 
 class OidcMappingProvider(Generic[C]):
