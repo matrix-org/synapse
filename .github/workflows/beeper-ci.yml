@@ -69,21 +69,20 @@ jobs:
   test-complement:
     runs-on: ubuntu-latest
     steps:
-      - name: Install complement dependencies
-        run: |-
-          sudo apt-get -qq update
-          sudo apt-get install -qqy libolm3 libolm-dev
       - uses: actions/checkout@v2
       - uses: actions/checkout@v2
         with:
           repository: beeper/complement
           path: complement
+      - name: Install complement dependencies
+        run: |-
+          sudo apt-get -qq update
+          sudo apt-get install -qqy libolm3 libolm-dev
+          go install -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
       - name: Run Complement
         run: ./scripts-dev/complement.sh
         env:
           COMPLEMENT_DIR: complement
-          POSTGRES: 1
-          WORKERS: 1
 
   # Builds
 
