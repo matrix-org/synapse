@@ -135,16 +135,20 @@ class SQLBaseStore(metaclass=ABCMeta):
     # most pain and avoiding tree caches (not so easily supported in Redis). This list
     # should be a subset of the non-async invalidation method above.
 
-    def _enable_external_caches(self):
+    def _enable_external_caches(self) -> None:
         external_cache = self.hs.get_external_sharded_cache()
         if external_cache.is_enabled():
-            self._attempt_to_enable_redis_cache("_get_user_ids_from_membership_event_ids")
+            self._attempt_to_enable_redis_cache(
+                "_get_user_ids_from_membership_event_ids"
+            )
             self._attempt_to_enable_redis_cache("get_users_in_room")
             self._attempt_to_enable_redis_cache("get_current_hosts_in_room")
             self._attempt_to_enable_redis_cache("get_local_users_in_room")
-            self._attempt_to_enable_redis_cache("get_rooms_for_user_with_stream_ordering")
+            self._attempt_to_enable_redis_cache(
+                "get_rooms_for_user_with_stream_ordering"
+            )
 
-    def _attempt_to_enable_redis_cache(self, cache_name: str):
+    def _attempt_to_enable_redis_cache(self, cache_name: str) -> None:
         external_cache = self.hs.get_external_sharded_cache()
         if not external_cache.is_enabled():
             return
@@ -160,9 +164,15 @@ class SQLBaseStore(metaclass=ABCMeta):
         self, room_id: str, members_changed: Collection[str]
     ) -> None:
         if members_changed:
-            await self._attempt_to_invalidate_external_cache("get_users_in_room", (room_id,))
-            await self._attempt_to_invalidate_external_cache("get_current_hosts_in_room", (room_id,))
-            await self._attempt_to_invalidate_external_cache("get_local_users_in_room", (room_id,))
+            await self._attempt_to_invalidate_external_cache(
+                "get_users_in_room", (room_id,)
+            )
+            await self._attempt_to_invalidate_external_cache(
+                "get_current_hosts_in_room", (room_id,)
+            )
+            await self._attempt_to_invalidate_external_cache(
+                "get_local_users_in_room", (room_id,)
+            )
 
         for user_id in members_changed:
             await self._attempt_to_invalidate_external_cache(
@@ -170,7 +180,9 @@ class SQLBaseStore(metaclass=ABCMeta):
             )
 
     async def _attempt_to_invalidate_external_cache(
-        self, cache_name: str, key: Collection[Any],
+        self,
+        cache_name: str,
+        key: Collection[Any],
     ) -> None:
         try:
             cache = getattr(self, cache_name)

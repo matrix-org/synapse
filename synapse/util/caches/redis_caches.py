@@ -1,12 +1,22 @@
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Union,
+    cast,
+)
 
 from synapse.util.caches.lrucache import KT, VT, AsyncLruCache, T
 
 if TYPE_CHECKING:
-    from synapse.util.caches.descriptors import _CachedFunction
     from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
+    from synapse.util.caches.descriptors import _CachedFunction
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +51,7 @@ def redisCachedList(
             return values
 
         return _wrapped
+
     return decorator
 
 
@@ -51,7 +62,7 @@ def redisCached(
 ) -> Callable:
     def decorator(f: Callable) -> "_CachedFunction":
         @wraps(f)
-        async def _wrapped(self, *args: Any, **kwargs: Any) -> Any:
+        async def _wrapped(self: Any, *args: Any, **kwargs: Any) -> Any:
             cache_key = _redis_key(get_cache_key(args, kwargs))
             value = await redis_shard_cache.get(
                 cache_name,
@@ -73,6 +84,7 @@ def redisCached(
         wrapped = cast("_CachedFunction", _wrapped)
         wrapped.invalidate = _invalidate
         return wrapped
+
     return decorator
 
 
