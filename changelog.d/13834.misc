@@ -1,0 +1,1 @@
+Clear out pending push actions when processing read receipts, removing extra checks during push action processing. Contributed by Nick @ Beeper (@fizzadar).
