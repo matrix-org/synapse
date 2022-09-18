@@ -1,0 +1,1 @@
+Check that portdb generates the same postgres schema as that in the source tree.
