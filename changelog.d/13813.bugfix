@@ -1,1 +1,1 @@
-Fix a bug where redactions were not being sent over federation if we did not have the original event (#13813).
+Fix a long-standing bug where redactions were not being sent over federation if we did not have the original event.
