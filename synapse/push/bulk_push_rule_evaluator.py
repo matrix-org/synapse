@@ -287,8 +287,6 @@ class BulkPushRuleEvaluator:
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
 
-        logger.info("Flatten map: %s", _flatten_dict(event))
-        logger.info("room_member_count: %s", room_member_count)
         evaluator = PushRuleEvaluatorForEvent(
             event,
             room_member_count,
