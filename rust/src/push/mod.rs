@@ -58,12 +58,16 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use anyhow::{Context, Error};
 use log::warn;
 use pyo3::prelude::*;
-use pythonize::pythonize;
+use pythonize::{depythonize, pythonize};
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use self::evaluator::PushRuleEvaluator;
+
 mod base_rules;
+mod evaluator;
+mod utils;
 
 /// Called when registering modules with python.
 pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
@@ -71,6 +75,7 @@ pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     child_module.add_class::<PushRule>()?;
     child_module.add_class::<PushRules>()?;
     child_module.add_class::<FilteredPushRules>()?;
+    child_module.add_class::<PushRuleEvaluator>()?;
     child_module.add_function(wrap_pyfunction!(get_base_rule_ids, m)?)?;
 
     m.add_submodule(child_module)?;
@@ -274,6 +279,8 @@ pub enum KnownCondition {
     #[serde(rename = "org.matrix.msc3772.relation_match")]
     RelationMatch {
         rel_type: Cow<'static, str>,
+        #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
+        event_type_pattern: Option<Cow<'static, str>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         sender: Option<Cow<'static, str>>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -284,6 +291,12 @@ pub enum KnownCondition {
 impl IntoPy<PyObject> for Condition {
     fn into_py(self, py: Python<'_>) -> PyObject {
         pythonize(py, &self).expect("valid condition")
+    }
+}
+
+impl<'source> FromPyObject<'source> for Condition {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        Ok(depythonize(ob)?)
     }
 }
 

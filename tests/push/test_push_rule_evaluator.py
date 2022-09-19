@@ -23,11 +23,12 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.appservice import ApplicationService
 from synapse.events import FrozenEvent
-from synapse.push import push_rule_evaluator
-from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
+from synapse.push.bulk_push_rule_evaluator import _flatten_dict
+from synapse.push.httppusher import tweaks_for_actions
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
+from synapse.synapse_rust.push import PushRuleEvaluator
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -41,7 +42,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         content: JsonDict,
         relations: Optional[Dict[str, Set[Tuple[str, str]]]] = None,
         relations_match_enabled: bool = False,
-    ) -> PushRuleEvaluatorForEvent:
+    ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -56,12 +57,12 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         room_member_count = 0
         sender_power_level = 0
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
-        return PushRuleEvaluatorForEvent(
-            event,
+        return PushRuleEvaluator(
+            _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels,
-            relations or set(),
+            power_levels.get("notifications", {}),
+            relations or {},
             relations_match_enabled,
         )
 
@@ -293,7 +294,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         ]
 
         self.assertEqual(
-            push_rule_evaluator.tweaks_for_actions(actions),
+            tweaks_for_actions(actions),
             {"sound": "default", "highlight": True},
         )
 
