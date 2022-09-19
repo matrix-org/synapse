@@ -153,6 +153,12 @@ class RelationsWorkerStore(SQLBaseStore):
             # If there are more events, generate the next pagination key.
             next_token = None
             if len(events) > limit and last_topo_id and last_stream_id:
+                # Due to how the pagination clause is generated, the stream ID is
+                # handled as an exclusive range when paginating forward. Correct
+                # for that here.
+                if direction == "f":
+                    last_stream_id -= 1
+
                 next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
                     next_token = from_token.copy_and_replace(
