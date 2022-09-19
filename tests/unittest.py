@@ -35,7 +35,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import canonicaljson
 import signedjson.key
@@ -68,7 +68,7 @@ from synapse.logging.context import (
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 
@@ -79,7 +79,7 @@ from tests.server import (
     make_request,
     setup_test_homeserver,
 )
-from tests.test_utils import event_injection, make_awaitable, setup_awaitable_errors
+from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -312,26 +312,18 @@ class HomeserverTestCase(TestCase):
                     )
                 )
 
-                requester = create_requester(
-                    user_id=UserID.from_string(self.helper.auth_user_id),
-                    access_token_id=token_id,
-                )
+                # This has to be a function and not just a Mock, because
+                # `self.helper.auth_user_id` is temporarily reassigned in some tests
+                async def get_requester(*args, **kwargs) -> Requester:
+                    assert self.helper.auth_user_id is not None
+                    return create_requester(
+                        user_id=UserID.from_string(self.helper.auth_user_id),
+                        access_token_id=token_id,
+                    )
 
-                patch.object(
-                    self.hs.get_auth(),
-                    "get_user_by_req",
-                    return_value=make_awaitable(requester),
-                    autospec=True,
-                    new_callable=MagicMock,
-                )
-
-                patch.object(
-                    self.hs.get_auth(),
-                    "get_user_by_access_token",
-                    return_value=make_awaitable(requester),
-                    autospec=True,
-                    new_callable=MagicMock,
-                )
+                # Type ignore: mypy doesn't like us assigning to methods.
+                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[assignment]
+                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[assignment]
 
                 patch.object(
                     self.hs.get_auth(),
