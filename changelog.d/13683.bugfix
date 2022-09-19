@@ -1,1 +1,0 @@
-Fix a long-standing bug which meant that keys for unwhitelisted servers were not returned by `/_matrix/key/v2/query`.
