@@ -115,6 +115,20 @@ class RefreshTokenLookupResult:
     If None, the session can be refreshed indefinitely."""
 
 
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class LoginTokenLookupResult:
+    """Result of looking up a login token."""
+
+    user_id: str
+    """The user this token belongs to."""
+
+    auth_provider_id: Optional[str]
+    """The SSO Identity Provider that the user authenticated with, to get this token."""
+
+    auth_provider_session_id: Optional[str]
+    """The session ID advertised by the SSO Identity Provider."""
+
+
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     def __init__(
         self,
@@ -1789,6 +1803,114 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "replace_refresh_token", _replace_refresh_token_txn
         )
 
+    async def add_login_token_to_user(
+        self,
+        user_id: str,
+        token: str,
+        expiry_ts: int,
+        auth_provider_id: Optional[str],
+        auth_provider_session_id: Optional[str],
+    ) -> None:
+        """Adds a short-term login token for the given user.
+
+        Args:
+            user_id: The user ID.
+            token: The new login token to add.
+            expiry_ts (milliseconds since the epoch): Time after which the login token
+                cannot be used.
+            auth_provider_id: The SSO Identity Provider that the user authenticated with
+                to get this token, if any
+            auth_provider_session_id: The session ID advertised by the SSO Identity
+                Provider, if any.
+        """
+        await self.db_pool.simple_insert(
+            "login_tokens",
+            {
+                "token": token,
+                "user_id": user_id,
+                "expiry_ts": expiry_ts,
+                "auth_provider_id": auth_provider_id,
+                "auth_provider_session_id": auth_provider_session_id,
+            },
+            desc="add_login_token_to_user",
+        )
+
+    def _consume_login_token(
+        self,
+        txn: LoggingTransaction,
+        token: str,
+        ts: int,
+    ) -> Optional[LoginTokenLookupResult]:
+        if self.database_engine.supports_returning:
+            # If the database engine supports the `RETURNING` keyword, delete and fetch
+            # the token with one query
+            txn.execute(
+                """
+                DELETE FROM login_tokens
+                WHERE token = ?
+                RETURNING user_id, expiry_ts, auth_provider_id, auth_provider_session_id
+                """,
+                (token,),
+            )
+            ret = txn.fetchone()
+            if ret is None:
+                return None
+
+            user_id, expiry_ts, auth_provider_id, auth_provider_session_id = ret
+        else:
+            values = self.db_pool.simple_select_one_txn(
+                txn,
+                "login_tokens",
+                keyvalues={"token": token},
+                retcols=(
+                    "user_id",
+                    "expiry_ts",
+                    "auth_provider_id",
+                    "auth_provider_session_id",
+                ),
+                allow_none=True,
+            )
+
+            if values is None:
+                return None
+
+            self.db_pool.simple_delete_one_txn(
+                txn,
+                "login_tokens",
+                keyvalues={"token": token},
+            )
+            user_id = values["user_id"]
+            expiry_ts = values["expiry_ts"]
+            auth_provider_id = values["auth_provider_id"]
+            auth_provider_session_id = values["auth_provider_session_id"]
+
+        # Token expired
+        if ts > int(expiry_ts):
+            return None
+
+        return LoginTokenLookupResult(
+            user_id=user_id,
+            auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
+        )
+
+    async def consume_login_token(self, token: str) -> Optional[LoginTokenLookupResult]:
+        """Lookup a login token and consume it.
+
+        Args:
+            token: The login token.
+
+        Returns:
+            The data stored with that token, including the `user_id`. Returns `None` if
+            the token does not exist or if it expired.
+        """
+        return await self.db_pool.runInteraction(
+            "consume_login_token",
+            self._consume_login_token,
+            token,
+            self._clock.time_msec(),
+        )
+
     @cached()
     async def is_guest(self, user_id: str) -> bool:
         res = await self.db_pool.simple_select_one_onecol(
@@ -2018,6 +2140,12 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             hs.config.experimental.msc3866.enabled
             and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
+
+        # Create a background job for removing expired login tokens
+        if hs.config.worker.run_background_tasks:
+            self._clock.looping_call(
+                self._delete_expired_login_tokens, THIRTY_MINUTES_IN_MS
+            )
 
     async def add_access_token_to_user(
         self,
@@ -2615,6 +2743,20 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             self.update_user_approval_status_txn,
             user_id.to_string(),
             approved,
+        )
+
+    @wrap_as_background_process("delete_expired_login_tokens")
+    async def _delete_expired_login_tokens(self) -> None:
+        """Remove login tokens with expiry dates that have passed."""
+
+        def _delete_expired_login_tokens_txn(txn: LoggingTransaction, ts: int) -> None:
+            sql = "DELETE FROM login_tokens WHERE expiry_ts <= ?"
+            txn.execute(sql, (ts,))
+
+        await self.db_pool.runInteraction(
+            "delete_expired_login_tokens",
+            _delete_expired_login_tokens_txn,
+            self._clock.time_msec(),
         )
 
 

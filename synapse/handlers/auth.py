@@ -63,10 +63,10 @@ from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.registration import LoginTokenLookupResult
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
-from synapse.util.macaroons import LoginTokenAttributes
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
@@ -883,6 +883,25 @@ class AuthHandler:
 
         return True
 
+    async def create_login_token_for_user_id(
+        self,
+        user_id: str,
+        duration_ms: int = (2 * 60 * 1000),
+        auth_provider_id: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
+    ) -> str:
+        login_token = self.generate_login_token()
+        now = self._clock.time_msec()
+        expiry_ts = now + duration_ms
+        await self.store.add_login_token_to_user(
+            user_id=user_id,
+            token=login_token,
+            expiry_ts=expiry_ts,
+            auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
+        )
+        return login_token
+
     async def create_refresh_token_for_user_id(
         self,
         user_id: str,
@@ -1401,6 +1420,18 @@ class AuthHandler:
             return None
         return user_id
 
+    def generate_login_token(self) -> str:
+        """Generates an opaque string, for use as an short-term login token"""
+
+        # we use the following format for access tokens:
+        #    syl_<random string>_<base62 crc check>
+
+        random_string = stringutils.random_string(20)
+        base = f"syl_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
+
     def generate_access_token(self, for_user: UserID) -> str:
         """Generates an opaque string, for use as an access token"""
 
@@ -1427,15 +1458,11 @@ class AuthHandler:
         crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
         return f"{base}_{crc}"
 
-    async def validate_short_term_login_token(
-        self, login_token: str
-    ) -> LoginTokenAttributes:
-        try:
-            res = self.macaroon_gen.verify_short_term_login_token(login_token)
-        except Exception:
+    async def consume_login_token(self, login_token: str) -> LoginTokenLookupResult:
+        res = await self.store.consume_login_token(login_token)
+        if res is None:
             raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
-        await self.auth_blocking.check_auth_blocking(res.user_id)
         return res
 
     async def delete_access_token(self, access_token: str) -> None:
@@ -1711,7 +1738,7 @@ class AuthHandler:
             )
 
         # Create a login token
-        login_token = self.macaroon_gen.generate_short_term_login_token(
+        login_token = await self.create_login_token_for_user_id(
             registered_user_id,
             auth_provider_id=auth_provider_id,
             auth_provider_session_id=auth_provider_session_id,
