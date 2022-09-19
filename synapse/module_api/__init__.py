@@ -843,7 +843,7 @@ class ModuleApi:
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
 
-        This is deprecated in favor of complete_sso_login_async.
+        This was removed in favor of complete_sso_login_async in Synapse 1.68.0.
 
         Added in Synapse v1.11.1.
 
@@ -854,11 +854,8 @@ class ModuleApi:
             client_redirect_url: The URL to which to offer to redirect the user (or to
                 redirect them directly if whitelisted).
         """
-        self._auth_handler._complete_sso_login(
-            registered_user_id,
-            "<unknown>",
-            request,
-            client_redirect_url,
+        raise Exception(
+            "ModuleApi.complete_sso_login is deprecated in favor of ModuleApi.complete_sso_login_async"
         )
 
     async def complete_sso_login_async(
