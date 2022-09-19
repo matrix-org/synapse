@@ -607,7 +607,8 @@ class EventsWorkerStore(SQLBaseStore):
             allow_rejected: Whether to include rejected events. If False,
                 rejected events are omitted from the response.
 
-            get_prev_content: whether to fetch previous event content
+            get_prev_content: add prev_content and prev_sender keys to the unsigned dict
+            when fetching redaction events. Has no effect on non-redaction events.
 
         Returns:
             map from event id to result
