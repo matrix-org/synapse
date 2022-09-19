@@ -162,6 +162,9 @@ pub enum Action {
     Notify,
     Coalesce,
     SetTweak(SetTweak),
+
+    // An unrecognized custom action.
+    Unknown(Value),
 }
 
 impl IntoPy<PyObject> for Action {
@@ -208,6 +211,7 @@ impl Serialize for Action {
             Action::Notify => serializer.serialize_str("notify"),
             Action::Coalesce => serializer.serialize_str("coalesce"),
             Action::SetTweak(tweak) => tweak.serialize(serializer),
+            Action::Unknown(value) => value.serialize(serializer),
         }
     }
 }
@@ -218,6 +222,7 @@ impl Serialize for Action {
 enum ActionDeserializeHelper {
     Str(String),
     SetTweak(SetTweak),
+    Unknown(Value),
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -234,6 +239,7 @@ impl<'de> Deserialize<'de> for Action {
                 _ => Err(D::Error::custom("unrecognized action")),
             },
             ActionDeserializeHelper::SetTweak(set_tweak) => Ok(Action::SetTweak(set_tweak)),
+            ActionDeserializeHelper::Unknown(value) => Ok(Action::Unknown(value)),
         }
     }
 }
@@ -458,4 +464,15 @@ fn test_deserialize_action() {
     let _: Action = serde_json::from_str(r#""dont_notify""#).unwrap();
     let _: Action = serde_json::from_str(r#""coalesce""#).unwrap();
     let _: Action = serde_json::from_str(r#"{"set_tweak": "highlight"}"#).unwrap();
+}
+
+#[test]
+fn test_custom_action() {
+    let json = r#"{"some_custom":"action_fields"}"#;
+
+    let action: Action = serde_json::from_str(json).unwrap();
+    assert!(matches!(action, Action::Unknown(_)));
+
+    let new_json = serde_json::to_string(&action).unwrap();
+    assert_eq!(json, new_json);
 }
