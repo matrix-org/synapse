@@ -194,7 +194,7 @@ pub const BASE_APPEND_CONTENT_RULES: &[PushRule] = &[PushRule {
         pattern: None,
         pattern_type: Some(Cow::Borrowed("user_localpart")),
     })]),
-    actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
+    actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_ACTION]),
     default: true,
     default_enabled: true,
 }];
