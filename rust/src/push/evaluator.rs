@@ -142,14 +142,8 @@ impl PushRuleEvaluator {
     ) -> Result<bool, Error> {
         let known_condition = match condition {
             Condition::Known(known) => known,
-
-            // XXX This looks incorrect -- we have reached an unknown condition
-            // kind and are unconditionally returning that it matches. Note that
-            // it seems possible to provide a condition to the /pushrules
-            // endpoint with an unknown kind, see
-            // _rule_tuple_from_request_object.
             Condition::Unknown(_) => {
-                return Ok(true);
+                return Ok(false);
             }
         };
 

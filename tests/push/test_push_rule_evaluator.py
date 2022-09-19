@@ -305,9 +305,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         evaluator = self._get_evaluator(
             {}, {"m.annotation": {("@user:test", "m.reaction")}}
         )
-        condition = {"kind": "relation_match"}
-        # Oddly, an unknown condition always matches.
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
 
         # A push rule evaluator with the experimental rule enabled.
         evaluator = self._get_evaluator(
