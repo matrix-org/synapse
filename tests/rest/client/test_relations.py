@@ -829,8 +829,8 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
         self.assertEqual(found_event_ids, expected_event_ids)
 
         # Test forward pagination.
-        prev_token: Optional[str] = ""
-        found_event_ids: List[str] = []
+        prev_token = ""
+        found_event_ids = []
         for _ in range(20):
             from_token = ""
             if prev_token:
