@@ -245,10 +245,23 @@ impl<'de> Deserialize<'de> for Action {
 }
 
 /// A condition used in push rules to match against an event.
+///
+/// We need this split as `serde` doesn't give us the ability to have a
+/// "catchall" variant in tagged enums.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum Condition {
+    /// A recognized condition that we can match against
+    Known(KnownCondition),
+    /// An unrecognized condition that we ignore.
+    Unknown(Value),
+}
+
+/// The set of "known" conditions that we can handle.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "kind")]
-pub enum Condition {
+pub enum KnownCondition {
     EventMatch(EventMatchCondition),
     ContainsDisplayName,
     RoomMemberCount {
@@ -438,11 +451,11 @@ impl FilteredPushRules {
 
 #[test]
 fn test_serialize_condition() {
-    let condition = Condition::EventMatch(EventMatchCondition {
+    let condition = Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
         key: "content.body".into(),
         pattern: Some("coffee".into()),
         pattern_type: None,
-    });
+    }));
 
     let json = serde_json::to_string(&condition).unwrap();
     assert_eq!(
@@ -456,6 +469,17 @@ fn test_deserialize_condition() {
     let json = r#"{"kind":"event_match","key":"content.body","pattern":"coffee"}"#;
 
     let _: Condition = serde_json::from_str(json).unwrap();
+}
+
+#[test]
+fn test_deserialize_custom_condition() {
+    let json = r#"{"kind":"custom_tag"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(condition, Condition::Unknown(_)));
+
+    let new_json = serde_json::to_string(&condition).unwrap();
+    assert_eq!(json, new_json);
 }
 
 #[test]
