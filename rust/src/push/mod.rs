@@ -59,13 +59,19 @@ fn get_base_rule_ids() -> HashSet<&'static str> {
 #[derive(Debug, Clone)]
 #[pyclass(frozen)]
 pub struct PushRule {
+    /// A unique ID for this rule
     pub rule_id: Cow<'static, str>,
+    /// The "kind" of push rule this is (see `PRIORITY_CLASS_MAP` in Python)
     #[pyo3(get)]
     pub priority_class: i32,
+    /// The conditions that must all match for actions to be applied
     pub conditions: Cow<'static, [Condition]>,
+    /// The actions to apply if all conditions are met
     pub actions: Cow<'static, [Action]>,
+    /// Whether this is a base rule
     #[pyo3(get)]
     pub default: bool,
+    /// Whether this is enabled by default
     #[pyo3(get)]
     pub default_enabled: bool,
 }
