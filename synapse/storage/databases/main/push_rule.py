@@ -85,7 +85,6 @@ def _load_rules(
         ruleslist,
     )
 
-    # TODO: Experimental config
     filtered_rules = FilteredPushRules(
         push_rules,
         enabled_map,
