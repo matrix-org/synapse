@@ -463,7 +463,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 AND (
                     (last_receipt_stream_ordering IS NULL AND stream_ordering > ?)
                     OR last_receipt_stream_ordering = ?
-                ) AND (notif_count OR unread_count)
+                ) AND (notif_count != 0 OR COALESCE(unread_count, 0) != 0)
             """,
             (room_id, user_id, receipt_stream_ordering, receipt_stream_ordering),
         )
