@@ -91,7 +91,7 @@ A custom mapping provider must specify the following methods:
         `None`, the user is prompted to pick their own username. This is only used
         during a user's first login. Once a localpart has been associated with a
         remote user ID (see `get_remote_user_id`) it cannot be updated.
-      - `displayname`: An optional string, the display name for the user.
+      - `display_name`: An optional string, the display name for the user.
 * `async def get_extra_attributes(self, userinfo, token)`
     - This method must be async.
     - Arguments:
