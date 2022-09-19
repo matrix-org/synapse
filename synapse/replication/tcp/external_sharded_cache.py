@@ -83,7 +83,6 @@ class ExternalShardedCache:
                         host=shard["host"],
                         port=shard["port"],
                         reconnect=True,
-                        replyTimeout=5,
                     ),
                 )
 
