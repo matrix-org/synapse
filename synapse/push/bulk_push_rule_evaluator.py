@@ -34,7 +34,6 @@ from synapse.api.constants import EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
-from synapse.push.push_rule_evaluator import _flatten_dict
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
