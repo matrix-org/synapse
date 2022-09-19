@@ -147,7 +147,7 @@ pub struct SetTweak {
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<TweakValue>,
 
-    // This picks saves any other fields that may have been added as clients.
+    // This picks up any other fields that may have been added by clients.
     // These get added when we convert the `Action` to a python object.
     #[serde(flatten)]
     other_keys: Value,
