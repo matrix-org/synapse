@@ -445,32 +445,19 @@ def _upload(gh_token: Optional[str]) -> None:
         click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
         click.get_current_context().abort()
 
-    headers = {"Accept": "application/vnd.github+json"}
-    if gh_token is not None:
-        headers["authorization"] = f"token {gh_token}"
+    # Query all the assets corresponding to this release.
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_release = gh_repo.get_release(tag_name)
 
-    # First load info about the release
-    try:
-        url = (
-            f"https://api.github.com/repos/matrix-org/synapse/releases/tags/{tag_name}"
-        )
-        req = urllib.request.Request(url, headers=headers)
-        response = urllib.request.urlopen(req)
-        release_info_resp = json.loads(response.read())
-    except Exception:
-        raise RuntimeError(f"Failed to look up release by tag name '{tag_name}'!")
-
-    # Then load the list of assets
-    req = urllib.request.Request(release_info_resp["assets_url"], headers=headers)
-    response = urllib.request.urlopen(req)
-    asset_list_resp = json.loads(response.read())
+    all_assets = set(gh_release.get_assets())
 
     # Only accept the wheels and sdist.
     # Notably: we don't care about debs.tar.xz.
     asset_names_and_urls = sorted(
-        (asset["name"], asset["browser_download_url"])
-        for asset in asset_list_resp
-        if asset["name"].endswith((".whl", ".tar.gz"))
+        (asset.name, asset.browser_download_url)
+        for asset in all_assets
+        if asset.name.endswith((".whl", ".tar.gz"))
     )
 
     # Print out what we've determined.
@@ -479,7 +466,7 @@ def _upload(gh_token: Optional[str]) -> None:
         print(f" - {asset_name}")
 
     ignored_asset_names = sorted(
-        {asset["name"] for asset in asset_list_resp}
+        {asset.name for asset in all_assets}
         - {asset_name for asset_name, _ in asset_names_and_urls}
     )
     print("\nIgnoring irrelevant assets:")
