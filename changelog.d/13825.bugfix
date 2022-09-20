@@ -1,0 +1,1 @@
+Delete associated data from `event_failed_pull_attempts`, `insertion_events`, `insertion_event_extremities`, `insertion_event_extremities`, `insertion_event_extremities` when purging the room.

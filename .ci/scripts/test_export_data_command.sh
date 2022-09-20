@@ -32,7 +32,7 @@ else
 fi
 
 # Create the PostgreSQL database.
-poetry run .ci/scripts/postgres_exec.py "CREATE DATABASE synapse"
+psql -c "CREATE DATABASE synapse"
 
 # Port the SQLite databse to postgres so we can check command works against postgres
 echo "+++ Port SQLite3 databse to postgres"
