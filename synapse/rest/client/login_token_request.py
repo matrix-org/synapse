@@ -57,11 +57,15 @@ class LoginTokenRequestServlet(RestServlet):
         self.server_name = hs.config.server.server_name
         self.macaroon_gen = hs.get_macaroon_generator()
         self.auth_handler = hs.get_auth_handler()
+        self.enabled = hs.config.experimental.msc3882_enabled
         self.token_timeout = hs.config.experimental.msc3882_token_timeout
         self.ui_auth = hs.config.experimental.msc3882_ui_auth
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if not self.enabled:
+            return (404, {"errcode": "M_NOT_FOUND", "error": "Not found"})
+
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
 
@@ -80,7 +84,6 @@ class LoginTokenRequestServlet(RestServlet):
             duration_in_ms=self.token_timeout,
         )
 
-
         return (
             200,
             {
@@ -91,5 +94,4 @@ class LoginTokenRequestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    if hs.config.experimental.msc3882_enabled:
-        LoginTokenRequestServlet(hs).register(http_server)
+    LoginTokenRequestServlet(hs).register(http_server)
