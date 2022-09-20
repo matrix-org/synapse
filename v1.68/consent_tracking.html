@@ -1,0 +1,350 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Consent Tracking - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html" class="active">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/consent_tracking.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="support-in-synapse-for-tracking-agreement-to-server-terms-and-conditions"><a class="header" href="#support-in-synapse-for-tracking-agreement-to-server-terms-and-conditions">Support in Synapse for tracking agreement to server terms and conditions</a></h1>
+<p>Synapse 0.30 introduces support for tracking whether users have agreed to the
+terms and conditions set by the administrator of a server - and blocking access
+to the server until they have.</p>
+<p>There are several parts to this functionality; each requires some specific
+configuration in <code>homeserver.yaml</code> to be enabled.</p>
+<p>Note that various parts of the configuation and this document refer to the
+&quot;privacy policy&quot;: agreement with a privacy policy is one particular use of this
+feature, but of course adminstrators can specify other terms and conditions
+unrelated to &quot;privacy&quot; per se.</p>
+<h2 id="collecting-policy-agreement-from-a-user"><a class="header" href="#collecting-policy-agreement-from-a-user">Collecting policy agreement from a user</a></h2>
+<p>Synapse can be configured to serve the user a simple policy form with an
+&quot;accept&quot; button. Clicking &quot;Accept&quot; records the user's acceptance in the
+database and shows a success page.</p>
+<p>To enable this, first create templates for the policy and success pages.
+These should be stored on the local filesystem.</p>
+<p>These templates use the <a href="http://jinja.pocoo.org">Jinja2</a> templating language,
+and <a href="https://github.com/matrix-org/synapse/tree/develop/docs/privacy_policy_templates/">docs/privacy_policy_templates</a>
+gives examples of the sort of thing that can be done.</p>
+<p>Note that the templates must be stored under a name giving the language of the
+template - currently this must always be <code>en</code> (for &quot;English&quot;);
+internationalisation support is intended for the future.</p>
+<p>The template for the policy itself should be versioned and named according to
+the version: for example <code>1.0.html</code>. The version of the policy which the user
+has agreed to is stored in the database.</p>
+<p>Once the templates are in place, make the following changes to <code>homeserver.yaml</code>:</p>
+<ol>
+<li>
+<p>Add a <code>user_consent</code> section, which should look like:</p>
+<pre><code class="language-yaml">user_consent:
+  template_dir: privacy_policy_templates
+  version: 1.0
+</code></pre>
+<p><code>template_dir</code> points to the directory containing the policy
+templates. <code>version</code> defines the version of the policy which will be served
+to the user. In the example above, Synapse will serve
+<code>privacy_policy_templates/en/1.0.html</code>.</p>
+</li>
+<li>
+<p>Add a <code>form_secret</code> setting at the top level:</p>
+<pre><code class="language-yaml">form_secret: &quot;&lt;unique secret&gt;&quot;
+</code></pre>
+<p>This should be set to an arbitrary secret string (try <code>pwgen -y 30</code> to
+generate suitable secrets).</p>
+<p>More on what this is used for below.</p>
+</li>
+<li>
+<p>Add <code>consent</code> wherever the <code>client</code> resource is currently enabled in the
+<code>listeners</code> configuration. For example:</p>
+<pre><code class="language-yaml">listeners:
+  - port: 8008
+    resources:
+      - names:
+        - client
+        - consent
+</code></pre>
+</li>
+</ol>
+<p>Finally, ensure that <code>jinja2</code> is installed. If you are using a virtualenv, this
+should be a matter of <code>pip install Jinja2</code>. On debian, try <code>apt-get install python-jinja2</code>.</p>
+<p>Once this is complete, and the server has been restarted, try visiting
+<code>https://&lt;server&gt;/_matrix/consent</code>. If correctly configured, this should give
+an error &quot;Missing string query parameter 'u'&quot;. It is now possible to manually
+construct URIs where users can give their consent.</p>
+<h3 id="enabling-consent-tracking-at-registration"><a class="header" href="#enabling-consent-tracking-at-registration">Enabling consent tracking at registration</a></h3>
+<ol>
+<li>
+<p>Add the following to your configuration:</p>
+<pre><code class="language-yaml">user_consent:
+  require_at_registration: true
+  policy_name: &quot;Privacy Policy&quot; # or whatever you'd like to call the policy
+</code></pre>
+</li>
+<li>
+<p>In your consent templates, make use of the <code>public_version</code> variable to
+see if an unauthenticated user is viewing the page. This is typically
+wrapped around the form that would be used to actually agree to the document:</p>
+<pre><code class="language-html">{% if not public_version %}
+  &lt;!-- The variables used here are only provided when the 'u' param is given to the homeserver --&gt;
+  &lt;form method=&quot;post&quot; action=&quot;consent&quot;&gt;
+    &lt;input type=&quot;hidden&quot; name=&quot;v&quot; value=&quot;{{version}}&quot;/&gt;
+    &lt;input type=&quot;hidden&quot; name=&quot;u&quot; value=&quot;{{user}}&quot;/&gt;
+    &lt;input type=&quot;hidden&quot; name=&quot;h&quot; value=&quot;{{userhmac}}&quot;/&gt;
+    &lt;input type=&quot;submit&quot; value=&quot;Sure thing!&quot;/&gt;
+  &lt;/form&gt;
+{% endif %}
+</code></pre>
+</li>
+<li>
+<p>Restart Synapse to apply the changes.</p>
+</li>
+</ol>
+<p>Visiting <code>https://&lt;server&gt;/_matrix/consent</code> should now give you a view of the privacy
+document. This is what users will be able to see when registering for accounts.</p>
+<h3 id="constructing-the-consent-uri"><a class="header" href="#constructing-the-consent-uri">Constructing the consent URI</a></h3>
+<p>It may be useful to manually construct the &quot;consent URI&quot; for a given user - for
+instance, in order to send them an email asking them to consent. To do this,
+take the base <code>https://&lt;server&gt;/_matrix/consent</code> URL and add the following
+query parameters:</p>
+<ul>
+<li>
+<p><code>u</code>: the user id of the user. This can either be a full MXID
+(<code>@user:server.com</code>) or just the localpart (<code>user</code>).</p>
+</li>
+<li>
+<p><code>h</code>: hex-encoded HMAC-SHA256 of <code>u</code> using the <code>form_secret</code> as a key. It is
+possible to calculate this on the commandline with something like:</p>
+<pre><code class="language-bash">echo -n '&lt;user&gt;' | openssl sha256 -hmac '&lt;form_secret&gt;'
+</code></pre>
+<p>This should result in a URI which looks something like:
+<code>https://&lt;server&gt;/_matrix/consent?u=&lt;user&gt;&amp;h=68a152465a4d...</code>.</p>
+</li>
+</ul>
+<p>Note that not providing a <code>u</code> parameter will be interpreted as wanting to view
+the document from an unauthenticated perspective, such as prior to registration.
+Therefore, the <code>h</code> parameter is not required in this scenario. To enable this
+behaviour, set <code>require_at_registration</code> to <code>true</code> in your <code>user_consent</code> config.</p>
+<h2 id="sending-users-a-server-notice-asking-them-to-agree-to-the-policy"><a class="header" href="#sending-users-a-server-notice-asking-them-to-agree-to-the-policy">Sending users a server notice asking them to agree to the policy</a></h2>
+<p>It is possible to configure Synapse to send a <a href="server_notices.html">server
+notice</a> to anybody who has not yet agreed to the current
+version of the policy. To do so:</p>
+<ul>
+<li>
+<p>ensure that the consent resource is configured, as in the previous section</p>
+</li>
+<li>
+<p>ensure that server notices are configured, as in <a href="server_notices.html">the server notice documentation</a>.</p>
+</li>
+<li>
+<p>Add <code>server_notice_content</code> under <code>user_consent</code> in <code>homeserver.yaml</code>. For
+example:</p>
+<pre><code class="language-yaml">user_consent:
+  server_notice_content:
+    msgtype: m.text
+    body: &gt;-
+      Please give your consent to the privacy policy at %(consent_uri)s.
+</code></pre>
+<p>Synapse automatically replaces the placeholder <code>%(consent_uri)s</code> with the
+consent uri for that user.</p>
+</li>
+<li>
+<p>ensure that <code>public_baseurl</code> is set in <code>homeserver.yaml</code>, and gives the base
+URI that clients use to connect to the server. (It is used to construct
+<code>consent_uri</code> in the server notice.)</p>
+</li>
+</ul>
+<h2 id="blocking-users-from-using-the-server-until-they-agree-to-the-policy"><a class="header" href="#blocking-users-from-using-the-server-until-they-agree-to-the-policy">Blocking users from using the server until they agree to the policy</a></h2>
+<p>Synapse can be configured to block any attempts to join rooms or send messages
+until the user has given their agreement to the policy. (Joining the server
+notices room is exempted from this).</p>
+<p>To enable this, add <code>block_events_error</code> under <code>user_consent</code>. For example:</p>
+<pre><code class="language-yaml">user_consent:
+  block_events_error: &gt;-
+    You can't send any messages until you consent to the privacy policy at
+    %(consent_uri)s.
+</code></pre>
+<p>Synapse automatically replaces the placeholder <code>%(consent_uri)s</code> with the
+consent uri for that user.</p>
+<p>ensure that <code>public_baseurl</code> is set in <code>homeserver.yaml</code>, and gives the base
+URI that clients use to connect to the server. (It is used to construct
+<code>consent_uri</code> in the error.)</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="server_notices.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="user_directory.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="server_notices.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="user_directory.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

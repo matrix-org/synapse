@@ -1,0 +1,402 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Media - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html" class="active">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/admin_api/media_admin_api.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
+<p>These APIs allow extracting media information from the homeserver.</p>
+<p>Details about the format of the <code>media_id</code> and storage of the media in the file system
+are documented under <a href="../media_repository.html">media repository</a>.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
+<h2 id="list-all-media-in-a-room"><a class="header" href="#list-all-media-in-a-room">List all media in a room</a></h2>
+<p>This API gets a list of known media in a room.
+However, it only shows media from unencrypted events or rooms.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/room/&lt;room_id&gt;/media
+</code></pre>
+<p>The API returns a JSON body like the following:</p>
+<pre><code class="language-json">{
+  &quot;local&quot;: [
+    &quot;mxc://localhost/xwvutsrqponmlkjihgfedcba&quot;,
+    &quot;mxc://localhost/abcdefghijklmnopqrstuvwx&quot;
+  ],
+  &quot;remote&quot;: [
+    &quot;mxc://matrix.org/xwvutsrqponmlkjihgfedcba&quot;,
+    &quot;mxc://matrix.org/abcdefghijklmnopqrstuvwx&quot;
+  ]
+}
+</code></pre>
+<h2 id="list-all-media-uploaded-by-a-user"><a class="header" href="#list-all-media-uploaded-by-a-user">List all media uploaded by a user</a></h2>
+<p>Listing all media that has been uploaded by a local user can be achieved through
+the use of the
+<a href="user_admin_api.html#list-media-uploaded-by-a-user">List media uploaded by a user</a>
+Admin API.</p>
+<h1 id="quarantine-media"><a class="header" href="#quarantine-media">Quarantine media</a></h1>
+<p>Quarantining media means that it is marked as inaccessible by users. It applies
+to any local media, and any locally-cached copies of remote media.</p>
+<p>The media file itself (and any thumbnails) is not deleted from the server.</p>
+<h2 id="quarantining-media-by-id"><a class="header" href="#quarantining-media-by-id">Quarantining media by ID</a></h2>
+<p>This API quarantines a single piece of local or remote media.</p>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/quarantine/&lt;server_name&gt;/&lt;media_id&gt;
+
+{}
+</code></pre>
+<p>Where <code>server_name</code> is in the form of <code>example.org</code>, and <code>media_id</code> is in the
+form of <code>abcdefg12345...</code>.</p>
+<p>Response:</p>
+<pre><code class="language-json">{}
+</code></pre>
+<h2 id="remove-media-from-quarantine-by-id"><a class="header" href="#remove-media-from-quarantine-by-id">Remove media from quarantine by ID</a></h2>
+<p>This API removes a single piece of local or remote media from quarantine.</p>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/unquarantine/&lt;server_name&gt;/&lt;media_id&gt;
+
+{}
+</code></pre>
+<p>Where <code>server_name</code> is in the form of <code>example.org</code>, and <code>media_id</code> is in the
+form of <code>abcdefg12345...</code>.</p>
+<p>Response:</p>
+<pre><code class="language-json">{}
+</code></pre>
+<h2 id="quarantining-media-in-a-room"><a class="header" href="#quarantining-media-in-a-room">Quarantining media in a room</a></h2>
+<p>This API quarantines all local and remote media in a room.</p>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/room/&lt;room_id&gt;/media/quarantine
+
+{}
+</code></pre>
+<p>Where <code>room_id</code> is in the form of <code>!roomid12345:example.org</code>.</p>
+<p>Response:</p>
+<pre><code class="language-json">{
+  &quot;num_quarantined&quot;: 10
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>num_quarantined</code>: integer - The number of media items successfully quarantined</li>
+</ul>
+<p>Note that there is a legacy endpoint, <code>POST /_synapse/admin/v1/quarantine_media/&lt;room_id&gt;</code>, that operates the same.
+However, it is deprecated and may be removed in a future release.</p>
+<h2 id="quarantining-all-media-of-a-user"><a class="header" href="#quarantining-all-media-of-a-user">Quarantining all media of a user</a></h2>
+<p>This API quarantines all <em>local</em> media that a <em>local</em> user has uploaded. That is to say, if
+you would like to quarantine media uploaded by a user on a remote homeserver, you should
+instead use one of the other APIs.</p>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/user/&lt;user_id&gt;/media/quarantine
+
+{}
+</code></pre>
+<p>URL Parameters</p>
+<ul>
+<li><code>user_id</code>: string - User ID in the form of <code>@bob:example.org</code></li>
+</ul>
+<p>Response:</p>
+<pre><code class="language-json">{
+  &quot;num_quarantined&quot;: 10
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>num_quarantined</code>: integer - The number of media items successfully quarantined</li>
+</ul>
+<h2 id="protecting-media-from-being-quarantined"><a class="header" href="#protecting-media-from-being-quarantined">Protecting media from being quarantined</a></h2>
+<p>This API protects a single piece of local media from being quarantined using the
+above APIs. This is useful for sticker packs and other shared media which you do
+not want to get quarantined, especially when
+<a href="#quarantining-media-in-a-room">quarantining media in a room</a>.</p>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/protect/&lt;media_id&gt;
+
+{}
+</code></pre>
+<p>Where <code>media_id</code> is in the  form of <code>abcdefg12345...</code>.</p>
+<p>Response:</p>
+<pre><code class="language-json">{}
+</code></pre>
+<h2 id="unprotecting-media-from-being-quarantined"><a class="header" href="#unprotecting-media-from-being-quarantined">Unprotecting media from being quarantined</a></h2>
+<p>This API reverts the protection of a media.</p>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/unprotect/&lt;media_id&gt;
+
+{}
+</code></pre>
+<p>Where <code>media_id</code> is in the  form of <code>abcdefg12345...</code>.</p>
+<p>Response:</p>
+<pre><code class="language-json">{}
+</code></pre>
+<h1 id="delete-local-media"><a class="header" href="#delete-local-media">Delete local media</a></h1>
+<p>This API deletes the <em>local</em> media from the disk of your own server.
+This includes any local thumbnails and copies of media downloaded from
+remote homeservers.
+This API will not affect media that has been uploaded to external
+media repositories (e.g https://github.com/turt2live/matrix-media-repo/).
+See also <a href="#purge-remote-media-api">Purge Remote Media API</a>.</p>
+<h2 id="delete-a-specific-local-media"><a class="header" href="#delete-a-specific-local-media">Delete a specific local media</a></h2>
+<p>Delete a specific <code>media_id</code>.</p>
+<p>Request:</p>
+<pre><code>DELETE /_synapse/admin/v1/media/&lt;server_name&gt;/&lt;media_id&gt;
+
+{}
+</code></pre>
+<p>URL Parameters</p>
+<ul>
+<li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>)</li>
+<li><code>media_id</code>: string - The ID of the media (e.g <code>abcdefghijklmnopqrstuvwx</code>)</li>
+</ul>
+<p>Response:</p>
+<pre><code class="language-json">{
+  &quot;deleted_media&quot;: [
+    &quot;abcdefghijklmnopqrstuvwx&quot;
+  ],
+  &quot;total&quot;: 1
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>deleted_media</code>: an array of strings - List of deleted <code>media_id</code></li>
+<li><code>total</code>: integer - Total number of deleted <code>media_id</code></li>
+</ul>
+<h2 id="delete-local-media-by-date-or-size"><a class="header" href="#delete-local-media-by-date-or-size">Delete local media by date or size</a></h2>
+<p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/&lt;server_name&gt;/delete?before_ts=&lt;before_ts&gt;
+
+{}
+</code></pre>
+<p>URL Parameters</p>
+<ul>
+<li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>).</li>
+<li><code>before_ts</code>: string representing a positive integer - Unix timestamp in milliseconds.
+Files that were last used before this timestamp will be deleted. It is the timestamp of
+last access, not the timestamp when the file was created.</li>
+<li><code>size_gt</code>: Optional - string representing a positive integer - Size of the media in bytes.
+Files that are larger will be deleted. Defaults to <code>0</code>.</li>
+<li><code>keep_profiles</code>: Optional - string representing a boolean - Switch to also delete files
+that are still used in image data (e.g user profile, room avatar).
+If <code>false</code> these files will be deleted. Defaults to <code>true</code>.</li>
+</ul>
+<p>Response:</p>
+<pre><code class="language-json">{
+  &quot;deleted_media&quot;: [
+    &quot;abcdefghijklmnopqrstuvwx&quot;,
+    &quot;abcdefghijklmnopqrstuvwz&quot;
+  ],
+  &quot;total&quot;: 2
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>deleted_media</code>: an array of strings - List of deleted <code>media_id</code></li>
+<li><code>total</code>: integer - Total number of deleted <code>media_id</code></li>
+</ul>
+<h2 id="delete-media-uploaded-by-a-user"><a class="header" href="#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></h2>
+<p>You can find details of how to delete multiple media uploaded by a user in
+<a href="user_admin_api.html#delete-media-uploaded-by-a-user">User Admin API</a>.</p>
+<h1 id="purge-remote-media-api"><a class="header" href="#purge-remote-media-api">Purge Remote Media API</a></h1>
+<p>The purge remote media API allows server admins to purge old cached remote media.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/purge_media_cache?before_ts=&lt;unix_timestamp_in_ms&gt;
+
+{}
+</code></pre>
+<p>URL Parameters</p>
+<ul>
+<li><code>before_ts</code>: string representing a positive integer - Unix timestamp in milliseconds.
+All cached media that was last accessed before this timestamp will be removed.</li>
+</ul>
+<p>Response:</p>
+<pre><code class="language-json">{
+  &quot;deleted&quot;: 10
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>deleted</code>: integer - The number of media items successfully deleted</li>
+</ul>
+<p>If the user re-requests purged remote media, synapse will re-request the media
+from the originating server.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../admin_api/event_reports.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../admin_api/purge_history_api.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../admin_api/event_reports.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../admin_api/purge_history_api.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>
