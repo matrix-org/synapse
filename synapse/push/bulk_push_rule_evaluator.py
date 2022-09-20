@@ -30,7 +30,7 @@ from typing import (
 
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -277,7 +277,7 @@ class BulkPushRuleEvaluator:
         # If the event does not have a relation, then cannot have any mutual
         # relations or thread ID.
         relations = {}
-        thread_id = "main"
+        thread_id = MAIN_TIMELINE
         if relation:
             relations = await self._get_mutual_relations(
                 relation.parent_id,

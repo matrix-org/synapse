@@ -88,7 +88,7 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import ReceiptTypes
+from synapse.api.constants import MAIN_TIMELINE, ReceiptTypes
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
@@ -469,7 +469,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
         max_summary_stream_ordering = 0
         for summary_stream_ordering, notif_count, unread_count, thread_id in txn:
-            if thread_id == "main":
+            if thread_id == MAIN_TIMELINE:
                 counts = NotifCounts(
                     notify_count=notif_count, unread_count=unread_count
                 )
@@ -498,7 +498,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         """
         txn.execute(sql, (user_id, room_id, receipt_stream_ordering))
         for highlight_count, thread_id in txn:
-            if thread_id == "main":
+            if thread_id == MAIN_TIMELINE:
                 counts.highlight_count += highlight_count
             elif thread_id in thread_counts:
                 thread_counts[thread_id].highlight_count += highlight_count
@@ -519,7 +519,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
         for notif_count, unread_count, thread_id in unread_counts:
-            if thread_id == "main":
+            if thread_id == MAIN_TIMELINE:
                 counts.notify_count += notif_count
                 counts.unread_count += unread_count
             elif thread_id in thread_counts:
