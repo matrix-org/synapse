@@ -37,7 +37,7 @@ Improved Documentation
 ----------------------
 
 - Note that `libpq` is required on ARM-based Macs. ([\#13480](https://github.com/matrix-org/synapse/issues/13480))
-- Fix a mistake in the config manual: the `event_cache_size` _is_ scaled by `caches.global_factor`. The documentation was incorrect since Synapse 1.22. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
+- Fix a mistake in the config manual: the `event_cache_size` _is_ scaled by `caches.global_factor`. The documentation was incorrect since Synapse v1.22.0. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
 - Fix a typo in the documentation for the login ratelimiting configuration. ([\#13727](https://github.com/matrix-org/synapse/issues/13727))
 - Define Synapse's compatability policy for SQLite versions. ([\#13728](https://github.com/matrix-org/synapse/issues/13728))
 - Add docs for common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems. ([\#13785](https://github.com/matrix-org/synapse/issues/13785))
