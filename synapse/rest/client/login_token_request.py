@@ -35,7 +35,8 @@ class LoginTokenRequestServlet(RestServlet):
 
     Request:
 
-    POST /login/token?access_token=... HTTP/1.1
+    POST /login/token HTTP/1.1
+    Content-Type: application/json
 
     {}
 
