@@ -15,11 +15,11 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import AccountDataTypes
-from synapse.push.baserules import PushRule
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest import admin
 from synapse.rest.client import account, login
 from synapse.server import HomeServer
+from synapse.synapse_rust.push import PushRule
 from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
@@ -161,20 +161,15 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             self._store.get_push_rules_for_user(self.user)
         )
         # Filter out default rules; we don't care
-        push_rules = [r for r, _ in filtered_push_rules if self._is_custom_rule(r)]
+        push_rules = [
+            r for r, _ in filtered_push_rules.rules() if self._is_custom_rule(r)
+        ]
         # Check our rule made it
-        self.assertEqual(
-            push_rules,
-            [
-                PushRule(
-                    rule_id="personal.override.rule1",
-                    priority_class=5,
-                    conditions=[],
-                    actions=[],
-                )
-            ],
-            push_rules,
-        )
+        self.assertEqual(len(push_rules), 1)
+        self.assertEqual(push_rules[0].rule_id, "personal.override.rule1")
+        self.assertEqual(push_rules[0].priority_class, 5)
+        self.assertEqual(push_rules[0].conditions, [])
+        self.assertEqual(push_rules[0].actions, [])
 
         # Request the deactivation of our account
         self._deactivate_my_account()
@@ -183,7 +178,9 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             self._store.get_push_rules_for_user(self.user)
         )
         # Filter out default rules; we don't care
-        push_rules = [r for r, _ in filtered_push_rules if self._is_custom_rule(r)]
+        push_rules = [
+            r for r, _ in filtered_push_rules.rules() if self._is_custom_rule(r)
+        ]
         # Check our rule no longer exists
         self.assertEqual(push_rules, [], push_rules)
 
