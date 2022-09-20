@@ -1,1 +1,0 @@
-Fix a long-standing bug where the `cache_invalidation_stream_seq` sequence would begin at 1 instead of 2.
