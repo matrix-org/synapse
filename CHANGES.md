@@ -28,7 +28,7 @@ Bugfixes
 - Fix a long-standing bug where Synapse fails to start if a signing key file contains an empty line. ([\#13738](https://github.com/matrix-org/synapse/issues/13738))
 - Fix a long-standing bug where Synapse would fail to handle malformed user IDs or room aliases gracefully in certain cases. ([\#13746](https://github.com/matrix-org/synapse/issues/13746))
 - Fix a long-standing bug where device lists would remain cached when remote users left and rejoined the last room shared with the local homeserver. ([\#13749](https://github.com/matrix-org/synapse/issues/13749), [\#13826](https://github.com/matrix-org/synapse/issues/13826))
-- Fix a long-standing bug where the `cache_invalidation_stream_seq` sequence would begin at 1 instead of 2. ([\#13766](https://github.com/matrix-org/synapse/issues/13766))
+- Fix a long-standing bug that could cause stale caches in some rare cases on the first startup of Synapse with replication. ([\#13766](https://github.com/matrix-org/synapse/issues/13766))
 - Fix a long-standing spec compliance bug where Synapse would accept a trailing slash on the end of `/get_missing_events` federation requests. ([\#13789](https://github.com/matrix-org/synapse/issues/13789))
 - Delete associated data from `event_failed_pull_attempts`, `insertion_events`, `insertion_event_extremities`, `insertion_event_extremities`, `insertion_event_extremities` when purging the room. ([\#13825](https://github.com/matrix-org/synapse/issues/13825))
 
