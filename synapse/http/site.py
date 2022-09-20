@@ -72,10 +72,12 @@ class SynapseRequest(Request):
         site: "SynapseSite",
         *args: Any,
         max_request_body_size: int = 1024,
+        request_id_header: Optional[str] = None,
         **kw: Any,
     ):
         super().__init__(channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
+        self.request_id_header = request_id_header
         self.synapse_site = site
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
@@ -172,7 +174,14 @@ class SynapseRequest(Request):
         self._opentracing_span = span
 
     def get_request_id(self) -> str:
-        return "%s-%i" % (self.get_method(), self.request_seq)
+        request_id_value = None
+        if self.request_id_header:
+            request_id_value = self.getHeader(self.request_id_header)
+
+        if request_id_value is None:
+            request_id_value = str(self.request_seq)
+
+        return "%s-%s" % (self.get_method(), request_id_value)
 
     def get_redacted_uri(self) -> str:
         """Gets the redacted URI associated with the request (or placeholder if the URI
@@ -611,12 +620,15 @@ class SynapseSite(Site):
         proxied = config.http_options.x_forwarded
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
+        request_id_header = config.http_options.request_id_header
+
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
                 channel,
                 self,
                 max_request_body_size=max_request_body_size,
                 queued=queued,
+                request_id_header=request_id_header,
             )
 
         self.requestFactory = request_factory  # type: ignore
