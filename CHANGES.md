@@ -1,17 +1,23 @@
 Synapse 1.68.0rc1 (2022-09-20)
 ==============================
 
+Please note that Synapse will now refuse to start if configured to use a version of SQLite earlier than 3.27.
+
+In addition, please note that installing Synapse from a source checkout now requires a recent Rust compiler.
+Those using packages will not be affected. On most platforms, installing with `pip install matrix-synapse` will not be affected.
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1670).
+
+
 Features
 --------
 
 - Keep track of when we fail to process a pulled event over federation so we can intelligently back off in the future. ([\#13589](https://github.com/matrix-org/synapse/issues/13589), [\#13814](https://github.com/matrix-org/synapse/issues/13814))
-- Add admin APIs to fetch messages within a particular window of time. ([\#13672](https://github.com/matrix-org/synapse/issues/13672))
+- Add an [admin API endpoint to fetch messages within a particular window of time](https://matrix-org.github.io/synapse/v1.68/admin_api/rooms.html#room-messages-api). ([\#13672](https://github.com/matrix-org/synapse/issues/13672))
+- Add an [admin API endpoint to find a user based on their external ID in an auth provider](https://matrix-org.github.io/synapse/v1.68/admin_api/user_admin_api.html#find-a-user-based-on-their-id-in-an-auth-provider). ([\#13810](https://github.com/matrix-org/synapse/issues/13810))
 - Cancel the processing of key query requests when they time out. ([\#13680](https://github.com/matrix-org/synapse/issues/13680))
-- Improve validation of request bodies for the following client-server API endpoints: [`/account/3pid/msisdn/requestToken`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidmsisdnrequesttoken) and [`/org.matrix.msc3720/account_status`](https://github.com/matrix-org/matrix-spec-proposals/blob/babolivier/user_status/proposals/3720-account-status.md#post-_matrixclientv1account_status). ([\#13687](https://github.com/matrix-org/synapse/issues/13687))
-- Improve validation of request bodies for the following client-server API endpoints: [`/account/3pid/add`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidadd), [`/account/3pid/bind`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidbind), [`/account/3pid/delete`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3piddelete) and [`/account/3pid/unbind`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidunbind). ([\#13736](https://github.com/matrix-org/synapse/issues/13736))
+- Improve validation of request bodies for the following client-server API endpoints: [`/account/3pid/msisdn/requestToken`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidmsisdnrequesttoken), [`/org.matrix.msc3720/account_status`](https://github.com/matrix-org/matrix-spec-proposals/blob/babolivier/user_status/proposals/3720-account-status.md#post-_matrixclientv1account_status), [`/account/3pid/add`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidadd), [`/account/3pid/bind`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidbind), [`/account/3pid/delete`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3piddelete) and [`/account/3pid/unbind`](https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3account3pidunbind). ([\#13687](https://github.com/matrix-org/synapse/issues/13687), [\#13736](https://github.com/matrix-org/synapse/issues/13736))
 - Document the timestamp when a user accepts the consent, if [consent tracking](https://matrix-org.github.io/synapse/latest/consent_tracking.html) is used. ([\#13741](https://github.com/matrix-org/synapse/issues/13741))
 - Add a `listeners[x].request_id_header` configuration option to specify which request header to extract and use as the request ID in order to correlate requests from a reverse proxy. ([\#13801](https://github.com/matrix-org/synapse/issues/13801))
-- Add an admin API endpoint to find a user based on their external ID in an auth provider. ([\#13810](https://github.com/matrix-org/synapse/issues/13810))
 
 
 Bugfixes
@@ -19,7 +25,7 @@ Bugfixes
 
 - Fix a bug introduced in Synapse v1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`). ([\#13506](https://github.com/matrix-org/synapse/issues/13506))
 - Fix a long-standing bug where previously rejected events could end up in room state because they pass auth checks given the current state of the room. ([\#13723](https://github.com/matrix-org/synapse/issues/13723))
-- Fix a bug where Synapse fails to start if a signing key file contains an empty line. ([\#13738](https://github.com/matrix-org/synapse/issues/13738))
+- Fix a long-standing bug where Synapse fails to start if a signing key file contains an empty line. ([\#13738](https://github.com/matrix-org/synapse/issues/13738))
 - Fix a long-standing bug where Synapse would fail to handle malformed user IDs or room aliases gracefully in certain cases. ([\#13746](https://github.com/matrix-org/synapse/issues/13746))
 - Fix a long-standing bug where device lists would remain cached when remote users left and rejoined the last room shared with the local homeserver. ([\#13749](https://github.com/matrix-org/synapse/issues/13749), [\#13826](https://github.com/matrix-org/synapse/issues/13826))
 - Fix a long-standing bug where the `cache_invalidation_stream_seq` sequence would begin at 1 instead of 2. ([\#13766](https://github.com/matrix-org/synapse/issues/13766))
@@ -60,7 +66,7 @@ Internal Changes
 - Remove old queries to join room memberships to current state events. Contributed by Nick @ Beeper (@fizzadar). ([\#13745](https://github.com/matrix-org/synapse/issues/13745))
 - Avoid raising an error due to malformed user IDs in `get_current_hosts_in_room`. Malformed user IDs cannot currently join a room, so this error would not be hit. ([\#13748](https://github.com/matrix-org/synapse/issues/13748))
 - Update the docstrings for `get_users_in_room` and `get_current_hosts_in_room` to explain the impact of partial state. ([\#13750](https://github.com/matrix-org/synapse/issues/13750))
-- User an additional database query when persisting receipts. ([\#13752](https://github.com/matrix-org/synapse/issues/13752))
+- Use an additional database query when persisting receipts. ([\#13752](https://github.com/matrix-org/synapse/issues/13752))
 - Preparatory work for storing thread IDs for notifications and receipts. ([\#13753](https://github.com/matrix-org/synapse/issues/13753))
 - Re-type hint some collections as read-only. ([\#13754](https://github.com/matrix-org/synapse/issues/13754))
 - Remove unused Prometheus recording rules from `synapse-v2.rules` and add comments describing where the rest are used. ([\#13756](https://github.com/matrix-org/synapse/issues/13756))
