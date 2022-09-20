@@ -437,7 +437,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         """
 
         main_counts = NotifCounts()
-        thread_counts = {}
+        thread_counts: Dict[str, NotifCounts] = {}
+
         def _get_thread(thread_id: str) -> NotifCounts:
             if thread_id == MAIN_TIMELINE:
                 return main_counts
