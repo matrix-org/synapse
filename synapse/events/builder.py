@@ -137,7 +137,7 @@ class EventBuilder:
         # The types of auth/prev events changes between event versions.
         prev_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         auth_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
-        if format_version == EventFormatVersions.V1:
+        if format_version == EventFormatVersions.ROOM_V1_V2:
             auth_events = await self._store.add_event_hashes(auth_event_ids)
             prev_events = await self._store.add_event_hashes(prev_event_ids)
         else:
@@ -167,7 +167,6 @@ class EventBuilder:
             "content": self.content,
             "unsigned": self.unsigned,
             "depth": depth,
-            "prev_state": [],
         }
 
         if self.is_state():
@@ -253,7 +252,7 @@ def create_local_event_from_event_dict(
 
     time_now = int(clock.time_msec())
 
-    if format_version == EventFormatVersions.V1:
+    if format_version == EventFormatVersions.ROOM_V1_V2:
         event_dict["event_id"] = _create_event_id(clock, hostname)
 
     event_dict["origin"] = hostname

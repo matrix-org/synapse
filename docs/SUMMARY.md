@@ -69,6 +69,7 @@
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
       - [Reporting Homeserver Usage Statistics](usage/administration/monitoring/reporting_homeserver_usage_statistics.md)
+    - [Monthly Active Users](usage/administration/monthly_active_users.md)
     - [Understanding Synapse Through Grafana Graphs](usage/administration/understanding_synapse_through_grafana_graphs.md)
     - [Useful SQL for Admins](usage/administration/useful_sql_for_admins.md)
     - [Database Maintenance Tools](usage/administration/database_maintenance_tools.md)

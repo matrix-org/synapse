@@ -335,7 +335,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "sum(rate(synapse_storage_events_persisted_events{instance=\"$instance\"}[$bucket_size]))",
+          "expr": "sum(rate(synapse_storage_events_persisted_events_total{instance=\"$instance\"}[$bucket_size]))",
           "hide": false,
           "instant": false,
           "legendFormat": "Events",
@@ -1423,7 +1423,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1804,7 +1804,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_storage_events_persisted_events{instance=\"$instance\"}[$bucket_size])) without (job,index)",
+              "expr": "sum(rate(synapse_storage_events_persisted_events_total{instance=\"$instance\"}[$bucket_size])) without (job,index)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2437,7 +2437,7 @@
                 "uid": "$datasource"
               },
               "exemplar": false,
-              "expr": "sum(rate(synapse_state_res_db_for_biggest_room_seconds{instance=\"$instance\"}[1m]))",
+              "expr": "sum(rate(synapse_state_res_db_for_biggest_room_seconds_total{instance=\"$instance\"}[1m]))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -2451,7 +2451,7 @@
                 "uid": "$datasource"
               },
               "exemplar": false,
-              "expr": "sum(rate(synapse_state_res_cpu_for_biggest_room_seconds{instance=\"$instance\"}[1m]))",
+              "expr": "sum(rate(synapse_state_res_cpu_for_biggest_room_seconds_total{instance=\"$instance\"}[1m]))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -3244,6 +3244,104 @@
           "yaxis": {
             "align": false
           }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "description": "Average number of hosts being rate limited across each worker type.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 53
+          },
+          "id": 225,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "avg by(job, rate_limiter_name) (synapse_rate_limit_sleep_affected_hosts{instance=\"$instance\", job=~\"$job\", index=~\"$index\"})",
+              "hide": false,
+              "legendFormat": "Slept by {{job}}:{{rate_limiter_name}}",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "avg by(job, rate_limiter_name) (synapse_rate_limit_reject_affected_hosts{instance=\"$instance\", job=~\"$job\", index=~\"$index\"})",
+              "legendFormat": "Rejected by {{job}}:{{rate_limiter_name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Hosts being rate limited",
+          "type": "timeseries"
         }
       ],
       "targets": [
@@ -3327,7 +3425,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3420,7 +3518,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_background_process_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) +  rate(synapse_background_process_db_sched_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) +  rate(synapse_background_process_db_sched_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -3628,7 +3726,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_federation_client_sent_transactions{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_client_sent_transactions_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "successful txn rate",
@@ -3638,7 +3736,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_util_metrics_block_count{block_name=\"_send_new_transaction\",instance=\"$instance\"}[$bucket_size]) - ignoring (block_name) rate(synapse_federation_client_sent_transactions{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_metrics_block_count_total{block_name=\"_send_new_transaction\",instance=\"$instance\"}[$bucket_size]) - ignoring (block_name) rate(synapse_federation_client_sent_transactions_total{instance=\"$instance\"}[$bucket_size]))",
               "legendFormat": "failed txn rate",
               "refId": "B"
             }
@@ -3728,7 +3826,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_federation_server_received_pdus{instance=~\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_server_received_pdus_total{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "pdus",
@@ -3738,7 +3836,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_federation_server_received_edus{instance=~\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_server_received_edus_total{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "edus",
@@ -3830,7 +3928,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3841,7 +3939,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_federation_client_sent_edus{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_client_sent_edus_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "edus",
@@ -4944,7 +5042,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_http_httppusher_http_pushes_processed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
+              "expr": "rate(synapse_http_httppusher_http_pushes_processed_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed_total + synapse_http_httppusher_http_pushes_processed_total) > 0",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -4956,7 +5054,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_http_httppusher_http_pushes_failed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
+              "expr": "rate(synapse_http_httppusher_http_pushes_failed_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed_total + synapse_http_httppusher_http_pushes_processed_total) > 0",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "failed {{job}}",
@@ -5170,12 +5268,12 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
               "legendFormat": "{{index}}",
-              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter",
+              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter_total",
               "refId": "A",
               "step": 2
             }
@@ -5271,12 +5369,12 @@
                 "uid": "$datasource"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
               "legendFormat": "{{index}}",
-              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter",
+              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total",
               "refId": "A",
               "step": 2
             }
@@ -5377,12 +5475,12 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache:hits{job=\"$job\",index=~\"$index\",name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
               "legendFormat": "Hit Rate",
-              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter",
+              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total",
               "refId": "A",
               "step": 2
             },
@@ -5392,7 +5490,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"push_rules_delta_state_cache_metric\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5500,12 +5598,12 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache:hits{job=\"$job\",index=~\"$index\",name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
               "legendFormat": "Hit Rate",
-              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter",
+              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total",
               "refId": "A",
               "step": 2
             },
@@ -5515,7 +5613,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"room_push_rule_cache\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5621,12 +5719,12 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache:hits{job=\"$job\",index=~\"$index\",name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache_hits{job=\"$job\",index=~\"$index\",name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))/sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
               "legendFormat": "Hit Rate",
-              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter",
+              "metric": "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total",
               "refId": "A",
               "step": 2
             },
@@ -5636,7 +5734,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum(rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_caches_cache{job=\"$job\",index=~\"$index\", name=\"_get_rules_for_room\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5989,7 +6087,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "topk(10, rate(synapse_storage_transaction_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "topk(10, rate(synapse_storage_transaction_time_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6089,7 +6187,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_storage_transaction_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_transaction_time_sum_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -6189,7 +6287,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_storage_transaction_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_transaction_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_transaction_time_sum_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_transaction_time_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -6404,7 +6502,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 10
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 12,
@@ -6440,7 +6538,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_metrics_block_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds_total[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6502,7 +6600,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 10
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 26,
@@ -6538,7 +6636,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "(rate(synapse_util_metrics_block_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds[$bucket_size])) / rate(synapse_util_metrics_block_count[$bucket_size])",
+              "expr": "(rate(synapse_util_metrics_block_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds_total[$bucket_size])) / rate(synapse_util_metrics_block_count_total[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6601,7 +6699,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 23
+            "y": 48
           },
           "hiddenSeries": false,
           "id": 13,
@@ -6639,7 +6737,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6705,7 +6803,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 48
           },
           "hiddenSeries": false,
           "id": 27,
@@ -6741,7 +6839,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6803,7 +6901,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 61
           },
           "hiddenSeries": false,
           "id": 28,
@@ -6838,7 +6936,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6900,7 +6998,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 61
           },
           "hiddenSeries": false,
           "id": 25,
@@ -6935,7 +7033,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_metrics_block_time_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_time_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -6960,11 +7058,13 @@
           },
           "yaxes": [
             {
-              "format": "ms",
+              "$$hashKey": "object:180",
+              "format": "s",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:181",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -6988,7 +7088,7 @@
             "h": 15,
             "w": 12,
             "x": 0,
-            "y": 49
+            "y": 74
           },
           "hiddenSeries": false,
           "id": 154,
@@ -7009,7 +7109,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -7022,7 +7122,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_metrics_block_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "{{job}}-{{index}} {{block_name}}",
               "refId": "A"
@@ -7109,7 +7209,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 69
           },
           "hiddenSeries": false,
           "id": 1,
@@ -7146,7 +7246,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_cache:hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{name}} {{job}}-{{index}}",
@@ -7211,7 +7311,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 69
           },
           "hiddenSeries": false,
           "id": 8,
@@ -7247,7 +7347,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "synapse_util_caches_cache:size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "synapse_util_caches_cache_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -7311,7 +7411,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 38,
@@ -7347,7 +7447,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -7407,7 +7507,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 39,
@@ -7415,11 +7515,16 @@
             "alignAsTable": true,
             "avg": false,
             "current": false,
-            "max": false,
+            "hideEmpty": false,
+            "hideZero": false,
+            "max": true,
             "min": false,
+            "rightSide": false,
             "show": true,
+            "sort": "max",
+            "sortDesc": true,
             "total": false,
-            "values": false
+            "values": true
           },
           "lines": true,
           "linewidth": 1,
@@ -7442,7 +7547,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "topk(10, rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache:hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "topk(10, rate(synapse_util_caches_cache{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache_hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -7467,11 +7572,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:101",
               "format": "rps",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:102",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -7501,7 +7608,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 56
+            "y": 89
           },
           "hiddenSeries": false,
           "id": 65,
@@ -7536,7 +7643,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_cache:evicted_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache_evicted_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -7656,7 +7763,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "synapse_util_caches_response_cache:size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "synapse_util_caches_response_cache_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "interval": "",
               "legendFormat": "{{name}} {{job}}-{{index}}",
               "refId": "A"
@@ -7746,7 +7853,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_util_caches_response_cache:hits{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])/rate(synapse_util_caches_response_cache:total{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_response_cache_hits{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])/rate(synapse_util_caches_response_cache{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "{{name}} {{job}}-{{index}}",
               "refId": "A"
@@ -9449,7 +9556,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -9609,7 +9716,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -9686,7 +9793,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "50%",
@@ -9696,7 +9803,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "75%",
@@ -9706,7 +9813,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "90%",
@@ -9716,7 +9823,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "99%",
@@ -9798,7 +9905,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -9875,7 +9982,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "50%",
@@ -9885,7 +9992,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "75%",
@@ -9895,7 +10002,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "90%",
@@ -9905,7 +10012,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events_total > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "99%",
@@ -10190,7 +10297,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_storage_events_state_resolutions_during_persistence{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_storage_events_state_resolutions_during_persistence_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "interval": "",
               "legendFormat": "State res ",
               "refId": "A"
@@ -10199,7 +10306,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_storage_events_potential_times_prune_extremities{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_storage_events_potential_times_prune_extremities_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "interval": "",
               "legendFormat": "Potential to prune",
               "refId": "B"
@@ -10208,7 +10315,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_storage_events_times_pruned_extremities{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_storage_events_times_pruned_extremities_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "interval": "",
               "legendFormat": "Pruned",
               "refId": "C"
@@ -10962,7 +11069,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_handler_presence_notified_presence{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_handler_presence_notified_presence_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "Notified",
               "refId": "A"
@@ -10971,7 +11078,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_handler_presence_federation_presence_out{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_handler_presence_federation_presence_out_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "Remote ping",
               "refId": "B"
@@ -10980,7 +11087,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_handler_presence_presence_updates{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_handler_presence_presence_updates_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "Total updates",
               "refId": "C"
@@ -10989,7 +11096,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_handler_presence_federation_presence{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_handler_presence_federation_presence_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "Remote updates",
               "refId": "D"
@@ -10998,7 +11105,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_handler_presence_bump_active_time{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_handler_presence_bump_active_time_total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "interval": "",
               "legendFormat": "Bump active time",
               "refId": "E"
@@ -11682,7 +11789,7 @@
         "name": "instance",
         "options": [],
         "query": {
-          "query": "label_values(synapse_util_metrics_block_ru_utime_seconds, instance)",
+          "query": "label_values(synapse_util_metrics_block_ru_utime_seconds_total, instance)",
           "refId": "Prometheus-instance-Variable-Query"
         },
         "refresh": 2,
@@ -11711,7 +11818,7 @@
         "name": "job",
         "options": [],
         "query": {
-          "query": "label_values(synapse_util_metrics_block_ru_utime_seconds, job)",
+          "query": "label_values(synapse_util_metrics_block_ru_utime_seconds_total, job)",
           "refId": "Prometheus-job-Variable-Query"
         },
         "refresh": 2,
@@ -11741,7 +11848,7 @@
         "name": "index",
         "options": [],
         "query": {
-          "query": "label_values(synapse_util_metrics_block_ru_utime_seconds, index)",
+          "query": "label_values(synapse_util_metrics_block_ru_utime_seconds_total, index)",
           "refId": "Prometheus-index-Variable-Query"
         },
         "refresh": 2,
@@ -11757,8 +11864,8 @@
     ]
   },
   "time": {
-    "from": "2022-07-22T04:08:13.716Z",
-    "to": "2022-07-22T18:44:27.863Z"
+    "from": "now-3h",
+    "to": "now"
   },
   "timepicker": {
     "now": true,
@@ -11789,6 +11896,6 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 124,
+  "version": 133,
   "weekStart": ""
 }

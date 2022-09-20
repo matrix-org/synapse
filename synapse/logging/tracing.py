@@ -199,6 +199,9 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
+# Matches the number suffix in an instance name like "matrix.org client_reader-8"
+STRIP_INSTANCE_NUMBER_SUFFIX_REGEX = re.compile(r"[_-]?\d+$")
+
 
 class _DummyLookup(object):
     """This will always returns the fixed value given for any accessed property"""
@@ -213,7 +216,7 @@ class _DummyLookup(object):
 class DummyLink(ABC):
     """Dummy placeholder for `opentelemetry.trace.Link`"""
 
-    def __init__(self) -> None:
+    def __init__(self, *args: Any) -> None:
         self.not_implemented_message = (
             "opentelemetry isn't installed so this is just a dummy link placeholder"
         )
@@ -264,6 +267,9 @@ class SynapseTags:
 
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
+
+    # The Synapse instance name
+    INSTANCE_NAME = "instance_name"
 
     # incoming HTTP request ID  (as written in the logs)
     REQUEST_ID = "request_id"
@@ -401,9 +407,17 @@ def init_tracer(hs: "HomeServer") -> None:
     # Pull out of the config if it was given. Otherwise set it to something sensible.
     set_homeserver_whitelist(hs.config.tracing.homeserver_whitelist)
 
+    # Instance names are opaque strings but by stripping off the number suffix,
+    # we can get something that looks like a "worker type", e.g.
+    # "client_reader-1" -> "client_reader" so we don't spread the traces across
+    # so many services.
+    instance_name_by_type = re.sub(
+        STRIP_INSTANCE_NUMBER_SUFFIX_REGEX, "", hs.get_instance_name()
+    )
+
     resource = opentelemetry.sdk.resources.Resource(
         attributes={
-            opentelemetry.sdk.resources.SERVICE_NAME: f"{hs.config.server.server_name} {hs.get_instance_name()}"
+            opentelemetry.sdk.resources.SERVICE_NAME: f"{hs.config.server.server_name} {instance_name_by_type}"
         }
     )
 
@@ -474,17 +488,19 @@ def whitelisted_homeserver(destination: str) -> bool:
 
 
 def use_span(
-    span: "opentelemetry.trace.Span",
+    span: Optional["opentelemetry.trace.Span"],
     end_on_exit: bool = True,
-) -> ContextManager["opentelemetry.trace.Span"]:
-    if opentelemetry is None:
-        return contextlib.nullcontext()  # type: ignore[unreachable]
+) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
+    if opentelemetry is None or span is None:
+        return contextlib.nullcontext()
 
     return opentelemetry.trace.use_span(span=span, end_on_exit=end_on_exit)
 
 
-def create_non_recording_span() -> "opentelemetry.trace.Span":
+def create_non_recording_span() -> Optional["opentelemetry.trace.Span"]:
     """Create a no-op span that does not record or become part of a recorded trace"""
+    if opentelemetry is None:
+        return None  # type: ignore[unreachable]
 
     return opentelemetry.trace.NonRecordingSpan(
         opentelemetry.trace.INVALID_SPAN_CONTEXT
@@ -532,7 +548,7 @@ def start_active_span(
     name: str,
     *,
     context: Optional["opentelemetry.context.context.Context"] = None,
-    kind: Optional["opentelemetry.trace.SpanKind"] = SpanKind.INTERNAL,
+    kind: "opentelemetry.trace.SpanKind" = SpanKind.INTERNAL,
     attributes: "opentelemetry.util.types.Attributes" = None,
     links: Optional[Sequence["opentelemetry.trace.Link"]] = None,
     start_time: Optional[int] = None,
@@ -541,14 +557,9 @@ def start_active_span(
     end_on_exit: bool = True,
     # For testing only
     tracer: Optional["opentelemetry.trace.Tracer"] = None,
-) -> ContextManager["opentelemetry.trace.Span"]:
+) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
-
-    # TODO: Why is this necessary to satisfy this error? It has a default?
-    #  ` error: Argument "kind" to "start_span" of "Tracer" has incompatible type "Optional[SpanKind]"; expected "SpanKind"  [arg-type]`
-    if kind is None:
-        kind = SpanKind.INTERNAL
 
     span = start_span(
         name=name,
@@ -575,7 +586,7 @@ def start_active_span_from_edu(
     operation_name: str,
     *,
     edu_content: Dict[str, Any],
-) -> ContextManager["opentelemetry.trace.Span"]:
+) -> ContextManager[Optional["opentelemetry.trace.Span"]]:
     """
     Extracts a span context from an edu and uses it to start a new active span
 
@@ -989,17 +1000,20 @@ def trace_servlet(
         # finished sending the response to the client.
         end_on_exit=False,
     ) as span:
-        request.set_tracing_span(span)
+        if span:
+            request.set_tracing_span(span)
 
         inject_trace_id_into_response_headers(request.responseHeaders)
         try:
             yield
         finally:
-            # We set the operation name again in case its changed (which happens
-            # with JsonResource).
-            span.update_name(request.request_metrics.name)
+            if span:
+                # We set the operation name again in case its changed (which happens
+                # with JsonResource).
+                span.update_name(request.request_metrics.name)
 
-            if request.request_metrics.start_context.tag is not None:
-                span.set_attribute(
-                    SynapseTags.REQUEST_TAG, request.request_metrics.start_context.tag
-                )
+                if request.request_metrics.start_context.tag is not None:
+                    span.set_attribute(
+                        SynapseTags.REQUEST_TAG,
+                        request.request_metrics.start_context.tag,
+                    )
