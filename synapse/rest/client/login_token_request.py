@@ -18,10 +18,8 @@ from typing import TYPE_CHECKING, Tuple
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
+from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.types import JsonDict
-from synapse.util.stringutils import random_string
-
-from ._base import client_patterns, interactive_auth_handler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
