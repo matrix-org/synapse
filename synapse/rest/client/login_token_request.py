@@ -65,7 +65,6 @@ class LoginTokenRequestServlet(RestServlet):
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
         if self.ui_auth:
@@ -77,16 +76,12 @@ class LoginTokenRequestServlet(RestServlet):
                 can_skip_ui_auth=False,  # Don't allow skipping of UI auth
             )
 
-        token = random_string(24)
-        ts_valid_until_ms = self.clock.time_msec() + self.token_timeout
-
         login_token = self.macaroon_gen.generate_short_term_login_token(
             user_id=requester.user.to_string(),
             auth_provider_id="org.matrix.msc3882.login_token_request",
             duration_in_ms=self.token_timeout,
         )
 
-        await self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
 
         return (
             200,
