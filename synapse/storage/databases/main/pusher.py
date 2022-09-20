@@ -113,6 +113,7 @@ class PusherWorkerStore(SQLBaseStore):
         Returns:
             The pushers for which the given columns have the given values.
         """
+
         def get_pushers_by_txn(txn: LoggingTransaction) -> List[Dict[str, Any]]:
             # We could technically use simple_select_list here, but we need to call
             # COALESCE on the 'enabled' column. While it is technically possible to give

@@ -375,7 +375,7 @@ class UserRestServletV2(RestServlet):
                         and self.hs.config.email.email_notif_for_new_users
                         and medium == "email"
                     ):
-                        await self.pusher_pool.add_pusher(
+                        await self.pusher_pool.add_or_update_pusher(
                             user_id=user_id,
                             access_token=None,
                             kind="email",
@@ -383,7 +383,7 @@ class UserRestServletV2(RestServlet):
                             app_display_name="Email Notifications",
                             device_display_name=address,
                             pushkey=address,
-                            lang=None,  # We don't know a user's language here
+                            lang=None,
                             data={},
                         )
 
