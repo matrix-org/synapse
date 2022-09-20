@@ -436,8 +436,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             and threads.
         """
 
-        counts = NotifCounts()
+        main_counts = NotifCounts()
         thread_counts = {}
+        def _get_thread(thread_id: str) -> NotifCounts:
+            if thread_id == MAIN_TIMELINE:
+                return main_counts
+            return thread_counts.setdefault(thread_id, NotifCounts())
 
         # First we pull the counts from the summary table.
         #
@@ -469,14 +473,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
         max_summary_stream_ordering = 0
         for summary_stream_ordering, notif_count, unread_count, thread_id in txn:
-            if thread_id == MAIN_TIMELINE:
-                counts = NotifCounts(
-                    notify_count=notif_count, unread_count=unread_count
-                )
-            else:
-                thread_counts[thread_id] = NotifCounts(
-                    notify_count=notif_count, unread_count=unread_count
-                )
+            counts = _get_thread(thread_id)
+            counts.notify_count += notif_count
+            counts.unread_count += unread_count
 
             # Summaries will only be used if they have not been invalidated by
             # a recent receipt; track the latest stream ordering or a valid summary.
@@ -498,14 +497,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         """
         txn.execute(sql, (user_id, room_id, receipt_stream_ordering))
         for highlight_count, thread_id in txn:
-            if thread_id == MAIN_TIMELINE:
-                counts.highlight_count += highlight_count
-            elif thread_id in thread_counts:
-                thread_counts[thread_id].highlight_count += highlight_count
-            else:
-                thread_counts[thread_id] = NotifCounts(
-                    notify_count=0, unread_count=0, highlight_count=highlight_count
-                )
+            _get_thread(thread_id).highlight_count += highlight_count
 
         # Finally we need to count push actions that aren't included in the
         # summary returned above. This might be due to recent events that haven't
@@ -519,20 +511,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
         for notif_count, unread_count, thread_id in unread_counts:
-            if thread_id == MAIN_TIMELINE:
-                counts.notify_count += notif_count
-                counts.unread_count += unread_count
-            elif thread_id in thread_counts:
-                thread_counts[thread_id].notify_count += notif_count
-                thread_counts[thread_id].unread_count += unread_count
-            else:
-                thread_counts[thread_id] = NotifCounts(
-                    notify_count=notif_count,
-                    unread_count=unread_count,
-                    highlight_count=0,
-                )
+            counts = _get_thread(thread_id)
+            counts.notify_count += notif_count
+            counts.unread_count += unread_count
 
-        return RoomNotifCounts(counts, thread_counts)
+        return RoomNotifCounts(main_counts, thread_counts)
 
     def _get_notif_unread_count_for_user_room(
         self,
