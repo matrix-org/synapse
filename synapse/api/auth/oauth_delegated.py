@@ -200,7 +200,14 @@ class OAuthDelegatedAuth(BaseAuth):
                 # TODO: we could use SCIM to provision users ahead of time and listen
                 # for SCIM SET events if those ever become standard:
                 # https://datatracker.ietf.org/doc/html/draft-hunt-scim-notify-00
-                await self.store.register_user(user_id=user_id.to_string())
+
+                # TODO: claim mapping should be configurable
+                # If present, use the name claim as the displayname
+                name: Optional[str] = introspection_result.get("name")
+
+                await self.store.register_user(
+                    user_id=user_id.to_string(), create_profile_with_displayname=name
+                )
 
             # And record the sub as external_id
             await self.store.record_user_external_id(
