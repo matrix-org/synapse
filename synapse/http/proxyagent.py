@@ -221,7 +221,7 @@ class ProxyAgent(_AgentBase):
                 self._reactor, parsed_uri.host, parsed_uri.port, **self._endpoint_kwargs
             )
 
-        logger.debug("Requesting %s via %s", redact_uri(uri), endpoint)
+        logger.debug("Requesting %s via %s", redact_uri(str(uri)), endpoint)
 
         if parsed_uri.scheme == b"https":
             tls_connection_creator = self._policy_for_https.creatorForNetloc(
