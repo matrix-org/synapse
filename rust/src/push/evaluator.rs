@@ -19,7 +19,7 @@ lazy_static! {
 #[pyclass]
 pub struct PushRuleEvaluator {
     /// A mapping of "flattened" keys to string values in the event, e.g.
-    /// includes things liek "type" and "content.msgtype".
+    /// includes things like "type" and "content.msgtype".
     flattened_keys: BTreeMap<String, String>,
 
     /// The "content.body", if any.
