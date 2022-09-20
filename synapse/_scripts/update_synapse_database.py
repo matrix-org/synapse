@@ -48,10 +48,13 @@ class MockHomeserver(HomeServer):
 
 
 def run_background_updates(hs: HomeServer) -> None:
-    store = hs.get_datastores().main
+    main = hs.get_datastores().main
+    state = hs.get_datastores().state
 
     async def run_background_updates() -> None:
-        await store.db_pool.updates.run_background_updates(sleep=False)
+        await main.db_pool.updates.run_background_updates(sleep=False)
+        if state:
+            await state.db_pool.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
@@ -97,8 +100,11 @@ def main() -> None:
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
 
-    if "database" not in hs_config:
-        sys.stderr.write("The configuration file must have a 'database' section.\n")
+    if "database" not in hs_config and "databases" not in hs_config:
+        sys.stderr.write(
+            "The configuration file must have a 'database' or 'databases' section. "
+            "See https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#database"
+        )
         sys.exit(4)
 
     config = HomeServerConfig()
