@@ -118,7 +118,7 @@ fn tset_glob() -> Result<(), Error> {
 
     assert_eq!(
         glob_to_regex("simple", GlobMatchType::Word)?.as_str(),
-        r"\bsimple\b"
+        r"(?:^|\W|\b)simple(?:\b|\W|$)"
     );
 
     assert!(glob_to_regex("simple", GlobMatchType::Word)?.is_match("some simple."));
