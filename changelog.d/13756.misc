@@ -1,1 +1,0 @@
-Remove unused Prometheus recording rules from `synapse-v2.rules` and add comments describing where the rest are used.

@@ -1,1 +1,0 @@
-complement: init postgres DB directly inside the target image instead of the base postgres image to fix building using Buildah.
