@@ -1,1 +1,0 @@
-Don't include redundant `prev_state` in new events. Contributed by Denis Kariakin (@dakariakin).
