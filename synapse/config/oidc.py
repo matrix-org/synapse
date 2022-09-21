@@ -124,6 +124,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         "jwks_uri": {"type": "string"},
         "skip_verification": {"type": "boolean"},
         "backchannel_logout_enabled": {"type": "boolean"},
+        "backchannel_logout_ignore_sub": {"type": "boolean"},
         "user_profile_method": {
             "type": "string",
             "enum": ["auto", "userinfo_endpoint"],
@@ -294,6 +295,9 @@ def _parse_oidc_config_dict(
         userinfo_endpoint=oidc_config.get("userinfo_endpoint"),
         jwks_uri=oidc_config.get("jwks_uri"),
         backchannel_logout_enabled=oidc_config.get("backchannel_logout_enabled", False),
+        backchannel_logout_ignore_sub=oidc_config.get(
+            "backchannel_logout_ignore_sub", False
+        ),
         skip_verification=oidc_config.get("skip_verification", False),
         user_profile_method=oidc_config.get("user_profile_method", "auto"),
         allow_existing_users=oidc_config.get("allow_existing_users", False),
@@ -372,6 +376,9 @@ class OidcProviderConfig:
 
     # Whether Synapse should react to backchannel logouts
     backchannel_logout_enabled: bool
+
+    # Whetever Synapse should ignore the `sub` claim in backchannel logouts or not
+    backchannel_logout_ignore_sub: bool
 
     # Whether to skip metadata verification
     skip_verification: bool

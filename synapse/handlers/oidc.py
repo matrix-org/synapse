@@ -33,7 +33,7 @@ import attr
 import unpaddedbase64
 from authlib.common.security import generate_token
 from authlib.jose import JsonWebToken, JWTClaims
-from authlib.jose.errors import InvalidClaimError, MissingClaimError
+from authlib.jose.errors import InvalidClaimError, JoseError, MissingClaimError
 from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, UserInfo
@@ -509,21 +509,24 @@ class OidcProvider:
                     self.issuer,
                 )
 
-            # If OIDC backchannel logouts are enabled, the provider mapping provider
-            # should use the `sub` claim. We verify that by mapping a dumb user and see
-            # if we get back the sub claim
-            user = UserInfo({"sub": "thisisasubject"})
-            try:
-                subject = self._user_mapping_provider.get_remote_user_id(user)
-                if subject != user["sub"]:
-                    raise Exception()
-            except Exception:
-                logger.warning(
-                    "OIDC Back-Channel Logout is enabled for issuer %r but it looks "
-                    "like the configured `user_mapping_provider` does not use the "
-                    "`sub` claim as subject, which may be resuired for logouts to work",
-                    self.issuer,
-                )
+            if not self._config.backchannel_logout_ignore_sub:
+                # If OIDC backchannel logouts are enabled, the provider mapping provider
+                # should use the `sub` claim. We verify that by mapping a dumb user and
+                # see if we get back the sub claim
+                user = UserInfo({"sub": "thisisasubject"})
+                try:
+                    subject = self._user_mapping_provider.get_remote_user_id(user)
+                    if subject != user["sub"]:
+                        raise Exception()
+                except Exception:
+                    logger.warning(
+                        f"OIDC Back-Channel Logout is enabled for issuer {self.issuer!r} "
+                        f"but it looks like the configured `user_mapping_provider` "
+                        f"does not use the `sub` claim as subject. If it is the case, "
+                        f"and you want Synapse to ignore the `sub` claim in OIDC "
+                        f"Back-Channel Logouts, set `backchannel_logout_ignore_sub` "
+                        f"to `true` in the issuer config."
+                    )
 
     @property
     def _uses_userinfo(self) -> bool:
@@ -1257,12 +1260,16 @@ class OidcProvider:
             "aud": {"values": [self.client_id]},
         }
 
-        claims = await self._verify_jwt(
-            alg_values=alg_values,
-            token=logout_token,
-            claims_cls=LogoutToken,
-            claims_options=claims_options,
-        )
+        try:
+            claims = await self._verify_jwt(
+                alg_values=alg_values,
+                token=logout_token,
+                claims_cls=LogoutToken,
+                claims_options=claims_options,
+            )
+        except JoseError:
+            logger.exception("Invalid logout_token")
+            raise SynapseError(400, "Invalid logout_token")
 
         # As per sec. 2.6:
         #    4. Verify that the Logout Token contains a sub Claim, a sid Claim,
@@ -1274,6 +1281,16 @@ class OidcProvider:
         # This is all verified by the LogoutToken claims class, so at this
         # point the `sid` claim exists and is a string.
         sid: str = claims.get("sid")
+
+        # If the `sub` claim was included in the logout token, we check that it matches
+        # that it matches the right user. We can have cases where the `sub` claim is not
+        # the ID saved in database, so we let admins disable this check in config.
+        sub: Optional[str] = claims.get("sub")
+        expected_user_id: Optional[str] = None
+        if sub is not None and not self._config.backchannel_logout_ignore_sub:
+            expected_user_id = await self._store.get_user_by_external_id(
+                self.idp_id, sub
+            )
 
         # Fetch any device(s) in the store associated with the session ID.
         devices = await self._store.get_devices_by_auth_provider_session_id(
@@ -1287,6 +1304,22 @@ class OidcProvider:
         for device in devices:
             user_id = device["user_id"]
             device_id = device["device_id"]
+
+            # If the user_id associated with that device/session is not the one we got
+            # out of the `sub` claim, skip that device and show log an error.
+            if expected_user_id is not None and user_id != expected_user_id:
+                logger.error(
+                    f"Received an OIDC Back-Channel Logout request "
+                    f"from issuer {self.issuer!r}, "
+                    f"for the user {expected_user_id!r} (sub: {sub!r}), "
+                    f"but with a session ID ({sid!r}) which belongs to {user_id!r}. "
+                    f"This may happen when the OIDC user mapper uses something else "
+                    f"than the `sub` claim as subject claim. "
+                    f"Set `backchannel_logout_ignore_sub` to `true` "
+                    f"in the provider config it that is the case."
+                )
+                continue
+
             logger.info(
                 "Logging out %r (device %r) via OIDC backchannel logout (sid %r).",
                 user_id,
