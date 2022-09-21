@@ -254,7 +254,7 @@ class DatabaseOutageTestCase(unittest.HomeserverTestCase):
                         "room_id": self.room_id,
                         "json": json.dumps(event_json),
                         "internal_metadata": "{}",
-                        "format_version": EventFormatVersions.V3,
+                        "format_version": EventFormatVersions.ROOM_V4_PLUS,
                     },
                 )
             )

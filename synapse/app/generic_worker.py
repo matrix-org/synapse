@@ -412,7 +412,11 @@ class GenericWorkerServer(HomeServer):
                         "enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(listener.bind_addresses, listener.port)
+                    _base.listen_metrics(
+                        listener.bind_addresses,
+                        listener.port,
+                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
+                    )
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 

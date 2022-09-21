@@ -72,6 +72,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
         build-essential \
+        curl \
         debhelper \
         devscripts \
         libsystemd-dev \
@@ -84,6 +85,15 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         sqlite3 \
         libpq-dev \
         xmlsec1
+
+# Install rust and ensure it's in the PATH
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+RUN mkdir /rust /cargo
+
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable
+
 
 COPY --from=builder /dh-virtualenv_1.2.2-1_all.deb /
 

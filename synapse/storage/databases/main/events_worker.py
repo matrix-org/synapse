@@ -81,6 +81,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred, delay_cancellation
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import AsyncLruCache
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -339,6 +340,7 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> Optional[EventBase]:
         ...
 
+    @cancellable
     async def get_event(
         self,
         event_id: str,
@@ -433,6 +435,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     @trace
     @tag_args
+    @cancellable
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
@@ -584,6 +587,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         return events
 
+    @cancellable
     async def _get_events_from_cache_or_db(
         self, event_ids: Iterable[str], allow_rejected: bool = False
     ) -> Dict[str, EventCacheEntry]:
@@ -1156,7 +1160,7 @@ class EventsWorkerStore(SQLBaseStore):
             if format_version is None:
                 # This means that we stored the event before we had the concept
                 # of a event format version, so it must be a V1 event.
-                format_version = EventFormatVersions.V1
+                format_version = EventFormatVersions.ROOM_V1_V2
 
             room_version_id = row.room_version_id
 
@@ -1186,10 +1190,10 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 # So, the following approximations should be adequate.
 
-                if format_version == EventFormatVersions.V1:
+                if format_version == EventFormatVersions.ROOM_V1_V2:
                     # if it's event format v1 then it must be room v1 or v2
                     room_version = RoomVersions.V1
-                elif format_version == EventFormatVersions.V2:
+                elif format_version == EventFormatVersions.ROOM_V3:
                     # if it's event format v2 then it must be room v3
                     room_version = RoomVersions.V3
                 else:
@@ -2111,7 +2115,14 @@ class EventsWorkerStore(SQLBaseStore):
                 AND room_id = ?
                 /* Make sure event is not rejected */
                 AND rejections.event_id IS NULL
-            ORDER BY origin_server_ts %s
+            /**
+             * First sort by the message timestamp. If the message timestamps are the
+             * same, we want the message that logically comes "next" (before/after
+             * the given timestamp) based on the DAG and its topological order (`depth`).
+             * Finally, we can tie-break based on when it was received on the server
+             * (`stream_ordering`).
+             */
+            ORDER BY origin_server_ts %s, depth %s, stream_ordering %s
             LIMIT 1;
         """
 
@@ -2130,7 +2141,8 @@ class EventsWorkerStore(SQLBaseStore):
                 order = "ASC"
 
             txn.execute(
-                sql_template % (comparison_operator, order), (timestamp, room_id)
+                sql_template % (comparison_operator, order, order, order),
+                (timestamp, room_id),
             )
             row = txn.fetchone()
             if row:

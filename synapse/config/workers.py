@@ -27,7 +27,7 @@ from ._base import (
     RoutableShardedWorkerHandlingConfig,
     ShardedWorkerHandlingConfig,
 )
-from .server import ListenerConfig, parse_listener_def
+from .server import DIRECT_TCP_ERROR, ListenerConfig, parse_listener_def
 
 _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
 The send_federation config option must be disabled in the main
@@ -128,7 +128,8 @@ class WorkerConfig(Config):
             self.worker_app = None
 
         self.worker_listeners = [
-            parse_listener_def(x) for x in config.get("worker_listeners", [])
+            parse_listener_def(i, x)
+            for i, x in enumerate(config.get("worker_listeners", []))
         ]
         self.worker_daemonize = bool(config.get("worker_daemonize"))
         self.worker_pid_file = config.get("worker_pid_file")
@@ -142,7 +143,8 @@ class WorkerConfig(Config):
         self.worker_replication_host = config.get("worker_replication_host", None)
 
         # The port on the main synapse for TCP replication
-        self.worker_replication_port = config.get("worker_replication_port", None)
+        if "worker_replication_port" in config:
+            raise ConfigError(DIRECT_TCP_ERROR, ("worker_replication_port",))
 
         # The port on the main synapse for HTTP replication endpoint
         self.worker_replication_http_port = config.get("worker_replication_http_port")

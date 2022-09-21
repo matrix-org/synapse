@@ -23,7 +23,7 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 class RegistrationStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
         self.user_id = "@my-user:test"
@@ -31,7 +31,7 @@ class RegistrationStoreTestCase(HomeserverTestCase):
         self.pwhash = "{xx1}123456789"
         self.device_id = "akgjhdjklgshg"
 
-    def test_register(self):
+    def test_register(self) -> None:
         self.get_success(self.store.register_user(self.user_id, self.pwhash))
 
         self.assertEqual(
@@ -42,6 +42,7 @@ class RegistrationStoreTestCase(HomeserverTestCase):
                 "admin": 0,
                 "is_guest": 0,
                 "consent_version": None,
+                "consent_ts": None,
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
                 "creation_ts": 0,
@@ -53,7 +54,20 @@ class RegistrationStoreTestCase(HomeserverTestCase):
             (self.get_success(self.store.get_user_by_id(self.user_id))),
         )
 
-    def test_add_tokens(self):
+    def test_consent(self) -> None:
+        self.get_success(self.store.register_user(self.user_id, self.pwhash))
+        before_consent = self.clock.time_msec()
+        self.reactor.advance(5)
+        self.get_success(self.store.user_set_consent_version(self.user_id, "1"))
+        self.reactor.advance(5)
+
+        user = self.get_success(self.store.get_user_by_id(self.user_id))
+        assert user
+        self.assertEqual(user["consent_version"], "1")
+        self.assertGreater(user["consent_ts"], before_consent)
+        self.assertLess(user["consent_ts"], self.clock.time_msec())
+
+    def test_add_tokens(self) -> None:
         self.get_success(self.store.register_user(self.user_id, self.pwhash))
         self.get_success(
             self.store.add_access_token_to_user(
@@ -63,11 +77,12 @@ class RegistrationStoreTestCase(HomeserverTestCase):
 
         result = self.get_success(self.store.get_user_by_access_token(self.tokens[1]))
 
+        assert result
         self.assertEqual(result.user_id, self.user_id)
         self.assertEqual(result.device_id, self.device_id)
         self.assertIsNotNone(result.token_id)
 
-    def test_user_delete_access_tokens(self):
+    def test_user_delete_access_tokens(self) -> None:
         # add some tokens
         self.get_success(self.store.register_user(self.user_id, self.pwhash))
         self.get_success(
@@ -92,6 +107,7 @@ class RegistrationStoreTestCase(HomeserverTestCase):
 
         # check the one not associated with the device was not deleted
         user = self.get_success(self.store.get_user_by_access_token(self.tokens[0]))
+        assert user
         self.assertEqual(self.user_id, user.user_id)
 
         # now delete the rest
@@ -100,11 +116,11 @@ class RegistrationStoreTestCase(HomeserverTestCase):
         user = self.get_success(self.store.get_user_by_access_token(self.tokens[0]))
         self.assertIsNone(user, "access token was not deleted without device_id")
 
-    def test_is_support_user(self):
+    def test_is_support_user(self) -> None:
         TEST_USER = "@test:test"
         SUPPORT_USER = "@support:test"
 
-        res = self.get_success(self.store.is_support_user(None))
+        res = self.get_success(self.store.is_support_user(None))  # type: ignore[arg-type]
         self.assertFalse(res)
         self.get_success(
             self.store.register_user(user_id=TEST_USER, password_hash=None)
@@ -120,7 +136,7 @@ class RegistrationStoreTestCase(HomeserverTestCase):
         res = self.get_success(self.store.is_support_user(SUPPORT_USER))
         self.assertTrue(res)
 
-    def test_3pid_inhibit_invalid_validation_session_error(self):
+    def test_3pid_inhibit_invalid_validation_session_error(self) -> None:
         """Tests that enabling the configuration option to inhibit 3PID errors on
         /requestToken also inhibits validation errors caused by an unknown session ID.
         """

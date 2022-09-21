@@ -598,9 +598,9 @@ class EventsPersistenceStorageController:
             # room
             state_delta_for_room: Dict[str, DeltaState] = {}
 
-            # Set of remote users which were in rooms the server has left. We
-            # should check if we still share any rooms and if not we mark their
-            # device lists as stale.
+            # Set of remote users which were in rooms the server has left or who may
+            # have left rooms the server is in. We should check if we still share any
+            # rooms and if not we mark their device lists as stale.
             potentially_left_users: Set[str] = set()
 
             if not backfilled:
@@ -724,6 +724,20 @@ class EventsPersistenceStorageController:
                                 latest_event_ids = set()
                                 current_state = {}
                                 delta.no_longer_in_room = True
+
+                            # Add all remote users that might have left rooms.
+                            potentially_left_users.update(
+                                user_id
+                                for event_type, user_id in delta.to_delete
+                                if event_type == EventTypes.Member
+                                and not self.is_mine_id(user_id)
+                            )
+                            potentially_left_users.update(
+                                user_id
+                                for event_type, user_id in delta.to_insert.keys()
+                                if event_type == EventTypes.Member
+                                and not self.is_mine_id(user_id)
+                            )
 
                             state_delta_for_room[room_id] = delta
 

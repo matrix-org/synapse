@@ -47,9 +47,6 @@ class ExperimentalConfig(Config):
         # MSC2716 (importing historical messages)
         self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
-        # MSC2285 (unstable private read receipts)
-        self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
-
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
 
@@ -89,6 +86,9 @@ class ExperimentalConfig(Config):
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
 
         # MSC2654: Unread counts
+        #
+        # Note that enabling this will result in an incorrect unread count for
+        # previously calculated push actions.
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
 
         # MSC2815 (allow room moderators to view redacted event content)
