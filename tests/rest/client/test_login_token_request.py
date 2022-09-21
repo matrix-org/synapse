@@ -58,7 +58,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"experimental_features": {"msc3882_enabled": True}})
     def test_uia_on(self) -> None:
-        self.register_user(self.user, self.password)
+        user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
         channel = self.make_request("POST", "/login/token", {}, access_token=token)
@@ -88,13 +88,13 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
             content={"type": "m.login.token", "token": login_token},
         )
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertEqual(channel.json_body["user_id"], "@" + self.user + ":test")
+        self.assertEqual(channel.json_body["user_id"], user_id)
 
     @override_config(
         {"experimental_features": {"msc3882_enabled": True, "msc3882_ui_auth": False}}
     )
     def test_uia_off(self) -> None:
-        self.register_user(self.user, self.password)
+        user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
         channel = self.make_request("POST", "/login/token", {}, access_token=token)
@@ -109,7 +109,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
             content={"type": "m.login.token", "token": login_token},
         )
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertEqual(channel.json_body["user_id"], "@" + self.user + ":test")
+        self.assertEqual(channel.json_body["user_id"], user_id)
 
     @override_config(
         {
@@ -126,3 +126,4 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", "/login/token", {}, access_token=token)
         self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["expires_in"], 15)
