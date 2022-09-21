@@ -107,6 +107,8 @@ class VersionsRestServlet(RestServlet):
                     "fi.mau.msc2815": self.config.experimental.msc2815_enabled,
                     # Adds support for login token requests as per MSC3882
                     "org.matrix.msc3882": self.config.experimental.msc3882_enabled,
+                    # Adds support for remotely enabling/disabling pushers, as per MSC3881
+                    "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
                 },
             },
         )
