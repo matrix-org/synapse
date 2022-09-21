@@ -32,15 +32,15 @@ logger = logging.getLogger("synapse.app.homeserver")
 _stats_process: List[Tuple[int, "resource.struct_rusage"]] = []
 
 # Gauges to expose monthly active user control metrics
-current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
+current_mau_gauge = Gauge("synapse_admin_mau_current", "Current MAU")
 current_mau_by_service_gauge = Gauge(
     "synapse_admin_mau_current_mau_by_service",
     "Current MAU by service",
     ["app_service"],
 )
-max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
+max_mau_gauge = Gauge("synapse_admin_mau_max", "MAU Limit")
 registered_reserved_users_mau_gauge = Gauge(
-    "synapse_admin_mau:registered_reserved_users",
+    "synapse_admin_mau_registered_reserved_users",
     "Registered users with reserved threepids",
 )
 

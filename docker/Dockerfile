@@ -31,7 +31,9 @@ ARG PYTHON_VERSION=3.9
 ###
 ### Stage 0: generate requirements.txt
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
+# We hardcode the use of Debian bullseye here because this could change upstream
+# and other Dockerfiles used for testing are expecting bullseye.
+FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye as requirements
 
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
@@ -76,7 +78,7 @@ RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
 ###
 ### Stage 1: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as builder
+FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye as builder
 
 # install the OS build deps
 RUN \
@@ -92,10 +94,19 @@ RUN \
     libxml++2.6-dev \
     libxslt1-dev \
     openssl \
-    rustc \
     zlib1g-dev \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+
+# Install rust and ensure its in the PATH
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+RUN mkdir /rust /cargo
+
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
@@ -108,8 +119,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
+COPY rust /synapse/rust/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst /synapse/
+COPY pyproject.toml README.rst build_rust.py /synapse/
 
 # Repeat of earlier build argument declaration, as this is a new build stage.
 ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
@@ -127,7 +139,7 @@ RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
 ### Stage 2: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-slim
+FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye
 
 LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
 LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'

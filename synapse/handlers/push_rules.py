@@ -16,12 +16,15 @@ from typing import TYPE_CHECKING, List, Optional, Union
 import attr
 
 from synapse.api.errors import SynapseError, UnrecognizedRequestError
-from synapse.push.baserules import BASE_RULE_IDS
 from synapse.storage.push_rule import RuleNotFoundException
+from synapse.synapse_rust.push import get_base_rule_ids
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+
+BASE_RULE_IDS = get_base_rule_ids()
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
