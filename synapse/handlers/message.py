@@ -567,9 +567,17 @@ class EventCreationHandler:
         outlier: bool = False,
         historical: bool = False,
         depth: Optional[int] = None,
+        state_map: Optional[Mapping[Tuple[str, str], str]] = None,
+        for_batch: bool = False,
+        current_state_group: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """
-        Given a dict from a client, create a new event.
+        Given a dict from a client, create a new event. If bool for_batch is true, will
+        create an event using the prev_event_ids, and will create an event context for
+        the event using the parameters state_map current_state_group, thus these parameters
+        must be provided in this case if for_batch is True. The subsequent created event
+        and context are suitable for being batched up and bulk persisted to the database
+        with other similarly created events.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
         etc.
@@ -612,16 +620,27 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
 
+            state_map: A state map of previously created events, used only when creating events
+                for batch persisting
+
+            for_batch: whether the event is being created for batch persisting to the db
+
+            current_state_group: the current state group, used only for creating events for
+                batch persisting
+
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
+
         Returns:
             Tuple of created event, Context
         """
@@ -685,15 +704,28 @@ class EventCreationHandler:
 
         builder.internal_metadata.historical = historical
 
-        event, context = await self.create_new_client_event(
-            builder=builder,
-            requester=requester,
-            allow_no_prev_events=allow_no_prev_events,
-            prev_event_ids=prev_event_ids,
-            auth_event_ids=auth_event_ids,
-            state_event_ids=state_event_ids,
-            depth=depth,
-        )
+        if for_batch:
+            assert prev_event_ids is not None
+            assert state_map is not None
+            assert current_state_group is not None
+            auth_ids = self._event_auth_handler.compute_auth_events(builder, state_map)
+            event = await builder.build(
+                prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
+            )
+            context = await self.state.compute_event_context_for_batched(
+                event, state_map, current_state_group
+            )
+
+        else:
+            event, context = await self.create_new_client_event(
+                builder=builder,
+                requester=requester,
+                allow_no_prev_events=allow_no_prev_events,
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                state_event_ids=state_event_ids,
+                depth=depth,
+            )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
@@ -701,7 +733,11 @@ class EventCreationHandler:
         # m.room.aliases event is created, which includes hitting a /directory route.
         # Therefore not including this condition here would render the similar one in
         # synapse.handlers.directory pointless.
-        if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
+        if (
+            builder.type == EventTypes.Aliases
+            and self.require_membership_for_aliases
+            and not for_batch
+        ):
             # Ideally we'd do the membership check in event_auth.check(), which
             # describes a spec'd algorithm for authenticating events received over
             # federation as well as those created locally. As of room v3, aliases events
