@@ -1,0 +1,1 @@
+Fix a mistake in sso_mapping_providers.md: `map_user_attributes` is expected to return `display_name` not `displayname`.
