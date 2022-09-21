@@ -1784,24 +1784,35 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     async def is_user_approved(self, user_id: str) -> bool:
         """Checks if a user is approved and therefore can be allowed to log in.
 
+        If the user's 'approved' column is NULL, we consider it as true given it means
+        the user was registered when support for an approval flow was either disabled
+        or nonexistent.
+
         Args:
             user_id: the user to check the approval status of.
 
         Returns:
             A boolean that is True if the user is approved, False otherwise.
         """
-        ret = await self.db_pool.simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="approved",
-            allow_none=True,
-            desc="is_user_pending_approval",
-        )
 
-        # We need to handle the case of the column being None because even though the
-        # background update *should* have taken care of setting a value for all users,
-        # we can't be certain it's finished running.
-        return bool(ret)
+        def is_user_approved_txn(txn: LoggingTransaction) -> bool:
+            txn.execute(
+                """
+                SELECT COALESCE(approved, TRUE) AS approved FROM users WHERE name = ?
+                """,
+                (user_id,),
+            )
+
+            rows = self.db_pool.cursor_to_dict(txn)
+
+            # We cast to bool because the value returned by the database engine might
+            # be an integer if we're using SQLite.
+            return bool(rows[0]["approved"])
+
+        return await self.db_pool.runInteraction(
+            desc="is_user_pending_approval",
+            func=is_user_approved_txn,
+        )
 
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
@@ -1840,10 +1851,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             table="user_external_ids",
             columns=["user_id"],
             unique=False,
-        )
-
-        self.db_pool.updates.register_background_update_handler(
-            "users_set_approved_flag", self._background_update_set_approved_flag
         )
 
     async def _background_update_set_deactivated_flag(
@@ -1943,52 +1950,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
-
-    async def _background_update_set_approved_flag(
-        self, progress: JsonDict, batch_size: int
-    ) -> int:
-        """Set the 'approved' flag for all already existing users. We want to set it to
-        true systematically because we don't want to suddenly prevent already existing
-        users from logging in if the option to block registration on approval is turned
-        on.
-        """
-        last_user = progress.get("user_id", "")
-
-        def _background_update_set_approved_flag_txn(txn: LoggingTransaction) -> int:
-            txn.execute(
-                """
-                SELECT name
-                FROM users
-                WHERE
-                    approved IS NULL
-                    AND name > ?
-                ORDER BY name ASC
-                LIMIT ?
-                """,
-                (last_user, batch_size),
-            )
-            rows = self.db_pool.cursor_to_dict(txn)
-
-            if len(rows) == 0:
-                return 0
-
-            for user in rows:
-                self.update_user_approval_status_txn(txn, user["name"], True)
-
-            self.db_pool.updates._background_update_progress_txn(
-                txn, "users_set_approved_flag", {"user_id": rows[-1]["name"]}
-            )
-
-            return len(rows)
-
-        nb_processed = await self.db_pool.runInteraction(
-            "users_set_approved_flag", _background_update_set_approved_flag_txn
-        )
-
-        if nb_processed < batch_size:
-            await self.db_pool.updates._end_background_update("users_set_approved_flag")
-
-        return nb_processed
 
     def update_user_approval_status_txn(
         self, txn: LoggingTransaction, user_id: str, approved: bool
