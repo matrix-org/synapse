@@ -216,6 +216,9 @@ class _PerHostRatelimiter:
         self.reject_limit = config.reject_limit
         self.concurrent_requests = config.concurrent
 
+        logger.info("self.sleep_limit=%s", self.sleep_limit)
+        logger.info("self.reject_limit=%s", self.reject_limit)
+
         # request_id objects for requests which have been slept
         self.sleeping_requests: Set[object] = set()
 

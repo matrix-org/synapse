@@ -93,7 +93,8 @@ async def create_event(
         KNOWN_ROOM_VERSIONS[room_version], kwargs
     )
     event, context = await hs.get_event_creation_handler().create_new_client_event(
-        builder, prev_event_ids=prev_event_ids
+        builder,
+        prev_event_ids=prev_event_ids,
     )
 
     return event, context

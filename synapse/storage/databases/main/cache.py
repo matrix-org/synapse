@@ -54,6 +54,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
+        logger.info("CacheInvalidationWorkerStore constructor")
         super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
@@ -222,6 +223,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
+        logger.info("_invalidate_caches_for_event event_id=%s", event_id)
         self._invalidate_local_get_event_cache(event_id)
         self.have_seen_event.invalidate((room_id, event_id))
 
