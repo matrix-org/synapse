@@ -2,9 +2,9 @@
 
 How do I become a server admin?
 ---
-If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not)
+If your server already has an admin account you should use the [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not) to promote other accounts to become admins.
 
-If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.
+If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.
 
 ```sql
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
@@ -32,9 +32,11 @@ What users are registered on my server?
 SELECT NAME from users;
 ```
 
-Manually resetting passwords:
+Manually resetting passwords
 ---
-See https://github.com/matrix-org/synapse/blob/master/README.rst#password-reset
+Users can reset their password through their client. Alternatively, a server admin
+can reset a user's password using the [admin API](../../admin_api/user_admin_api.md#reset-password).
+
 
 I have a problem with my server. Can I just delete my database and start again?
 ---
@@ -101,3 +103,83 @@ LIMIT 10;
 
 You can also use the [List Room API](../../admin_api/rooms.md#list-room-api)
 and `order_by` `state_events`.
+
+
+People can't accept room invitations from me
+---
+
+The typical failure mode here is that you send an invitation to someone
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs:
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](docs/reverse_proxy.md) and double-check that your settings are correct.
+
+
+Help!! Synapse is slow and eats all my RAM/CPU!
+-----------------------------------------------
+
+First, ensure you are running the latest version of Synapse, using Python 3
+with a [PostgreSQL database](../../postgres.md).
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests. We'll improve this in the future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable. The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained environments, or increased if performance starts to
+degrade.
+
+However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.
+
+Using [libjemalloc](https://jemalloc.net) can also yield a significant
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the `libjemalloc1` package and adding this
+line to `/etc/default/matrix-synapse`:
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+This made a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.
+
+If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see [discussion](https://github.com/matrix-org/synapse/issues/3971)). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by disabling presence
+in the Synapse config file: [see here](../configuration/config_documentation.md#presence).
+
+
+Running out of File Handles
+---------------------------
+
+If Synapse runs out of file handles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like `#matrix:matrix.org` containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
+to respond. (We need to improve the routing algorithm used to be better than
+full mesh, but as of March 2019 this hasn't happened yet).
+
+If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing ``/etc/security/limits.conf``
+
+Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute. Please let us know at [`#synapse:matrix.org`](https://matrix.to/#/#synapse-dev:matrix.org) if
+you see this failure mode so we can help debug it, however.

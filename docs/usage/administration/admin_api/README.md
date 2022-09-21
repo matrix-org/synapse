@@ -5,8 +5,9 @@
 Many of the API calls in the admin api will require an `access_token` for a
 server admin. (Note that a server admin is distinct from a room admin.)
 
-A user can be marked as a server admin by updating the database directly, e.g.:
+An existing user can be marked as a server admin by updating the database directly.
 
+Check your [database settings](config_documentation.md#database) in the configuration file, connect to the correct database using either `psql [database name]` (if using PostgreSQL) or `sqlite3 path/to/your/database.db` (if using SQLite) and elevate the user `@foo:bar.com` to administrator.
 ```sql
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```

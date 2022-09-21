@@ -21,6 +21,7 @@ from synapse.handlers.presence import PresenceEventSource
 from synapse.handlers.receipts import ReceiptEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
+from synapse.logging.opentracing import trace
 from synapse.streams import EventSource
 from synapse.types import StreamToken
 
@@ -69,6 +70,7 @@ class EventSources:
         )
         return token
 
+    @trace
     async def get_current_token_for_pagination(self, room_id: str) -> StreamToken:
         """Get the current token for a given room to be used to paginate
         events.

@@ -81,12 +81,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.handler = self.homeserver.get_federation_handler()
         federation_event_handler = self.homeserver.get_federation_event_handler()
 
-        async def _check_event_auth(
-            origin,
-            event,
-            context,
-        ):
-            return context
+        async def _check_event_auth(origin, event, context):
+            pass
 
         federation_event_handler._check_event_auth = _check_event_auth
         self.client = self.homeserver.get_federation_client()

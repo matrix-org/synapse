@@ -126,7 +126,9 @@ class _TestImage:
         expected_scaled: The expected bytes from scaled thumbnailing, or None if
             test should just check for a valid image returned.
         expected_found: True if the file should exist on the server, or False if
-            a 404 is expected.
+            a 404/400 is expected.
+        unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
+            False if the thumbnailing should succeed or a normal 404 is expected.
     """
 
     data: bytes
@@ -135,6 +137,7 @@ class _TestImage:
     expected_cropped: Optional[bytes] = None
     expected_scaled: Optional[bytes] = None
     expected_found: bool = True
+    unable_to_thumbnail: bool = False
 
 
 @parameterized_class(
@@ -192,6 +195,7 @@ class _TestImage:
                 b"image/gif",
                 b".gif",
                 expected_found=False,
+                unable_to_thumbnail=True,
             ),
         ),
     ],
@@ -366,18 +370,29 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     def test_thumbnail_crop(self) -> None:
         """Test that a cropped remote thumbnail is available."""
         self._test_thumbnail(
-            "crop", self.test_image.expected_cropped, self.test_image.expected_found
+            "crop",
+            self.test_image.expected_cropped,
+            expected_found=self.test_image.expected_found,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
         )
 
     def test_thumbnail_scale(self) -> None:
         """Test that a scaled remote thumbnail is available."""
         self._test_thumbnail(
-            "scale", self.test_image.expected_scaled, self.test_image.expected_found
+            "scale",
+            self.test_image.expected_scaled,
+            expected_found=self.test_image.expected_found,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
         )
 
     def test_invalid_type(self) -> None:
         """An invalid thumbnail type is never available."""
-        self._test_thumbnail("invalid", None, False)
+        self._test_thumbnail(
+            "invalid",
+            None,
+            expected_found=False,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
+        )
 
     @unittest.override_config(
         {"thumbnail_sizes": [{"width": 32, "height": 32, "method": "scale"}]}
@@ -386,7 +401,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         """
         Override the config to generate only scaled thumbnails, but request a cropped one.
         """
-        self._test_thumbnail("crop", None, False)
+        self._test_thumbnail(
+            "crop",
+            None,
+            expected_found=False,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
+        )
 
     @unittest.override_config(
         {"thumbnail_sizes": [{"width": 32, "height": 32, "method": "crop"}]}
@@ -395,14 +415,22 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         """
         Override the config to generate only cropped thumbnails, but request a scaled one.
         """
-        self._test_thumbnail("scale", None, False)
+        self._test_thumbnail(
+            "scale",
+            None,
+            expected_found=False,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
+        )
 
     def test_thumbnail_repeated_thumbnail(self) -> None:
         """Test that fetching the same thumbnail works, and deleting the on disk
         thumbnail regenerates it.
         """
         self._test_thumbnail(
-            "scale", self.test_image.expected_scaled, self.test_image.expected_found
+            "scale",
+            self.test_image.expected_scaled,
+            expected_found=self.test_image.expected_found,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
         )
 
         if not self.test_image.expected_found:
@@ -459,8 +487,24 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             )
 
     def _test_thumbnail(
-        self, method: str, expected_body: Optional[bytes], expected_found: bool
+        self,
+        method: str,
+        expected_body: Optional[bytes],
+        expected_found: bool,
+        unable_to_thumbnail: bool = False,
     ) -> None:
+        """Test the given thumbnailing method works as expected.
+
+        Args:
+            method: The thumbnailing method to use (crop, scale).
+            expected_body: The expected bytes from thumbnailing, or None if
+                test should just check for a valid image.
+            expected_found: True if the file should exist on the server, or False if
+                a 404/400 is expected.
+            unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
+                False if the thumbnailing should succeed or a normal 404 is expected.
+        """
+
         params = "?width=32&height=32&method=" + method
         channel = make_request(
             self.reactor,
@@ -496,6 +540,16 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             else:
                 # ensure that the result is at least some valid image
                 Image.open(BytesIO(channel.result["body"]))
+        elif unable_to_thumbnail:
+            # A 400 with a JSON body.
+            self.assertEqual(channel.code, 400)
+            self.assertEqual(
+                channel.json_body,
+                {
+                    "errcode": "M_UNKNOWN",
+                    "error": "Cannot find any thumbnails for the requested media ([b'example.com', b'12345']). This might mean the media is not a supported_media_format=(image/jpeg, image/jpg, image/webp, image/gif, image/png) or that thumbnailing failed for some other reason. (Dynamic thumbnails are disabled on this server.)",
+                },
+            )
         else:
             # A 404 with a JSON body.
             self.assertEqual(channel.code, 404)

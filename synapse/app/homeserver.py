@@ -57,7 +57,6 @@ from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
@@ -219,7 +218,10 @@ class SynapseHomeServer(HomeServer):
             resources.update({"/_matrix/consent": consent_resource})
 
         if name == "federation":
-            resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+            federation_resource: Resource = TransportLayerServer(self)
+            if compress:
+                federation_resource = gz_wrap(federation_resource)
+            resources.update({FEDERATION_PREFIX: federation_resource})
 
         if name == "openid":
             resources.update(
@@ -287,16 +289,6 @@ class SynapseHomeServer(HomeServer):
                     manhole_settings=self.config.server.manhole_settings,
                     manhole_globals={"hs": self},
                 )
-            elif listener.type == "replication":
-                services = listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    ReplicationStreamProtocolFactory(self),
-                )
-                for s in services:
-                    self.get_reactor().addSystemEventTrigger(
-                        "before", "shutdown", s.stopListening
-                    )
             elif listener.type == "metrics":
                 if not self.config.metrics.enable_metrics:
                     logger.warning(
@@ -304,7 +296,11 @@ class SynapseHomeServer(HomeServer):
                         "enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(listener.bind_addresses, listener.port)
+                    _base.listen_metrics(
+                        listener.bind_addresses,
+                        listener.port,
+                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
+                    )
             else:
                 # this shouldn't happen, as the listener type should have been checked
                 # during parsing

@@ -1,3 +1,106 @@
+matrix-synapse-py3 (1.68.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.68.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 20 Sep 2022 11:18:20 +0100
+
+matrix-synapse-py3 (1.67.0) stable; urgency=medium
+
+  * New Synapse release 1.67.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 13 Sep 2022 09:19:56 +0100
+
+matrix-synapse-py3 (1.67.0~rc1) stable; urgency=medium
+
+  [ Erik Johnston ]
+  * Use stable poetry 1.2.0 version, rather than a prerelease.
+
+  [ Synapse Packaging team ]
+  * New Synapse release 1.67.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 06 Sep 2022 09:01:06 +0100
+
+matrix-synapse-py3 (1.66.0) stable; urgency=medium
+
+  * New Synapse release 1.66.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 31 Aug 2022 11:20:17 +0100
+
+matrix-synapse-py3 (1.66.0~rc2+nmu1) UNRELEASED; urgency=medium
+
+  [ Jörg Behrmann ]
+  * Update debhelper to compatibility level 12.
+  * Drop the preinst script stopping synapse.
+  * Allocate a group for the system user.
+  * Change dpkg-statoverride to --force-statoverride-add.
+
+  [ Erik Johnston ]
+  * Disable `dh_auto_configure` as it broke during Rust build.
+
+ -- Jörg Behrmann <behrmann@physik.fu-berlin.de>  Tue, 23 Aug 2022 17:17:00 +0100
+
+matrix-synapse-py3 (1.66.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.66.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 30 Aug 2022 12:25:19 +0100
+
+matrix-synapse-py3 (1.66.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.66.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 23 Aug 2022 09:48:55 +0100
+
+matrix-synapse-py3 (1.65.0) stable; urgency=medium
+
+  * New Synapse release 1.65.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Aug 2022 16:51:26 +0100
+
+matrix-synapse-py3 (1.65.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.65.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 11 Aug 2022 11:38:18 +0100
+
+matrix-synapse-py3 (1.65.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.65.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 09 Aug 2022 11:39:29 +0100
+
+matrix-synapse-py3 (1.64.0) stable; urgency=medium
+
+  * New Synapse release 1.64.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 02 Aug 2022 10:32:30 +0100
+
+matrix-synapse-py3 (1.64.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.64.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 29 Jul 2022 12:22:53 +0100
+
+matrix-synapse-py3 (1.64.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.64.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Jul 2022 12:11:49 +0100
+
+matrix-synapse-py3 (1.63.1) stable; urgency=medium
+
+  * New Synapse release 1.63.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 20 Jul 2022 13:36:52 +0100
+
+matrix-synapse-py3 (1.63.0) stable; urgency=medium
+
+  * Clarify that homeserver server names are included in the data reported
+    by opt-in server stats reporting (`report_stats` homeserver config option).
+  * New Synapse release 1.63.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 19 Jul 2022 14:42:24 +0200
+
 matrix-synapse-py3 (1.63.0~rc1) stable; urgency=medium
 
   * New Synapse release 1.63.0rc1.

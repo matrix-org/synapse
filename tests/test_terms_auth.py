@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
@@ -51,10 +50,10 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
     def test_ui_auth(self):
         # Do a UI auth request
-        request_data = json.dumps({"username": "kermit", "password": "monkey"})
+        request_data = {"username": "kermit", "password": "monkey"}
         channel = self.make_request(b"POST", self.url, request_data)
 
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, channel.result)
 
         self.assertTrue(channel.json_body is not None)
         self.assertIsInstance(channel.json_body["session"], str)
@@ -82,16 +81,14 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.assertDictContainsSubset(channel.json_body["params"], expected_params)
 
         # We have to complete the dummy auth stage before completing the terms stage
-        request_data = json.dumps(
-            {
-                "username": "kermit",
-                "password": "monkey",
-                "auth": {
-                    "session": channel.json_body["session"],
-                    "type": "m.login.dummy",
-                },
-            }
-        )
+        request_data = {
+            "username": "kermit",
+            "password": "monkey",
+            "auth": {
+                "session": channel.json_body["session"],
+                "type": "m.login.dummy",
+            },
+        }
 
         self.registration_handler.check_username = Mock(return_value=True)
 
@@ -99,25 +96,23 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
         # We don't bother checking that the response is correct - we'll leave that to
         # other tests. We just want to make sure we're on the right path.
-        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.code, 401, channel.result)
 
         # Finish the UI auth for terms
-        request_data = json.dumps(
-            {
-                "username": "kermit",
-                "password": "monkey",
-                "auth": {
-                    "session": channel.json_body["session"],
-                    "type": "m.login.terms",
-                },
-            }
-        )
+        request_data = {
+            "username": "kermit",
+            "password": "monkey",
+            "auth": {
+                "session": channel.json_body["session"],
+                "type": "m.login.terms",
+            },
+        }
         channel = self.make_request(b"POST", self.url, request_data)
 
         # We're interested in getting a response that looks like a successful
         # registration, not so much that the details are exactly what we want.
 
-        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         self.assertTrue(channel.json_body is not None)
         self.assertIsInstance(channel.json_body["user_id"], str)

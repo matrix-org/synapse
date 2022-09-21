@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import urllib.parse
-from http import HTTPStatus
 
 from parameterized import parameterized
 
@@ -42,7 +41,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
     def test_version_string(self) -> None:
         channel = self.make_request("GET", self.url, shorthand=False)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(
             {"server_version", "python_version"}, set(channel.json_body.keys())
         )
@@ -79,10 +78,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Should be quarantined
         self.assertEqual(
-            HTTPStatus.NOT_FOUND,
+            404,
             channel.code,
             msg=(
-                "Expected to receive a HTTPStatus.NOT_FOUND on accessing quarantined media: %s"
+                "Expected to receive a 404 on accessing quarantined media: %s"
                 % server_and_media_id
             ),
         )
@@ -107,7 +106,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Expect a forbidden error
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg="Expected forbidden on quarantining media as a non-admin",
         )
@@ -139,7 +138,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Should be successful
-        self.assertEqual(HTTPStatus.OK, channel.code)
+        self.assertEqual(200, channel.code)
 
         # Quarantine the media
         url = "/_synapse/admin/v1/media/quarantine/%s/%s" % (
@@ -152,7 +151,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Attempt to access the media
         self._ensure_quarantined(admin_user_tok, server_name_and_media_id)
@@ -209,7 +208,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(
             channel.json_body, {"num_quarantined": 2}, "Expected 2 quarantined items"
         )
@@ -251,7 +250,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(
             channel.json_body, {"num_quarantined": 2}, "Expected 2 quarantined items"
         )
@@ -285,7 +284,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/media/protect/%s" % (urllib.parse.quote(media_id_2),)
         channel = self.make_request("POST", url, access_token=admin_user_tok)
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Quarantine all media by this user
         url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
@@ -297,7 +296,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(
             channel.json_body, {"num_quarantined": 1}, "Expected 1 quarantined item"
         )
@@ -318,10 +317,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Shouldn't be quarantined
         self.assertEqual(
-            HTTPStatus.OK,
+            200,
             channel.code,
             msg=(
-                "Expected to receive a HTTPStatus.OK on accessing not-quarantined media: %s"
+                "Expected to receive a 200 on accessing not-quarantined media: %s"
                 % server_and_media_id_2
             ),
         )
@@ -350,7 +349,7 @@ class PurgeHistoryTestCase(unittest.HomeserverTestCase):
     def test_purge_history(self) -> None:
         """
         Simple test of purge history API.
-        Test only that is is possible to call, get status HTTPStatus.OK and purge_id.
+        Test only that is is possible to call, get status 200 and purge_id.
         """
 
         channel = self.make_request(
@@ -360,7 +359,7 @@ class PurgeHistoryTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -371,5 +370,5 @@ class PurgeHistoryTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("complete", channel.json_body["status"])

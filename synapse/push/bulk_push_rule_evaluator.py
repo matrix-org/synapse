@@ -15,7 +15,18 @@
 
 import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 from prometheus_client import Counter
 
@@ -26,6 +37,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
@@ -112,7 +124,7 @@ class BulkPushRuleEvaluator:
     async def _get_rules_for_event(
         self,
         event: EventBase,
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> Dict[str, FilteredPushRules]:
         """Get the push rules for all users who may need to be notified about
         the event.
 
@@ -130,6 +142,13 @@ class BulkPushRuleEvaluator:
         # may be expensive for large rooms with few local users.
 
         local_users = await self.store.get_local_users_in_room(event.room_id)
+
+        # Filter out appservice users.
+        local_users = [
+            u
+            for u in local_users
+            if not self.store.get_if_app_services_interested_in_user(u)
+        ]
 
         # if this event is an invite event, we may need to run rules for the user
         # who's been invited, otherwise they won't get told they've been invited
@@ -179,7 +198,7 @@ class BulkPushRuleEvaluator:
         return pl_event.content if pl_event else {}, sender_level
 
     async def _get_mutual_relations(
-        self, event: EventBase, rules: Iterable[Dict[str, Any]]
+        self, parent_id: str, rules: Iterable[Tuple[PushRule, bool]]
     ) -> Dict[str, Set[Tuple[str, str]]]:
         """
         Fetch event metadata for events which related to the same event as the given event.
@@ -187,7 +206,7 @@ class BulkPushRuleEvaluator:
         If the given event has no relation information, returns an empty dictionary.
 
         Args:
-            event_id: The event ID which is targeted by relations.
+            parent_id: The event ID which is targeted by relations.
             rules: The push rules which will be processed for this event.
 
         Returns:
@@ -201,20 +220,13 @@ class BulkPushRuleEvaluator:
         if not self._relations_match_enabled:
             return {}
 
-        # If the event does not have a relation, then cannot have any mutual
-        # relations.
-        relation = relation_from_event(event)
-        if not relation:
-            return {}
-
         # Pre-filter to figure out which relation types are interesting.
         rel_types = set()
-        for rule in rules:
-            # Skip disabled rules.
-            if "enabled" in rule and not rule["enabled"]:
+        for rule, enabled in rules:
+            if not enabled:
                 continue
 
-            for condition in rule["conditions"]:
+            for condition in rule.conditions:
                 if condition["kind"] != "org.matrix.msc3772.relation_match":
                     continue
 
@@ -228,9 +240,7 @@ class BulkPushRuleEvaluator:
             return {}
 
         # If any valid rules were found, fetch the mutual relations.
-        return await self.store.get_mutual_event_relations(
-            relation.parent_id, rel_types
-        )
+        return await self.store.get_mutual_event_relations(parent_id, rel_types)
 
     @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
@@ -244,10 +254,15 @@ class BulkPushRuleEvaluator:
             # This can happen due to out of band memberships
             return
 
-        count_as_unread = _should_count_as_unread(event, context)
+        # Disable counting as unread unless the experimental configuration is
+        # enabled, as it can cause additional (unwanted) rows to be added to the
+        # event_push_actions table.
+        count_as_unread = False
+        if self.hs.config.experimental.msc2654_enabled:
+            count_as_unread = _should_count_as_unread(event, context)
 
         rules_by_user = await self._get_rules_for_event(event)
-        actions_by_user: Dict[str, List[Union[dict, str]]] = {}
+        actions_by_user: Dict[str, Collection[Union[Mapping, str]]] = {}
 
         room_member_count = await self.store.get_number_joined_users_in_room(
             event.room_id
@@ -258,9 +273,18 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
-        relations = await self._get_mutual_relations(
-            event, itertools.chain(*rules_by_user.values())
-        )
+        relation = relation_from_event(event)
+        # If the event does not have a relation, then cannot have any mutual
+        # relations or thread ID.
+        relations = {}
+        thread_id = "main"
+        if relation:
+            relations = await self._get_mutual_relations(
+                relation.parent_id,
+                itertools.chain(*(r.rules() for r in rules_by_user.values())),
+            )
+            if relation.rel_type == RelationTypes.THREAD:
+                thread_id = relation.parent_id
 
         evaluator = PushRuleEvaluatorForEvent(
             event,
@@ -310,15 +334,13 @@ class BulkPushRuleEvaluator:
                 # current user, it'll be added to the dict later.
                 actions_by_user[uid] = []
 
-            for rule in rules:
-                if "enabled" in rule and not rule["enabled"]:
+            for rule, enabled in rules.rules():
+                if not enabled:
                     continue
 
-                matches = evaluator.check_conditions(
-                    rule["conditions"], uid, display_name
-                )
+                matches = evaluator.check_conditions(rule.conditions, uid, display_name)
                 if matches:
-                    actions = [x for x in rule["actions"] if x != "dont_notify"]
+                    actions = [x for x in rule.actions if x != "dont_notify"]
                     if actions and "notify" in actions:
                         # Push rules say we should notify the user of this event
                         actions_by_user[uid] = actions
@@ -331,6 +353,7 @@ class BulkPushRuleEvaluator:
             event.event_id,
             actions_by_user,
             count_as_unread,
+            thread_id,
         )
 
 

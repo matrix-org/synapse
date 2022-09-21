@@ -115,6 +115,6 @@ class PurgeTests(HomeserverTestCase):
         )
 
         # The events aren't found.
-        self.store._invalidate_get_event_cache(create_event.event_id)
+        self.store._invalidate_local_get_event_cache(create_event.event_id)
         self.get_failure(self.store.get_event(create_event.event_id), NotFoundError)
         self.get_failure(self.store.get_event(first["event_id"]), NotFoundError)

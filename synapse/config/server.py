@@ -36,6 +36,12 @@ from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
+DIRECT_TCP_ERROR = """
+Using direct TCP replication for workers is no longer supported.
+
+Please see https://matrix-org.github.io/synapse/latest/upgrade.html#direct-tcp-replication-is-no-longer-supported-migrate-to-redis
+"""
+
 # by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
 # (Windows, macOS, other BSD/Linux where net.ipv6.bindv6only is set) will only listen
 # on IPv6 when '::' is set.
@@ -165,7 +171,6 @@ KNOWN_LISTENER_TYPES = {
     "http",
     "metrics",
     "manhole",
-    "replication",
 }
 
 KNOWN_RESOURCES = {
@@ -201,6 +206,7 @@ class HttpListenerConfig:
     resources: List[HttpResourceConfig] = attr.Factory(list)
     additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
+    request_id_header: Optional[str] = None
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -517,7 +523,11 @@ class ServerConfig(Config):
         ):
             raise ConfigError("allowed_avatar_mimetypes must be a list")
 
-        self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
+        listeners = config.get("listeners", [])
+        if not isinstance(listeners, list):
+            raise ConfigError("Expected a list", ("listeners",))
+
+        self.listeners = [parse_listener_def(i, x) for i, x in enumerate(listeners)]
 
         # no_tls is not really supported any more, but let's grandfather it in
         # here.
@@ -889,9 +899,15 @@ def read_gc_thresholds(
         )
 
 
-def parse_listener_def(listener: Any) -> ListenerConfig:
+def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     """parse a listener config from the config file"""
+    if not isinstance(listener, dict):
+        raise ConfigError("Expected a dictionary", ("listeners", str(num)))
+
     listener_type = listener["type"]
+    # Raise a helpful error if direct TCP replication is still configured.
+    if listener_type == "replication":
+        raise ConfigError(DIRECT_TCP_ERROR, ("listeners", str(num), "type"))
 
     port = listener.get("port")
     if not isinstance(port, int):
@@ -927,6 +943,7 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
             resources=resources,
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
+            request_id_header=listener.get("request_id_header"),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
