@@ -45,11 +45,14 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         self.password = "password"
 
     def test_disabled(self) -> None:
+        channel = self.make_request("POST", "/login/token", {}, access_token=None)
+        self.assertEqual(channel.code, 400)
+
         self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
         channel = self.make_request("POST", "/login/token", {}, access_token=token)
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 400)
 
     @override_config({"experimental_features": {"msc3882_enabled": True}})
     def test_require_auth(self) -> None:
