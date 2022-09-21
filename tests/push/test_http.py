@@ -772,6 +772,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 lang=None,
                 data={"url": "http://example.com/_matrix/push/v1/notify"},
                 enabled=enabled,
+                device_id=user_tuple.device_id,
             )
         )
 
@@ -886,19 +887,21 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(channel.json_body["pushers"]), 1)
         self.assertTrue(channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"])
 
-    def test_update_different_device_access_token(self) -> None:
+    def test_update_different_device_access_token_device_id(self) -> None:
         """Tests that if we create a pusher from one device, the update it from another
-        device, the access token associated with the pusher stays the same.
+        device, the access token and device ID associated with the pusher stays the
+        same.
         """
         # Create a user with a pusher.
         user_id, access_token = self._make_user_with_pusher("user")
 
         # Get the token ID for the current access token, since that's what we store in
-        # the pushers table.
+        # the pushers table. Also get the device ID from it.
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         # Generate a new access token, and update the pusher with it.
         new_token = self.login("user", "pass")
@@ -910,10 +913,11 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers: List[PusherConfig] = list(ret)
 
-        # Check that we still have one pusher, and that the access token associated with
-        # it didn't change.
+        # Check that we still have one pusher, and that the access token and device ID
+        # associated with it didn't change.
         self.assertEqual(len(pushers), 1)
         self.assertEqual(pushers[0].access_token, token_id)
+        self.assertEqual(pushers[0].device_id, device_id)
 
     @override_config({"experimental_features": {"msc3881_enabled": True}})
     def test_device_id(self) -> None:
