@@ -51,6 +51,8 @@ class _RelatedEvent:
     event_id: str
     # The sender of the related event.
     sender: str
+    topological_ordering: Optional[int]
+    stream_ordering: int
 
 
 class RelationsWorkerStore(SQLBaseStore):
@@ -142,31 +144,32 @@ class RelationsWorkerStore(SQLBaseStore):
         ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
             txn.execute(sql, where_args + [limit + 1])
 
-            last_topo_id = None
-            last_stream_id = None
             events = []
             for event_id, relation_type, sender, topo_ordering, stream_ordering in txn:
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or relation_type != RelationTypes.REPLACE:
-                    events.append(_RelatedEvent(event_id, sender))
-                last_topo_id = topo_ordering
-                last_stream_id = stream_ordering
+                    events.append(
+                        _RelatedEvent(event_id, sender, topo_ordering, stream_ordering)
+                    )
 
-            # If there are more events, generate the next pagination key.
+            # If there are more events, generate the next pagination key from the
+            # last event returned.
             next_token = None
             if len(events) > limit:
-                # If there are events we must have pulled at least one row.
-                assert last_topo_id is not None
-                assert last_stream_id is not None
+                events = events[:limit]
 
-                # Due to how the pagination clause is generated, the stream ID is
-                # handled as an exclusive range when paginating forward. Correct
-                # for that here.
-                if direction == "f":
-                    last_stream_id -= 1
+                topo = events[-1].topological_ordering
+                toke = events[-1].stream_ordering
+                if direction == "b":
+                    # Tokens are positions between events.
+                    # This token points *after* the last event in the chunk.
+                    # We need it to point to the event before it in the chunk
+                    # when we are going backwards so we subtract one from the
+                    # stream part.
+                    toke -= 1
+                next_key = RoomStreamToken(topo, toke)
 
-                next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
                     next_token = from_token.copy_and_replace(
                         StreamKeyType.ROOM, next_key
