@@ -35,7 +35,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import canonicaljson
 import signedjson.key
@@ -324,13 +324,7 @@ class HomeserverTestCase(TestCase):
                 # Type ignore: mypy doesn't like us assigning to methods.
                 self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[assignment]
                 self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[assignment]
-
-                patch.object(
-                    self.hs.get_auth(),
-                    "get_access_token_from_request",
-                    return_value=token,
-                    autospec=True,
-                )
+                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[assignment]
 
         if self.needs_threadpool:
             self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
