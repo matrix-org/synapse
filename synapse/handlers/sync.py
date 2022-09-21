@@ -1349,9 +1349,27 @@ class SyncHandler:
             # For the latest membership event in each room found, add/remove the room ID
             # from the joined room list accordingly. In this case we only care if the
             # latest change is JOIN.
+
             for room_id, event in mem_last_change_by_room_id.items():
+                logger.info(
+                    "User membership change between getting rooms and current token: %s %s %s",
+                    user_id,
+                    event.membership,
+                    room_id,
+                )
+                # User joined a room - we have to then check the room state to ensure we
+                # respect any bans if there's a race between the join and ban events.
                 if event.membership == Membership.JOIN:
-                    mutable_joined_room_ids.add(room_id)
+                    assert event.internal_metadata.stream_ordering
+                    extrems = await self.store.get_forward_extremities_for_room_at_stream_ordering(
+                        room_id, event.internal_metadata.stream_ordering
+                    )
+                    user_ids_in_room = await self.state.get_current_user_ids_in_room(
+                        room_id, extrems
+                    )
+                    if user_id in user_ids_in_room:
+                        mutable_joined_room_ids.add(room_id)
+                # The user left the room, or left and was re-invited but not joined yet
                 else:
                     mutable_joined_room_ids.discard(room_id)
 
