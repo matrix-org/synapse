@@ -229,8 +229,8 @@ for the user. Commonly the <code>sub</code> claim of the response.</li>
 <li>This method must be async.</li>
 <li>Arguments:
 <ul>
-<li><code>userinfo</code> - A <code>authlib.oidc.core.claims.UserInfo</code> object to extract user
-information from.</li>
+<li><code>userinfo</code> - An <a href="https://docs.authlib.org/en/latest/specs/oidc.html#authlib.oidc.core.UserInfo"><code>authlib.oidc.core.claims.UserInfo</code></a>
+object to extract user information from.</li>
 <li><code>token</code> - A dictionary which includes information necessary to make
 further requests to the OpenID provider.</li>
 <li><code>failures</code> - An <code>int</code> that represents the amount of times the returned
@@ -250,7 +250,13 @@ with failures=1. The method should then return a different
 <code>None</code>, the user is prompted to pick their own username. This is only used
 during a user's first login. Once a localpart has been associated with a
 remote user ID (see <code>get_remote_user_id</code>) it cannot be updated.</li>
-<li><code>displayname</code>: An optional string, the display name for the user.</li>
+<li><code>confirm_localpart</code>: A boolean. If set to <code>True</code>, when a <code>localpart</code>
+string is returned from this method, Synapse will prompt the user to
+either accept this localpart or pick their own username. Otherwise this
+option has no effect. If omitted, defaults to <code>False</code>.</li>
+<li><code>display_name</code>: An optional string, the display name for the user.</li>
+<li><code>emails</code>: A list of strings, the email address(es) to associate with
+this user. If omitted, defaults to an empty list.</li>
 </ul>
 </li>
 </ul>
