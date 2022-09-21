@@ -145,13 +145,13 @@ class RelationsWorkerStore(SQLBaseStore):
             last_topo_id = None
             last_stream_id = None
             events = []
-            for row in txn:
+            for event_id, relation_type, sender, topo_ordering, stream_ordering in txn:
                 # Do not include edits for redacted events as they leak event
                 # content.
-                if not is_redacted or row[1] != RelationTypes.REPLACE:
-                    events.append(_RelatedEvent(row[0], row[2]))
-                last_topo_id = row[3]
-                last_stream_id = row[4]
+                if not is_redacted or relation_type != RelationTypes.REPLACE:
+                    events.append(_RelatedEvent(event_id, sender))
+                last_topo_id = topo_ordering
+                last_stream_id = stream_ordering
 
             # If there are more events, generate the next pagination key.
             next_token = None
