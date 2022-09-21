@@ -434,24 +434,6 @@ class PersistEventsStore:
 
         self._store_event_txn(txn, events_and_contexts=events_and_contexts)
 
-        for event, _ in events_and_contexts:
-            # We expect events to be persisted by this point
-            assert event.internal_metadata.stream_ordering
-
-            relation = relation_from_event(event)
-            self.store._invalidate_caches_for_event(
-                stream_ordering=event.internal_metadata.stream_ordering,
-                event_id=event.event_id,
-                room_id=event.room_id,
-                etype=event.type,
-                state_key=None,  # event.state_key,
-                # TODO
-                redacts=None,
-                relates_to=relation.parent_id if relation else None,
-                # TODO
-                backfilled=False,
-            )
-
         self._persist_transaction_ids_txn(txn, events_and_contexts)
 
         # Insert into event_to_state_groups.

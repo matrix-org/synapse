@@ -228,9 +228,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             room_id,
             event_id,
         )
-        logger.info(
-            "CacheInvalidationWorkerStore self.have_seen_event=%s", self.have_seen_event
-        )
         self._invalidate_local_get_event_cache(event_id)
         self.have_seen_event.invalidate(((room_id, event_id),))
 
