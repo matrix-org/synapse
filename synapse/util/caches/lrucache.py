@@ -511,6 +511,7 @@ class LruCache(Generic[KT, VT]):
                 callbacks,
                 prune_unread_entries,
             )
+            logger.info("LruCache add_node key=%s value=%s", key, value)
             cache[key] = node
 
             if size_callback:
@@ -722,7 +723,12 @@ class LruCache(Generic[KT, VT]):
             may be of lower cardinality than the TreeCache - in which case the whole
             subtree is deleted.
             """
+            logger.info(
+                "LruCache cache values before pop %s",
+                {node.key: node.value for node in cache.values()},
+            )
             popped = cache.pop(key, None)
+            logger.info("LruCache cache_del_multi key=%s popped=%s", key, popped)
             if popped is None:
                 return
             # for each deleted node, we now need to remove it from the linked list

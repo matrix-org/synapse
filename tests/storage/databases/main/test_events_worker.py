@@ -20,9 +20,6 @@ from twisted.enterprise.adbapi import ConnectionPool
 from twisted.internet.defer import CancelledError, Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
-import synapse.rest.admin
-import synapse.rest.client.login
-import synapse.rest.client.room
 from synapse.api.room_versions import EventFormatVersions, RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
@@ -36,76 +33,47 @@ from synapse.storage.databases.main.events_worker import (
 from synapse.storage.types import Connection
 from synapse.util import Clock
 from synapse.util.async_helpers import yieldable_gather_results
-from tests.test_utils.event_injection import create_event
 
 from tests import unittest
+from tests.test_utils.event_injection import create_event, inject_event
 
 
 class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
     servlets = [
-        synapse.rest.admin.register_servlets,
-        synapse.rest.client.login.register_servlets,
-        synapse.rest.client.room.register_servlets,
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
         self.hs = hs
         self.store: EventsWorkerStore = hs.get_datastores().main
 
-        # insert some test data
-        for rid in ("room1", "room2"):
-            self.get_success(
-                self.store.db_pool.simple_insert(
-                    "rooms",
-                    {"room_id": rid, "room_version": 4},
-                )
-            )
+        self.user = self.register_user("user", "pass")
+        self.token = self.login(self.user, "pass")
+        self.room_id = self.helper.create_room_as(self.user, tok=self.token)
 
         self.event_ids: List[str] = []
-        for idx, rid in enumerate(
-            (
-                "room1",
-                "room1",
-                "room1",
-                "room2",
+        for i in range(3):
+            event = self.get_success(
+                inject_event(
+                    hs,
+                    room_version=RoomVersions.V7.identifier,
+                    room_id=self.room_id,
+                    sender=self.user,
+                    type="test_event_type",
+                    content={"body": f"foobarbaz{i}"},
+                )
             )
-        ):
-            event_json = {"type": f"test {idx}", "room_id": rid}
-            event = make_event_from_dict(event_json, room_version=RoomVersions.V4)
-            event_id = event.event_id
 
-            self.get_success(
-                self.store.db_pool.simple_insert(
-                    "events",
-                    {
-                        "event_id": event_id,
-                        "room_id": rid,
-                        "topological_ordering": idx,
-                        "stream_ordering": idx,
-                        "type": event.type,
-                        "processed": True,
-                        "outlier": False,
-                    },
-                )
-            )
-            self.get_success(
-                self.store.db_pool.simple_insert(
-                    "event_json",
-                    {
-                        "event_id": event_id,
-                        "room_id": rid,
-                        "json": json.dumps(event_json),
-                        "internal_metadata": "{}",
-                        "format_version": 3,
-                    },
-                )
-            )
-            self.event_ids.append(event_id)
+            self.event_ids.append(event.event_id)
 
     def test_simple(self):
         with LoggingContext(name="test") as ctx:
             res = self.get_success(
-                self.store.have_seen_events("room1", [self.event_ids[0], "event19"])
+                self.store.have_seen_events(
+                    self.room_id, [self.event_ids[0], "eventdoesnotexist"]
+                )
             )
             self.assertEqual(res, {self.event_ids[0]})
 
@@ -115,7 +83,9 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
         # a second lookup of the same events should cause no queries
         with LoggingContext(name="test") as ctx:
             res = self.get_success(
-                self.store.have_seen_events("room1", [self.event_ids[0], "event19"])
+                self.store.have_seen_events(
+                    self.room_id, [self.event_ids[0], "eventdoesnotexist"]
+                )
             )
             self.assertEqual(res, {self.event_ids[0]})
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
@@ -127,46 +97,53 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
         # looking it up should now cause no db hits
         with LoggingContext(name="test") as ctx:
             res = self.get_success(
-                self.store.have_seen_events("room1", [self.event_ids[0]])
+                self.store.have_seen_events(self.room_id, [self.event_ids[0]])
             )
             self.assertEqual(res, {self.event_ids[0]})
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
     def test_persisting_event_invalidates_cache(self):
-        with LoggingContext(name="test") as ctx:
-            alice = self.register_user("alice", "pass")
-            alice_token = self.login("alice", "pass")
-            room_id = self.helper.create_room_as(alice, tok=alice_token)
-
-            event, event_context = self.get_success(
-                create_event(
-                    self.hs,
-                    room_id=room_id,
-                    room_version="6",
-                    sender=alice,
-                    type="test_event_type",
-                    content={"body": "foobarbaz"},
-                )
+        event, event_context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=self.room_id,
+                sender=self.user,
+                type="test_event_type",
+                content={"body": "garply"},
             )
+        )
 
-            # Check first `have_seen_events` for an event we have not seen yet
-            # to prime the cache with a `false`.
+        with LoggingContext(name="test") as ctx:
+            # First, check `have_seen_event` for an event we have not seen yet
+            # to prime the cache with a `false` value.
             res = self.get_success(
                 self.store.have_seen_events(event.room_id, [event.event_id])
             )
             self.assertEqual(res, set())
 
-            # that should result in a single db query to lookup if we have the
-            # event that we have not persisted yet.
+            # That should result in a single db query to lookup
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
-            persistence = self.hs.get_storage_controllers().persistence
-            self.get_success(
-                persistence.persist_event(
-                    event,
-                    event_context,
-                )
+        # Persist the event which should invalidate or prefill the
+        # `have_seen_event` cache so we don't return stale values.
+        persistence = self.hs.get_storage_controllers().persistence
+        self.get_success(
+            persistence.persist_event(
+                event,
+                event_context,
             )
+        )
+
+        with LoggingContext(name="test") as ctx:
+            # Check `have_seen_event` again and we should see the updated fact
+            # that we have now seen the event after persisting it.
+            res = self.get_success(
+                self.store.have_seen_events(event.room_id, [event.event_id])
+            )
+            self.assertEqual(res, {event.event_id})
+
+            # That should result in a single db query to lookup
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
 
 class EventCacheTestCase(unittest.HomeserverTestCase):

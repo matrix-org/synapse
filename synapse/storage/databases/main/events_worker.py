@@ -1453,7 +1453,7 @@ class EventsWorkerStore(SQLBaseStore):
     @trace
     @tag_args
     async def have_seen_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> Set[str]:
         """Given a list of event ids, check if we have already processed them.
 
@@ -1468,6 +1468,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             The set of events we have already seen.
         """
+        logger.info("have_seen_events room_id=%s event_ids=%s", room_id, event_ids)
 
         # @cachedList chomps lots of memory if you call it with a big list, so
         # we break it down. However, each batch requires its own index scan, so we make
@@ -1491,6 +1492,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
              a dict {(room_id, event_id)-> bool}
         """
+        logger.info("_have_seen_events_dict keys=%s", keys)
         # if the event cache contains the event, obviously we've seen it.
 
         cache_results = {

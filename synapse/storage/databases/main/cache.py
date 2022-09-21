@@ -223,9 +223,16 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
-        logger.info("_invalidate_caches_for_event event_id=%s", event_id)
+        logger.info(
+            "CacheInvalidationWorkerStore _invalidate_caches_for_event room_id=%s event_id=%s",
+            room_id,
+            event_id,
+        )
+        logger.info(
+            "CacheInvalidationWorkerStore self.have_seen_event=%s", self.have_seen_event
+        )
         self._invalidate_local_get_event_cache(event_id)
-        self.have_seen_event.invalidate((room_id, event_id))
+        self.have_seen_event.invalidate(((room_id, event_id),))
 
         self.get_latest_event_ids_in_room.invalidate((room_id,))
 

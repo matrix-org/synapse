@@ -383,8 +383,14 @@ class DeferredCache(Generic[KT, VT]):
         may be of lower cardinality than the TreeCache - in which case the whole
         subtree is deleted.
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info("DeferredCache before=%s", self.cache.len())
+        logger.info("DeferredCache invalidate key=%s", key)
         self.check_thread()
         self.cache.del_multi(key)
+        logger.info("DeferredCache after=%s", self.cache.len())
 
         # if we have a pending lookup for this key, remove it from the
         # _pending_deferred_cache, which will (a) stop it being returned for
