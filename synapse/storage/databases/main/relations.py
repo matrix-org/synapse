@@ -91,6 +91,9 @@ class RelationsWorkerStore(SQLBaseStore):
         # it. The `event_id` must match the `event.event_id`.
         assert event.event_id == event_id
 
+        # Ensure bad limits aren't being passed in.
+        assert limit >= 0
+
         where_clause = ["relates_to_id = ?", "room_id = ?"]
         where_args: List[Union[str, int]] = [event.event_id, room_id]
         is_redacted = event.internal_metadata.is_redacted()
@@ -152,7 +155,11 @@ class RelationsWorkerStore(SQLBaseStore):
 
             # If there are more events, generate the next pagination key.
             next_token = None
-            if len(events) > limit and last_topo_id and last_stream_id:
+            if len(events) > limit:
+                # If there are events we must have pulled at least one row.
+                assert last_topo_id is not None
+                assert last_stream_id is not None
+
                 # Due to how the pagination clause is generated, the stream ID is
                 # handled as an exclusive range when paginating forward. Correct
                 # for that here.
