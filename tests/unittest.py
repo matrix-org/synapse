@@ -321,12 +321,10 @@ class HomeserverTestCase(TestCase):
                         access_token_id=token_id,
                     )
 
-                get_access_token = Mock(return_value=token)
-
-                auth = self.hs.get_auth()
-                patch.object(auth, "get_user_by_req", get_requester)
-                patch.object(auth, "get_user_by_access_token", get_requester)
-                patch.object(auth, "get_access_token_from_request", get_access_token)
+                # Type ignore: mypy doesn't like us assigning to methods.
+                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[assignment]
+                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[assignment]
+                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[assignment]
 
         if self.needs_threadpool:
             self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
