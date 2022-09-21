@@ -114,7 +114,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
 
         self.pusher = self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.user_id,
                 access_token=self.token_id,
                 kind="email",
@@ -136,7 +136,7 @@ class EmailPusherTests(HomeserverTestCase):
         """
         with self.assertRaises(SynapseError) as cm:
             self.get_success_or_raise(
-                self.hs.get_pusherpool().add_pusher(
+                self.hs.get_pusherpool().add_or_update_pusher(
                     user_id=self.user_id,
                     access_token=self.token_id,
                     kind="email",
