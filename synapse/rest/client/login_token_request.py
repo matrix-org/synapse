@@ -80,7 +80,6 @@ class LoginTokenRequestServlet(RestServlet):
             duration_in_ms=self.token_timeout,
         )
 
-
         return (
             200,
             {
