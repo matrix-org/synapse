@@ -537,7 +537,9 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
         )
 
         if nb_processed < batch_size:
-            await self.db_pool.updates._end_background_update("set_device_id_for_pushers")
+            await self.db_pool.updates._end_background_update(
+                "set_device_id_for_pushers"
+            )
 
         return nb_processed
 
