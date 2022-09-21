@@ -152,8 +152,8 @@ class PusherPool:
             )
         )
 
-        # Before we actually create the pusher, we check if the user already has one for
-        # this app ID and pushkey. If so, we want to keep the access token in place,
+        # Before we actually persist the pusher, we check if the user already has one
+        # for this app ID and pushkey. If so, we want to keep the access token in place,
         # since this could be one device modifying (e.g. enabling/disabling) another
         # device's pusher.
         existing_config = await self._get_pusher_config_for_user_by_app_id_and_pushkey(
