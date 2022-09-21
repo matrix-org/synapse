@@ -66,8 +66,8 @@ use serde_json::Value;
 use self::evaluator::PushRuleEvaluator;
 
 mod base_rules;
-mod evaluator;
-mod utils;
+pub mod evaluator;
+pub mod utils;
 
 /// Called when registering modules with python.
 pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
@@ -303,17 +303,17 @@ impl<'source> FromPyObject<'source> for Condition {
 /// The body of a [`Condition::EventMatch`]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventMatchCondition {
-    key: Cow<'static, str>,
+    pub key: Cow<'static, str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pattern: Option<Cow<'static, str>>,
+    pub pattern: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pattern_type: Option<Cow<'static, str>>,
+    pub pattern_type: Option<Cow<'static, str>>,
 }
 
 /// The collection of push rules for a user.
 #[derive(Debug, Clone, Default)]
 #[pyclass(frozen)]
-struct PushRules {
+pub struct PushRules {
     /// Custom push rules that override a base rule.
     overridden_base_rules: HashMap<Cow<'static, str>, PushRule>,
 
@@ -332,7 +332,7 @@ struct PushRules {
 #[pymethods]
 impl PushRules {
     #[new]
-    fn new(rules: Vec<PushRule>) -> PushRules {
+    pub fn new(rules: Vec<PushRule>) -> PushRules {
         let mut push_rules: PushRules = Default::default();
 
         for rule in rules {
@@ -409,7 +409,7 @@ pub struct FilteredPushRules {
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    fn py_new(
+    pub fn py_new(
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
         msc3786_enabled: bool,

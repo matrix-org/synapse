@@ -26,7 +26,8 @@ pub(crate) fn get_localpart_from_id(id: &str) -> Result<&str, Error> {
 }
 
 /// Used by `glob_to_regex` to specify what to match the regex against.
-pub(crate) enum GlobMatchType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobMatchType {
     /// The generated regex will match against the entire input.
     Whole,
     /// The generated regex will match against words.
@@ -35,7 +36,7 @@ pub(crate) enum GlobMatchType {
 
 /// Convert a "glob" style expression to a regex, anchoring either to the entire
 /// input or to individual words.
-pub(crate) fn glob_to_regex(glob: &str, match_type: GlobMatchType) -> Result<Regex, Error> {
+pub fn glob_to_regex(glob: &str, match_type: GlobMatchType) -> Result<Regex, Error> {
     let mut chunks = Vec::new();
 
     // Patterns with wildcards must be simplified to avoid performance cliffs

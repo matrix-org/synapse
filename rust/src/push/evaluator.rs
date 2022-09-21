@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
-use log::warn;
+use log::{info, warn};
 use pyo3::prelude::*;
 use regex::Regex;
 
@@ -46,7 +46,7 @@ pub struct PushRuleEvaluator {
 impl PushRuleEvaluator {
     /// Create a new `PushRuleEvaluator`. See struct docstring for details.
     #[new]
-    fn py_new(
+    pub fn py_new(
         flattened_keys: BTreeMap<String, String>,
         room_member_count: u64,
         sender_power_level: i64,
@@ -78,7 +78,7 @@ impl PushRuleEvaluator {
     ///
     /// Returns the set of actions, if any, that match (filtering out any
     /// `dont_notify` actions).
-    fn run(
+    pub fn run(
         &self,
         push_rules: &FilteredPushRules,
         user_id: Option<&str>,
@@ -271,6 +271,12 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
+        let haystack = if let Some(haystack) = self.flattened_keys.get(&*event_match.key) {
+            haystack
+        } else {
+            return Ok(false);
+        };
+
         // For the content.body we match against "words", but for everything
         // else we match against the entire value.
         let match_type = if event_match.key == "content.body" {
@@ -279,12 +285,16 @@ impl PushRuleEvaluator {
             GlobMatchType::Whole
         };
 
-        if let Some(value) = self.flattened_keys.get(&*event_match.key) {
-            let compiled_pattern = glob_to_regex(pattern, match_type)?;
-            Ok(compiled_pattern.is_match(value))
-        } else {
-            Ok(false)
+        if !pattern.contains(['*', '?']) {
+            if match_type == GlobMatchType::Word && !haystack.contains(&pattern.to_lowercase()) {
+                return Ok(false);
+            } else if match_type == GlobMatchType::Whole {
+                return Ok(haystack == &pattern.to_lowercase());
+            }
         }
+
+        let compiled_pattern = glob_to_regex(pattern, match_type)?;
+        Ok(compiled_pattern.is_match(haystack))
     }
 
     /// Match the member count against an 'is' condition
