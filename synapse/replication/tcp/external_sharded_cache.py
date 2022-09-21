@@ -16,11 +16,11 @@ import binascii
 import logging
 import pickle
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 import jump
 from prometheus_client import Counter, Histogram
-from txredisapi import RedisError
+from txredisapi import ConnectionError, RedisError
 
 from twisted.internet import defer
 
@@ -60,6 +60,25 @@ response_timer = Histogram(
 
 
 logger = logging.getLogger(__name__)
+
+
+# Max number of times to retry Redis commands on connection errors
+_MAX_CONNECTION_ATTEMPTS = 5
+
+
+async def _redis_with_retry(
+    handler: Callable,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    attempt = 0
+    while True:
+        try:
+            return await handler(*args, **kwargs)
+        except ConnectionError:
+            if attempt >= _MAX_CONNECTION_ATTEMPTS:
+                raise
+            attempt += 1
 
 
 class ExternalShardedCache:
@@ -129,7 +148,7 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("set").time():
                 deferreds = [
-                    self._redis_shards[shard_id].mset(values)
+                    defer.ensureDeferred(_redis_with_retry(self._redis_shards[shard_id].mset, values))
                     for shard_id, values in shard_id_to_encoded_values.items()
                 ]
                 try:
@@ -183,7 +202,7 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("get").time():
                 deferreds = [
-                    defer.ensureDeferred(self._mget_shard(shard_id, keys))
+                    defer.ensureDeferred(_redis_with_retry(self._mget_shard, shard_id, keys))
                     for shard_id, keys in shard_id_to_key_mapping.items()
                 ]
                 results: Union[
@@ -218,4 +237,4 @@ class ExternalShardedCache:
     async def delete(self, cache_name: str, key: str) -> None:
         redis_key = self._get_redis_key(cache_name, key)
         shard_id = self._get_redis_shard_id(redis_key)
-        await self._redis_shards[shard_id].delete(redis_key)
+        await _redis_with_retry(self._redis_shards[shard_id].delete, redis_key)
