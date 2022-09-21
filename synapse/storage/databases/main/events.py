@@ -1294,8 +1294,10 @@ class PersistEventsStore:
         """
         depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
-            # Remove the any existing cache entries for the event_ids
-            self.store.invalidate_get_event_cache_after_txn(txn, event.event_id)
+            # Remove any existing cache entries for the event_ids
+            self.store.invalidate_get_event_cache_by_event_id_after_txn(
+                txn, event.event_id
+            )
             # Then update the `stream_ordering` position to mark the latest
             # event as the front of the room. This should not be done for
             # backfilled events because backfilled events have negative
@@ -1703,7 +1705,7 @@ class PersistEventsStore:
         _invalidate_caches_for_event.
         """
         assert event.redacts is not None
-        self.store.invalidate_get_event_cache_after_txn(txn, event.redacts)
+        self.store.invalidate_get_event_cache_by_event_id_after_txn(txn, event.redacts)
         txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
         txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
 

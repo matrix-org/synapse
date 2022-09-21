@@ -80,6 +80,7 @@ from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred, delay_cancellation
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches.dual_lookup_cache import DualLookupCache
 from synapse.util.caches.lrucache import AsyncLruCache
 from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
@@ -245,6 +246,8 @@ class EventsWorkerStore(SQLBaseStore):
         ] = AsyncLruCache(
             cache_name="*getEvent*",
             max_size=hs.config.caches.event_cache_size,
+            cache_type=DualLookupCache,
+            dual_lookup_secondary_key_function=lambda v: (v.event.room_id,),
         )
 
         # Map from event ID to a deferred that will result in a map from event
@@ -733,7 +736,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_entry_map
 
-    def invalidate_get_event_cache_after_txn(
+    def invalidate_get_event_cache_by_event_id_after_txn(
         self, txn: LoggingTransaction, event_id: str
     ) -> None:
         """
@@ -747,10 +750,31 @@ class EventsWorkerStore(SQLBaseStore):
             event_id: the event ID to be invalidated from caches
         """
 
-        txn.async_call_after(self._invalidate_async_get_event_cache, event_id)
-        txn.call_after(self._invalidate_local_get_event_cache, event_id)
+        txn.async_call_after(
+            self._invalidate_async_get_event_cache_by_event_id, event_id
+        )
+        txn.call_after(self._invalidate_local_get_event_cache_by_event_id, event_id)
 
-    async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
+    def invalidate_get_event_cache_by_room_id_after_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
+        """
+        Prepares a database transaction to invalidate the get event cache for a given
+        room ID when executed successfully. This is achieved by attaching two callbacks
+        to the transaction, one to invalidate the async cache and one for the in memory
+        sync cache (importantly called in that order).
+
+        Arguments:
+            txn: the database transaction to attach the callbacks to.
+            room_id: the room ID to invalidate all associated event caches for.
+        """
+
+        txn.async_call_after(self._invalidate_async_get_event_cache_by_room_id, room_id)
+        txn.call_after(self._invalidate_local_get_event_cache_by_room_id, room_id)
+
+    async def _invalidate_async_get_event_cache_by_event_id(
+        self, event_id: str
+    ) -> None:
         """
         Invalidates an event in the asyncronous get event cache, which may be remote.
 
@@ -760,7 +784,18 @@ class EventsWorkerStore(SQLBaseStore):
 
         await self._get_event_cache.invalidate((event_id,))
 
-    def _invalidate_local_get_event_cache(self, event_id: str) -> None:
+    async def _invalidate_async_get_event_cache_by_room_id(self, room_id: str) -> None:
+        """
+        Invalidates all events associated with a given room in the asyncronous get event
+        cache, which may be remote.
+
+        Arguments:
+            room_id: the room ID to invalidate associated events of.
+        """
+
+        await self._get_event_cache.invalidate((room_id,))
+
+    def _invalidate_local_get_event_cache_by_event_id(self, event_id: str) -> None:
         """
         Invalidates an event in local in-memory get event caches.
 
@@ -771,6 +806,18 @@ class EventsWorkerStore(SQLBaseStore):
         self._get_event_cache.invalidate_local((event_id,))
         self._event_ref.pop(event_id, None)
         self._current_event_fetches.pop(event_id, None)
+
+    def _invalidate_local_get_event_cache_by_room_id(self, room_id: str) -> None:
+        """
+        Invalidates all events associated with a given room ID in local in-memory
+        get event caches.
+
+        Arguments:
+            room_id: the room ID to invalidate events of.
+        """
+        self._get_event_cache.invalidate_local((room_id,))
+
+        # TODO: invalidate _event_ref and _current_event_fetches. How?
 
     async def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
@@ -2284,7 +2331,7 @@ class EventsWorkerStore(SQLBaseStore):
             updatevalues={"rejection_reason": rejection_reason},
         )
 
-        self.invalidate_get_event_cache_after_txn(txn, event_id)
+        self.invalidate_get_event_cache_by_event_id_after_txn(txn, event_id)
 
         # TODO(faster_joins): invalidate the cache on workers. Ideally we'd just
         #   call '_send_invalidation_to_replication', but we actually need the other

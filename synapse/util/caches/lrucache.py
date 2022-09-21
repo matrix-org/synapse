@@ -46,6 +46,7 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.metrics.jemalloc import get_jemalloc_stats
 from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, EvictionReason, register_cache
+from synapse.util.caches.dual_lookup_cache import DualLookupCache
 from synapse.util.caches.treecache import (
     TreeCache,
     iterate_tree_cache_entry,
@@ -375,12 +376,13 @@ class LruCache(Generic[KT, VT]):
         self,
         max_size: int,
         cache_name: Optional[str] = None,
-        cache_type: Type[Union[dict, TreeCache]] = dict,
+        cache_type: Type[Union[dict, TreeCache, DualLookupCache]] = dict,
         size_callback: Optional[Callable[[VT], int]] = None,
         metrics_collection_callback: Optional[Callable[[], None]] = None,
         apply_cache_factor_from_config: bool = True,
         clock: Optional[Clock] = None,
         prune_unread_entries: bool = True,
+        dual_lookup_secondary_key_function: Optional[Callable[[Any], Any]] = None,
     ):
         """
         Args:
@@ -411,6 +413,10 @@ class LruCache(Generic[KT, VT]):
             prune_unread_entries: If True, cache entries that haven't been read recently
                 will be evicted from the cache in the background. Set to False to
                 opt-out of this behaviour.
+
+            # TODO: At this point we should probably just pass an initialised cache type
+            # to LruCache, no?
+            dual_lookup_secondary_key_function:
         """
         # Default `clock` to something sensible. Note that we rename it to
         # `real_clock` so that mypy doesn't think its still `Optional`.
@@ -419,7 +425,30 @@ class LruCache(Generic[KT, VT]):
         else:
             real_clock = clock
 
-        cache: Union[Dict[KT, _Node[KT, VT]], TreeCache] = cache_type()
+        # TODO: I've had to make this ugly to appease mypy :(
+        # Perhaps initialise the backing cache and then pass to LruCache?
+        cache: Union[Dict[KT, _Node[KT, VT]], TreeCache, DualLookupCache]
+        if cache_type is DualLookupCache:
+            # The dual_lookup_secondary_key_function is a function that's intended to
+            # extract a key from the value in the cache. Since we wrap values given to
+            # us in a _Node object, this function will actually operate on a _Node,
+            # instead of directly on the object type callers are expecting.
+            #
+            # Thus, we wrap the function given by the caller in another one that
+            # extracts the value from the _Node, before then handing it off to the
+            # given function for processing.
+            def key_function_wrapper(node: Any) -> Any:
+                assert dual_lookup_secondary_key_function is not None
+                return dual_lookup_secondary_key_function(node.value)
+
+            cache = DualLookupCache(
+                secondary_key_function=key_function_wrapper,
+            )
+        elif cache_type is TreeCache:
+            cache = TreeCache()
+        else:
+            cache = {}
+
         self.cache = cache  # Used for introspection.
         self.apply_cache_factor_from_config = apply_cache_factor_from_config
 
@@ -722,13 +751,21 @@ class LruCache(Generic[KT, VT]):
             may be of lower cardinality than the TreeCache - in which case the whole
             subtree is deleted.
             """
-            popped = cache.pop(key, None)
-            if popped is None:
+            if isinstance(cache, DualLookupCache):
+                # Make use of DualLookupCache's del_multi feature
+                cache.del_multi(key)
                 return
-            # for each deleted node, we now need to remove it from the linked list
-            # and run its callbacks.
-            for leaf in iterate_tree_cache_entry(popped):
-                delete_node(leaf)
+
+            # Remove an entry from the cache.
+            # In the case of a 'dict' cache type, we're just removing an entry from the
+            # dict. For a TreeCache, we're removing a subtree which has children.
+            popped_entry = cache.pop(key, None)
+            if popped_entry is not None and cache_type is TreeCache:
+                # We've popped a subtree - now we need to clean up each child node.
+                # For each deleted node, we remove it from the linked list and run
+                # its callbacks.
+                for leaf in iterate_tree_cache_entry(popped_entry):
+                    delete_node(leaf)
 
         @synchronized
         def cache_clear() -> None:

@@ -304,7 +304,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 self._invalidate_cache_and_stream(
                     txn, self.have_seen_event, (room_id, event_id)
                 )
-                self.invalidate_get_event_cache_after_txn(txn, event_id)
+                self.invalidate_get_event_cache_by_event_id_after_txn(txn, event_id)
 
         logger.info("[purge] done")
 
@@ -478,6 +478,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # XXX: as with purge_history, this is racy, but no worse than other races
         #   that already exist.
         self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
+        self._invalidate_local_get_event_cache_by_room_id(room_id)
 
         logger.info("[purge] done")
 
