@@ -43,7 +43,7 @@ from prometheus_client import Counter, Histogram
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.logging.opentracing import (
@@ -431,6 +431,22 @@ class EventsPersistenceStorageController:
             else:
                 events.append(event)
 
+                # We expect events to be persisted by this point and this makes
+                # mypy happy about `stream_ordering` not being optional below
+                assert event.internal_metadata.stream_ordering
+                # Invalidate related caches after we persist a new event
+                relation = relation_from_event(event)
+                self.main_store._invalidate_caches_for_event(
+                    stream_ordering=event.internal_metadata.stream_ordering,
+                    event_id=event.event_id,
+                    room_id=event.room_id,
+                    etype=event.type,
+                    state_key=event.state_key if hasattr(event, "state_key") else None,
+                    redacts=event.redacts,
+                    relates_to=relation.parent_id if relation else None,
+                    backfilled=backfilled,
+                )
+
         return (
             events,
             self.main_store.get_room_max_token(),
@@ -463,6 +479,22 @@ class EventsPersistenceStorageController:
         replaced_event = replaced_events.get(event.event_id)
         if replaced_event:
             event = await self.main_store.get_event(replaced_event)
+        else:
+            # We expect events to be persisted by this point and this makes
+            # mypy happy about `stream_ordering` not being optional below
+            assert event.internal_metadata.stream_ordering
+            # Invalidate related caches after we persist a new event
+            relation = relation_from_event(event)
+            self.main_store._invalidate_caches_for_event(
+                stream_ordering=event.internal_metadata.stream_ordering,
+                event_id=event.event_id,
+                room_id=event.room_id,
+                etype=event.type,
+                state_key=event.state_key if hasattr(event, "state_key") else None,
+                redacts=event.redacts,
+                relates_to=relation.parent_id if relation else None,
+                backfilled=backfilled,
+            )
 
         event_stream_id = event.internal_metadata.stream_ordering
         # stream ordering should have been assigned by now
