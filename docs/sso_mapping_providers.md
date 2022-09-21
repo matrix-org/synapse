@@ -91,10 +91,10 @@ A custom mapping provider must specify the following methods:
         `None`, the user is prompted to pick their own username. This is only used
         during a user's first login. Once a localpart has been associated with a
         remote user ID (see `get_remote_user_id`) it cannot be updated.
-      - `confirm_localpart`: A boolean. If a `localpart` string is returned from
-        this method and `confirm_localpart` is `True`, Synapse will ask users to 
-        confirm their Matrix ID. Otherwise Synapse will not ask for 
-        confirmation. If omitted, defaults to `False`.
+      - `confirm_localpart`: A boolean. If set to `True`, when a `localpart`
+        string is returned from this method, Synapse will prompt the user to
+        either accept this localpart or pick their own username. Otherwise this
+        option has no effect. If omitted, defaults to `False`.
       - `display_name`: An optional string, the display name for the user.
       - `emails`: A list of strings, the email address(es) to associate with
         this user. If omitted, defaults to an empty list.
