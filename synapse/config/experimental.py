@@ -112,3 +112,6 @@ class ExperimentalConfig(Config):
         # MSC3866: M_USER_AWAITING_APPROVAL error code
         raw_msc3866_config = experimental.get("msc3866", {})
         self.msc3866 = MSC3866Config(**raw_msc3866_config)
+
+        # MSC3881: Remotely toggle push notifications for another client
+        self.msc3881_enabled: bool = experimental.get("msc3881_enabled", False)
