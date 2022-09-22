@@ -168,6 +168,10 @@ class EventAuthHandler:
 
         If the room is partial-stated, we raise an AuthError with the
         UNABLE_DUE_TO_PARTIAL_STATE error code, unless `allow_partial_state_rooms` is true.
+
+        If allow_partial_state_rooms is True and the room is partial-stated,
+        this function may return an incorrect result as we are not able to fully
+        track server membership in a room without full state.
         """
         if not allow_partial_state_rooms and await self._store.is_partial_state_room(
             room_id
