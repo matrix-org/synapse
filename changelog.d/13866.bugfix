@@ -1,0 +1,1 @@
+Fix building from packaged sdist. Broke in v1.68.0rc1.
