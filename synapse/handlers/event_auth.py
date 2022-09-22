@@ -31,7 +31,6 @@ from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.types import StateMap, get_domain_from_id
-from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -157,8 +156,7 @@ class EventAuthHandler:
         )
 
     async def is_host_in_room(self, room_id: str, host: str) -> bool:
-        with Measure(self._clock, "check_host_in_room"):
-            return await self._store.is_host_joined(room_id, host)
+        return await self._store.is_host_joined(room_id, host)
 
     async def assert_host_in_room(
         self, room_id: str, host: str, allow_partial_state_rooms: bool = False
