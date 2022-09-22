@@ -1138,7 +1138,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             # Then any updated threads get their notification count and unread
             # count updated.
-            self.db_pool.simple_upsert_many_txn(
+            self.db_pool.simple_update_many_txn(
                 txn,
                 table="event_push_summary",
                 key_names=("room_id", "user_id", "thread_id"),
