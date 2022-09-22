@@ -148,7 +148,9 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("set").time():
                 deferreds = [
-                    defer.ensureDeferred(_redis_with_retry(self._redis_shards[shard_id].mset, values))
+                    defer.ensureDeferred(
+                        _redis_with_retry(self._redis_shards[shard_id].mset, values)
+                    )
                     for shard_id, values in shard_id_to_encoded_values.items()
                 ]
                 try:
@@ -202,7 +204,9 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("get").time():
                 deferreds = [
-                    defer.ensureDeferred(_redis_with_retry(self._mget_shard, shard_id, keys))
+                    defer.ensureDeferred(
+                        _redis_with_retry(self._mget_shard, shard_id, keys)
+                    )
                     for shard_id, keys in shard_id_to_key_mapping.items()
                 ]
                 results: Union[
