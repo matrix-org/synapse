@@ -170,8 +170,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipt_types: Collection[str],
     ) -> Optional[Tuple[str, int]]:
         """
-        Fetch the event ID and stream_ordering for the latest receipt in a room
-        with one of the given receipt types.
+        Fetch the event ID and stream_ordering for the latest unthreaded receipt
+        in a room with one of the given receipt types.
 
         Args:
             user_id: The user to fetch receipts for.
@@ -193,6 +193,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             WHERE {clause}
             AND user_id = ?
             AND room_id = ?
+            AND thread_id IS NULL
             ORDER BY stream_ordering DESC
             LIMIT 1
         """
