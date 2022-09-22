@@ -223,15 +223,16 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
         self._invalidate_local_get_event_cache(event_id)
-        self.have_seen_event.invalidate((room_id, event_id))
 
-        self.get_latest_event_ids_in_room.invalidate((room_id,))
-
-        self.get_unread_event_push_actions_by_room_for_user.invalidate((room_id,))
+        self._attempt_to_invalidate_cache("have_seen_event", (room_id, event_id))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
 
         # The `_get_membership_from_event_id` is immutable, except for the
         # case where we look up an event *before* persisting it.
-        self._get_membership_from_event_id.invalidate((event_id,))
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", (event_id,))
 
         if not backfilled:
             self._events_stream_cache.entity_has_changed(room_id, stream_ordering)
@@ -240,20 +241,26 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._invalidate_local_get_event_cache(redacts)
             # Caches which might leak edits must be invalidated for the event being
             # redacted.
-            self.get_relations_for_event.invalidate((redacts,))
-            self.get_applicable_edit.invalidate((redacts,))
+            self._attempt_to_invalidate_cache("get_relations_for_event", (redacts,))
+            self._attempt_to_invalidate_cache("get_applicable_edit", (redacts,))
 
         if etype == EventTypes.Member:
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
-            self.get_invited_rooms_for_local_user.invalidate((state_key,))
+            self._attempt_to_invalidate_cache(
+                "get_invited_rooms_for_local_user", (state_key,)
+            )
 
         if relates_to:
-            self.get_relations_for_event.invalidate((relates_to,))
-            self.get_aggregation_groups_for_event.invalidate((relates_to,))
-            self.get_applicable_edit.invalidate((relates_to,))
-            self.get_thread_summary.invalidate((relates_to,))
-            self.get_thread_participated.invalidate((relates_to,))
-            self.get_mutual_event_relations_for_rel_type.invalidate((relates_to,))
+            self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
+            self._attempt_to_invalidate_cache(
+                "get_aggregation_groups_for_event", (relates_to,)
+            )
+            self._attempt_to_invalidate_cache("get_applicable_edit", (relates_to,))
+            self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
+            self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
+            self._attempt_to_invalidate_cache(
+                "get_mutual_event_relations_for_rel_type", (relates_to,)
+            )
 
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
