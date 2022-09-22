@@ -88,6 +88,7 @@ include = [
     { path = "Cargo.toml", format = "sdist" },
     { path = "rust/Cargo.toml", format = "sdist" },
     { path = "rust/Cargo.lock", format = "sdist" },
+    { path = "rust/build.rs", format = "sdist" },
     { path = "rust/src/**", format = "sdist" },
 ]
 exclude = [
