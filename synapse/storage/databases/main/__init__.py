@@ -254,7 +254,7 @@ class DataStore(
             if not approved:
                 # We ignore NULL values for the approved flag because these should only
                 # be already existing users that we consider as already approved.
-                filters.append("approved = 0")
+                filters.append("approved IS FALSE")
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
