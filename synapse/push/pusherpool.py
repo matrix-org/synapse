@@ -107,6 +107,7 @@ class PusherPool:
         data: JsonDict,
         profile_tag: str = "",
         enabled: bool = True,
+        device_id: Optional[str] = None,
     ) -> Optional[Pusher]:
         """Creates a new pusher and adds it to the pool
 
@@ -149,18 +150,20 @@ class PusherPool:
                 last_success=None,
                 failing_since=None,
                 enabled=enabled,
+                device_id=device_id,
             )
         )
 
         # Before we actually persist the pusher, we check if the user already has one
-        # for this app ID and pushkey. If so, we want to keep the access token in place,
-        # since this could be one device modifying (e.g. enabling/disabling) another
-        # device's pusher.
+        # this app ID and pushkey. If so, we want to keep the access token and device ID
+        # in place, since this could be one device modifying (e.g. enabling/disabling)
+        # another device's pusher.
         existing_config = await self._get_pusher_config_for_user_by_app_id_and_pushkey(
             user_id, app_id, pushkey
         )
         if existing_config:
             access_token = existing_config.access_token
+            device_id = existing_config.device_id
 
         await self.store.add_pusher(
             user_id=user_id,
@@ -176,6 +179,7 @@ class PusherPool:
             last_stream_ordering=last_stream_ordering,
             profile_tag=profile_tag,
             enabled=enabled,
+            device_id=device_id,
         )
         pusher = await self.process_pusher_change_by_id(app_id, pushkey, user_id)
 

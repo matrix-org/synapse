@@ -57,7 +57,9 @@ class PushersRestServlet(RestServlet):
         for pusher in pusher_dicts:
             if self._msc3881_enabled:
                 pusher["org.matrix.msc3881.enabled"] = pusher["enabled"]
+                pusher["org.matrix.msc3881.device_id"] = pusher["device_id"]
             del pusher["enabled"]
+            del pusher["device_id"]
 
         return 200, {"pushers": pusher_dicts}
 
@@ -134,6 +136,7 @@ class PushersSetRestServlet(RestServlet):
                 data=content["data"],
                 profile_tag=content.get("profile_tag", ""),
                 enabled=enabled,
+                device_id=requester.device_id,
             )
         except PusherConfigException as pce:
             raise SynapseError(
