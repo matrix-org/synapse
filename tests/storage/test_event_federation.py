@@ -854,8 +854,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # visible regardless.
         self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
 
-        # Try at "A" and make sure that "b3" is not in the list because we've
-        # already attemted many times
+        # Try at "A" and make sure that "b1" is not in the list because we've
+        # already attempted many times
         backfill_points = self.get_success(
             self.store.get_backfill_points_in_room(room_id, depth_map["A"])
         )
@@ -1003,7 +1003,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # No time has passed since we attempted to backfill ^
 
-        # Try at "B"
+        # Try at "insertion_eventB"
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
                 room_id, depth_map["insertion_eventB"]
@@ -1031,6 +1031,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # haven't passed the backoff interval.
         self.get_success(
             self.store.record_event_failed_pull_attempt(
+                room_id, "insertion_eventB", "fake cause"
+            )
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(
                 room_id, "insertion_eventA", "fake cause"
             )
         )
@@ -1050,15 +1055,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             )
         )
 
-        # Now advance time by 2 hours and we should only be able to see "b3"
-        # because we have waited long enough for the single attempt (2^1 hours)
-        # but we still shouldn't see "b1" because we haven't waited long enough
-        # for this many attempts. We didn't do anything to "b2" so it should be
-        # visible regardless.
+        # Now advance time by 2 hours and we should only be able to see
+        # "insertion_eventB" because we have waited long enough for the single
+        # attempt (2^1 hours) but we still shouldn't see "insertion_eventA"
+        # because we haven't waited long enough for this many attempts.
         self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
 
         # Try at "insertion_eventA" and make sure that "insertion_eventA" is not
-        # in the list because we've already attemted many times
+        # in the list because we've already attempted many times
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
                 room_id, depth_map["insertion_eventA"]
