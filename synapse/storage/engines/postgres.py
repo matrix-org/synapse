@@ -31,7 +31,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
+class PostgresEngine(
+    BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
+):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)

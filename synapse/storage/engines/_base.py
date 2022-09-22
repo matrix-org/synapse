@@ -32,9 +32,10 @@ class IncorrectDatabaseSetup(RuntimeError):
 
 
 ConnectionType = TypeVar("ConnectionType", bound=Connection)
+CursorType = TypeVar("CursorType", bound=Cursor)
 
 
-class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
+class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCMeta):
     def __init__(self, module: DBAPI2Module, config: Mapping[str, Any]):
         self.module = module
 
