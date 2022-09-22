@@ -26,6 +26,9 @@ usage() {
   echo "  Defaults to 9999."
   echo "-h"
   echo "  Display this help text."
+  echo ""
+  echo "  NB: make sure to run this against the *oldest* supported version of postgres,"
+  echo "  or else pg_dump might output non-backwards-compatible syntax."
 }
 
 SCHEMA_NUMBER="9999"
