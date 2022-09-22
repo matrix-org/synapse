@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import itertools
 import logging
 from queue import Empty, PriorityQueue
@@ -43,7 +44,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -71,7 +72,6 @@ pdus_pruned_from_federation_queue = Counter(
 )
 
 logger = logging.getLogger(__name__)
-
 
 # All the info we need while iterating the DAG while backfilling
 @attr.s(frozen=True, slots=True, auto_attribs=True)
@@ -715,97 +715,179 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
     @trace
     @tag_args
-    async def get_oldest_event_ids_with_depth_in_room(
-        self, room_id: str
-    ) -> List[Tuple[str, int]]:
-        """Gets the oldest events(backwards extremities) in the room along with the
-        aproximate depth.
+    async def get_backfill_points_in_room(
+        self,
+        room_id: str,
+        current_depth: int,
+    ) -> List[Tuple[str, int, int]]:
+        """
+        Gets the oldest events(backwards extremities) in the room along with the
+        approximate depth. Sorted by depth, highest to lowest (descending) so the closest
+        events to the `current_depth` are first in the list.
 
-        We use this function so that we can compare and see if someones current
-        depth at their current scrollback is within pagination range of the
-        event extremeties. If the current depth is close to the depth of given
-        oldest event, we can trigger a backfill.
+        We use this function so that we can compare and see if a client's
+        `current_depth` at their current scrollback is within pagination range
+        of the event extremities. If the `current_depth` is close to the depth
+        of given oldest event, we can trigger a backfill.
+
+        We ignore extremities that have a greater depth than our `current_depth`
+        as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that extremity, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those extremities.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the users current scrollback position
+                because we only care about finding events older than the given
+                `current_depth` when scrolling and paginating backwards.
 
         Returns:
-            List of (event_id, depth) tuples
+            List of (event_id, depth, stream_ordering) tuples. Sorted by depth,
+            highest to lowest (descending) so the closest events to the
+            `current_depth` are first in the list. Tie-broken with `stream_ordering`,
+            then `event_id` to get a stable sort.
         """
 
-        def get_oldest_event_ids_with_depth_in_room_txn(
+        def get_backfill_points_in_room_txn(
             txn: LoggingTransaction, room_id: str
-        ) -> List[Tuple[str, int]]:
-            # Assemble a dictionary with event_id -> depth for the oldest events
+        ) -> List[Tuple[str, int, int]]:
+            # Assemble a tuple lookup of event_id -> depth for the oldest events
             # we know of in the room. Backwards extremeties are the oldest
             # events we know of in the room but we only know of them because
-            # some other event referenced them by prev_event and aren't peristed
-            # in our database yet (meaning we don't know their depth
-            # specifically). So we need to look for the aproximate depth from
+            # some other event referenced them by prev_event and aren't
+            # persisted in our database yet (meaning we don't know their depth
+            # specifically). So we need to look for the approximate depth from
             # the events connected to the current backwards extremeties.
             sql = """
-                SELECT b.event_id, MAX(e.depth) FROM events as e
+                SELECT backward_extrem.event_id, event.depth, event.stream_ordering FROM events AS event
                 /**
                  * Get the edge connections from the event_edges table
                  * so we can see whether this event's prev_events points
                  * to a backward extremity in the next join.
                  */
-                INNER JOIN event_edges as g
-                ON g.event_id = e.event_id
+                INNER JOIN event_edges AS edge
+                ON edge.event_id = event.event_id
                 /**
                  * We find the "oldest" events in the room by looking for
                  * events connected to backwards extremeties (oldest events
                  * in the room that we know of so far).
                  */
-                INNER JOIN event_backward_extremities as b
-                ON g.prev_event_id = b.event_id
-                WHERE b.room_id = ? AND g.is_state is ?
-                GROUP BY b.event_id
+                INNER JOIN event_backward_extremities AS backward_extrem
+                ON edge.prev_event_id = backward_extrem.event_id
+                WHERE
+                    backward_extrem.room_id = ?
+                    /* We only care about non-state events because TODO: why */
+                    AND edge.is_state is ? /* False */
+                    /**
+                     * We only want backwards extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                           current_depth (ignore events that come after this, ignore 2-4)
+                     *                           |
+                     * <oldest-in-time> [0]<--[1]▼<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                /**
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
+                 */
+                ORDER BY event.depth DESC, event.stream_ordering DESC, backward_extrem.event_id DESC
             """
 
-            txn.execute(sql, (room_id, False))
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    False,
+                    current_depth,
+                ),
+            )
 
-            return cast(List[Tuple[str, int]], txn.fetchall())
+            return cast(List[Tuple[str, int, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
-            "get_oldest_event_ids_with_depth_in_room",
-            get_oldest_event_ids_with_depth_in_room_txn,
+            "get_backfill_points_in_room",
+            get_backfill_points_in_room_txn,
             room_id,
         )
 
     @trace
     async def get_insertion_event_backward_extremities_in_room(
-        self, room_id: str
-    ) -> List[Tuple[str, int]]:
-        """Get the insertion events we know about that we haven't backfilled yet.
+        self,
+        room_id: str,
+        current_depth: int,
+    ) -> List[Tuple[str, int, int]]:
+        """
+        Get the insertion events we know about that we haven't backfilled yet
+        along with the approximate depth. Sorted by depth, highest to lowest
+        (descending) so the closest events to the `current_depth` are first
+        in the list.
 
-        We use this function so that we can compare and see if someones current
-        depth at their current scrollback is within pagination range of the
-        insertion event. If the current depth is close to the depth of given
-        insertion event, we can trigger a backfill.
+        We use this function so that we can compare and see if someones
+        `current_depth` at their current scrollback is within pagination range
+        of the insertion event. If the `current_depth` is close to the depth
+        of the given insertion event, we can trigger a backfill.
+
+        We ignore insertion events that have a greater depth than our `current_depth`
+        as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that insertion event, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those insertion event.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the users current scrollback position because
+                we only care about finding events older than the given
+                `current_depth` when scrolling and paginating backwards.
 
         Returns:
-            List of (event_id, depth) tuples
+            List of (event_id, depth, stream_ordering) tuples. Sorted by depth,
+            highest to lowest (descending) so the closest events to the
+            `current_depth` are first in the list. Tie-broken with `stream_ordering`,
+            then `event_id` to get a stable sort.
         """
 
         def get_insertion_event_backward_extremities_in_room_txn(
             txn: LoggingTransaction, room_id: str
-        ) -> List[Tuple[str, int]]:
+        ) -> List[Tuple[str, int, int]]:
             sql = """
-                SELECT b.event_id, MAX(e.depth) FROM insertion_events as i
+                SELECT
+                    insertion_event_extremity.event_id, event.depth, event.stream_ordering
                 /* We only want insertion events that are also marked as backwards extremities */
-                INNER JOIN insertion_event_extremities as b USING (event_id)
+                FROM insertion_event_extremities AS insertion_event_extremity
                 /* Get the depth of the insertion event from the events table */
-                INNER JOIN events AS e USING (event_id)
-                WHERE b.room_id = ?
-                GROUP BY b.event_id
+                INNER JOIN events AS event USING (event_id)
+                WHERE
+                    insertion_event_extremity.room_id = ?
+                    AND event.depth <= ? /* current_depth */
+                /**
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
+                 */
+                ORDER BY event.depth DESC, event.stream_ordering DESC, insertion_event_extremity.event_id DESC
             """
 
-            txn.execute(sql, (room_id,))
-            return cast(List[Tuple[str, int]], txn.fetchall())
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    current_depth,
+                ),
+            )
+            return cast(List[Tuple[str, int, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_insertion_event_backward_extremities_in_room",
@@ -1539,7 +1621,12 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
     ) -> Optional[Tuple[str, str]]:
-        """Get the next event ID in the staging area for the given room."""
+        """
+        Get the next event ID in the staging area for the given room.
+
+        Returns:
+            Tuple of the `origin` and `event_id`
+        """
 
         def _get_next_staged_event_id_for_room_txn(
             txn: LoggingTransaction,

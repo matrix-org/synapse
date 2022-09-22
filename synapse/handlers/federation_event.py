@@ -649,12 +649,30 @@ class FederationEventHandler:
             #
             # We expect the events from the `/backfill`response to start from
             # `?v` and include events that preceded it (so the list will be
-            # newest -> oldest). This is at-most a convention between Synapse
-            # servers as the order is not specced.
+            # newest -> oldest, reverse chronological). This is at-most a
+            # convention between Synapse servers as the order is not specced.
             #
-            # Reverse the list of events
+            # We want to calculate the `stream_ordering`` from newest -> oldest
+            # (so historical events sort in the correct order) and persist in
+            # oldest -> newest to get the least missing `prev_event` fetch
+            # thrashing.
             reverse_chronological_events = events
+            # `[::-1]` is just syntax to reverse the list and give us a copy
             chronological_events = reverse_chronological_events[::-1]
+
+            logger.info(
+                "backfill assumed reverse_chronological_events=%s",
+                [
+                    "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                    % (
+                        event.event_id,
+                        event.depth,
+                        event.content.get("body", event.type),
+                        event.prev_event_ids(),
+                    )
+                    for event in reverse_chronological_events
+                ],
+            )
 
             from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 
@@ -826,6 +844,21 @@ class FederationEventHandler:
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
         sorted_events = sorted(events, key=lambda x: x.depth)
+
+        logger.info(
+            "backfill sorted_events=%s",
+            [
+                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                % (
+                    event.event_id,
+                    event.depth,
+                    event.content.get("body", event.type),
+                    event.prev_event_ids(),
+                )
+                for event in sorted_events
+            ],
+        )
+
         for ev in sorted_events:
             with nested_logging_context(ev.event_id):
                 await self._process_pulled_event(origin, ev, backfilled=backfilled)
