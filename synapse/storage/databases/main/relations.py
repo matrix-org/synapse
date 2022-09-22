@@ -160,15 +160,15 @@ class RelationsWorkerStore(SQLBaseStore):
                 events = events[:limit]
 
                 topo = events[-1].topological_ordering
-                toke = events[-1].stream_ordering
+                token = events[-1].stream_ordering
                 if direction == "b":
                     # Tokens are positions between events.
                     # This token points *after* the last event in the chunk.
                     # We need it to point to the event before it in the chunk
                     # when we are going backwards so we subtract one from the
                     # stream part.
-                    toke -= 1
-                next_key = RoomStreamToken(topo, toke)
+                    token -= 1
+                next_key = RoomStreamToken(topo, token)
 
                 if from_token:
                     next_token = from_token.copy_and_replace(
