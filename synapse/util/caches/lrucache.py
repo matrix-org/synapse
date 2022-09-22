@@ -46,9 +46,10 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.metrics.jemalloc import get_jemalloc_stats
 from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, EvictionReason, register_cache
-from synapse.util.caches.dual_lookup_cache import DualLookupCache
+from synapse.util.caches.dual_lookup_cache import DualLookupCache, SecondarySet
 from synapse.util.caches.treecache import (
     TreeCache,
+    TreeCacheNode,
     iterate_tree_cache_entry,
     iterate_tree_cache_items,
 )
@@ -751,21 +752,25 @@ class LruCache(Generic[KT, VT]):
             may be of lower cardinality than the TreeCache - in which case the whole
             subtree is deleted.
             """
-            if isinstance(cache, DualLookupCache):
-                # Make use of DualLookupCache's del_multi feature
-                cache.del_multi(key)
-                return
-
             # Remove an entry from the cache.
             # In the case of a 'dict' cache type, we're just removing an entry from the
             # dict. For a TreeCache, we're removing a subtree which has children.
-            popped_entry = cache.pop(key, None)
-            if popped_entry is not None and cache_type is TreeCache:
-                # We've popped a subtree - now we need to clean up each child node.
-                # For each deleted node, we remove it from the linked list and run
-                # its callbacks.
+            popped_entry: _Node[KT, VT] = cache.pop(key, None)
+            if popped_entry is None:
+                return
+
+            if isinstance(popped_entry, TreeCacheNode):
+                # We've popped a subtree from a TreeCache - now we need to clean up
+                # each child node.
                 for leaf in iterate_tree_cache_entry(popped_entry):
+                    # For each deleted child node, we remove it from the linked list and
+                    # run its callbacks.
                     delete_node(leaf)
+            elif isinstance(popped_entry, SecondarySet):
+                for leaf in popped_entry:
+                    delete_node(leaf)
+            else:
+                delete_node(popped_entry)
 
         @synchronized
         def cache_clear() -> None:
