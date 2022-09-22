@@ -103,8 +103,8 @@ class Codes(str, Enum):
     # Returned for federation requests where we can't process a request as we
     # can't ensure the sending server is in a room which is partial-stated on
     # our side.
-    # Part of MSC3706-rei1.
-    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3706_UNABLE_DUE_TO_PARTIAL_STATE"
+    # Part of MSC3895.
+    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
 
 
 class CodeMessageException(RuntimeError):
