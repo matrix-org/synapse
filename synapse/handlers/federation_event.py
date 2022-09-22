@@ -695,7 +695,9 @@ class FederationEventHandler:
 
             await self._process_pulled_events(
                 dest,
+                # Expecting to persist in chronological order here (oldest -> newest)
                 chronological_events,
+                # reverse_chronological_events,
                 backfilled=True,
             )
 

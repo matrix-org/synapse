@@ -387,7 +387,7 @@ class FederationHandler:
             )
             return False
 
-        logger.debug(
+        logger.info(
             "_maybe_backfill_inner: extremities_to_request %s", extremities_to_request
         )
         set_attribute(
