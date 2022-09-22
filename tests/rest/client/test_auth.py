@@ -577,7 +577,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
                     "enabled": True,
                     "require_approval_for_new_accounts": True,
                 }
-            }
+            },
         }
     )
     def test_sso_not_approved(self) -> None:

@@ -582,7 +582,9 @@ class RestHelper:
             "/login",
             content={"type": "m.login.token", "token": login_token},
         )
-        assert channel.code == expected_status, f"unexpected status in response: {channel.code}"
+        assert (
+            channel.code == expected_status
+        ), f"unexpected status in response: {channel.code}"
         return channel.json_body
 
     def auth_via_oidc(
