@@ -1,1 +1,1 @@
-Align comments with current behavior for the Docker build used for testing purpose.
+Correct the comments in the complement dockerfile.
