@@ -55,11 +55,11 @@ logger = logging.getLogger(__name__)
 
 class LoginResponse(TypedDict, total=False):
     user_id: str
-    access_token: str
+    access_token: Optional[str]
     home_server: str
     expires_in_ms: Optional[int]
     refresh_token: Optional[str]
-    device_id: str
+    device_id: Optional[str]
     well_known: Optional[Dict[str, Any]]
 
 
@@ -370,6 +370,16 @@ class LoginRestServlet(RestServlet):
                 "device_id cannot be longer than 512 characters.",
                 errcode=Codes.INVALID_PARAM,
             )
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(user_id)
+            if not approved:
+                # If the user isn't approved (and needs to be) we won't allow them to
+                # actually log in, so we don't want to create a device/access token.
+                return LoginResponse(
+                    user_id=user_id,
+                    home_server=self.hs.hostname,
+                )
 
         initial_display_name = login_submission.get("initial_device_display_name")
         (
