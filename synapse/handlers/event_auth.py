@@ -167,7 +167,7 @@ class EventAuthHandler:
         Asserts that the host is in the room, or raises an AuthError.
 
         If the room is partial-stated, we raise an AuthError with the
-        UNABLE_DUE_TO_PARTIAL_STATE flag, unless `allow_partial_state_rooms` is true.
+        UNABLE_DUE_TO_PARTIAL_STATE error code, unless `allow_partial_state_rooms` is true.
         """
         if not allow_partial_state_rooms and await self._store.is_partial_state_room(
             room_id
