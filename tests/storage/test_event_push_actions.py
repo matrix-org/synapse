@@ -16,7 +16,7 @@ from typing import Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import MAIN_TIMELINE
+from synapse.api.constants import MAIN_TIMELINE, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
@@ -66,16 +66,23 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         user_id, token, _, other_token, room_id = self._create_users_and_room()
 
         # Create two events, one of which is a highlight.
-        self.helper.send_event(
+        first_event_id = self.helper.send_event(
             room_id,
             type="m.room.message",
             content={"msgtype": "m.text", "body": "msg"},
             tok=other_token,
-        )
-        event_id = self.helper.send_event(
+        )["event_id"]
+        second_event_id = self.helper.send_event(
             room_id,
             type="m.room.message",
-            content={"msgtype": "m.text", "body": user_id},
+            content={
+                "msgtype": "m.text",
+                "body": user_id,
+                "m.relates_to": {
+                    "rel_type": RelationTypes.THREAD,
+                    "event_id": first_event_id,
+                },
+            },
             tok=other_token,
         )["event_id"]
 
@@ -95,14 +102,38 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         )
         self.assertEqual(2, len(email_actions))
 
-        # Send a receipt, which should clear any actions.
+        # Send a receipt, which should clear the first action.
         self.get_success(
             self.store.insert_receipt(
                 room_id,
                 "m.read",
                 user_id=user_id,
-                event_ids=[event_id],
+                event_ids=[first_event_id],
                 thread_id=None,
+                data={},
+            )
+        )
+        http_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_http(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual(1, len(http_actions))
+        email_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_email(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual(1, len(email_actions))
+
+        # Send a thread receipt to clear the thread action.
+        self.get_success(
+            self.store.insert_receipt(
+                room_id,
+                "m.read",
+                user_id=user_id,
+                event_ids=[second_event_id],
+                thread_id=first_event_id,
                 data={},
             )
         )
@@ -417,17 +448,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         sends both unthreaded and threaded receipts.
         """
 
-        # Create a user to receive notifications and send receipts.
-        user_id = self.register_user("user1235", "pass")
-        token = self.login("user1235", "pass")
-
-        # And another users to send events.
-        other_id = self.register_user("other", "pass")
-        other_token = self.login("other", "pass")
-
-        # Create a room and put both users in it.
-        room_id = self.helper.create_room_as(user_id, tok=token)
-        self.helper.join(room_id, other_id, tok=other_token)
+        user_id, token, _, other_token, room_id = self._create_users_and_room()
         thread_id: str
 
         last_event_id: str
