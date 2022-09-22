@@ -758,7 +758,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
-        depth_map = setup_info.depth_map
 
         backfill_points = self.get_success(
             self.store.get_backfill_points_in_room(room_id)
@@ -777,7 +776,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
-        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
@@ -814,7 +812,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
-        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
@@ -945,7 +942,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
-        depth_map = setup_info.depth_map
 
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(room_id)
@@ -965,7 +961,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
-        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_insertion_event_backward_extremities_in_room` exclude them
@@ -996,7 +991,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
-        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
