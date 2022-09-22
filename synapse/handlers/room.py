@@ -1064,7 +1064,7 @@ class RoomCreationHandler:
         # a map of event types, state keys -> event_ids. We collect these mappings this as events are
         # created (but not persisted to the db) to determine state for future created events
         # (as this info can't be pulled from the db)
-        state_map: dict = {}
+        state_map: MutableStateMap[str] = {}
         # current_state_group of last event created. Used for computing event context of
         # events to be batched
         current_state_group = None
