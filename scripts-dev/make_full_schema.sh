@@ -2,34 +2,34 @@
 #
 # This script generates SQL files for creating a brand new Synapse DB with the latest
 # schema, on both SQLite3 and Postgres.
-#
-# It does so by having Synapse generate an up-to-date SQLite DB, then running
-# synapse_port_db to convert it to Postgres. It then dumps the contents of both.
 
 export PGHOST="localhost"
-POSTGRES_DB_NAME="synapse_full_schema.$$"
-
-SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
-POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
-
+POSTGRES_MAIN_DB_NAME="synapse_full_schema_main.$$"
+POSTGRES_COMMON_DB_NAME="synapse_full_schema_common.$$"
+POSTGRES_STATE_DB_NAME="synapse_full_schema_state.$$"
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
 usage() {
   echo
-  echo "Usage: $0 -p <postgres_username> -o <path> [-c] [-n] [-h]"
+  echo "Usage: $0 -p <postgres_username> -o <path> [-c] [-n <schema number>] [-h]"
   echo
   echo "-p <postgres_username>"
   echo "  Username to connect to local postgres instance. The password will be requested"
   echo "  during script execution."
   echo "-c"
-  echo "  CI mode. Enables coverage tracking and prints every command that the script runs."
+  echo "  CI mode. Prints every command that the script runs."
   echo "-o <path>"
   echo "  Directory to output full schema files to."
+  echo "-n <schema number>"
+  echo "  Schema number for the new snapshot. Used to set the location of files within "
+  echo "  the output directory, mimicking that of synapse/storage/schemas."
+  echo "  Defaults to 9999."
   echo "-h"
   echo "  Display this help text."
 }
 
-while getopts "p:co:h" opt; do
+SCHEMA_NUMBER="9999"
+while getopts "p:co:hn:" opt; do
   case $opt in
     p)
       export PGUSER=$OPTARG
@@ -37,11 +37,6 @@ while getopts "p:co:h" opt; do
     c)
       # Print all commands that are being executed
       set -x
-
-      # Modify required dependencies for coverage
-      REQUIRED_DEPS+=("coverage" "coverage-enable-subprocess")
-
-      COVERAGE=1
       ;;
     o)
       command -v realpath > /dev/null || (echo "The -o flag requires the 'realpath' binary to be installed" && exit 1)
@@ -50,6 +45,9 @@ while getopts "p:co:h" opt; do
     h)
       usage
       exit
+      ;;
+    n)
+      SCHEMA_NUMBER="$OPTARG"
       ;;
     \?)
       echo "ERROR: Invalid option: -$OPTARG" >&2
@@ -98,11 +96,21 @@ cd "$(dirname "$0")/.."
 TMPDIR=$(mktemp -d)
 KEY_FILE=$TMPDIR/test.signing.key # default Synapse signing key path
 SQLITE_CONFIG=$TMPDIR/sqlite.conf
-SQLITE_DB=$TMPDIR/homeserver.db
+SQLITE_MAIN_DB=$TMPDIR/main.db
+SQLITE_STATE_DB=$TMPDIR/state.db
+SQLITE_COMMON_DB=$TMPDIR/common.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
-trap 'rm -rf $TMPDIR' EXIT
+cleanup() {
+  echo "Cleaning up temporary sqlite database and config files..."
+  rm -r "$TMPDIR"
+  echo "Cleaning up temporary Postgres database..."
+  dropdb --if-exists "$POSTGRES_COMMON_DB_NAME"
+  dropdb --if-exists "$POSTGRES_MAIN_DB_NAME"
+  dropdb --if-exists "$POSTGRES_STATE_DB_NAME"
+}
+trap 'cleanup' EXIT
 
 cat > "$SQLITE_CONFIG" <<EOF
 server_name: "test"
@@ -112,10 +120,22 @@ macaroon_secret_key: "abcde"
 
 report_stats: false
 
-database:
-  name: "sqlite3"
-  args:
-    database: "$SQLITE_DB"
+databases:
+  common:
+    name: "sqlite3"
+    data_stores: []
+    args:
+      database: "$SQLITE_COMMON_DB"
+  main:
+    name: "sqlite3"
+    data_stores: ["main"]
+    args:
+      database: "$SQLITE_MAIN_DB"
+  state:
+    name: "sqlite3"
+    data_stores: ["state"]
+    args:
+      database: "$SQLITE_STATE_DB"
 
 # Suppress the key server warning.
 trusted_key_servers: []
@@ -129,13 +149,32 @@ macaroon_secret_key: "abcde"
 
 report_stats: false
 
-database:
-  name: "psycopg2"
-  args:
-    user: "$PGUSER"
-    host: "$PGHOST"
-    password: "$PGPASSWORD"
-    database: "$POSTGRES_DB_NAME"
+databases:
+  common:
+    name: "psycopg2"
+    data_stores: []
+    args:
+      user: "$PGUSER"
+      host: "$PGHOST"
+      password: "$PGPASSWORD"
+      database: "$POSTGRES_COMMON_DB_NAME"
+  main:
+    name: "psycopg2"
+    data_stores: ["main"]
+    args:
+      user: "$PGUSER"
+      host: "$PGHOST"
+      password: "$PGPASSWORD"
+      database: "$POSTGRES_MAIN_DB_NAME"
+  state:
+    name: "psycopg2"
+    data_stores: ["state"]
+    args:
+      user: "$PGUSER"
+      host: "$PGHOST"
+      password: "$PGPASSWORD"
+      database: "$POSTGRES_STATE_DB_NAME"
+
 
 # Suppress the key server warning.
 trusted_key_servers: []
@@ -147,29 +186,46 @@ python -m synapse.app.homeserver --generate-keys -c "$SQLITE_CONFIG"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 echo "Running db background jobs..."
-synapse/_scripts/update_synapse_database.py --database-config --run-background-updates "$SQLITE_CONFIG"
+synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" --run-background-updates
 
 # Create the PostgreSQL database.
-echo "Creating postgres database..."
-createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_DB_NAME"
+echo "Creating postgres databases..."
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_COMMON_DB_NAME"
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_MAIN_DB_NAME"
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_STATE_DB_NAME"
 
-echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
-if [ -z "$COVERAGE" ]; then
-  # No coverage needed
-  synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
-else
-  # Coverage desired
-  coverage run synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
-fi
+echo "Running db background jobs..."
+synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
 
-# Delete schema_version, applied_schema_deltas and applied_module_schemas tables
-# Also delete any shadow tables from fts4
-# This needs to be done after synapse_port_db is run
+
 echo "Dropping unwanted db tables..."
-SQL="
+
+# Some common tables are created and updated by Synapse itself and do not belong in the
+# schema.
+DROP_APP_MANAGED_TABLES="
 DROP TABLE schema_version;
+DROP TABLE schema_compat_version;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
+"
+# Other common tables are not created by Synapse and do belong in the schema.
+# TODO: we could derive DROP_COMMON_TABLES from the dump of the common-only DB. But
+#       since there's only one table there, I haven't bothered to do so.
+DROP_COMMON_TABLES="$DROP_APP_MANAGED_TABLES
+DROP TABLE background_updates;
+"
+
+sqlite3 "$SQLITE_COMMON_DB" <<< "$DROP_APP_MANAGED_TABLES"
+sqlite3 "$SQLITE_MAIN_DB" <<< "$DROP_COMMON_TABLES"
+sqlite3 "$SQLITE_STATE_DB" <<< "$DROP_COMMON_TABLES"
+psql "$POSTGRES_COMMON_DB_NAME" -w <<< "$DROP_APP_MANAGED_TABLES"
+psql "$POSTGRES_MAIN_DB_NAME" -w <<< "$DROP_COMMON_TABLES"
+psql "$POSTGRES_STATE_DB_NAME" -w <<< "$DROP_COMMON_TABLES"
+
+# For Reasons(TM), SQLite's `.schema` also dumps out "shadow tables", the implementation
+# details behind full text search tables. Omit these from the dumps.
+
+sqlite3 "$SQLITE_MAIN_DB" <<< "
 DROP TABLE event_search_content;
 DROP TABLE event_search_segments;
 DROP TABLE event_search_segdir;
@@ -181,16 +237,28 @@ DROP TABLE user_directory_search_segdir;
 DROP TABLE user_directory_search_docsize;
 DROP TABLE user_directory_search_stat;
 "
-sqlite3 "$SQLITE_DB" <<< "$SQL"
-psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
 
-echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
-sqlite3 "$SQLITE_DB" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"
+echo "Dumping SQLite3 schema..."
 
-echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE'..."
-pg_dump --format=plain --no-tablespaces --no-acl --no-owner $POSTGRES_DB_NAME | sed -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE"
+mkdir -p "$OUTPUT_DIR/"{common,main,state}"/full_schema/$SCHEMA_NUMBER"
+sqlite3 "$SQLITE_COMMON_DB" ".schema --indent"           > "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_COMMON_DB" ".dump --data-only --nosys" >> "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_MAIN_DB"   ".schema --indent"           > "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_MAIN_DB"   ".dump --data-only --nosys" >> "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_STATE_DB"  ".schema --indent"           > "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
+sqlite3 "$SQLITE_STATE_DB"  ".dump --data-only --nosys" >> "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.sqlite"
 
-echo "Cleaning up temporary Postgres database..."
-dropdb $POSTGRES_DB_NAME
+cleanup_pg_schema() {
+   sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d'
+}
+
+echo "Dumping Postgres schema..."
+
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_COMMON_DB_NAME" | cleanup_pg_schema  > "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_COMMON_DB_NAME" | cleanup_pg_schema >> "$OUTPUT_DIR/common/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"   | cleanup_pg_schema  > "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_MAIN_DB_NAME"   | cleanup_pg_schema >> "$OUTPUT_DIR/main/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema  > "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema >> "$OUTPUT_DIR/state/full_schema/$SCHEMA_NUMBER/full.sql.postgres"
 
 echo "Done! Files dumped to: $OUTPUT_DIR"

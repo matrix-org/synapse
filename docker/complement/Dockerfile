@@ -17,25 +17,23 @@ ARG SYNAPSE_VERSION=latest
 # the same debian version as Synapse's docker image (so the versions of the
 # shared libraries match).
 
-FROM postgres:13-bullseye AS postgres_base
+# now build the final image, based on the Synapse image.
+
+FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
+    # copy the postgres installation over from the image we built above
+    RUN adduser --system --uid 999 postgres --home /var/lib/postgresql
+    COPY --from=postgres:13-bullseye /usr/lib/postgresql /usr/lib/postgresql
+    COPY --from=postgres:13-bullseye /usr/share/postgresql /usr/share/postgresql
+    RUN mkdir /var/run/postgresql && chown postgres /var/run/postgresql
+    ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
+    ENV PGDATA=/var/lib/postgresql/data
+
     # initialise the database cluster in /var/lib/postgresql
     RUN gosu postgres initdb --locale=C --encoding=UTF-8 --auth-host password
 
     # Configure a password and create a database for Synapse
     RUN echo "ALTER USER postgres PASSWORD 'somesecret'" | gosu postgres postgres --single
     RUN echo "CREATE DATABASE synapse" | gosu postgres postgres --single
-
-# now build the final image, based on the Synapse image.
-
-FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
-    # copy the postgres installation over from the image we built above
-    RUN adduser --system --uid 999 postgres --home /var/lib/postgresql
-    COPY --from=postgres_base /var/lib/postgresql /var/lib/postgresql
-    COPY --from=postgres_base /usr/lib/postgresql /usr/lib/postgresql
-    COPY --from=postgres_base /usr/share/postgresql /usr/share/postgresql
-    RUN mkdir /var/run/postgresql && chown postgres /var/run/postgresql
-    ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
-    ENV PGDATA=/var/lib/postgresql/data
 
     # Extend the shared homeserver config to disable rate-limiting,
     # set Complement's static shared secret, enable registration, amongst other

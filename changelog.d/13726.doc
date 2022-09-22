@@ -1,1 +1,0 @@
-Fix a mistake in the config manual: the `event_cache_size` _is_ scaled by `caches.global_factor`. The documentation was incorrect since Synapse 1.22.

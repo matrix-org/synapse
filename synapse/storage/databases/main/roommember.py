@@ -86,6 +86,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # at a time. Keyed by room_id.
         self._joined_host_linearizer = Linearizer("_JoinedHostsCache")
 
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
+
         if (
             self.hs.config.worker.run_background_tasks
             and self.hs.config.metrics.metrics_flags.known_servers
@@ -501,6 +503,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
         return membership == Membership.JOIN
+
+    async def is_server_notice_room(self, room_id: str) -> bool:
+        """
+        Determines whether the given room is a 'Server Notices' room, used for
+        sending server notices to a user.
+
+        This is determined by seeing whether the server notices user is present
+        in the room.
+        """
+        if self._server_notices_mxid is None:
+            return False
+        is_server_notices_room = await self.check_local_user_in_room(
+            user_id=self._server_notices_mxid, room_id=room_id
+        )
+        return is_server_notices_room
 
     async def get_local_current_membership_for_user_in_room(
         self, user_id: str, room_id: str
