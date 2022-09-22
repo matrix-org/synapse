@@ -8,16 +8,16 @@
 
 ARG SYNAPSE_VERSION=latest
 
-# first of all, we create a base image with a postgres server and database,
-# which we can copy into the target image. For repeated rebuilds, this is
-# much faster than apt installing postgres each time.
+# First of all, we copy postgres server from the official postgres image,
+# since for repeated rebuilds, this is much faster than apt installing
+# postgres each time.
 #
 # This trick only works because (a) the Synapse image happens to have all the
 # shared libraries that postgres wants, (b) we use a postgres image based on
 # the same debian version as Synapse's docker image (so the versions of the
 # shared libraries match).
 
-# now build the final image, based on the Synapse image.
+# We also initialize the database itself at build and not runtime for speed reason.
 
 FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
     # copy the postgres installation over from the image we built above
