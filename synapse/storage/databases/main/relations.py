@@ -157,6 +157,8 @@ class RelationsWorkerStore(SQLBaseStore):
             # last event returned.
             next_token = None
             if len(events) > limit:
+                # Instead of using the last row (which tells us there is more
+                # data), use the last row to be returned.
                 events = events[:limit]
 
                 topo = events[-1].topological_ordering
