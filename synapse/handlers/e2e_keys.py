@@ -188,18 +188,21 @@ class E2eKeysHandler:
                 )
                 invalid_cached_users = cached_users - valid_cached_users
                 if invalid_cached_users:
-                    # Fix up results. If we get here, there is either a bug in device
-                    # list tracking, or we hit the race mentioned above.
+                    # Fix up results. If we get here, it means there was either a bug in
+                    # device list tracking, or we hit the race mentioned above.
+                    # TODO: In practice, this path is hit fairly often in existing
+                    #       deployments when clients query the keys of departed remote
+                    #       users. A background update to mark the appropriate device
+                    #       lists as unsubscribed is needed.
+                    #       https://github.com/matrix-org/synapse/issues/13651
+                    # Note that this currently introduces a failure mode when clients
+                    # are trying to decrypt old messages from a remote user whose
+                    # homeserver is no longer available. We may want to consider falling
+                    # back to the cached data when we fail to retrieve a device list
+                    # over federation for such remote users.
                     user_ids_not_in_cache.update(invalid_cached_users)
                     for invalid_user_id in invalid_cached_users:
                         remote_results.pop(invalid_user_id)
-                    # This log message may be removed if it turns out it's almost
-                    # entirely triggered by races.
-                    logger.error(
-                        "Devices for %s were cached, but the server no longer shares "
-                        "any rooms with them. The cached device lists are stale.",
-                        invalid_cached_users,
-                    )
 
                 for user_id, devices in remote_results.items():
                     user_devices = results.setdefault(user_id, {})

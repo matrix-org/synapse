@@ -285,7 +285,10 @@ class BackgroundUpdater:
         back_to_back_failures = 0
 
         try:
-            logger.info("Starting background schema updates")
+            logger.info(
+                "Starting background schema updates for database %s",
+                self._database_name,
+            )
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
@@ -533,6 +536,7 @@ class BackgroundUpdater:
             index_name: name of index to add
             table: table to add index to
             columns: columns/expressions to include in index
+            where_clause: A WHERE clause to specify a partial unique index.
             unique: true to make a UNIQUE index
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)

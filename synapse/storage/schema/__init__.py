@@ -83,6 +83,8 @@ Changes in SCHEMA_VERSION = 73;
       event_push_summary, receipts_linearized, and receipts_graph.
     - Add table `event_failed_pull_attempts` to keep track when we fail to pull
       events over federation.
+    - Add indexes to various tables (`event_failed_pull_attempts`, `insertion_events`,
+      `batch_events`) to make it easy to delete all associated rows when purging a room.
 """
 
 

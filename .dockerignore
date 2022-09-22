@@ -11,5 +11,6 @@
 !build_rust.py
 
 rust/target
+synapse/*.so
 
 **/__pycache__
