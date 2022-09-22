@@ -433,7 +433,7 @@ class EventsPersistenceStorageController:
 
                 # We expect events to be persisted by this point and this makes
                 # mypy happy about `stream_ordering` not being optional below
-                assert event.internal_metadata.stream_ordering
+                assert event.internal_metadata.stream_ordering is not None
                 # Invalidate related caches after we persist a new event
                 relation = relation_from_event(event)
                 self.main_store._invalidate_caches_for_event(
@@ -482,7 +482,7 @@ class EventsPersistenceStorageController:
         else:
             # We expect events to be persisted by this point and this makes
             # mypy happy about `stream_ordering` not being optional below
-            assert event.internal_metadata.stream_ordering
+            assert event.internal_metadata.stream_ordering is not None
             # Invalidate related caches after we persist a new event
             relation = relation_from_event(event)
             self.main_store._invalidate_caches_for_event(
