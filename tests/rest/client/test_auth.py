@@ -588,6 +588,13 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         self.assertEqual(login_resp["errcode"], Codes.USER_AWAITING_APPROVAL)
 
+        # Check that we didn't register a device for the user during the login attempt.
+        devices = self.get_success(
+            self.hs.get_datastores().main.get_devices_by_user("@username:test")
+        )
+
+        self.assertEqual(len(devices), 0)
+
 
 class RefreshAuthTests(unittest.HomeserverTestCase):
     servlets = [
