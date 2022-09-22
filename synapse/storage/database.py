@@ -391,6 +391,14 @@ class LoggingTransaction:
     def executemany(self, sql: str, *args: Any) -> None:
         self._do_execute(self.txn.executemany, sql, *args)
 
+    def executescript(self, sql: str) -> None:
+        if isinstance(self.database_engine, Sqlite3Engine):
+            self._do_execute(self.txn.executescript, sql)  # type: ignore[attr-defined]
+        else:
+            raise NotImplementedError(
+                f"executescript only exists for sqlite driver, not {type(self.database_engine)}"
+            )
+
     def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())

@@ -214,3 +214,11 @@ class PostgresEngine(
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)
+
+    @staticmethod
+    def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+        """
+        cursor.execute(script)
