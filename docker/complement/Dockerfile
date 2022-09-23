@@ -24,7 +24,7 @@ FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
     ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
     ENV PGDATA=/var/lib/postgresql/data
 
-    # We also initialize the database at build and not runtime for speed reason.
+    # We also initialize the database at build time, rather than runtime, so that it's faster to spin up the image.
     RUN gosu postgres initdb --locale=C --encoding=UTF-8 --auth-host password
 
     # Configure a password and create a database for Synapse
