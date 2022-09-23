@@ -1186,7 +1186,7 @@ class PersistEventsStore:
             # Check if any of the remote membership changes requires us to
             # unsubscribe from their device lists.
             self.store.handle_potentially_left_users_txn(
-                txn, {m for m in members_changed if self.hs.is_mine_id(m)}
+                txn, {m for m in members_changed if not self.hs.is_mine_id(m)}
             )
 
     def _upsert_room_version_txn(self, txn: LoggingTransaction, room_id: str) -> None:
