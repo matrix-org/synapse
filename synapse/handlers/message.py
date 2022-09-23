@@ -1019,8 +1019,7 @@ class EventCreationHandler:
 
             ev = await self.handle_new_client_event(
                 requester=requester,
-                event=event,
-                context=context,
+                events_and_context=[(event, context)],
                 ratelimit=ratelimit,
                 ignore_shadow_ban=ignore_shadow_ban,
             )
@@ -1292,49 +1291,6 @@ class EventCreationHandler:
                     400, "Cannot start threads from an event with a relation"
                 )
 
-    async def handle_create_room_events(
-        self,
-        requester: Requester,
-        events_and_ctx: List[Tuple[EventBase, EventContext]],
-        ratelimit: bool = True,
-    ) -> EventBase:
-        """
-        Process a batch of room creation events. For each event in the list it checks
-        the authorization and that the event can be serialized. Returns the last event in the
-        list once it has been persisted.
-        Args:
-            requester: the room creator
-            events_and_ctx: a set of events and their associated contexts to persist
-            ratelimit: whether to ratelimit this request
-        """
-        for event, context in events_and_ctx:
-            try:
-                validate_event_for_room_version(event)
-                await self._event_auth_handler.check_auth_rules_from_context(
-                    event, context
-                )
-            except AuthError as err:
-                logger.warning("Denying new event %r because %s", event, err)
-                raise err
-
-            # Ensure that we can round trip before trying to persist in db
-            try:
-                dump = json_encoder.encode(event.content)
-                json_decoder.decode(dump)
-            except Exception:
-                logger.exception("Failed to encode content: %r", event.content)
-                raise
-
-        # We now persist the events
-        try:
-            result = await self._persist_events_batch(
-                requester, events_and_ctx, ratelimit
-            )
-        except Exception as e:
-            logger.info(f"Encountered an error persisting events: {e}")
-
-        return result
-
     async def _persist_events_batch(
         self,
         requester: Requester,
@@ -1437,13 +1393,12 @@ class EventCreationHandler:
     async def handle_new_client_event(
         self,
         requester: Requester,
-        event: EventBase,
-        context: EventContext,
+        events_and_context: List[Tuple[EventBase, EventContext]],
         ratelimit: bool = True,
         extra_users: Optional[List[UserID]] = None,
         ignore_shadow_ban: bool = False,
     ) -> EventBase:
-        """Processes a new event.
+        """Processes new events.
 
         This includes deduplicating, checking auth, persisting,
         notifying users, sending to remote servers, etc.
@@ -1453,8 +1408,7 @@ class EventCreationHandler:
 
         Args:
             requester
-            event
-            context
+            events_and_context: A list of one or more tuples of event, context to be persisted
             ratelimit
             extra_users: Any extra users to notify about event
 
@@ -1472,84 +1426,98 @@ class EventCreationHandler:
         """
         extra_users = extra_users or []
 
-        # we don't apply shadow-banning to membership events here. Invites are blocked
-        # higher up the stack, and we allow shadow-banned users to send join and leave
-        # events as normal.
-        if (
-            event.type != EventTypes.Member
-            and not ignore_shadow_ban
-            and requester.shadow_banned
-        ):
-            # We randomly sleep a bit just to annoy the requester.
-            await self.clock.sleep(random.randint(1, 10))
-            raise ShadowBanError()
+        for event, context in events_and_context:
+            # we don't apply shadow-banning to membership events here. Invites are blocked
+            # higher up the stack, and we allow shadow-banned users to send join and leave
+            # events as normal.
+            if (
+                event.type != EventTypes.Member
+                and not ignore_shadow_ban
+                and requester.shadow_banned
+            ):
+                # We randomly sleep a bit just to annoy the requester.
+                await self.clock.sleep(random.randint(1, 10))
+                raise ShadowBanError()
 
-        if event.is_state():
-            prev_event = await self.deduplicate_state_event(event, context)
-            if prev_event is not None:
-                logger.info(
-                    "Not bothering to persist state event %s duplicated by %s",
-                    event.event_id,
-                    prev_event.event_id,
-                )
-                return prev_event
+            if event.is_state():
+                prev_event = await self.deduplicate_state_event(event, context)
+                if prev_event is not None:
+                    logger.info(
+                        "Not bothering to persist state event %s duplicated by %s",
+                        event.event_id,
+                        prev_event.event_id,
+                    )
+                    return prev_event
 
-        if event.internal_metadata.is_out_of_band_membership():
-            # the only sort of out-of-band-membership events we expect to see here are
-            # invite rejections and rescinded knocks that we have generated ourselves.
-            assert event.type == EventTypes.Member
-            assert event.content["membership"] == Membership.LEAVE
-        else:
+            if event.internal_metadata.is_out_of_band_membership():
+                # the only sort of out-of-band-membership events we expect to see here are
+                # invite rejections and rescinded knocks that we have generated ourselves.
+                assert event.type == EventTypes.Member
+                assert event.content["membership"] == Membership.LEAVE
+            else:
+                try:
+                    validate_event_for_room_version(event)
+                    await self._event_auth_handler.check_auth_rules_from_context(
+                        event, context
+                    )
+                except AuthError as err:
+                    logger.warning("Denying new event %r because %s", event, err)
+                    raise err
+
+            # Ensure that we can round trip before trying to persist in db
             try:
-                validate_event_for_room_version(event)
-                await self._event_auth_handler.check_auth_rules_from_context(
-                    event, context
+                dump = json_encoder.encode(event.content)
+                json_decoder.decode(dump)
+            except Exception:
+                logger.exception("Failed to encode content: %r", event.content)
+                raise
+
+        if len(events_and_context) > 1:
+            try:
+                result = await self._persist_events_batch(
+                    requester, events_and_context, ratelimit
                 )
-            except AuthError as err:
-                logger.warning("Denying new event %r because %s", event, err)
-                raise err
 
-        # Ensure that we can round trip before trying to persist in db
-        try:
-            dump = json_encoder.encode(event.content)
-            json_decoder.decode(dump)
-        except Exception:
-            logger.exception("Failed to encode content: %r", event.content)
-            raise
+            except Exception as e:
+                logger.info(f"Encountered an error persisting events: {e}")
 
-        # We now persist the event (and update the cache in parallel, since we
-        # don't want to block on it).
-        try:
-            result, _ = await make_deferred_yieldable(
-                gather_results(
-                    (
-                        run_in_background(
-                            self._persist_event,
-                            requester=requester,
-                            event=event,
-                            context=context,
-                            ratelimit=ratelimit,
-                            extra_users=extra_users,
+            return result
+
+        else:
+            # We now persist the event (and update the cache in parallel, since we
+            # don't want to block on it).
+            event, context = events_and_context[0]
+            try:
+                result, _ = await make_deferred_yieldable(
+                    gather_results(
+                        (
+                            run_in_background(
+                                self._persist_event,
+                                requester=requester,
+                                event=event,
+                                context=context,
+                                ratelimit=ratelimit,
+                                extra_users=extra_users,
+                            ),
+                            run_in_background(
+                                self.cache_joined_hosts_for_event, event, context
+                            ).addErrback(
+                                log_failure, "cache_joined_hosts_for_event failed"
+                            ),
                         ),
-                        run_in_background(
-                            self.cache_joined_hosts_for_event, event, context
-                        ).addErrback(
-                            log_failure, "cache_joined_hosts_for_event failed"
-                        ),
-                    ),
-                    consumeErrors=True,
+                        consumeErrors=True,
+                    )
+                ).addErrback(unwrapFirstError)
+            except PartialStateConflictError as e:
+                # The event context needs to be recomputed.
+                # Turn the error into a 429, as a hint to the client to try again.
+                logger.info(
+                    "Room %s was un-partial stated while persisting client event.",
+                    event.room_id,
                 )
-            ).addErrback(unwrapFirstError)
-        except PartialStateConflictError as e:
-            # The event context needs to be recomputed.
-            # Turn the error into a 429, as a hint to the client to try again.
-            logger.info(
-                "Room %s was un-partial stated while persisting client event.",
-                event.room_id,
-            )
-            raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
+                raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
-        return result
+            return result
 
     async def _persist_event(
         self,
@@ -2107,8 +2075,7 @@ class EventCreationHandler:
                 # shadow-banned user.
                 await self.handle_new_client_event(
                     requester,
-                    event,
-                    context,
+                    events_and_context=[(event, context)],
                     ratelimit=False,
                     ignore_shadow_ban=True,
                 )

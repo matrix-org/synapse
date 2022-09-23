@@ -301,8 +301,7 @@ class RoomCreationHandler:
         # now send the tombstone
         await self.event_creation_handler.handle_new_client_event(
             requester=requester,
-            event=tombstone_event,
-            context=tombstone_context,
+            events_and_context=[(tombstone_event, tombstone_context)],
         )
 
         state_filter = StateFilter.from_types(
@@ -1114,8 +1113,7 @@ class RoomCreationHandler:
 
             ev = await self.event_creation_handler.handle_new_client_event(
                 requester=creator,
-                event=event,
-                context=context,
+                events_and_context=[(event, context)],
                 ratelimit=False,
                 ignore_shadow_ban=True,
             )
@@ -1154,7 +1152,6 @@ class RoomCreationHandler:
             prev_event_ids=[last_sent_event_id],
             depth=depth,
         )
-        # last_sent_event_id = member_event_id
         prev_event = [member_event_id]
 
         # update the depth and state map here as the membership event has been created
@@ -1273,8 +1270,8 @@ class RoomCreationHandler:
             )
             events_to_send.append((encryption_event, encryption_context))
 
-        last_event = await self.event_creation_handler.handle_create_room_events(
-            creator, events_to_send
+        last_event = await self.event_creation_handler.handle_new_client_event(
+            creator, events_to_send, ignore_shadow_ban=True
         )
         assert last_event.internal_metadata.stream_ordering is not None
         return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
