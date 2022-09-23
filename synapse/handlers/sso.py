@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import io
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -29,6 +30,7 @@ from typing import (
 from urllib.parse import urlencode
 
 import attr
+import requests
 from typing_extensions import NoReturn, Protocol
 
 from twisted.web.iweb import IRequest
@@ -137,6 +139,7 @@ class UserAttributes:
     localpart: Optional[str]
     confirm_localpart: bool = False
     display_name: Optional[str] = None
+    picture: str = ""
     emails: Collection[str] = attr.Factory(list)
 
 
@@ -191,6 +194,7 @@ class SsoHandler:
         self._error_template = hs.config.sso.sso_error_template
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
+        self.media_repo = hs.get_media_repository()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
@@ -693,7 +697,48 @@ class SsoHandler:
         await self._store.record_user_external_id(
             auth_provider_id, remote_user_id, registered_user_id
         )
+
+        # Set avatar, if available
+        if attributes.picture:
+            await self.set_avatar(registered_user_id, attributes.picture)
+
         return registered_user_id
+
+    async def set_avatar(self, user_id: str, picture_https_url: str) -> None:
+        try:
+            uid = UserID.from_string(user_id)
+
+            # download picture
+            http_response = requests.get(picture_https_url)
+            if http_response.status_code != 200:
+                http_response.raise_for_status()
+
+            content_type = http_response.headers["Content-Type"]
+            content_length = int(http_response.headers["Content-Length"])
+
+            # convert image into BytesIO
+            b = io.BytesIO(http_response.content)
+
+            # store it in media repository
+            avatar_mxc_url = await self.media_repo.create_content(
+                content_type,
+                None,
+                b,
+                content_length,
+                uid,
+            )
+
+            # save it as user avatar
+            await self._profile_handler.set_avatar_url(
+                uid,
+                create_requester(uid),
+                str(avatar_mxc_url),
+            )
+
+            logger.info("successfully saved the user avatar via SSO: %s", user_id)
+        except Exception as e:
+            logger.info("failed to save the user avatar via SSO: %s", user_id)
+            logger.exception(e)
 
     async def complete_sso_ui_auth_request(
         self,
