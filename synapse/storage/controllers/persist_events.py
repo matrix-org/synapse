@@ -716,28 +716,12 @@ class EventsPersistenceStorageController:
                                 room_id,
                                 ev_ctx_rm,
                                 delta,
-                                current_state,
-                                potentially_left_users,
                             )
                             if not is_still_joined:
                                 logger.info("Server no longer in room %s", room_id)
                                 latest_event_ids = set()
                                 current_state = {}
                                 delta.no_longer_in_room = True
-
-                            # Add all remote users that might have left rooms.
-                            potentially_left_users.update(
-                                user_id
-                                for event_type, user_id in delta.to_delete
-                                if event_type == EventTypes.Member
-                                and not self.is_mine_id(user_id)
-                            )
-                            potentially_left_users.update(
-                                user_id
-                                for event_type, user_id in delta.to_insert.keys()
-                                if event_type == EventTypes.Member
-                                and not self.is_mine_id(user_id)
-                            )
 
                             state_delta_for_room[room_id] = delta
 
@@ -748,8 +732,6 @@ class EventsPersistenceStorageController:
                 use_negative_stream_ordering=backfilled,
                 inhibit_local_membership_updates=backfilled,
             )
-
-            await self.main_store.handle_potentially_left_users(potentially_left_users)
 
         return replaced_events
 
@@ -1126,8 +1108,6 @@ class EventsPersistenceStorageController:
         room_id: str,
         ev_ctx_rm: List[Tuple[EventBase, EventContext]],
         delta: DeltaState,
-        current_state: Optional[StateMap[str]],
-        potentially_left_users: Set[str],
     ) -> bool:
         """Check if the server will still be joined after the given events have
         been persised.
@@ -1137,11 +1117,6 @@ class EventsPersistenceStorageController:
             ev_ctx_rm
             delta: The delta of current state between what is in the database
                 and what the new current state will be.
-            current_state: The new current state if it already been calculated,
-                otherwise None.
-            potentially_left_users: If the server has left the room, then joined
-                remote users will be added to this set to indicate that the
-                server may no longer be sharing a room with them.
         """
 
         if not any(
@@ -1194,30 +1169,5 @@ class EventsPersistenceStorageController:
             room_id, users_to_ignore
         ):
             return True
-
-        # The server will leave the room, so we go and find out which remote
-        # users will still be joined when we leave.
-        if current_state is None:
-            current_state = await self.main_store.get_partial_current_state_ids(room_id)
-            current_state = dict(current_state)
-            for key in delta.to_delete:
-                current_state.pop(key, None)
-
-            current_state.update(delta.to_insert)
-
-        remote_event_ids = [
-            event_id
-            for (
-                typ,
-                state_key,
-            ), event_id in current_state.items()
-            if typ == EventTypes.Member and not self.is_mine_id(state_key)
-        ]
-        members = await self.main_store.get_membership_from_event_ids(remote_event_ids)
-        potentially_left_users.update(
-            member.user_id
-            for member in members.values()
-            if member and member.membership == Membership.JOIN
-        )
 
         return False
