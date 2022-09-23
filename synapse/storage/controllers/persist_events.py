@@ -749,7 +749,7 @@ class EventsPersistenceStorageController:
                 inhibit_local_membership_updates=backfilled,
             )
 
-            await self._handle_potentially_left_users(potentially_left_users)
+            await self.main_store.handle_potentially_left_users(potentially_left_users)
 
         return replaced_events
 
@@ -1221,19 +1221,3 @@ class EventsPersistenceStorageController:
         )
 
         return False
-
-    async def _handle_potentially_left_users(self, user_ids: Set[str]) -> None:
-        """Given a set of remote users check if the server still shares a room with
-        them. If not then mark those users' device cache as stale.
-        """
-
-        if not user_ids:
-            return
-
-        joined_users = await self.main_store.get_users_server_still_shares_room_with(
-            user_ids
-        )
-        left_users = user_ids - joined_users
-
-        for user_id in left_users:
-            await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)
