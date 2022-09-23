@@ -362,7 +362,6 @@ class TypingWriterHandler(FollowerTypingHandler):
             )
             return
 
-        # Let's check that the origin server is in the room before accepting the typing event.
         # Let's check that the origin server is in the room before accepting the typing
         # event. We don't want to block waiting on a partial state so take an
         # approximation if needed.
