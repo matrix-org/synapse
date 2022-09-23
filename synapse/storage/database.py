@@ -95,6 +95,8 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
     "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
     "event_push_summary": "event_push_summary_unique_index2",
+    "receipts_linearized": "receipts_linearized_unique_index",
+    "receipts_graph": "receipts_graph_unique_index",
 }
 
 

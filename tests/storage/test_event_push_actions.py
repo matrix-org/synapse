@@ -110,6 +110,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     "m.read",
                     user_id=user_id,
                     event_ids=[event_id],
+                    thread_id=None,
                     data={},
                 )
             )
@@ -267,13 +268,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _rotate() -> None:
             self.get_success(self.store._rotate_notifs())
 
-        def _mark_read(event_id: str) -> None:
+        def _mark_read(event_id: str, thread_id: Optional[str] = None) -> None:
             self.get_success(
                 self.store.insert_receipt(
                     room_id,
                     "m.read",
                     user_id=user_id,
                     event_ids=[event_id],
+                    thread_id=thread_id,
                     data={},
                 )
             )
