@@ -20,4 +20,4 @@
 --
 -- Both columns are nullable without defaults, for backwards compatibility.
 ALTER TABLE partial_state_rooms ADD COLUMN device_lists_stream_id BIGINT;
-ALTER TABLE partial_state_rooms ADD COLUMN join_event_id TEXT REFERENCES events(event_id);
+ALTER TABLE partial_state_rooms ADD COLUMN join_event_id TEXT;
