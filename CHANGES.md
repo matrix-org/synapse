@@ -1,3 +1,20 @@
+Synapse 1.68.0rc2 (2022-09-23)
+==============================
+
+Bugfixes
+--------
+
+- Fix building from packaged sdist. Broke in v1.68.0rc1. ([\#13866](https://github.com/matrix-org/synapse/issues/13866))
+
+
+Internal Changes
+----------------
+
+- Fix the release script not publishing binary wheels. ([\#13850](https://github.com/matrix-org/synapse/issues/13850))
+- Lower minimum supported rustc version to 1.58.1. ([\#13857](https://github.com/matrix-org/synapse/issues/13857))
+- Lock Rust dependencies versions. ([\#13858](https://github.com/matrix-org/synapse/issues/13858))
+
+
 Synapse 1.68.0rc1 (2022-09-20)
 ==============================
 
