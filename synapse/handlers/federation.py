@@ -209,7 +209,7 @@ class FederationHandler:
         current_depth: int,
         limit: int,
         *,
-        processing_start_time: int,
+        processing_start_time: Optional[int],
     ) -> bool:
         """
         Checks whether the `current_depth` is at or approaching any backfill
@@ -280,7 +280,10 @@ class FederationHandler:
                 # time (all events are below the `MAX_DEPTH`)
                 current_depth=MAX_DEPTH,
                 limit=limit,
-                processing_start_time=processing_start_time,
+                # We don't want to another timing observation from this nested
+                # recursive call. The top-most call can record the time overall
+                # otherwise the smaller one will throw off the results.
+                processing_start_time=None,
             )
         elif not sorted_backfill_points and current_depth == MAX_DEPTH:
             # Even after trying again with `MAX_DEPTH`, we didn't find any
@@ -446,10 +449,15 @@ class FederationHandler:
 
             return False
 
-        processing_end_time = self.clock.time_msec()
-        backfill_processing_before_timer.observe(
-            (processing_end_time - processing_start_time) / 1000
-        )
+        # If we have the `processing_start_time`, then we can make an
+        # observation. We wouldn't have the `processing_start_time` in the case
+        # where `_maybe_backfill_inner` is recursively called to find any
+        # backfill points regardless of `current_depth`.
+        if processing_start_time is not None:
+            processing_end_time = self.clock.time_msec()
+            backfill_processing_before_timer.observe(
+                (processing_end_time - processing_start_time) / 1000
+            )
 
         success = await try_backfill(likely_domains)
         if success:
