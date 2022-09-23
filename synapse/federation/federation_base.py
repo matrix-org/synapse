@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -58,7 +58,12 @@ class FederationBase:
 
     @trace
     async def _check_sigs_and_hash(
-        self, room_version: RoomVersion, pdu: EventBase
+        self,
+        room_version: RoomVersion,
+        pdu: EventBase,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> EventBase:
         """Checks that event is correctly signed by the sending server.
 
@@ -83,9 +88,8 @@ class FederationBase:
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
         except Exception as exc:
-            await self.store.record_event_failed_pull_attempt(
-                pdu.room_id, pdu.event_id, str(exc)
-            )
+            if record_failure_callback:
+                await record_failure_callback(pdu, str(exc))
             raise exc
 
         if not check_event_content_hash(pdu):
@@ -122,9 +126,10 @@ class FederationBase:
                         "event_id": pdu.event_id,
                     }
                 )
-                await self.store.record_event_failed_pull_attempt(
-                    pdu.room_id, pdu.event_id, "Event content has been tampered with"
-                )
+                if record_failure_callback:
+                    await record_failure_callback(
+                        pdu, "Event content has been tampered with"
+                    )
             return redacted_event
 
         spam_check = await self.spam_checker.check_event_for_spam(pdu)

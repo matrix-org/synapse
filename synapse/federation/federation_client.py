@@ -278,7 +278,7 @@ class FederationClient(FederationBase):
         pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
-        pdus[:] = await self._check_sigs_and_hash_and_fetch(
+        pdus[:] = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             dest, pdus, room_version=room_version
         )
 
@@ -547,24 +547,28 @@ class FederationClient(FederationBase):
             len(auth_event_map),
         )
 
-        valid_auth_events = await self._check_sigs_and_hash_and_fetch(
+        valid_auth_events = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             destination, auth_event_map.values(), room_version
         )
 
-        valid_state_events = await self._check_sigs_and_hash_and_fetch(
-            destination, state_event_map.values(), room_version
+        valid_state_events = (
+            await self._check_sigs_and_hash_for_pulled_events_and_fetch(
+                destination, state_event_map.values(), room_version
+            )
         )
 
         return valid_state_events, valid_auth_events
 
     @trace
-    async def _check_sigs_and_hash_and_fetch(
+    async def _check_sigs_and_hash_for_pulled_events_and_fetch(
         self,
         origin: str,
         pdus: Collection[EventBase],
         room_version: RoomVersion,
     ) -> List[EventBase]:
-        """Checks the signatures and hashes of a list of events.
+        """
+        Checks the signatures and hashes of a list of pulled events we got from
+        federation and records any signature failures as failed pull attempts.
 
         If a PDU fails its signature check then we check if we have it in
         the database, and if not then request it from the sender's server (if that
@@ -597,11 +601,17 @@ class FederationClient(FederationBase):
 
         valid_pdus: List[EventBase] = []
 
+        async def _record_failure_callback(event: EventBase, cause: str) -> None:
+            await self.store.record_event_failed_pull_attempt(
+                event.room_id, event.event_id, cause
+            )
+
         async def _execute(pdu: EventBase) -> None:
             valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                 pdu=pdu,
                 origin=origin,
                 room_version=room_version,
+                record_failure_callback=_record_failure_callback,
             )
 
             if valid_pdu:
@@ -618,6 +628,9 @@ class FederationClient(FederationBase):
         pdu: EventBase,
         origin: str,
         room_version: RoomVersion,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> Optional[EventBase]:
         """Takes a PDU and checks its signatures and hashes.
 
@@ -694,7 +707,7 @@ class FederationClient(FederationBase):
 
         auth_chain = [event_from_pdu_json(p, room_version) for p in res["auth_chain"]]
 
-        signed_auth = await self._check_sigs_and_hash_and_fetch(
+        signed_auth = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             destination, auth_chain, room_version=room_version
         )
 
@@ -1401,7 +1414,7 @@ class FederationClient(FederationBase):
                 event_from_pdu_json(e, room_version) for e in content.get("events", [])
             ]
 
-            signed_events = await self._check_sigs_and_hash_and_fetch(
+            signed_events = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
                 destination, events, room_version=room_version
             )
         except HttpResponseException as e:
