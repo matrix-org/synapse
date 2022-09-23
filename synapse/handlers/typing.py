@@ -363,7 +363,9 @@ class TypingWriterHandler(FollowerTypingHandler):
             return
 
         # Let's check that the origin server is in the room before accepting the typing event.
-        # We don't want to block waiting on a partial state so take the approximation if needed.
+        # Let's check that the origin server is in the room before accepting the typing
+        # event. We don't want to block waiting on a partial state so take an
+        # approximation if needed.
         domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
