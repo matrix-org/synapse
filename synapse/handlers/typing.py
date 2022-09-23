@@ -340,7 +340,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         # If we're not in the room just ditch the event entirely. This is
         # probably an old server that has come back and thinks we're still in
         # the room (or we've been rejoined to the room by a state reset).
-        is_in_room = await self.event_auth_handler.check_host_in_room(
+        is_in_room = await self.event_auth_handler.is_host_in_room(
             room_id, self.server_name
         )
         if not is_in_room:
