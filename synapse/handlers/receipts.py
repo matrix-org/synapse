@@ -63,6 +63,8 @@ class ReceiptsHandler:
         self.clock = self.hs.get_clock()
         self.state = hs.get_state_handler()
 
+        self._msc3771_enabled = hs.config.experimental.msc3771_enabled
+
     async def _received_remote_receipt(self, origin: str, content: JsonDict) -> None:
         """Called when we receive an EDU of type m.receipt from a remote HS."""
         receipts = []
@@ -94,7 +96,7 @@ class ReceiptsHandler:
                     # Check if these receipts apply to a thread.
                     thread_id = None
                     data = user_values.get("data", {})
-                    if isinstance(data, dict):
+                    if self._msc3771_enabled and isinstance(data, dict):
                         thread_id = data.get("thread_id")
                         # If the thread ID is invalid, consider it missing.
                         if not isinstance(thread_id, str):
