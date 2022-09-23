@@ -106,6 +106,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     "m.read",
                     user_id=user_id,
                     event_ids=[event_id],
+                    thread_id=None,
                     data={},
                 )
             )
