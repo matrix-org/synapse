@@ -103,6 +103,11 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
     def test_persisting_event_invalidates_cache(self):
+        """
+        Test to make sure that the `have_seen_event` cache
+        is invalided after we persist an event and returns
+        the updated value.
+        """
         event, event_context = self.get_success(
             create_event(
                 self.hs,
