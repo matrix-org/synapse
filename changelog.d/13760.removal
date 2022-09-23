@@ -1,1 +1,0 @@
-Synapse will now refuse to start if configured to use SQLite < 3.27.

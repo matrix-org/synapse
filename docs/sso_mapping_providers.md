@@ -73,8 +73,8 @@ A custom mapping provider must specify the following methods:
 * `async def map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
-      - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
-                     information from.
+      - `userinfo` - An [`authlib.oidc.core.claims.UserInfo`](https://docs.authlib.org/en/latest/specs/oidc.html#authlib.oidc.core.UserInfo)
+                     object to extract user information from.
       - `token` - A dictionary which includes information necessary to make
                   further requests to the OpenID provider.
       - `failures` - An `int` that represents the amount of times the returned
@@ -91,7 +91,13 @@ A custom mapping provider must specify the following methods:
         `None`, the user is prompted to pick their own username. This is only used
         during a user's first login. Once a localpart has been associated with a
         remote user ID (see `get_remote_user_id`) it cannot be updated.
-      - `displayname`: An optional string, the display name for the user.
+      - `confirm_localpart`: A boolean. If set to `True`, when a `localpart`
+        string is returned from this method, Synapse will prompt the user to
+        either accept this localpart or pick their own username. Otherwise this
+        option has no effect. If omitted, defaults to `False`.
+      - `display_name`: An optional string, the display name for the user.
+      - `emails`: A list of strings, the email address(es) to associate with
+        this user. If omitted, defaults to an empty list.
 * `async def get_extra_attributes(self, userinfo, token)`
     - This method must be async.
     - Arguments:

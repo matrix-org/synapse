@@ -32,9 +32,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - run: pip install .
-      - run: scripts-dev/generate_sample_config.sh --check
-      - run: scripts-dev/config-lint.sh
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          extras: "all"
+      - run: poetry run scripts-dev/generate_sample_config.sh --check
+      - run: poetry run scripts-dev/config-lint.sh
 
   check-schema-delta:
     runs-on: ubuntu-latest
@@ -76,7 +78,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
       - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "all"
@@ -93,7 +94,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
             components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -111,7 +112,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
             components: rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -203,7 +204,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
@@ -319,7 +320,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
@@ -361,18 +362,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - run: sudo apt-get -qq install xmlsec1
+      - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+
 
   portdb:
     if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
-    env:
-      TOP: ${{ github.workspace }}
     strategy:
       matrix:
         include:
@@ -398,12 +403,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - run: sudo apt-get -qq install xmlsec1
+      - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
           extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
+        id: run_tester_script
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+      - name: "Upload schema differences"
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() && !cancelled() && steps.run_tester_script.outcome == 'failure' }}
+        with:
+          name: Schema dumps
+          path: |
+            unported.sql
+            ported.sql
+            schema_diff
 
   complement:
     if: "${{ !failure() && !cancelled() }}"
@@ -432,7 +452,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
@@ -458,7 +478,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 

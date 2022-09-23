@@ -1,1 +1,0 @@
-Update the docstrings for `get_users_in_room` and `get_current_hosts_in_room` to explain the impact of partial state.

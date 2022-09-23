@@ -11,14 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 from unittest import mock
 
+from synapse.api.errors import AuthError
+from synapse.api.room_versions import RoomVersion
+from synapse.event_auth import (
+    check_state_dependent_auth_rules,
+    check_state_independent_auth_rules,
+)
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.federation.transport.client import StateRequestResponse
 from synapse.logging.context import LoggingContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.state.v2 import _mainline_sort, _reverse_topological_power_sort
+from synapse.types import JsonDict
 
 from tests import unittest
 from tests.test_utils import event_injection, make_awaitable
@@ -449,3 +458,393 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             main_store.get_event(pulled_event.event_id, allow_none=True)
         )
         self.assertIsNotNone(persisted, "pulled event was not persisted at all")
+
+    def test_process_pulled_event_with_rejected_missing_state(self) -> None:
+        """Ensure that we correctly handle pulled events with missing state containing a
+        rejected state event
+
+        In this test, we pretend we are processing a "pulled" event (eg, via backfill
+        or get_missing_events). The pulled event has a prev_event we haven't previously
+        seen, so the server requests the state at that prev_event. We expect the server
+        to make a /state request.
+
+        We simulate a remote server whose /state includes a rejected kick event for a
+        local user. Notably, the kick event is rejected only because it cites a rejected
+        auth event and would otherwise be accepted based on the room state. During state
+        resolution, we re-run auth and can potentially introduce such rejected events
+        into the state if we are not careful.
+
+        We check that the pulled event is correctly persisted, and that the state
+        afterwards does not include the rejected kick.
+        """
+        # The DAG we are testing looks like:
+        #
+        #                 ...
+        #                  |
+        #                  v
+        #       remote admin user joins
+        #                |   |
+        #        +-------+   +-------+
+        #        |                   |
+        #        |          rejected power levels
+        #        |           from remote server
+        #        |                   |
+        #        |                   v
+        #        |       rejected kick of local user
+        #        v           from remote server
+        # new power levels           |
+        #        |                   v
+        #        |             missing event
+        #        |           from remote server
+        #        |                   |
+        #        +-------+   +-------+
+        #                |   |
+        #                v   v
+        #             pulled event
+        #          from remote server
+        #
+        # (arrows are in the opposite direction to prev_events.)
+
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
+
+        # Create the room.
+        kermit_user_id = self.register_user("kermit", "test")
+        kermit_tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(
+            room_creator=kermit_user_id, tok=kermit_tok
+        )
+        room_version = self.get_success(main_store.get_room_version(room_id))
+
+        # Add another local user to the room. This user is going to be kicked in a
+        # rejected event.
+        bert_user_id = self.register_user("bert", "test")
+        bert_tok = self.login("bert", "test")
+        self.helper.join(room_id, user=bert_user_id, tok=bert_tok)
+
+        # Allow the remote user to kick bert.
+        # The remote user is going to send a rejected power levels event later on and we
+        # need state resolution to order it before another power levels event kermit is
+        # going to send later on. Hence we give both users the same power level, so that
+        # ties are broken by `origin_server_ts`.
+        self.helper.send_state(
+            room_id,
+            "m.room.power_levels",
+            {"users": {kermit_user_id: 100, OTHER_USER: 100}},
+            tok=kermit_tok,
+        )
+
+        # Add the remote user to the room.
+        other_member_event = self.get_success(
+            event_injection.inject_member_event(self.hs, room_id, OTHER_USER, "join")
+        )
+
+        initial_state_map = self.get_success(
+            main_store.get_partial_current_state_ids(room_id)
+        )
+        create_event = self.get_success(
+            main_store.get_event(initial_state_map[("m.room.create", "")])
+        )
+        bert_member_event = self.get_success(
+            main_store.get_event(initial_state_map[("m.room.member", bert_user_id)])
+        )
+        power_levels_event = self.get_success(
+            main_store.get_event(initial_state_map[("m.room.power_levels", "")])
+        )
+
+        # We now need a rejected state event that will fail
+        # `check_state_independent_auth_rules` but pass
+        # `check_state_dependent_auth_rules`.
+
+        # First, we create a power levels event that we pretend the remote server has
+        # accepted, but the local homeserver will reject.
+        next_depth = 100
+        next_timestamp = other_member_event.origin_server_ts + 100
+        rejected_power_levels_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "m.room.power_levels",
+                    "state_key": "",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [other_member_event.event_id],
+                    "auth_events": [
+                        initial_state_map[("m.room.create", "")],
+                        initial_state_map[("m.room.power_levels", "")],
+                        # The event will be rejected because of the duplicated auth
+                        # event.
+                        other_member_event.event_id,
+                        other_member_event.event_id,
+                    ],
+                    "origin_server_ts": next_timestamp,
+                    "depth": next_depth,
+                    "content": power_levels_event.content,
+                }
+            ),
+            room_version,
+        )
+        next_depth += 1
+        next_timestamp += 100
+
+        with LoggingContext("send_rejected_power_levels_event"):
+            self.get_success(
+                self.hs.get_federation_event_handler()._process_pulled_event(
+                    self.OTHER_SERVER_NAME,
+                    rejected_power_levels_event,
+                    backfilled=False,
+                )
+            )
+            self.assertEqual(
+                self.get_success(
+                    main_store.get_rejection_reason(
+                        rejected_power_levels_event.event_id
+                    )
+                ),
+                "auth_error",
+            )
+
+        # Then we create a kick event for a local user that cites the rejected power
+        # levels event in its auth events. The kick event will be rejected solely
+        # because of the rejected auth event and would otherwise be accepted.
+        rejected_kick_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "m.room.member",
+                    "state_key": bert_user_id,
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [rejected_power_levels_event.event_id],
+                    "auth_events": [
+                        initial_state_map[("m.room.create", "")],
+                        rejected_power_levels_event.event_id,
+                        initial_state_map[("m.room.member", bert_user_id)],
+                        initial_state_map[("m.room.member", OTHER_USER)],
+                    ],
+                    "origin_server_ts": next_timestamp,
+                    "depth": next_depth,
+                    "content": {"membership": "leave"},
+                }
+            ),
+            room_version,
+        )
+        next_depth += 1
+        next_timestamp += 100
+
+        # The kick event must fail the state-independent auth rules, but pass the
+        # state-dependent auth rules, so that it has a chance of making it through state
+        # resolution.
+        self.get_failure(
+            check_state_independent_auth_rules(main_store, rejected_kick_event),
+            AuthError,
+        )
+        check_state_dependent_auth_rules(
+            rejected_kick_event,
+            [create_event, power_levels_event, other_member_event, bert_member_event],
+        )
+
+        # The kick event must also win over the original member event during state
+        # resolution.
+        self.assertEqual(
+            self.get_success(
+                _mainline_sort(
+                    self.clock,
+                    room_id,
+                    event_ids=[
+                        bert_member_event.event_id,
+                        rejected_kick_event.event_id,
+                    ],
+                    resolved_power_event_id=power_levels_event.event_id,
+                    event_map={
+                        bert_member_event.event_id: bert_member_event,
+                        rejected_kick_event.event_id: rejected_kick_event,
+                    },
+                    state_res_store=main_store,
+                )
+            ),
+            [bert_member_event.event_id, rejected_kick_event.event_id],
+            "The rejected kick event will not be applied after bert's join event "
+            "during state resolution. The test setup is incorrect.",
+        )
+
+        with LoggingContext("send_rejected_kick_event"):
+            self.get_success(
+                self.hs.get_federation_event_handler()._process_pulled_event(
+                    self.OTHER_SERVER_NAME, rejected_kick_event, backfilled=False
+                )
+            )
+            self.assertEqual(
+                self.get_success(
+                    main_store.get_rejection_reason(rejected_kick_event.event_id)
+                ),
+                "auth_error",
+            )
+
+        # We need another power levels event which will win over the rejected one during
+        # state resolution, otherwise we hit other issues where we end up with rejected
+        # a power levels event during state resolution.
+        self.reactor.advance(100)  # ensure the `origin_server_ts` is larger
+        new_power_levels_event = self.get_success(
+            main_store.get_event(
+                self.helper.send_state(
+                    room_id,
+                    "m.room.power_levels",
+                    {"users": {kermit_user_id: 100, OTHER_USER: 100, bert_user_id: 1}},
+                    tok=kermit_tok,
+                )["event_id"]
+            )
+        )
+        self.assertEqual(
+            self.get_success(
+                _reverse_topological_power_sort(
+                    self.clock,
+                    room_id,
+                    event_ids=[
+                        new_power_levels_event.event_id,
+                        rejected_power_levels_event.event_id,
+                    ],
+                    event_map={},
+                    state_res_store=main_store,
+                    full_conflicted_set=set(),
+                )
+            ),
+            [rejected_power_levels_event.event_id, new_power_levels_event.event_id],
+            "The power levels events will not have the desired ordering during state "
+            "resolution. The test setup is incorrect.",
+        )
+
+        # Create a missing event, so that the local homeserver has to do a `/state` or
+        # `/state_ids` request to pull state from the remote homeserver.
+        missing_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "m.room.message",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [rejected_kick_event.event_id],
+                    "auth_events": [
+                        initial_state_map[("m.room.create", "")],
+                        initial_state_map[("m.room.power_levels", "")],
+                        initial_state_map[("m.room.member", OTHER_USER)],
+                    ],
+                    "origin_server_ts": next_timestamp,
+                    "depth": next_depth,
+                    "content": {"msgtype": "m.text", "body": "foo"},
+                }
+            ),
+            room_version,
+        )
+        next_depth += 1
+        next_timestamp += 100
+
+        # The pulled event has two prev events, one of which is missing. We will make a
+        # `/state` or `/state_ids` request to the remote homeserver to ask it for the
+        # state before the missing prev event.
+        pulled_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "m.room.message",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [
+                        new_power_levels_event.event_id,
+                        missing_event.event_id,
+                    ],
+                    "auth_events": [
+                        initial_state_map[("m.room.create", "")],
+                        new_power_levels_event.event_id,
+                        initial_state_map[("m.room.member", OTHER_USER)],
+                    ],
+                    "origin_server_ts": next_timestamp,
+                    "depth": next_depth,
+                    "content": {"msgtype": "m.text", "body": "bar"},
+                }
+            ),
+            room_version,
+        )
+        next_depth += 1
+        next_timestamp += 100
+
+        # Prepare the response for the `/state` or `/state_ids` request.
+        # The remote server believes bert has been kicked, while the local server does
+        # not.
+        state_before_missing_event = self.get_success(
+            main_store.get_events_as_list(initial_state_map.values())
+        )
+        state_before_missing_event = [
+            event
+            for event in state_before_missing_event
+            if event.event_id != bert_member_event.event_id
+        ]
+        state_before_missing_event.append(rejected_kick_event)
+
+        # We have to bump the clock a bit, to keep the retry logic in
+        # `FederationClient.get_pdu` happy
+        self.reactor.advance(60000)
+        with LoggingContext("send_pulled_event"):
+
+            async def get_event(
+                destination: str, event_id: str, timeout: Optional[int] = None
+            ) -> JsonDict:
+                self.assertEqual(destination, self.OTHER_SERVER_NAME)
+                self.assertEqual(event_id, missing_event.event_id)
+                return {"pdus": [missing_event.get_pdu_json()]}
+
+            async def get_room_state_ids(
+                destination: str, room_id: str, event_id: str
+            ) -> JsonDict:
+                self.assertEqual(destination, self.OTHER_SERVER_NAME)
+                self.assertEqual(event_id, missing_event.event_id)
+                return {
+                    "pdu_ids": [event.event_id for event in state_before_missing_event],
+                    "auth_chain_ids": [],
+                }
+
+            async def get_room_state(
+                room_version: RoomVersion, destination: str, room_id: str, event_id: str
+            ) -> StateRequestResponse:
+                self.assertEqual(destination, self.OTHER_SERVER_NAME)
+                self.assertEqual(event_id, missing_event.event_id)
+                return StateRequestResponse(
+                    state=state_before_missing_event,
+                    auth_events=[],
+                )
+
+            self.mock_federation_transport_client.get_event.side_effect = get_event
+            self.mock_federation_transport_client.get_room_state_ids.side_effect = (
+                get_room_state_ids
+            )
+            self.mock_federation_transport_client.get_room_state.side_effect = (
+                get_room_state
+            )
+
+            self.get_success(
+                self.hs.get_federation_event_handler()._process_pulled_event(
+                    self.OTHER_SERVER_NAME, pulled_event, backfilled=False
+                )
+            )
+            self.assertIsNone(
+                self.get_success(
+                    main_store.get_rejection_reason(pulled_event.event_id)
+                ),
+                "Pulled event was unexpectedly rejected, likely due to a problem with "
+                "the test setup.",
+            )
+            self.assertEqual(
+                {pulled_event.event_id},
+                self.get_success(
+                    main_store.have_events_in_timeline([pulled_event.event_id])
+                ),
+                "Pulled event was not persisted, likely due to a problem with the test "
+                "setup.",
+            )
+
+            # We must not accept rejected events into the room state, so we expect bert
+            # to not be kicked, even if the remote server believes so.
+            new_state_map = self.get_success(
+                main_store.get_partial_current_state_ids(room_id)
+            )
+            self.assertEqual(
+                new_state_map[("m.room.member", bert_user_id)],
+                bert_member_event.event_id,
+                "Rejected kick event unexpectedly became part of room state.",
+            )

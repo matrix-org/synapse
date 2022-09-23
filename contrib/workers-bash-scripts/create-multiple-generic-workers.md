@@ -7,13 +7,15 @@ You can alternatively create multiple worker configuration files with a simple `
 #!/bin/bash
 for i in {1..5}
 do
-cat << EOF >> generic_worker$i.yaml
+cat << EOF > generic_worker$i.yaml
 worker_app: synapse.app.generic_worker
 worker_name: generic_worker$i
 
 # The replication listener on the main synapse process.
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
+
+worker_main_http_uri: http://localhost:8008/
 
 worker_listeners:
   - type: http
