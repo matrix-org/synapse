@@ -70,12 +70,12 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             content={"msgtype": "m.text", "body": "msg"},
             tok=other_token,
         )
-        self.helper.send_event(
+        event_id = self.helper.send_event(
             room_id,
             type="m.room.message",
             content={"msgtype": "m.text", "body": user_id},
             tok=other_token,
-        )
+        )["event_id"]
 
         # Fetch unread actions for HTTP pushers.
         http_actions = self.get_success(
@@ -92,6 +92,30 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(2, len(email_actions))
+
+        # Send a receipt, which should clear any actions.
+        self.get_success(
+            self.store.insert_receipt(
+                room_id,
+                "m.read",
+                user_id=user_id,
+                event_ids=[event_id],
+                thread_id=None,
+                data={},
+            )
+        )
+        http_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_http(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual([], http_actions)
+        email_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_email(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual([], email_actions)
 
     def test_count_aggregation(self) -> None:
         # Create a user to receive notifications and send receipts.
