@@ -226,9 +226,7 @@ class FederationHandler:
         """
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
-            for event_id, depth in await self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id
-            )
+            for event_id, depth in await self.store.get_backfill_points_in_room(room_id)
         ]
 
         insertion_events_to_be_backfilled: List[_BackfillPoint] = []
