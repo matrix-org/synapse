@@ -1777,28 +1777,47 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         room_id: str,
         servers: Collection[str],
+        join_event_id: str,
+        device_lists_stream_id: int,
     ) -> None:
-        """Mark the given room as containing events with partial state
+        """Mark the given room as containing events with partial state.
+
+        We also store additional data that describes _when_ we first partial-joined this
+        room, which helps us to keep other homeservers in sync when we finally fully
+        join this room.
 
         Args:
             room_id: the ID of the room
             servers: other servers known to be in the room
+            join_event_id: the event ID of the join membership event returned in the
+                (partial) /send_join response.
+            device_lists_stream_id: the device_lists stream ID at the time when we first
+                joined the room.
         """
         await self.db_pool.runInteraction(
             "store_partial_state_room",
             self._store_partial_state_room_txn,
             room_id,
             servers,
+            join_event_id,
+            device_lists_stream_id,
         )
 
     def _store_partial_state_room_txn(
-        self, txn: LoggingTransaction, room_id: str, servers: Collection[str]
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        servers: Collection[str],
+        join_event_id: str,
+        device_lists_stream_id: int,
     ) -> None:
         DatabasePool.simple_insert_txn(
             txn,
             table="partial_state_rooms",
             values={
                 "room_id": room_id,
+                "device_lists_stream_id": device_lists_stream_id,
+                "join_event_id": join_event_id,
             },
         )
         DatabasePool.simple_insert_many_txn(

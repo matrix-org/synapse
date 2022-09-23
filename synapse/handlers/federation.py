@@ -583,7 +583,12 @@ class FederationHandler:
                 # Mark the room as having partial state.
                 # The background process is responsible for unmarking this flag,
                 # even if the join fails.
-                await self.store.store_partial_state_room(room_id, ret.servers_in_room)
+                await self.store.store_partial_state_room(
+                    room_id,
+                    ret.servers_in_room,
+                    ret.event.event_id,
+                    self.store.get_device_stream_token(),
+                )
 
             try:
                 max_stream_id = (
