@@ -407,6 +407,7 @@ class StateStorageController:
         self,
         room_id: str,
         state_filter: Optional[StateFilter] = None,
+        await_full_state: bool = True,
         on_invalidate: Optional[Callable[[], None]] = None,
     ) -> StateMap[str]:
         """Get the current state event ids for a room based on the
@@ -419,13 +420,17 @@ class StateStorageController:
             room_id: The room to get the state IDs of. state_filter: The state
             filter used to fetch state from the
                 database.
+            await_full_state: if true, will block if we do not yet have complete
+               state for the room.
             on_invalidate: Callback for when the `get_current_state_ids` cache
                 for the room gets invalidated.
 
         Returns:
             The current state of the room.
         """
-        if not state_filter or state_filter.must_await_full_state(self._is_mine_id):
+        if await_full_state and (
+            not state_filter or state_filter.must_await_full_state(self._is_mine_id)
+        ):
             await self._partial_state_room_tracker.await_full_state(room_id)
 
         if state_filter and not state_filter.is_full():

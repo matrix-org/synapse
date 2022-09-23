@@ -1,0 +1,1 @@
+Faster room joins: Avoid waiting for full state when processing `/keys/changes` requests.
