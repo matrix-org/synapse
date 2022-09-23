@@ -1,6 +1,13 @@
 Synapse 1.68.0rc2 (2022-09-23)
 ==============================
 
+Please note that Synapse will now refuse to start if configured to use a version of SQLite earlier than 3.27.
+
+In addition, please note that installing Synapse from a source checkout now requires a recent Rust compiler.
+Those using packages will not be affected. On most platforms, installing with `pip install matrix-synapse` will not be affected.
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1670).
+
+
 Bugfixes
 --------
 
@@ -17,13 +24,6 @@ Internal Changes
 
 Synapse 1.68.0rc1 (2022-09-20)
 ==============================
-
-Please note that Synapse will now refuse to start if configured to use a version of SQLite earlier than 3.27.
-
-In addition, please note that installing Synapse from a source checkout now requires a recent Rust compiler.
-Those using packages will not be affected. On most platforms, installing with `pip install matrix-synapse` will not be affected.
-See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1670).
-
 
 Features
 --------
