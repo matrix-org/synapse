@@ -763,7 +763,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "B"
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id, depth_map["B"])
+            self.store.get_backfill_points_in_room(room_id, depth_map["B"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(
@@ -772,7 +772,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "A"
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id, depth_map["A"])
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Event "2" has a depth of 2 but is not included here because we only
@@ -810,7 +810,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "B"
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id, depth_map["B"])
+            self.store.get_backfill_points_in_room(room_id, depth_map["B"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Only the backfill points that we didn't record earlier exist here.
@@ -857,7 +857,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Try at "A" and make sure that "b1" is not in the list because we've
         # already attempted many times
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id, depth_map["A"])
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(backfill_event_ids, ["b3", "b2"])
@@ -868,7 +868,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Try at "A" again after we advanced enough time and we should see "b3" again
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id, depth_map["A"])
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertListEqual(backfill_event_ids, ["b3", "b2", "b1"])
@@ -961,7 +961,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Try at "insertion_eventB"
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
-                room_id, depth_map["insertion_eventB"]
+                room_id, depth_map["insertion_eventB"], limit=100
             )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
@@ -972,7 +972,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Try at "insertion_eventA"
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
-                room_id, depth_map["insertion_eventA"]
+                room_id, depth_map["insertion_eventA"], limit=100
             )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
@@ -1006,7 +1006,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Try at "insertion_eventB"
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
-                room_id, depth_map["insertion_eventB"]
+                room_id, depth_map["insertion_eventB"], limit=100
             )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
@@ -1065,7 +1065,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # in the list because we've already attempted many times
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
-                room_id, depth_map["insertion_eventA"]
+                room_id, depth_map["insertion_eventA"], limit=100
             )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
@@ -1079,7 +1079,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # should see "insertion_eventA" again
         backfill_points = self.get_success(
             self.store.get_insertion_event_backward_extremities_in_room(
-                room_id, depth_map["insertion_eventA"]
+                room_id, depth_map["insertion_eventA"], limit=100
             )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]

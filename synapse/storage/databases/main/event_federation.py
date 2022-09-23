@@ -727,6 +727,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
         current_depth: int,
+        limit: int,
     ) -> List[Tuple[str, int]]:
         """
         Gets the oldest events(backwards extremities) in the room along with the
@@ -752,6 +753,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             current_depth: The depth at the users current scrollback position
                 because we only care about finding events older than the given
                 `current_depth` when scrolling and paginating backwards.
+            limit: The max number of backfill points to return
 
         Returns:
             List of (event_id, depth) tuples. Sorted by depth, highest to lowest
@@ -835,6 +837,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * consistent ordering which is nice when asserting things in tests.
                  */
                 ORDER BY event.depth DESC, backward_extrem.event_id DESC
+                LIMIT ?
             """
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -853,6 +856,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     self._clock.time_msec(),
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
                     1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                    limit,
                 ),
             )
 
@@ -869,6 +873,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
         current_depth: int,
+        limit: int,
     ) -> List[Tuple[str, int]]:
         """
         Get the insertion events we know about that we haven't backfilled yet
@@ -895,6 +900,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             current_depth: The depth at the users current scrollback position because
                 we only care about finding events older than the given
                 `current_depth` when scrolling and paginating backwards.
+            limit: The max number of insertion event extremities to return
 
         Returns:
             List of (event_id, depth) tuples. Sorted by depth, highest to lowest
@@ -922,6 +928,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     AND failed_backfill_attempt_info.event_id = insertion_event_extremity.event_id
                 WHERE
                     insertion_event_extremity.room_id = ?
+                    /**
+                     * We only want extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                           current_depth (ignore events that come after this, ignore 2-4)
+                     *                           |
+                     * <oldest-in-time> [0]<--[1]▼<--[2]<--[3]<--[4] <newest-in-time>
+                     */
                     AND event.depth <= ? /* current_depth */
                     /**
                      * Exponential back-off (up to the upper bound) so we don't retry the
@@ -943,6 +959,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  * consistent ordering which is nice when asserting things in tests.
                  */
                 ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
+                LIMIT ?
             """
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -960,6 +977,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     self._clock.time_msec(),
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
                     1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                    limit,
                 ),
             )
             return cast(List[Tuple[str, int]], txn.fetchall())

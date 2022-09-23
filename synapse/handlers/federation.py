@@ -229,6 +229,14 @@ class FederationHandler:
             for event_id, depth in await self.store.get_backfill_points_in_room(
                 room_id=room_id,
                 current_depth=current_depth,
+                # We only need to end up with 5 extremities combined with the
+                # insertion event extremities to make the `/backfill` request
+                # but fetch an order of magnitude more to make sure there is
+                # enough even after we filter them by whether visible in the
+                # history. This isn't fool-proof as all backfill points within
+                # our limit could be filtered out but seems like a good amount
+                # to try with at least.
+                limit=50,
             )
         ]
 
@@ -239,6 +247,10 @@ class FederationHandler:
                 for event_id, depth in await self.store.get_insertion_event_backward_extremities_in_room(
                     room_id=room_id,
                     current_depth=current_depth,
+                    # We only need to end up with 5 extremities combined with
+                    # the backfill points to make the `/backfill` request ...
+                    # (see the other comment above for more context).
+                    limit=50,
                 )
             ]
         logger.debug(
