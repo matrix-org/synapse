@@ -103,6 +103,11 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
     def test_persisting_event_invalidates_cache(self):
+        """
+        Test to make sure that the `have_seen_event` cache
+        is invalidated after we persist an event and returns
+        the updated value.
+        """
         event, event_context = self.get_success(
             create_event(
                 self.hs,
@@ -143,6 +148,33 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(res, {event.event_id})
 
             # That should result in a single db query to lookup
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
+
+    def test_invalidate_cache_by_room_id(self):
+        """
+        Test to make sure that all events associated with the given `(room_id,)`
+        are invalidated in the `have_seen_event` cache.
+        """
+        with LoggingContext(name="test") as ctx:
+            # Prime the cache with some values
+            res = self.get_success(
+                self.store.have_seen_events(self.room_id, self.event_ids)
+            )
+            self.assertEqual(res, set(self.event_ids))
+
+            # That should result in a single db query to lookup
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
+
+        # Clear the cache with any events associated with the `room_id`
+        self.store.have_seen_event.invalidate((self.room_id,))
+
+        with LoggingContext(name="test") as ctx:
+            res = self.get_success(
+                self.store.have_seen_events(self.room_id, self.event_ids)
+            )
+            self.assertEqual(res, set(self.event_ids))
+
+            # Since we cleared the cache, it should result in another db query to lookup
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
 

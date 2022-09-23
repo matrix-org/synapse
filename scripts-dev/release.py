@@ -427,11 +427,12 @@ def _publish(gh_token: str) -> None:
 
 
 @cli.command()
-def upload() -> None:
-    _upload()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def upload(gh_token: Optional[str]) -> None:
+    _upload(gh_token)
 
 
-def _upload() -> None:
+def _upload(gh_token: Optional[str]) -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -444,18 +445,40 @@ def _upload() -> None:
         click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
         click.get_current_context().abort()
 
-    pypi_asset_names = [
-        f"matrix_synapse-{current_version}-py3-none-any.whl",
-        f"matrix-synapse-{current_version}.tar.gz",
-    ]
+    # Query all the assets corresponding to this release.
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_release = gh_repo.get_release(tag_name)
+
+    all_assets = set(gh_release.get_assets())
+
+    # Only accept the wheels and sdist.
+    # Notably: we don't care about debs.tar.xz.
+    asset_names_and_urls = sorted(
+        (asset.name, asset.browser_download_url)
+        for asset in all_assets
+        if asset.name.endswith((".whl", ".tar.gz"))
+    )
+
+    # Print out what we've determined.
+    print("Found relevant assets:")
+    for asset_name, _ in asset_names_and_urls:
+        print(f" - {asset_name}")
+
+    ignored_asset_names = sorted(
+        {asset.name for asset in all_assets}
+        - {asset_name for asset_name, _ in asset_names_and_urls}
+    )
+    print("\nIgnoring irrelevant assets:")
+    for asset_name in ignored_asset_names:
+        print(f" - {asset_name}")
 
     with TemporaryDirectory(prefix=f"synapse_upload_{tag_name}_") as tmpdir:
-        for name in pypi_asset_names:
+        for name, asset_download_url in asset_names_and_urls:
             filename = path.join(tmpdir, name)
-            url = f"https://github.com/matrix-org/synapse/releases/download/{tag_name}/{name}"
 
             click.echo(f"Downloading {name} into {filename}")
-            urllib.request.urlretrieve(url, filename=filename)
+            urllib.request.urlretrieve(asset_download_url, filename=filename)
 
         if click.confirm("Upload to PyPI?", default=True):
             subprocess.run("twine upload *", shell=True, cwd=tmpdir)
@@ -672,7 +695,7 @@ def full(gh_token: str) -> None:
     _publish(gh_token)
 
     click.echo("\n*** upload ***")
-    _upload()
+    _upload(gh_token)
 
     click.echo("\n*** merge back ***")
     _merge_back()

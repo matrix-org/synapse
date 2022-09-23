@@ -128,6 +128,9 @@ class SsoIdentityProvider(Protocol):
 
 @attr.s(auto_attribs=True)
 class UserAttributes:
+    # NB: This struct is documented in docs/sso_mapping_providers.md so that users can
+    # populate it with data from their own mapping providers.
+
     # the localpart of the mxid that the mapper has assigned to the user.
     # if `None`, the mapper has not picked a userid, and the user should be prompted to
     # enter one.

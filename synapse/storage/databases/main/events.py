@@ -412,6 +412,31 @@ class PersistEventsStore:
         assert min_stream_order
         assert max_stream_order
 
+        # Once the txn completes, invalidate all of the relevant caches. Note that we do this
+        # up here because it captures all the events_and_contexts before any are removed.
+        for event, _ in events_and_contexts:
+            self.store.invalidate_get_event_cache_after_txn(txn, event.event_id)
+            if event.redacts:
+                self.store.invalidate_get_event_cache_after_txn(txn, event.redacts)
+
+            relates_to = None
+            relation = relation_from_event(event)
+            if relation:
+                relates_to = relation.parent_id
+
+            assert event.internal_metadata.stream_ordering is not None
+            txn.call_after(
+                self.store._invalidate_caches_for_event,
+                event.internal_metadata.stream_ordering,
+                event.event_id,
+                event.room_id,
+                event.type,
+                getattr(event, "state_key", None),
+                event.redacts,
+                relates_to,
+                backfilled=False,
+            )
+
         self._update_forward_extremities_txn(
             txn,
             new_forward_extremities=new_forward_extremities,
