@@ -69,7 +69,7 @@ pub fn glob_to_regex(glob: &str, match_type: GlobMatchType) -> Result<Regex, Err
 
         // `^|\W` and `\W|$` handle the case where `pattern` starts or ends with a non-word
         // character.
-        GlobMatchType::Word => format!(r"(?:^|\W|\b){joined}(?:\b|\W|$)"),
+        GlobMatchType::Word => format!(r"\b{joined}\b"),
     };
 
     Ok(RegexBuilder::new(&regex_str)
@@ -119,11 +119,12 @@ fn tset_glob() -> Result<(), Error> {
 
     assert_eq!(
         glob_to_regex("simple", GlobMatchType::Word)?.as_str(),
-        r"(?:^|\W|\b)simple(?:\b|\W|$)"
+        r"\bsimple\b",
     );
 
     assert!(glob_to_regex("simple", GlobMatchType::Word)?.is_match("some simple."));
     assert!(glob_to_regex("simple", GlobMatchType::Word)?.is_match("simple"));
+    assert!(!glob_to_regex("simple", GlobMatchType::Word)?.is_match("simples"));
 
     Ok(())
 }

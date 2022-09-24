@@ -1,6 +1,10 @@
 #![feature(test)]
 
-use synapse::push::{evaluator::PushRuleEvaluator, Condition, EventMatchCondition};
+use std::collections::BTreeMap;
+
+use synapse::push::{
+    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
+};
 use test::Bencher;
 
 extern crate test;
@@ -111,4 +115,30 @@ fn bench_match_word_miss(b: &mut Bencher) {
     }
 
     b.iter(|| eval.match_condition(&condition, None, None).unwrap());
+}
+
+#[bench]
+fn bench_eval_message(b: &mut Bencher) {
+    let flattened_keys = [
+        ("type".to_string(), "m.text".to_string()),
+        ("room_id".to_string(), "!room:server".to_string()),
+        ("content.body".to_string(), "test message".to_string()),
+    ]
+    .into_iter()
+    .collect();
+
+    let eval = PushRuleEvaluator::py_new(
+        flattened_keys,
+        10,
+        0,
+        Default::default(),
+        Default::default(),
+        true,
+    )
+    .unwrap();
+
+    let rules =
+        FilteredPushRules::py_new(PushRules::new(Vec::new()), Default::default(), false, false);
+
+    b.iter(|| eval.run(&rules, Some("bob"), Some("person")));
 }

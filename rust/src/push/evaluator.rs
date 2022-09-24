@@ -153,7 +153,7 @@ impl PushRuleEvaluator {
             }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
-                    if !dn.is_empty() {
+                    if !dn.is_empty() && self.body.contains(dn) {
                         let matcher = glob_to_regex(dn, GlobMatchType::Word)?;
                         matcher.is_match(&self.body)
                     } else {
