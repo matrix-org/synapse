@@ -178,6 +178,7 @@ class FederationEventHandler:
 
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
+    @trace
     async def on_receive_pdu(self, origin: str, pdu: EventBase) -> None:
         """Process a PDU received via a federation /send/ transaction
 
@@ -663,11 +664,12 @@ class FederationEventHandler:
             logger.info(
                 "backfill assumed reverse_chronological_events=%s",
                 [
-                    "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                    "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
                     % (
                         event.event_id,
                         event.depth,
                         event.content.get("body", event.type),
+                        getattr(event, "state_key", None),
                         event.prev_event_ids(),
                     )
                     for event in reverse_chronological_events
@@ -677,11 +679,12 @@ class FederationEventHandler:
             # logger.info(
             #     "backfill chronological_events=%s",
             #     [
-            #         "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+            #         "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
             #         % (
             #             event.event_id,
             #             event.depth,
             #             event.content.get("body", event.type),
+            #             getattr(event, "state_key", None),
             #             event.prev_event_ids(),
             #         )
             #         for event in chronological_events
@@ -712,8 +715,8 @@ class FederationEventHandler:
                 # Expecting to persist in chronological order here (oldest ->
                 # newest) so that events are persisted before they're referenced
                 # as a `prev_event`.
-                # chronological_events,
-                reverse_chronological_events,
+                chronological_events,
+                # reverse_chronological_events,
                 backfilled=True,
             )
 
@@ -848,11 +851,12 @@ class FederationEventHandler:
             "processing pulled backfilled=%s events=%s",
             backfilled,
             [
-                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
                 % (
                     event.event_id,
                     event.depth,
                     event.content.get("body", event.type),
+                    getattr(event, "state_key", None),
                     event.prev_event_ids(),
                 )
                 for event in events
@@ -866,11 +870,12 @@ class FederationEventHandler:
         logger.info(
             "backfill sorted_events=%s",
             [
-                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
                 % (
                     event.event_id,
                     event.depth,
                     event.content.get("body", event.type),
+                    getattr(event, "state_key", None),
                     event.prev_event_ids(),
                 )
                 for event in sorted_events
@@ -1872,6 +1877,12 @@ class FederationEventHandler:
         # already have checked we have all the auth events, in
         # _load_or_fetch_auth_events_for_event above)
         if context.partial_state:
+            logger.info(
+                "_check_event_auth(event=%s) with partial_state - %s (%s)",
+                event.event_id,
+                event.content.get("body", event.type),
+                getattr(event, "state_key", None),
+            )
             room_version = await self._store.get_room_version_id(event.room_id)
 
             local_state_id_map = await context.get_prev_state_ids()
@@ -1889,13 +1900,36 @@ class FederationEventHandler:
                 )
             )
         else:
+            logger.info(
+                "_check_event_auth(event=%s) with full state - %s (%s)",
+                event.event_id,
+                event.content.get("body", event.type),
+                getattr(event, "state_key", None),
+            )
             event_types = event_auth.auth_types_for_event(event.room_version, event)
             state_for_auth_id_map = await context.get_prev_state_ids(
                 StateFilter.from_types(event_types)
             )
 
+        logger.info(
+            "_check_event_auth(event=%s) state_for_auth_id_map=%s - %s (%s)",
+            event.event_id,
+            state_for_auth_id_map,
+            event.content.get("body", event.type),
+            getattr(event, "state_key", None),
+        )
+
         calculated_auth_event_ids = self._event_auth_handler.compute_auth_events(
             event, state_for_auth_id_map, for_verification=True
+        )
+
+        logger.info(
+            "_check_event_auth(event=%s) claimed_auth_events=%s calculated_auth_event_ids=%s - %s (%s)",
+            event.event_id,
+            event.auth_event_ids(),
+            calculated_auth_event_ids,
+            event.content.get("body", event.type),
+            getattr(event, "state_key", None),
         )
 
         # if those are the same, we're done here.
