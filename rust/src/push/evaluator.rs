@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet},
+};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
@@ -153,7 +156,7 @@ impl PushRuleEvaluator {
             }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
-                    if !dn.is_empty() && self.body.contains(dn) {
+                    if !dn.is_empty() {
                         get_glob_matcher(dn, GlobMatchType::Word)?.is_match(&self.body)?
                     } else {
                         // We specifically ignore empty display names, as otherwise
@@ -186,68 +189,84 @@ impl PushRuleEvaluator {
                 sender,
                 sender_type,
             } => {
-                if !self.relation_match_enabled {
-                    return Ok(false);
-                }
-
-                let relations = if let Some(relations) = self.relations.get(&**rel_type) {
-                    relations
-                } else {
-                    return Ok(false);
-                };
-
-                let sender_pattern = if let Some(sender) = sender {
-                    Some(sender.as_ref())
-                } else if let Some(sender_type) = sender_type {
-                    if sender_type == "user_id" {
-                        if let Some(user_id) = user_id {
-                            Some(user_id)
-                        } else {
-                            return Ok(false);
-                        }
-                    } else {
-                        warn!("Unrecognized sender_type: {sender_type}");
-                        return Ok(false);
-                    }
-                } else {
-                    None
-                };
-
-                let mut sender_compiled_pattern = if let Some(pattern) = sender_pattern {
-                    Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
-                } else {
-                    None
-                };
-
-                let mut type_compiled_pattern = if let Some(pattern) = event_type_pattern {
-                    Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
-                } else {
-                    None
-                };
-
-                for (relation_sender, event_type) in relations {
-                    if let Some(pattern) = &mut sender_compiled_pattern {
-                        if !pattern.is_match(relation_sender)? {
-                            continue;
-                        }
-                    }
-
-                    if let Some(pattern) = &mut type_compiled_pattern {
-                        if !pattern.is_match(event_type)? {
-                            continue;
-                        }
-                    }
-
-                    return Ok(true);
-                }
-
-                false
+                self.match_relations(rel_type, sender, sender_type, user_id, event_type_pattern)?
             }
         };
 
         Ok(result)
     }
 
+    /// Evaluates a relation condition.
+    fn match_relations(
+        &self,
+        rel_type: &str,
+        sender: &Option<Cow<str>>,
+        sender_type: &Option<Cow<str>>,
+        user_id: Option<&str>,
+        event_type_pattern: &Option<Cow<str>>,
+    ) -> Result<bool, Error> {
+        // First check if relation matching is enabled...
+        if !self.relation_match_enabled {
+            return Ok(false);
+        }
+
+        // ... and if there are any relations to match against.
+        let relations = if let Some(relations) = self.relations.get(rel_type) {
+            relations
+        } else {
+            return Ok(false);
+        };
+
+        // Extract the sender pattern from the condition
+        let sender_pattern = if let Some(sender) = sender {
+            Some(sender.as_ref())
+        } else if let Some(sender_type) = sender_type {
+            if sender_type == "user_id" {
+                if let Some(user_id) = user_id {
+                    Some(user_id)
+                } else {
+                    return Ok(false);
+                }
+            } else {
+                warn!("Unrecognized sender_type: {sender_type}");
+                return Ok(false);
+            }
+        } else {
+            None
+        };
+
+        let mut sender_compiled_pattern = if let Some(pattern) = sender_pattern {
+            Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
+        } else {
+            None
+        };
+
+        let mut type_compiled_pattern = if let Some(pattern) = event_type_pattern {
+            Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
+        } else {
+            None
+        };
+
+        for (relation_sender, event_type) in relations {
+            if let Some(pattern) = &mut sender_compiled_pattern {
+                if !pattern.is_match(relation_sender)? {
+                    continue;
+                }
+            }
+
+            if let Some(pattern) = &mut type_compiled_pattern {
+                if !pattern.is_match(event_type)? {
+                    continue;
+                }
+            }
+
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
+    /// Evaluates a `event_match` condition.
     fn match_event_match(
         &self,
         event_match: &EventMatchCondition,
@@ -293,7 +312,7 @@ impl PushRuleEvaluator {
         }
 
         let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
-        Ok(compiled_pattern.is_match(haystack)?)
+        compiled_pattern.is_match(haystack)
     }
 
     /// Match the member count against an 'is' condition
