@@ -69,12 +69,79 @@ pub fn glob_to_regex(glob: &str, match_type: GlobMatchType) -> Result<Regex, Err
 
         // `^|\W` and `\W|$` handle the case where `pattern` starts or ends with a non-word
         // character.
-        GlobMatchType::Word => format!(r"\b{joined}\b"),
+        GlobMatchType::Word => format!(r"(?:^|\b|\W){joined}(?:\b|\W|$)"),
     };
 
     Ok(RegexBuilder::new(&regex_str)
         .case_insensitive(true)
         .build()?)
+}
+
+/// Compiles the glob into a `Matcher`.
+pub fn get_glob_matcher(glob: &str, match_type: GlobMatchType) -> Result<Matcher, Error> {
+    // There are a number of shortcuts we can make if the glob doesn't contain a
+    // wild card.
+    let matcher = if glob.contains(['*', '?']) {
+        let regex = glob_to_regex(glob, match_type)?;
+        Matcher::Regex(regex)
+    } else if match_type == GlobMatchType::Whole {
+        // If there aren't any wildcards and we're matching the whole thing,
+        // then we simply can do a case-insensitive string match.
+        Matcher::Whole(glob.to_lowercase())
+    } else {
+        // Otherwise, if we're matching against words then can first check
+        // if the haystack contains the glob at all.
+        Matcher::Word {
+            word: glob.to_lowercase(),
+            regex: None,
+        }
+    };
+
+    Ok(matcher)
+}
+
+/// Matches against a glob
+pub enum Matcher {
+    /// Plain regex matching.
+    Regex(Regex),
+
+    /// Case-insensitive equality.
+    Whole(String),
+
+    /// Word matching. `regex` is a cache of calling [`glob_to_regex`] on word.
+    Word { word: String, regex: Option<Regex> },
+}
+
+impl Matcher {
+    /// Checks if the glob matches the given haystack.
+    pub fn is_match(&mut self, haystack: &str) -> Result<bool, Error> {
+        // We want to to do case-insensitive matching, so we convert to
+        // lowercase first.
+        let haystack = haystack.to_lowercase();
+
+        match self {
+            Matcher::Regex(regex) => Ok(regex.is_match(&haystack)),
+            Matcher::Whole(whole) => Ok(whole == &haystack),
+            Matcher::Word { word, regex } => {
+                // If we're looking for a literal word, then we first check if
+                // the haystack contains the word as a substring.
+                if !haystack.contains(&*word) {
+                    return Ok(false);
+                }
+
+                // If it does contain the word as a substring, then we need to
+                // check if it is an actual word by testing it against the regex.
+                let regex = if let Some(regex) = regex {
+                    regex
+                } else {
+                    let compiled_regex = glob_to_regex(word, GlobMatchType::Word)?;
+                    regex.insert(compiled_regex)
+                };
+
+                Ok(regex.is_match(&haystack))
+            }
+        }
+    }
 }
 
 #[test]
@@ -117,14 +184,18 @@ fn tset_glob() -> Result<(), Error> {
         r"\Aescape\.\z"
     );
 
-    assert_eq!(
-        glob_to_regex("simple", GlobMatchType::Word)?.as_str(),
-        r"\bsimple\b",
-    );
+    assert!(glob_to_regex("simple", GlobMatchType::Whole)?.is_match("simple"));
+    assert!(!glob_to_regex("simple", GlobMatchType::Whole)?.is_match("simples"));
+    assert!(glob_to_regex("simple*", GlobMatchType::Whole)?.is_match("simples"));
+    assert!(glob_to_regex("simple?", GlobMatchType::Whole)?.is_match("simples"));
+    assert!(glob_to_regex("simple*", GlobMatchType::Whole)?.is_match("simple"));
 
     assert!(glob_to_regex("simple", GlobMatchType::Word)?.is_match("some simple."));
     assert!(glob_to_regex("simple", GlobMatchType::Word)?.is_match("simple"));
     assert!(!glob_to_regex("simple", GlobMatchType::Word)?.is_match("simples"));
+
+    assert!(glob_to_regex("@user:foo", GlobMatchType::Word)?.is_match("Some @user:foo test"));
+    assert!(glob_to_regex("@user:foo", GlobMatchType::Word)?.is_match("@user:foo"));
 
     Ok(())
 }

@@ -42,7 +42,6 @@
 //!
 //! The set of "base rules" are the list of rules that every user has by default. A
 //! user can modify their copy of the push rules in one of three ways:
-//!
 //!     1. Adding a new push rule of a certain kind
 //!     2. Changing the actions of a base rule
 //!     3. Enabling/disabling a base rule.

@@ -1,7 +1,4 @@
 #![feature(test)]
-
-use std::collections::BTreeMap;
-
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
 };

@@ -2,12 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
-use log::{info, warn};
+use log::warn;
 use pyo3::prelude::*;
 use regex::Regex;
 
 use super::{
-    utils::{get_localpart_from_id, glob_to_regex, GlobMatchType},
+    utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
     Action, Condition, EventMatchCondition, FilteredPushRules, KnownCondition,
 };
 
@@ -154,8 +154,7 @@ impl PushRuleEvaluator {
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
                     if !dn.is_empty() && self.body.contains(dn) {
-                        let matcher = glob_to_regex(dn, GlobMatchType::Word)?;
-                        matcher.is_match(&self.body)
+                        get_glob_matcher(dn, GlobMatchType::Word)?.is_match(&self.body)?
                     } else {
                         // We specifically ignore empty display names, as otherwise
                         // they would always match.
@@ -214,27 +213,27 @@ impl PushRuleEvaluator {
                     None
                 };
 
-                let sender_compiled_pattern = if let Some(pattern) = sender_pattern {
-                    Some(glob_to_regex(pattern, GlobMatchType::Whole)?)
+                let mut sender_compiled_pattern = if let Some(pattern) = sender_pattern {
+                    Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
                 } else {
                     None
                 };
 
-                let type_compiled_pattern = if let Some(pattern) = event_type_pattern {
-                    Some(glob_to_regex(pattern, GlobMatchType::Whole)?)
+                let mut type_compiled_pattern = if let Some(pattern) = event_type_pattern {
+                    Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
                 } else {
                     None
                 };
 
                 for (relation_sender, event_type) in relations {
-                    if let Some(pattern) = &sender_compiled_pattern {
-                        if !pattern.is_match(relation_sender) {
+                    if let Some(pattern) = &mut sender_compiled_pattern {
+                        if !pattern.is_match(relation_sender)? {
                             continue;
                         }
                     }
 
-                    if let Some(pattern) = &type_compiled_pattern {
-                        if !pattern.is_match(event_type) {
+                    if let Some(pattern) = &mut type_compiled_pattern {
+                        if !pattern.is_match(event_type)? {
                             continue;
                         }
                     }
@@ -293,8 +292,8 @@ impl PushRuleEvaluator {
             }
         }
 
-        let compiled_pattern = glob_to_regex(pattern, match_type)?;
-        Ok(compiled_pattern.is_match(haystack))
+        let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
+        Ok(compiled_pattern.is_match(haystack)?)
     }
 
     /// Match the member count against an 'is' condition
