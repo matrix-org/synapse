@@ -328,7 +328,17 @@ class FederationClient(FederationBase):
 
             # Check signatures are correct.
             try:
-                signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+                async def _record_failure_callback(
+                    event: EventBase, cause: str
+                ) -> None:
+                    await self.store.record_event_failed_pull_attempt(
+                        event.room_id, event.event_id, cause
+                    )
+
+                signed_pdu = await self._check_sigs_and_hash(
+                    room_version, pdu, _record_failure_callback
+                )
             except InvalidEventSignatureError as e:
                 errmsg = f"event id {pdu.event_id}: {e}"
                 logger.warning("%s", errmsg)
@@ -659,7 +669,9 @@ class FederationClient(FederationBase):
         """
 
         try:
-            return await self._check_sigs_and_hash(room_version, pdu)
+            return await self._check_sigs_and_hash(
+                room_version, pdu, record_failure_callback
+            )
         except InvalidEventSignatureError as e:
             logger.warning(
                 "Signature on retrieved event %s was invalid (%s). "
