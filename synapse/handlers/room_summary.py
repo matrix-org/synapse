@@ -609,7 +609,7 @@ class RoomSummaryHandler:
         # If this is a request over federation, check if the host is in the room or
         # has a user who could join the room.
         elif origin:
-            if await self._event_auth_handler.check_host_in_room(
+            if await self._event_auth_handler.is_host_in_room(
                 room_id, origin
             ) or await self._store.is_host_invited(room_id, origin):
                 return True
@@ -624,9 +624,7 @@ class RoomSummaryHandler:
                     await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 for space_id in allowed_rooms:
-                    if await self._event_auth_handler.check_host_in_room(
-                        space_id, origin
-                    ):
+                    if await self._event_auth_handler.is_host_in_room(space_id, origin):
                         return True
 
         logger.info(

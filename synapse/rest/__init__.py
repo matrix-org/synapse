@@ -30,6 +30,7 @@ from synapse.rest.client import (
     keys,
     knock,
     login as v1_login,
+    login_token_request,
     logout,
     mutual_rooms,
     notifications,
@@ -130,3 +131,4 @@ class ClientRestResource(JsonResource):
 
         # unstable
         mutual_rooms.register_servlets(hs, client_resource)
+        login_token_request.register_servlets(hs, client_resource)

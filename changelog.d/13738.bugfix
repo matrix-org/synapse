@@ -1,1 +1,0 @@
-Fix a bug where Synapse fails to start if a signing key file contains an empty line.

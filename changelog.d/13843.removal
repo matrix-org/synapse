@@ -1,0 +1,1 @@
+Remove the `complete_sso_login` method from the Module API which was deprecated in Synapse 1.13.0.
