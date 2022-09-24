@@ -316,7 +316,7 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send a read receipt for the first event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_1_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_1_id], None, {}
             )
         )
 
@@ -326,7 +326,7 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send a read receipt for the second event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_2_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_2_id], None, {}
             )
         )
 
@@ -357,7 +357,7 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send a read receipt for the first event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_1_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_1_id], None, {}
             )
         )
 
