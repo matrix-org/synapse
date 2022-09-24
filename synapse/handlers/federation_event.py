@@ -674,6 +674,20 @@ class FederationEventHandler:
                 ],
             )
 
+            # logger.info(
+            #     "backfill chronological_events=%s",
+            #     [
+            #         "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+            #         % (
+            #             event.event_id,
+            #             event.depth,
+            #             event.content.get("body", event.type),
+            #             event.prev_event_ids(),
+            #         )
+            #         for event in chronological_events
+            #     ],
+            # )
+
             from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 
             # This should only exist on instances that are configured to write
@@ -695,9 +709,11 @@ class FederationEventHandler:
 
             await self._process_pulled_events(
                 dest,
-                # Expecting to persist in chronological order here (oldest -> newest)
-                chronological_events,
-                # reverse_chronological_events,
+                # Expecting to persist in chronological order here (oldest ->
+                # newest) so that events are persisted before they're referenced
+                # as a `prev_event`.
+                # chronological_events,
+                reverse_chronological_events,
                 backfilled=True,
             )
 

@@ -634,6 +634,12 @@ class RoomMessageListRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        logger.info(
+            "RoomMessageListRestServlet ========================================"
+        )
+        logger.info(
+            "==================================================================="
+        )
         processing_start_time = self.clock.time_msec()
         # Fire off and hope that we get a result by the end.
         #
