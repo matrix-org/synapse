@@ -711,6 +711,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 WHERE room_id = ?
                 AND user_id = ?
                 AND stream_ordering <= ?
+                AND highlight = 0
             """
             txn.execute(sql, (room_id, user_id, stream_ordering))
 

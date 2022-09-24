@@ -313,3 +313,33 @@ class ReceiptTestCase(HomeserverTestCase):
         # Check that we have no push actions pending
         _assert_push_action_count(0)
 
+    def test_receipts_not_clear_highlight_push_actions(self) -> None:
+        event_1_id = self.create_and_send_event(
+            self.room_id1,
+            UserID.from_string(OTHER_USER_ID),
+            content="our",
+        )
+
+        def _assert_push_action_count(expected: int):
+            result = self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="event_push_actions",
+                    keyvalues={"1": 1},
+                    retcols=("*",),
+                    desc="",
+                )
+            )
+            self.assertEqual(len(result), expected)
+
+        # Check we have 1 push actions pending
+        _assert_push_action_count(1)
+
+        # Send a read receipt for the first event
+        self.get_success(
+            self.store.insert_receipt(
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event_1_id], {}
+            )
+        )
+
+        # Check that we now have a single push action pending
+        _assert_push_action_count(1)
