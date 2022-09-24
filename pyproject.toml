@@ -57,7 +57,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.67.0"
+version = "1.68.0rc2"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -88,6 +88,7 @@ include = [
     { path = "Cargo.toml", format = "sdist" },
     { path = "rust/Cargo.toml", format = "sdist" },
     { path = "rust/Cargo.lock", format = "sdist" },
+    { path = "rust/build.rs", format = "sdist" },
     { path = "rust/src/**", format = "sdist" },
 ]
 exclude = [

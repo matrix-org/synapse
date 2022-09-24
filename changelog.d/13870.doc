@@ -1,0 +1,1 @@
+Fix a cross-link from the register admin API to the `registration_shared_secret` configuration documentation.
