@@ -718,6 +718,7 @@ class HomeserverTestCase(TestCase):
         user: UserID,
         soft_failed: bool = False,
         prev_event_ids: Optional[List[str]] = None,
+        content: Optional[str] = None,
     ) -> str:
         """
         Create and send an event.
@@ -740,7 +741,10 @@ class HomeserverTestCase(TestCase):
                     "type": EventTypes.Message,
                     "room_id": room_id,
                     "sender": user.to_string(),
-                    "content": {"body": secrets.token_hex(), "msgtype": "m.text"},
+                    "content": {
+                        "body": content or secrets.token_hex(),
+                        "msgtype": "m.text",
+                    },
                 },
                 prev_event_ids=prev_event_ids,
             )
