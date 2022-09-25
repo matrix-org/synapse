@@ -303,14 +303,6 @@ impl PushRuleEvaluator {
             GlobMatchType::Whole
         };
 
-        if !pattern.contains(['*', '?']) {
-            if match_type == GlobMatchType::Word && !haystack.contains(&pattern.to_lowercase()) {
-                return Ok(false);
-            } else if match_type == GlobMatchType::Whole {
-                return Ok(haystack == &pattern.to_lowercase());
-            }
-        }
-
         let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
         compiled_pattern.is_match(haystack)
     }
