@@ -35,9 +35,7 @@ fn bench_match_exact(b: &mut Bencher) {
     ));
 
     let matched = eval.match_condition(&condition, None, None).unwrap();
-    if !matched {
-        panic!("Didn't match")
-    }
+    assert!(matched, "Didn't match");
 
     b.iter(|| eval.match_condition(&condition, None, None).unwrap());
 }
@@ -71,9 +69,7 @@ fn bench_match_word(b: &mut Bencher) {
     ));
 
     let matched = eval.match_condition(&condition, None, None).unwrap();
-    if !matched {
-        panic!("Didn't match")
-    }
+    assert!(matched, "Didn't match");
 
     b.iter(|| eval.match_condition(&condition, None, None).unwrap());
 }
@@ -107,9 +103,7 @@ fn bench_match_word_miss(b: &mut Bencher) {
     ));
 
     let matched = eval.match_condition(&condition, None, None).unwrap();
-    if matched {
-        panic!("Didn't match")
-    }
+    assert!(!matched, "Didn't match");
 
     b.iter(|| eval.match_condition(&condition, None, None).unwrap());
 }

@@ -315,7 +315,7 @@ impl PushRuleEvaluator {
     fn match_member_count(&self, is: &str) -> Result<bool, Error> {
         // The 'is' condition can be things like '>2', '==3' or event just '4'.
         let captures = INEQUALITY_EXPR.captures(is).context("bad 'is' clause")?;
-        let ineq = captures.get(1).map(|m| m.as_str()).unwrap_or("==");
+        let ineq = captures.get(1).map_or("==", |m| m.as_str());
         let rhs: u64 = captures
             .get(2)
             .context("missing number")?
