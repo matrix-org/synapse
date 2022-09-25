@@ -275,11 +275,15 @@ impl PushRuleEvaluator {
         let pattern = if let Some(pattern) = &event_match.pattern {
             pattern
         } else if let Some(pattern_type) = &event_match.pattern_type {
+            // The `pattern_type` can either be "user_id" or "user_localpart",
+            // either way if we don't have a `user_id` then the condition can't
+            // match.
             let user_id = if let Some(user_id) = user_id {
                 user_id
             } else {
                 return Ok(false);
             };
+
             match &**pattern_type {
                 "user_id" => user_id,
                 "user_localpart" => get_localpart_from_id(user_id)?,
