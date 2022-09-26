@@ -100,6 +100,12 @@ class Codes(str, Enum):
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
 
+    # Returned for federation requests where we can't process a request as we
+    # can't ensure the sending server is in a room which is partial-stated on
+    # our side.
+    # Part of MSC3895.
+    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
