@@ -1,1 +1,1 @@
-Update the manpage for the `hash_password` script to correct the default number of bcrypt rounds performed.
+Update the man page for the `hash_password` script to correct the default number of bcrypt rounds performed.
