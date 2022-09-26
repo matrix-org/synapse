@@ -83,7 +83,7 @@ def generate_config_from_template(
                     handle.write(value)
             environ[secret] = value
 
-    environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
+    environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/**/*.yaml", recurseive=True)
     if not os.path.exists(config_dir):
         os.mkdir(config_dir)
 
