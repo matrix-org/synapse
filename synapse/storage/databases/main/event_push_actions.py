@@ -591,7 +591,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         args.extend((user_id,))
         txn.execute(sql, args)
-        return dict(cast(List[Tuple[str, int]], txn.fetchall()))
+        return {
+            room_id: latest_stream_ordering
+            for room_id, latest_stream_ordering in txn.fetchall()
+        }
 
     async def get_unread_push_actions_for_user_in_range_for_http(
         self,
