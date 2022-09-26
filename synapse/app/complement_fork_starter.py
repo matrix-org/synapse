@@ -186,7 +186,7 @@ def main() -> None:
     # wait until the children have exited.
     def handle_signal(signum: int, frame: Optional[FrameType]) -> None:
         print(
-            "complement_fork_starter: Caught signal %i. Stopping children." % signum,
+            f"complement_fork_starter: Caught signal {signum}. Stopping children.",
             file=sys.stderr,
         )
         for p in processes:
