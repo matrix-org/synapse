@@ -63,7 +63,8 @@ class ExperimentalConfig(Config):
         # MSC3706 (server-side support for partial state in /send_join responses)
         self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
 
-        # experimental support for faster joins over federation (msc2775, msc3706)
+        # experimental support for faster joins over federation
+        # (MSC2775, MSC3706, MSC3895)
         # requires a target server with msc3706_enabled enabled.
         self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
 
@@ -82,6 +83,8 @@ class ExperimentalConfig(Config):
         # MSC3786 (Add a default push rule to ignore m.room.server_acl events)
         self.msc3786_enabled: bool = experimental.get("msc3786_enabled", False)
 
+        # MSC3771: Thread read receipts
+        self.msc3771_enabled: bool = experimental.get("msc3771_enabled", False)
         # MSC3772: A push rule for mutual relations.
         self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)
 
@@ -93,3 +96,13 @@ class ExperimentalConfig(Config):
 
         # MSC3852: Expose last seen user agent field on /_matrix/client/v3/devices.
         self.msc3852_enabled: bool = experimental.get("msc3852_enabled", False)
+
+        # MSC3881: Remotely toggle push notifications for another client
+        self.msc3881_enabled: bool = experimental.get("msc3881_enabled", False)
+
+        # MSC3882: Allow an existing session to sign in a new session
+        self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
+        self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)
+        self.msc3882_token_timeout = self.parse_duration(
+            experimental.get("msc3882_token_timeout", "5m")
+        )

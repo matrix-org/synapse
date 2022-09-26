@@ -226,9 +226,7 @@ class FederationHandler:
         """
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
-            for event_id, depth in await self.store.get_oldest_event_ids_with_depth_in_room(
-                room_id
-            )
+            for event_id, depth in await self.store.get_backfill_points_in_room(room_id)
         ]
 
         insertion_events_to_be_backfilled: List[_BackfillPoint] = []
@@ -804,7 +802,7 @@ class FederationHandler:
             )
 
         # now check that we are *still* in the room
-        is_in_room = await self._event_auth_handler.check_host_in_room(
+        is_in_room = await self._event_auth_handler.is_host_in_room(
             room_id, self.server_name
         )
         if not is_in_room:
@@ -1150,9 +1148,7 @@ class FederationHandler:
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
     ) -> List[EventBase]:
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
 
         # Synapse asks for 100 events per backfill request. Do not allow more.
         limit = min(limit, 100)
@@ -1198,20 +1194,16 @@ class FederationHandler:
             event_id, allow_none=True, allow_rejected=True
         )
 
-        if event:
-            in_room = await self._event_auth_handler.check_host_in_room(
-                event.room_id, origin
-            )
-            if not in_room:
-                raise AuthError(403, "Host not in room.")
-
-            events = await filter_events_for_server(
-                self._storage_controllers, origin, [event]
-            )
-            event = events[0]
-            return event
-        else:
+        if not event:
             return None
+
+        await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
+
+        events = await filter_events_for_server(
+            self._storage_controllers, origin, [event]
+        )
+        event = events[0]
+        return event
 
     async def on_get_missing_events(
         self,
@@ -1221,9 +1213,7 @@ class FederationHandler:
         latest_events: List[str],
         limit: int,
     ) -> List[EventBase]:
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
 
         # Only allow up to 20 events to be retrieved per request.
         limit = min(limit, 20)
@@ -1257,7 +1247,7 @@ class FederationHandler:
             "state_key": target_user_id,
         }
 
-        if await self._event_auth_handler.check_host_in_room(room_id, self.hs.hostname):
+        if await self._event_auth_handler.is_host_in_room(room_id, self.hs.hostname):
             room_version_obj = await self.store.get_room_version(room_id)
             builder = self.event_builder_factory.for_room_version(
                 room_version_obj, event_dict

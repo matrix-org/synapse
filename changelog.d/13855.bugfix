@@ -1,0 +1,1 @@
+Fix access token leak to logs from proxy agent.

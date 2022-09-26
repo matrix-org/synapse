@@ -340,7 +340,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         # If we're not in the room just ditch the event entirely. This is
         # probably an old server that has come back and thinks we're still in
         # the room (or we've been rejoined to the room by a state reset).
-        is_in_room = await self.event_auth_handler.check_host_in_room(
+        is_in_room = await self.event_auth_handler.is_host_in_room(
             room_id, self.server_name
         )
         if not is_in_room:
@@ -362,11 +362,14 @@ class TypingWriterHandler(FollowerTypingHandler):
             )
             return
 
-        domains = await self._storage_controllers.state.get_current_hosts_in_room(
+        # Let's check that the origin server is in the room before accepting the typing
+        # event. We don't want to block waiting on a partial state so take an
+        # approximation if needed.
+        domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
 
-        if self.server_name in domains:
+        if user.domain in domains:
             logger.info("Got typing update from %s: %r", user_id, content)
             now = self.clock.time_msec()
             self._member_typing_until[member] = now + FEDERATION_TIMEOUT

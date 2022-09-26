@@ -31,7 +31,6 @@ from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.types import StateMap, get_domain_from_id
-from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -156,9 +155,33 @@ class EventAuthHandler:
             Codes.UNABLE_TO_GRANT_JOIN,
         )
 
-    async def check_host_in_room(self, room_id: str, host: str) -> bool:
-        with Measure(self._clock, "check_host_in_room"):
-            return await self._store.is_host_joined(room_id, host)
+    async def is_host_in_room(self, room_id: str, host: str) -> bool:
+        return await self._store.is_host_joined(room_id, host)
+
+    async def assert_host_in_room(
+        self, room_id: str, host: str, allow_partial_state_rooms: bool = False
+    ) -> None:
+        """
+        Asserts that the host is in the room, or raises an AuthError.
+
+        If the room is partial-stated, we raise an AuthError with the
+        UNABLE_DUE_TO_PARTIAL_STATE error code, unless `allow_partial_state_rooms` is true.
+
+        If allow_partial_state_rooms is True and the room is partial-stated,
+        this function may return an incorrect result as we are not able to fully
+        track server membership in a room without full state.
+        """
+        if not allow_partial_state_rooms and await self._store.is_partial_state_room(
+            room_id
+        ):
+            raise AuthError(
+                403,
+                "Unable to authorise you right now; room is partial-stated here.",
+                errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
+            )
+
+        if not await self.is_host_in_room(room_id, host):
+            raise AuthError(403, "Host not in room.")
 
     async def check_restricted_join_rules(
         self,
