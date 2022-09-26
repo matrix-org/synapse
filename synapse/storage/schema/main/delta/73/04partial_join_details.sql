@@ -18,6 +18,6 @@
 -- the partial join. For now it's sufficient to know the device_list stream_id at the
 -- time of the partial join, and the join event created for us during a partial join.
 --
--- Both columns are nullable without defaults, for backwards compatibility.
-ALTER TABLE partial_state_rooms ADD COLUMN device_lists_stream_id BIGINT;
+-- Both columns are backwards compatible.
+ALTER TABLE partial_state_rooms ADD COLUMN device_lists_stream_id BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE partial_state_rooms ADD COLUMN join_event_id TEXT;
