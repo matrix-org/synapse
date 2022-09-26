@@ -217,10 +217,10 @@ class DualLookupCache(Generic[PKT, PVT, SKT]):
                 key,
             )
             for primary_key in primary_key_set:
-                logger.info("*** Popping entry from primary_dict: %s", primary_key)
+                primary_value = self._primary_dict.pop(primary_key)
+                logger.info("*** Popping entry from primary_dict: %s - %s", primary_key, primary_value)
                 logger.info("*** primary_dict: %s", self._primary_dict)
-                popped_primary_dict_values = self._primary_dict[primary_key]
-                del self._primary_dict[primary_key]
+                popped_primary_dict_values.append(primary_value)
 
             # Now return the unmodified copy of the set.
             return popped_primary_dict_values
