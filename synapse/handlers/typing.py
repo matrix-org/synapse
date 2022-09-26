@@ -362,11 +362,14 @@ class TypingWriterHandler(FollowerTypingHandler):
             )
             return
 
-        domains = await self._storage_controllers.state.get_current_hosts_in_room(
+        # Let's check that the origin server is in the room before accepting the typing
+        # event. We don't want to block waiting on a partial state so take an
+        # approximation if needed.
+        domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
 
-        if self.server_name in domains:
+        if user.domain in domains:
             logger.info("Got typing update from %s: %r", user_id, content)
             now = self.clock.time_msec()
             self._member_typing_until[member] = now + FEDERATION_TIMEOUT
