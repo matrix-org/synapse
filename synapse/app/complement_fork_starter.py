@@ -61,7 +61,7 @@ from twisted.internet.main import installReactor
 
 # a list of the original signal handlers, before we installed our custom ones.
 # We restore these in our child processes.
-_original_signal_handlers: dict[int, Callable] = {}
+_original_signal_handlers: dict[int, Any] = {}
 
 
 class ProxiedReactor:
@@ -190,7 +190,8 @@ def main() -> None:
             file=sys.stderr,
         )
         for p in processes:
-            os.kill(p.pid, signum)
+            if p.pid:
+                os.kill(p.pid, signum)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         _original_signal_handlers[sig] = signal.signal(sig, handle_signal)
