@@ -95,14 +95,15 @@ webencodings = "*"
 
 [[package]]
 name = "canonicaljson"
-version = "1.6.0"
+version = "1.6.3"
 description = "Canonical JSON"
 category = "main"
 optional = false
-python-versions = "~=3.7"
+python-versions = ">=3.7"
 
 [package.dependencies]
 simplejson = ">=3.14.0"
+typing-extensions = {version = ">=4.0.0", markers = "python_version < \"3.8\""}
 
 [package.extras]
 frozendict = ["frozendict (>=1.0)"]
@@ -1682,8 +1683,8 @@ bleach = [
     {file = "bleach-4.1.0.tar.gz", hash = "sha256:0900d8b37eba61a802ee40ac0061f8c2b5dee29c1927dd1d233e075ebf5a71da"},
 ]
 canonicaljson = [
-    {file = "canonicaljson-1.6.0-py3-none-any.whl", hash = "sha256:7230c2a2a3db07874f622af84effe41a655e07bf23734830e18a454e65d5b998"},
-    {file = "canonicaljson-1.6.0.tar.gz", hash = "sha256:8739d5fd91aca7281d425660ae65af7663808c8177778965f67e90b16a2b2427"},
+    {file = "canonicaljson-1.6.3-py3-none-any.whl", hash = "sha256:6ba3cf1702fa3d209b3e915a4e9a3e4ef194f1e8fca189c1f0b7a2a7686a27e6"},
+    {file = "canonicaljson-1.6.3.tar.gz", hash = "sha256:ca59760bc274a899a0da75809d6909ae43e5123381fd6ef040a44d1952c0b448"},
 ]
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},

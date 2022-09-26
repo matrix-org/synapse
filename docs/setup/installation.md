@@ -181,7 +181,7 @@ doas pkg_add synapse
 #### NixOS
 
 Robin Lambertz has packaged Synapse for NixOS at:
-<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
+<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix>
 
 
 ### Installing as a Python module from PyPI
