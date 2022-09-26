@@ -201,10 +201,11 @@ jobs:
   open-issue:
     if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request'"
     needs:
-      # TODO: should mypy be included here? It feels more brittle than the other two.
+      # TODO: should mypy be included here? It feels more brittle than the others.
       - mypy
       - trial
       - sytest
+      - complement
 
     runs-on: ubuntu-latest
 
