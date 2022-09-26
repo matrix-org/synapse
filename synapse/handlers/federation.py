@@ -584,10 +584,9 @@ class FederationHandler:
                 # The background process is responsible for unmarking this flag,
                 # even if the join fails.
                 await self.store.store_partial_state_room(
-                    room_id,
-                    ret.servers_in_room,
-                    ret.event.event_id,
-                    self.store.get_device_stream_token(),
+                    room_id=room_id,
+                    servers=ret.servers_in_room,
+                    device_lists_stream_id=self.store.get_device_stream_token(),
                 )
 
             try:
@@ -613,6 +612,14 @@ class FederationHandler:
                     room_id,
                 )
                 raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
+            else:
+                # Record the join event id for future use (when we finish the full
+                # join). We have to do this after persisting the event to keep foreign
+                # key constraints intact.
+                if ret.partial_state:
+                    await self.store.write_partial_state_rooms_join_event_id(
+                        room_id, event.event_id
+                    )
             finally:
                 # Always kick off the background process that asynchronously fetches
                 # state for the room.
