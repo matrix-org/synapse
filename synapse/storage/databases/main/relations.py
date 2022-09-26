@@ -30,7 +30,6 @@ import attr
 
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
-from synapse.logging.tracing import trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause

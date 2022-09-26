@@ -42,7 +42,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersio
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import ContextResourceUsage
-from synapse.logging.tracing import SynapseTags, log_kv, trace, tag_args, set_attribute
+from synapse.logging.tracing import SynapseTags, log_kv, set_attribute, tag_args, trace
 from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
