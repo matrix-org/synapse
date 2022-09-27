@@ -27,6 +27,7 @@ from typing import (
 )
 
 from synapse.api.constants import EduTypes
+from synapse.api.errors import StoreError
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -188,7 +189,10 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         # table because the event arrived after the receipt. In this case we can attempt to
         # fetch the stream ordering from the events table.
         if result and not result[1]:
-            stream_ordering = self.get_stream_id_for_event_txn(txn, result[0])
+            try:
+                stream_ordering = self.get_stream_id_for_event_txn(txn, result[0])
+            except StoreError:  # we don't know about this event
+                return None
             return result[0], stream_ordering
 
         return result
