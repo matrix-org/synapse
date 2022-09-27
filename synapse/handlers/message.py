@@ -1636,7 +1636,223 @@ class EventCreationHandler:
                 )
 
             # run checks/actions on event based on type
-            await self._actions_by_event_type(event, context)
+            if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+                (
+                    current_membership,
+                    _,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    event.state_key, event.room_id
+                )
+                if current_membership != Membership.JOIN:
+                    self._notifier.notify_user_joined_room(
+                        event.event_id, event.room_id
+                    )
+
+            await self._maybe_kick_guest_users(event, context)
+
+            if event.type == EventTypes.CanonicalAlias:
+                # Validate a newly added alias or newly added alt_aliases.
+
+                original_alias = None
+                original_alt_aliases: object = []
+
+                original_event_id = event.unsigned.get("replaces_state")
+                if original_event_id:
+                    original_alias_event = await self.store.get_event(original_event_id)
+
+                    if original_alias_event:
+                        original_alias = original_alias_event.content.get("alias", None)
+                        original_alt_aliases = original_alias_event.content.get(
+                            "alt_aliases", []
+                        )
+
+                # Check the alias is currently valid (if it has changed).
+                room_alias_str = event.content.get("alias", None)
+                directory_handler = self.hs.get_directory_handler()
+                if room_alias_str and room_alias_str != original_alias:
+                    await self._validate_canonical_alias(
+                        directory_handler, room_alias_str, event.room_id
+                    )
+
+                # Check that alt_aliases is the proper form.
+                alt_aliases = event.content.get("alt_aliases", [])
+                if not isinstance(alt_aliases, (list, tuple)):
+                    raise SynapseError(
+                        400,
+                        "The alt_aliases property must be a list.",
+                        Codes.INVALID_PARAM,
+                    )
+
+                # If the old version of alt_aliases is of an unknown form,
+                # completely replace it.
+                if not isinstance(original_alt_aliases, (list, tuple)):
+                    # TODO: check that the original_alt_aliases' entries are all strings
+                    original_alt_aliases = []
+
+                # Check that each alias is currently valid.
+                new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
+                if new_alt_aliases:
+                    for alias_str in new_alt_aliases:
+                        await self._validate_canonical_alias(
+                            directory_handler, alias_str, event.room_id
+                        )
+
+            federation_handler = self.hs.get_federation_handler()
+
+            if event.type == EventTypes.Member:
+                if event.content["membership"] == Membership.INVITE:
+                    event.unsigned[
+                        "invite_room_state"
+                    ] = await self.store.get_stripped_room_state_from_event_context(
+                        context,
+                        self.room_prejoin_state_types,
+                        membership_user_id=event.sender,
+                    )
+
+                    invitee = UserID.from_string(event.state_key)
+                    if not self.hs.is_mine(invitee):
+                        # TODO: Can we add signature from remote server in a nicer
+                        # way? If we have been invited by a remote server, we need
+                        # to get them to sign the event.
+
+                        returned_invite = await federation_handler.send_invite(
+                            invitee.domain, event
+                        )
+                        event.unsigned.pop("room_state", None)
+
+                        # TODO: Make sure the signatures actually are correct.
+                        event.signatures.update(returned_invite.signatures)
+
+                if event.content["membership"] == Membership.KNOCK:
+                    event.unsigned[
+                        "knock_room_state"
+                    ] = await self.store.get_stripped_room_state_from_event_context(
+                        context,
+                        self.room_prejoin_state_types,
+                    )
+
+            if event.type == EventTypes.Redaction:
+                assert event.redacts is not None
+
+                original_event = await self.store.get_event(
+                    event.redacts,
+                    redact_behaviour=EventRedactBehaviour.as_is,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=True,
+                )
+
+                room_version = await self.store.get_room_version_id(event.room_id)
+                room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+                # we can make some additional checks now if we have the original event.
+                if original_event:
+                    if original_event.type == EventTypes.Create:
+                        raise AuthError(403, "Redacting create events is not permitted")
+
+                    if original_event.room_id != event.room_id:
+                        raise SynapseError(
+                            400, "Cannot redact event from a different room"
+                        )
+
+                    if original_event.type == EventTypes.ServerACL:
+                        raise AuthError(
+                            403, "Redacting server ACL events is not permitted"
+                        )
+
+                    # Add a little safety stop-gap to prevent people from trying to
+                    # redact MSC2716 related events when they're in a room version
+                    # which does not support it yet. We allow people to use MSC2716
+                    # events in existing room versions but only from the room
+                    # creator since it does not require any changes to the auth
+                    # rules and in effect, the redaction algorithm . In the
+                    # supported room version, we add the `historical` power level to
+                    # auth the MSC2716 related events and adjust the redaction
+                    # algorthim to keep the `historical` field around (redacting an
+                    # event should only strip fields which don't affect the
+                    # structural protocol level).
+                    is_msc2716_event = (
+                        original_event.type == EventTypes.MSC2716_INSERTION
+                        or original_event.type == EventTypes.MSC2716_BATCH
+                        or original_event.type == EventTypes.MSC2716_MARKER
+                    )
+                    if not room_version_obj.msc2716_historical and is_msc2716_event:
+                        raise AuthError(
+                            403,
+                            "Redacting MSC2716 events is not supported in this room version",
+                        )
+
+                event_types = event_auth.auth_types_for_event(event.room_version, event)
+                prev_state_ids = await context.get_prev_state_ids(
+                    StateFilter.from_types(event_types)
+                )
+
+                auth_events_ids = self._event_auth_handler.compute_auth_events(
+                    event, prev_state_ids, for_verification=True
+                )
+                auth_events_map = await self.store.get_events(auth_events_ids)
+                auth_events = {
+                    (e.type, e.state_key): e for e in auth_events_map.values()
+                }
+
+                if event_auth.check_redaction(
+                    room_version_obj, event, auth_events=auth_events
+                ):
+                    # this user doesn't have 'redact' rights, so we need to do some more
+                    # checks on the original event. Let's start by checking the original
+                    # event exists.
+                    if not original_event:
+                        raise NotFoundError(
+                            "Could not find event %s" % (event.redacts,)
+                        )
+
+                    if event.user_id != original_event.user_id:
+                        raise AuthError(
+                            403, "You don't have permission to redact events"
+                        )
+
+                    # all the checks are done.
+                    event.internal_metadata.recheck_redaction = False
+
+            if event.type == EventTypes.Create:
+                prev_state_ids = await context.get_prev_state_ids()
+                if prev_state_ids:
+                    raise AuthError(403, "Changing the room create event is forbidden")
+
+            if event.type == EventTypes.MSC2716_INSERTION:
+                room_version = await self.store.get_room_version_id(event.room_id)
+                room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+                create_event = await self.store.get_create_event_for_room(event.room_id)
+                room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+
+                # Only check an insertion event if the room version
+                # supports it or the event is from the room creator.
+                if room_version_obj.msc2716_historical or (
+                    self.config.experimental.msc2716_enabled
+                    and event.sender == room_creator
+                ):
+                    next_batch_id = event.content.get(
+                        EventContentFields.MSC2716_NEXT_BATCH_ID
+                    )
+                    conflicting_insertion_event_id = None
+                    if next_batch_id:
+                        conflicting_insertion_event_id = (
+                            await self.store.get_insertion_event_id_by_batch_id(
+                                event.room_id, next_batch_id
+                            )
+                        )
+                    if conflicting_insertion_event_id is not None:
+                        # The current insertion event that we're processing is invalid
+                        # because an insertion event already exists in the room with the
+                        # same next_batch_id. We can't allow multiple because the batch
+                        # pointing will get weird, e.g. we can't determine which insertion
+                        # event the batch event is pointing to.
+                        raise SynapseError(
+                            HTTPStatus.BAD_REQUEST,
+                            "Another insertion event already exists with the same next_batch_id",
+                            errcode=Codes.INVALID_PARAM,
+                        )
 
             # Mark any `m.historical` messages as backfilled so they don't appear
             # in `/sync` and have the proper decrementing `stream_ordering` as we import
@@ -1680,216 +1896,6 @@ class EventCreationHandler:
                 run_in_background(self._bump_active_time, requester.user)
 
         return persisted_events[-1]
-
-    async def _actions_by_event_type(
-        self, event: EventBase, context: EventContext
-    ) -> None:
-        """
-        Helper function to execute actions/checks based on the event type
-        """
-        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-            (
-                current_membership,
-                _,
-            ) = await self.store.get_local_current_membership_for_user_in_room(
-                event.state_key, event.room_id
-            )
-            if current_membership != Membership.JOIN:
-                self._notifier.notify_user_joined_room(event.event_id, event.room_id)
-
-        await self._maybe_kick_guest_users(event, context)
-
-        if event.type == EventTypes.CanonicalAlias:
-            # Validate a newly added alias or newly added alt_aliases.
-
-            original_alias = None
-            original_alt_aliases: object = []
-
-            original_event_id = event.unsigned.get("replaces_state")
-            if original_event_id:
-                original_alias_event = await self.store.get_event(original_event_id)
-
-                if original_alias_event:
-                    original_alias = original_alias_event.content.get("alias", None)
-                    original_alt_aliases = original_alias_event.content.get(
-                        "alt_aliases", []
-                    )
-
-            # Check the alias is currently valid (if it has changed).
-            room_alias_str = event.content.get("alias", None)
-            directory_handler = self.hs.get_directory_handler()
-            if room_alias_str and room_alias_str != original_alias:
-                await self._validate_canonical_alias(
-                    directory_handler, room_alias_str, event.room_id
-                )
-
-            # Check that alt_aliases is the proper form.
-            alt_aliases = event.content.get("alt_aliases", [])
-            if not isinstance(alt_aliases, (list, tuple)):
-                raise SynapseError(
-                    400, "The alt_aliases property must be a list.", Codes.INVALID_PARAM
-                )
-
-            # If the old version of alt_aliases is of an unknown form,
-            # completely replace it.
-            if not isinstance(original_alt_aliases, (list, tuple)):
-                # TODO: check that the original_alt_aliases' entries are all strings
-                original_alt_aliases = []
-
-            # Check that each alias is currently valid.
-            new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
-            if new_alt_aliases:
-                for alias_str in new_alt_aliases:
-                    await self._validate_canonical_alias(
-                        directory_handler, alias_str, event.room_id
-                    )
-
-        federation_handler = self.hs.get_federation_handler()
-
-        if event.type == EventTypes.Member:
-            if event.content["membership"] == Membership.INVITE:
-                event.unsigned[
-                    "invite_room_state"
-                ] = await self.store.get_stripped_room_state_from_event_context(
-                    context,
-                    self.room_prejoin_state_types,
-                    membership_user_id=event.sender,
-                )
-
-                invitee = UserID.from_string(event.state_key)
-                if not self.hs.is_mine(invitee):
-                    # TODO: Can we add signature from remote server in a nicer
-                    # way? If we have been invited by a remote server, we need
-                    # to get them to sign the event.
-
-                    returned_invite = await federation_handler.send_invite(
-                        invitee.domain, event
-                    )
-                    event.unsigned.pop("room_state", None)
-
-                    # TODO: Make sure the signatures actually are correct.
-                    event.signatures.update(returned_invite.signatures)
-
-            if event.content["membership"] == Membership.KNOCK:
-                event.unsigned[
-                    "knock_room_state"
-                ] = await self.store.get_stripped_room_state_from_event_context(
-                    context,
-                    self.room_prejoin_state_types,
-                )
-
-        if event.type == EventTypes.Redaction:
-            assert event.redacts is not None
-
-            original_event = await self.store.get_event(
-                event.redacts,
-                redact_behaviour=EventRedactBehaviour.as_is,
-                get_prev_content=False,
-                allow_rejected=False,
-                allow_none=True,
-            )
-
-            room_version = await self.store.get_room_version_id(event.room_id)
-            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
-            # we can make some additional checks now if we have the original event.
-            if original_event:
-                if original_event.type == EventTypes.Create:
-                    raise AuthError(403, "Redacting create events is not permitted")
-
-                if original_event.room_id != event.room_id:
-                    raise SynapseError(400, "Cannot redact event from a different room")
-
-                if original_event.type == EventTypes.ServerACL:
-                    raise AuthError(403, "Redacting server ACL events is not permitted")
-
-                # Add a little safety stop-gap to prevent people from trying to
-                # redact MSC2716 related events when they're in a room version
-                # which does not support it yet. We allow people to use MSC2716
-                # events in existing room versions but only from the room
-                # creator since it does not require any changes to the auth
-                # rules and in effect, the redaction algorithm . In the
-                # supported room version, we add the `historical` power level to
-                # auth the MSC2716 related events and adjust the redaction
-                # algorthim to keep the `historical` field around (redacting an
-                # event should only strip fields which don't affect the
-                # structural protocol level).
-                is_msc2716_event = (
-                    original_event.type == EventTypes.MSC2716_INSERTION
-                    or original_event.type == EventTypes.MSC2716_BATCH
-                    or original_event.type == EventTypes.MSC2716_MARKER
-                )
-                if not room_version_obj.msc2716_historical and is_msc2716_event:
-                    raise AuthError(
-                        403,
-                        "Redacting MSC2716 events is not supported in this room version",
-                    )
-
-            event_types = event_auth.auth_types_for_event(event.room_version, event)
-            prev_state_ids = await context.get_prev_state_ids(
-                StateFilter.from_types(event_types)
-            )
-
-            auth_events_ids = self._event_auth_handler.compute_auth_events(
-                event, prev_state_ids, for_verification=True
-            )
-            auth_events_map = await self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events_map.values()}
-
-            if event_auth.check_redaction(
-                room_version_obj, event, auth_events=auth_events
-            ):
-                # this user doesn't have 'redact' rights, so we need to do some more
-                # checks on the original event. Let's start by checking the original
-                # event exists.
-                if not original_event:
-                    raise NotFoundError("Could not find event %s" % (event.redacts,))
-
-                if event.user_id != original_event.user_id:
-                    raise AuthError(403, "You don't have permission to redact events")
-
-                # all the checks are done.
-                event.internal_metadata.recheck_redaction = False
-
-        if event.type == EventTypes.Create:
-            prev_state_ids = await context.get_prev_state_ids()
-            if prev_state_ids:
-                raise AuthError(403, "Changing the room create event is forbidden")
-
-        if event.type == EventTypes.MSC2716_INSERTION:
-            room_version = await self.store.get_room_version_id(event.room_id)
-            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
-            create_event = await self.store.get_create_event_for_room(event.room_id)
-            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
-
-            # Only check an insertion event if the room version
-            # supports it or the event is from the room creator.
-            if room_version_obj.msc2716_historical or (
-                self.config.experimental.msc2716_enabled
-                and event.sender == room_creator
-            ):
-                next_batch_id = event.content.get(
-                    EventContentFields.MSC2716_NEXT_BATCH_ID
-                )
-                conflicting_insertion_event_id = None
-                if next_batch_id:
-                    conflicting_insertion_event_id = (
-                        await self.store.get_insertion_event_id_by_batch_id(
-                            event.room_id, next_batch_id
-                        )
-                    )
-                if conflicting_insertion_event_id is not None:
-                    # The current insertion event that we're processing is invalid
-                    # because an insertion event already exists in the room with the
-                    # same next_batch_id. We can't allow multiple because the batch
-                    # pointing will get weird, e.g. we can't determine which insertion
-                    # event the batch event is pointing to.
-                    raise SynapseError(
-                        HTTPStatus.BAD_REQUEST,
-                        "Another insertion event already exists with the same next_batch_id",
-                        errcode=Codes.INVALID_PARAM,
-                    )
 
     async def _maybe_kick_guest_users(
         self, event: EventBase, context: EventContext
