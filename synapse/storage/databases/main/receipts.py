@@ -30,6 +30,7 @@ from synapse.api.constants import EduTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -53,7 +54,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReceiptsWorkerStore(SQLBaseStore):
+class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -181,7 +182,16 @@ class ReceiptsWorkerStore(SQLBaseStore):
         args.extend((user_id, room_id))
         txn.execute(sql, args)
 
-        return cast(Optional[Tuple[str, int]], txn.fetchone())
+        result = cast(Optional[Tuple[str, int]], txn.fetchone())
+
+        # It's possible that the event_stream_ordering column isn't populated on the receipts
+        # table because the event arrived after the receipt. In this case we can attempt to
+        # fetch the stream ordering from the events table.
+        if result and not result[1]:
+            stream_ordering = self.get_stream_id_for_event_txn(txn, result[0])
+            return result[0], stream_ordering
+
+        return result
 
     async def get_receipts_for_user(
         self, user_id: str, receipt_types: Iterable[str]
@@ -646,7 +656,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             txn.execute(sql, (room_id, receipt_type, user_id))
 
             for so, eid in txn:
-                if int(so) >= stream_ordering:
+                if so and int(so) >= stream_ordering:
                     logger.debug(
                         "Ignoring new receipt for %s in favour of existing "
                         "one for later event %s",
