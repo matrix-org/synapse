@@ -147,9 +147,9 @@
                         </div>
 
                         <h1 id="deprecation-policy-for-platform-dependencies"><a class="header" href="#deprecation-policy-for-platform-dependencies">Deprecation Policy for Platform Dependencies</a></h1>
-<p>Synapse has a number of platform dependencies, including Python and PostgreSQL.
-This document outlines the policy towards which versions we support, and when we
-drop support for versions in the future.</p>
+<p>Synapse has a number of platform dependencies, including Python, Rust, 
+PostgreSQL and SQLite. This document outlines the policy towards which versions 
+we support, and when we drop support for versions in the future.</p>
 <h2 id="policy"><a class="header" href="#policy">Policy</a></h2>
 <p>Synapse follows the upstream support life cycles for Python and PostgreSQL,
 i.e. when a version reaches End of Life Synapse will withdraw support for that
@@ -157,6 +157,13 @@ version in future releases.</p>
 <p>Details on the upstream support life cycles for Python and PostgreSQL are
 documented at <a href="https://endoflife.date/python">https://endoflife.date/python</a> and
 <a href="https://endoflife.date/postgresql">https://endoflife.date/postgresql</a>.</p>
+<p>A Rust compiler is required to build Synapse from source. For any given release
+the minimum required version may be bumped up to a recent Rust version, and so
+people building from source should ensure they can fetch recent versions of Rust
+(e.g. by using <a href="https://rustup.rs/">rustup</a>).</p>
+<p>The oldest supported version of SQLite is the version
+<a href="https://packages.debian.org/buster/libsqlite3-0">provided</a> by
+<a href="https://wiki.debian.org/DebianOldStable">Debian oldstable</a>.</p>
 <h2 id="context"><a class="header" href="#context">Context</a></h2>
 <p>It is important for system admins to have a clear understanding of the platform
 requirements of Synapse and its deprecation policies so that they can
@@ -167,6 +174,16 @@ long process.</p>
 <p>By following the upstream support life cycles Synapse can ensure that its
 dependencies continue to get security patches, while not requiring system admins
 to constantly update their platform dependencies to the latest versions.</p>
+<p>For Rust, the situation is a bit different given that a) the Rust foundation
+does not generally support older Rust versions, and b) the library ecosystem
+generally bump their minimum support Rust versions frequently. In general, the
+Synapse team will try to avoid updating the dependency on Rust to the absolute
+latest version, but introducing a formal policy is hard given the constraints of
+the ecosystem.</p>
+<p>On a similar note, SQLite does not generally have a concept of &quot;supported 
+release&quot;; bugfixes are published for the latest minor release only. We chose to
+track Debian's oldstable as this is relatively conservative, predictably updated
+and is consistent with the <code>.deb</code> packages released by Matrix.org.</p>
 
                     </main>
 

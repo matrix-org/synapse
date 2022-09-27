@@ -242,6 +242,20 @@ context of poetry's venv, without having to run <code>poetry shell</code> before
 <h2 id="reset-my-venv-to-the-locked-environment"><a class="header" href="#reset-my-venv-to-the-locked-environment">...reset my venv to the locked environment?</a></h2>
 <pre><code class="language-shell">poetry install --extras all --remove-untracked
 </code></pre>
+<h2 id="delete-everything-and-start-over-from-scratch"><a class="header" href="#delete-everything-and-start-over-from-scratch">...delete everything and start over from scratch?</a></h2>
+<pre><code class="language-shell"># Stop the current virtualenv if active
+$ deactivate
+
+# Remove all of the files from the current environment.
+# Don't worry, even though it says &quot;all&quot;, this will only
+# remove the Poetry virtualenvs for the current project.
+$ poetry env remove --all
+
+# Reactivate Poetry shell to create the virtualenv again
+$ poetry shell
+# Install everything again
+$ poetry install --extras all
+</code></pre>
 <h2 id="run-a-command-in-the-poetry-virtualenv"><a class="header" href="#run-a-command-in-the-poetry-virtualenv">...run a command in the <code>poetry</code> virtualenv?</a></h2>
 <p>Use <code>poetry run cmd args</code> when you need the python virtualenv context.
 To avoid typing <code>poetry run</code> all the time, you can run  <code>poetry shell</code>
@@ -330,6 +344,11 @@ installed <code>poetry</code> with <code>pipx</code>, try <code>pipx runpip poet
 <p>Poetry caches a bunch of information about packages that isn't readily available
 from PyPI. (This is what makes poetry seem slow when doing the first
 <code>poetry install</code>.) Try <code>poetry cache list</code> and <code>poetry cache clear --all &lt;name of cache&gt;</code> to see if that fixes things.</p>
+<h2 id="remove-outdated-egg-info"><a class="header" href="#remove-outdated-egg-info">Remove outdated egg-info</a></h2>
+<p>Delete the <code>matrix_synapse.egg-info/</code> directory from the root of your Synapse
+install.</p>
+<p>This stores some cached information about dependencies and often conflicts with
+letting Poetry do the right thing.</p>
 <h2 id="try---verbose-or---dry-run-arguments"><a class="header" href="#try---verbose-or---dry-run-arguments">Try <code>--verbose</code> or <code>--dry-run</code> arguments.</a></h2>
 <p>Sometimes useful to see what poetry's internal logic is.</p>
 

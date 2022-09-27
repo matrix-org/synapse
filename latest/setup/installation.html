@@ -277,6 +277,9 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <li>Python 3.7 or later, up to Python 3.10.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
+<p>If building on an uncommon architecture for which pre-built wheels are
+unavailable, you will need to have a recent Rust compiler installed. The easiest
+way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <p>To install the Synapse homeserver run:</p>
 <pre><code class="language-sh">mkdir -p ~/synapse
 virtualenv -p python3 ~/synapse/env
@@ -347,8 +350,9 @@ sudo dnf groupinstall &quot;Development Tools&quot;
 <p>You may need to install the latest Xcode developer tools:</p>
 <pre><code class="language-sh">xcode-select --install
 </code></pre>
-<p>On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):</p>
-<pre><code class="language-sh"> brew install jpeg
+<p>On ARM-based Macs you may need to install libjpeg and libpq. 
+You can use Homebrew (https://brew.sh):</p>
+<pre><code class="language-sh"> brew install jpeg libpq
 </code></pre>
 <p>On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform <code>pip</code> about it so that <code>psycopg2</code> builds:</p>

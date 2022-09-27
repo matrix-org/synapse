@@ -153,14 +153,14 @@
 -AAAAAAAAAAAAAAAAAAAAA-   -BBBBBBBBBBBBBBBBBBBBBB-   -C-   -DD-   -EEEEEE-  -FFFFFFFFF-   -GG-    -HHHHHHHHHHHHHHHHHHHHHHH-                     -IIIIII- -JJJJJJJ-  -KKKKKK-, -LLLLLL-  -MMMMMMM- -NNNNNN- O  -P- -QQ-  -RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR-   -SSSSSSSSSSSS-   -TTTTTT-
 </code></pre>
 <table><thead><tr><th>Part</th><th>Explanation</th></tr></thead><tbody>
-<tr><td>AAAA</td><td>Timestamp request was logged (not recieved)</td></tr>
+<tr><td>AAAA</td><td>Timestamp request was logged (not received)</td></tr>
 <tr><td>BBBB</td><td>Logger name (<code>synapse.access.(http\|https).&lt;tag&gt;</code>, where 'tag' is defined in the <code>listeners</code> config section, normally the port)</td></tr>
 <tr><td>CCCC</td><td>Line number in code</td></tr>
 <tr><td>DDDD</td><td>Log Level</td></tr>
 <tr><td>EEEE</td><td>Request Identifier (This identifier is shared by related log lines)</td></tr>
 <tr><td>FFFF</td><td>Source IP (Or X-Forwarded-For if enabled)</td></tr>
 <tr><td>GGGG</td><td>Server Port</td></tr>
-<tr><td>HHHH</td><td>Federated Server or Local User making request (blank if unauthenticated or not supplied)</td></tr>
+<tr><td>HHHH</td><td>Federated Server or Local User making request (blank if unauthenticated or not supplied).<br/>If this is of the form `@aaa:example.com</td></tr>
 <tr><td>IIII</td><td>Total Time to process the request</td></tr>
 <tr><td>JJJJ</td><td>Time to send response over network once generated (this may be negative if the socket is closed before the response is generated)</td></tr>
 <tr><td>KKKK</td><td>Userland CPU time</td></tr>

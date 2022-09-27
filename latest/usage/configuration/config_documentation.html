@@ -488,7 +488,16 @@ configuration.</p>
 </li>
 <li>
 <p><code>x_forwarded</code>: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-behind a reverse-proxy.</p>
+behind a <a href="../../reverse_proxy.html">reverse-proxy</a>.</p>
+</li>
+<li>
+<p><code>request_id_header</code>: The header extracted from each incoming request that is
+used as the basis for the request ID. The request ID is used in
+<a href="../administration/request_log.html#request-log-format">logs</a> and tracing to
+correlate and match up requests. When unset, Synapse will automatically
+generate sequential request IDs. This option is useful when Synapse is behind
+a <a href="../../reverse_proxy.html">reverse-proxy</a>.</p>
+<p><em>Added in Synapse 1.68.0.</em></p>
 </li>
 <li>
 <p><code>resources</code>: Only valid for an 'http' listener. A list of resources to host
@@ -1008,8 +1017,9 @@ on this homeserver.</p>
 <p>Options related to caching.</p>
 <hr />
 <h3 id="event_cache_size"><a class="header" href="#event_cache_size"><code>event_cache_size</code></a></h3>
-<p>The number of events to cache in memory. Not affected by
-<code>caches.global_factor</code> and is not part of the <code>caches</code> section. Defaults to 10K.</p>
+<p>The number of events to cache in memory. Defaults to 10K. Like other caches,
+this is affected by <code>caches.global_factor</code> (see below).</p>
+<p>Note that this option is not part of the <code>caches</code> section.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">event_cache_size: 15K
 </code></pre>
@@ -1314,7 +1324,7 @@ client is attempting to log into. Defaults to <code>per_second: 0.17</code>,
 <code>burst_count: 3</code>.</p>
 </li>
 <li>
-<p><code>failted_attempts</code> ratelimits login requests based on the account the
+<p><code>failed_attempts</code> ratelimits login requests based on the account the
 client is attempting to log into, based on the amount of failed login
 attempts for this account. Defaults to <code>per_second: 0.17</code>, <code>burst_count: 3</code>.</p>
 </li>
