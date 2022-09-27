@@ -1291,104 +1291,6 @@ class EventCreationHandler:
                     400, "Cannot start threads from an event with a relation"
                 )
 
-    async def _persist_events_batch(
-        self,
-        requester: Requester,
-        events_and_ctx: List[Tuple[EventBase, EventContext]],
-        ratelimit: bool = True,
-    ) -> EventBase:
-        """
-        Processes the push actions and adds them to the push staging area before attempting to
-        persist the batch of events.
-        See handle_create_room_events for arguments
-        Returns the last event in the list if persisted successfully
-        """
-        for event, context in events_and_ctx:
-            with opentracing.start_active_span("calculate_push_actions"):
-                await self._bulk_push_rule_evaluator.action_for_event_by_user(
-                    event, context
-                )
-        try:
-            # If we're a worker we need to hit out to the master.
-            writer_instance = self._events_shard_config.get_instance(event.room_id)
-            if writer_instance != self._instance_name:
-                try:
-                    result = await self.send_events(
-                        instance_name=writer_instance,
-                        store=self.store,
-                        requester=requester,
-                        events_and_ctx=events_and_ctx,
-                        ratelimit=ratelimit,
-                    )
-                except SynapseError as e:
-                    if e.code == HTTPStatus.CONFLICT:
-                        raise PartialStateConflictError()
-                    raise
-                stream_id = result["stream_id"]
-
-                # If we newly persisted the event then we need to update its
-                # stream_ordering entry manually (as it was persisted on
-                # another worker).
-                event.internal_metadata.stream_ordering = stream_id
-                return event
-
-            last_event = await self.persist_and_notify_batched_events(
-                requester, events_and_ctx, ratelimit
-            )
-        except Exception:
-            # Ensure that we actually remove the entries in the push actions
-            # staging area, if we calculated them.
-            for event, _ in events_and_ctx:
-                await self.store.remove_push_actions_from_staging(event.event_id)
-            raise
-
-        return last_event
-
-    async def persist_and_notify_batched_events(
-        self,
-        requester: Requester,
-        events_and_ctx: List[Tuple[EventBase, EventContext]],
-        ratelimit: bool = True,
-    ) -> EventBase:
-        """
-        Handles the actual persisting of a batch of events to the DB, and sends the appropriate
-        notifications when this is done.
-        Args:
-            requester: the room creator
-            events_and_ctx: list of events and their associated contexts to persist
-            ratelimit: whether to apply ratelimiting to this request
-        """
-        if ratelimit:
-            await self.request_ratelimiter.ratelimit(requester)
-
-        for event, context in events_and_ctx:
-            await self._actions_by_event_type(event, context)
-
-        assert self._storage_controllers.persistence is not None
-        (
-            persisted_events,
-            max_stream_token,
-        ) = await self._storage_controllers.persistence.persist_events(events_and_ctx)
-
-        stream_ordering = persisted_events[-1].internal_metadata.stream_ordering
-        assert stream_ordering is not None
-        pos = PersistedEventPosition(self._instance_name, stream_ordering)
-
-        async def _notify() -> None:
-            try:
-                await self.notifier.on_new_room_event(
-                    persisted_events[-1], pos, max_stream_token
-                )
-            except Exception:
-                logger.exception(
-                    "Error notifying about new room event %s",
-                    event.event_id,
-                )
-
-        run_in_background(_notify)
-
-        return persisted_events[-1]
-
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
         self,
@@ -1472,62 +1374,48 @@ class EventCreationHandler:
                 logger.exception("Failed to encode content: %r", event.content)
                 raise
 
-        if len(events_and_context) > 1:
-            try:
-                result = await self._persist_events_batch(
-                    requester, events_and_context, ratelimit
-                )
-
-            except Exception as e:
-                logger.info(f"Encountered an error persisting events: {e}")
-
-            return result
-
-        else:
-            # We now persist the event (and update the cache in parallel, since we
-            # don't want to block on it).
-            event, context = events_and_context[0]
-            try:
-                result, _ = await make_deferred_yieldable(
-                    gather_results(
-                        (
-                            run_in_background(
-                                self._persist_event,
-                                requester=requester,
-                                event=event,
-                                context=context,
-                                ratelimit=ratelimit,
-                                extra_users=extra_users,
-                            ),
-                            run_in_background(
-                                self.cache_joined_hosts_for_event, event, context
-                            ).addErrback(
-                                log_failure, "cache_joined_hosts_for_event failed"
-                            ),
+        # We now persist the event (and update the cache in parallel, since we
+        # don't want to block on it).
+        event, context = events_and_context[0]
+        try:
+            result, _ = await make_deferred_yieldable(
+                gather_results(
+                    (
+                        run_in_background(
+                            self._persist_events,
+                            requester=requester,
+                            events_and_context=events_and_context,
+                            ratelimit=ratelimit,
+                            extra_users=extra_users,
                         ),
-                        consumeErrors=True,
-                    )
-                ).addErrback(unwrapFirstError)
-            except PartialStateConflictError as e:
-                # The event context needs to be recomputed.
-                # Turn the error into a 429, as a hint to the client to try again.
-                logger.info(
-                    "Room %s was un-partial stated while persisting client event.",
-                    event.room_id,
+                        run_in_background(
+                            self.cache_joined_hosts_for_event, event, context
+                        ).addErrback(
+                            log_failure, "cache_joined_hosts_for_event failed"
+                        ),
+                    ),
+                    consumeErrors=True,
                 )
-                raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
+            ).addErrback(unwrapFirstError)
+        except PartialStateConflictError as e:
+            # The event context needs to be recomputed.
+            # Turn the error into a 429, as a hint to the client to try again.
+            logger.info(
+                "Room %s was un-partial stated while persisting client event.",
+                event.room_id,
+            )
+            raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
-            return result
+        return result
 
-    async def _persist_event(
+    async def _persist_events(
         self,
         requester: Requester,
-        event: EventBase,
-        context: EventContext,
+        events_and_context: List[Tuple[EventBase, EventContext]],
         ratelimit: bool = True,
         extra_users: Optional[List[UserID]] = None,
     ) -> EventBase:
-        """Actually persists the event. Should only be called by
+        """Actually persists new events. Should only be called by
         `handle_new_client_event`, and see its docstring for documentation of
         the arguments.
 
@@ -1535,29 +1423,31 @@ class EventCreationHandler:
             a room that has been un-partial stated.
         """
 
-        # Skip push notification actions for historical messages
-        # because we don't want to notify people about old history back in time.
-        # The historical messages also do not have the proper `context.current_state_ids`
-        # and `state_groups` because they have `prev_events` that aren't persisted yet
-        # (historical messages persisted in reverse-chronological order).
-        if not event.internal_metadata.is_historical():
-            with opentracing.start_active_span("calculate_push_actions"):
-                await self._bulk_push_rule_evaluator.action_for_event_by_user(
-                    event, context
-                )
+        for event, context in events_and_context:
+            # Skip push notification actions for historical messages
+            # because we don't want to notify people about old history back in time.
+            # The historical messages also do not have the proper `context.current_state_ids`
+            # and `state_groups` because they have `prev_events` that aren't persisted yet
+            # (historical messages persisted in reverse-chronological order).
+            if not event.internal_metadata.is_historical():
+                with opentracing.start_active_span("calculate_push_actions"):
+                    await self._bulk_push_rule_evaluator.action_for_event_by_user(
+                        event, context
+                    )
 
         try:
             # If we're a worker we need to hit out to the master.
-            writer_instance = self._events_shard_config.get_instance(event.room_id)
+            first_event, _ = events_and_context[0]
+            writer_instance = self._events_shard_config.get_instance(
+                first_event.room_id
+            )
             if writer_instance != self._instance_name:
                 try:
-                    result = await self.send_event(
+                    result = await self.send_events(
                         instance_name=writer_instance,
-                        event_id=event.event_id,
+                        events_and_context=events_and_context,
                         store=self.store,
                         requester=requester,
-                        event=event,
-                        context=context,
                         ratelimit=ratelimit,
                         extra_users=extra_users,
                     )
@@ -1567,7 +1457,13 @@ class EventCreationHandler:
                     raise
                 stream_id = result["stream_id"]
                 event_id = result["event_id"]
-                if event_id != event.event_id:
+
+                # If we batch persisted events we return the last persisted event, otherwise
+                # we return the one event that was persisted
+                event, _ = events_and_context[-1]
+
+                # We don't worry about de-duplicating batch persisted events
+                if event_id != event.event_id and len(events_and_context) == 1:
                     # If we get a different event back then it means that its
                     # been de-duplicated, so we replace the given event with the
                     # one already persisted.
@@ -1579,15 +1475,19 @@ class EventCreationHandler:
                     event.internal_metadata.stream_ordering = stream_id
                 return event
 
-            event = await self.persist_and_notify_client_event(
-                requester, event, context, ratelimit=ratelimit, extra_users=extra_users
+            event = await self.persist_and_notify_client_events(
+                requester,
+                events_and_context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
             )
 
             return event
         except Exception:
-            # Ensure that we actually remove the entries in the push actions
-            # staging area, if we calculated them.
-            await self.store.remove_push_actions_from_staging(event.event_id)
+            for event, _ in events_and_context:
+                # Ensure that we actually remove the entries in the push actions
+                # staging area, if we calculated them.
+                await self.store.remove_push_actions_from_staging(event.event_id)
             raise
 
     async def cache_joined_hosts_for_event(
@@ -1681,23 +1581,23 @@ class EventCreationHandler:
                 Codes.BAD_ALIAS,
             )
 
-    async def persist_and_notify_client_event(
+    async def persist_and_notify_client_events(
         self,
         requester: Requester,
-        event: EventBase,
-        context: EventContext,
+        events_and_context: List[Tuple[EventBase, EventContext]],
         ratelimit: bool = True,
         extra_users: Optional[List[UserID]] = None,
     ) -> EventBase:
-        """Called when we have fully built the event, have already
-        calculated the push actions for the event, and checked auth.
+        """Called when we have fully built the events, have already
+        calculated the push actions for the events, and checked auth.
 
         This should only be run on the instance in charge of persisting events.
 
         Returns:
-            The persisted event. This may be different than the given event if
-            it was de-duplicated (e.g. because we had already persisted an
-            event with the same transaction ID.)
+            The persisted event, if one event is passed in, or the last event in the
+            list in the case of batch persisting. If only one event was persisted, the
+            returned event may be different than the given event if it was de-duplicated
+            (e.g. because we had already persisted an event with the same transaction ID.)
 
         Raises:
             PartialStateConflictError: if attempting to persist a partial state event in
@@ -1705,78 +1605,81 @@ class EventCreationHandler:
         """
         extra_users = extra_users or []
 
-        assert self._storage_controllers.persistence is not None
-        assert self._events_shard_config.should_handle(
-            self._instance_name, event.room_id
-        )
-
-        if ratelimit:
-            # We check if this is a room admin redacting an event so that we
-            # can apply different ratelimiting. We do this by simply checking
-            # it's not a self-redaction (to avoid having to look up whether the
-            # user is actually admin or not).
-            is_admin_redaction = False
-            if event.type == EventTypes.Redaction:
-                assert event.redacts is not None
-
-                original_event = await self.store.get_event(
-                    event.redacts,
-                    redact_behaviour=EventRedactBehaviour.as_is,
-                    get_prev_content=False,
-                    allow_rejected=False,
-                    allow_none=True,
-                )
-
-                is_admin_redaction = bool(
-                    original_event and event.sender != original_event.sender
-                )
-
-            await self.request_ratelimiter.ratelimit(
-                requester, is_admin_redaction=is_admin_redaction
+        for event, context in events_and_context:
+            assert self._events_shard_config.should_handle(
+                self._instance_name, event.room_id
             )
 
-        # run checks/actions on event based on type
-        await self._actions_by_event_type(event, context)
+            if ratelimit:
+                # We check if this is a room admin redacting an event so that we
+                # can apply different ratelimiting. We do this by simply checking
+                # it's not a self-redaction (to avoid having to look up whether the
+                # user is actually admin or not).
+                is_admin_redaction = False
+                if event.type == EventTypes.Redaction:
+                    assert event.redacts is not None
 
-        # Mark any `m.historical` messages as backfilled so they don't appear
-        # in `/sync` and have the proper decrementing `stream_ordering` as we import
-        backfilled = False
-        if event.internal_metadata.is_historical():
-            backfilled = True
+                    original_event = await self.store.get_event(
+                        event.redacts,
+                        redact_behaviour=EventRedactBehaviour.as_is,
+                        get_prev_content=False,
+                        allow_rejected=False,
+                        allow_none=True,
+                    )
 
-        # Note that this returns the event that was persisted, which may not be
-        # the same as we passed in if it was deduplicated due transaction IDs.
+                    is_admin_redaction = bool(
+                        original_event and event.sender != original_event.sender
+                    )
+
+                await self.request_ratelimiter.ratelimit(
+                    requester, is_admin_redaction=is_admin_redaction
+                )
+
+            # run checks/actions on event based on type
+            await self._actions_by_event_type(event, context)
+
+            # Mark any `m.historical` messages as backfilled so they don't appear
+            # in `/sync` and have the proper decrementing `stream_ordering` as we import
+            backfilled = False
+            if event.internal_metadata.is_historical():
+                backfilled = True
+
+        assert self._storage_controllers.persistence is not None
         (
-            event,
-            event_pos,
+            persisted_events,
             max_stream_token,
-        ) = await self._storage_controllers.persistence.persist_event(
-            event, context=context, backfilled=backfilled
+        ) = await self._storage_controllers.persistence.persist_events(
+            events_and_context, backfilled=backfilled
         )
 
-        if self._ephemeral_events_enabled:
-            # If there's an expiry timestamp on the event, schedule its expiry.
-            self._message_handler.maybe_schedule_expiry(event)
+        for event in persisted_events:
+            if self._ephemeral_events_enabled:
+                # If there's an expiry timestamp on the event, schedule its expiry.
+                self._message_handler.maybe_schedule_expiry(event)
 
-        async def _notify() -> None:
-            try:
-                await self.notifier.on_new_room_event(
-                    event, event_pos, max_stream_token, extra_users=extra_users
-                )
-            except Exception:
-                logger.exception(
-                    "Error notifying about new room event %s",
-                    event.event_id,
-                )
+            stream_ordering = event.internal_metadata.stream_ordering
+            assert stream_ordering is not None
+            pos = PersistedEventPosition(self._instance_name, stream_ordering)
 
-        run_in_background(_notify)
+            async def _notify() -> None:
+                try:
+                    await self.notifier.on_new_room_event(
+                        event, pos, max_stream_token, extra_users=extra_users
+                    )
+                except Exception:
+                    logger.exception(
+                        "Error notifying about new room event %s",
+                        event.event_id,
+                    )
 
-        if event.type == EventTypes.Message:
-            # We don't want to block sending messages on any presence code. This
-            # matters as sometimes presence code can take a while.
-            run_in_background(self._bump_active_time, requester.user)
+            run_in_background(_notify)
 
-        return event
+            if event.type == EventTypes.Message:
+                # We don't want to block sending messages on any presence code. This
+                # matters as sometimes presence code can take a while.
+                run_in_background(self._bump_active_time, requester.user)
+
+        return persisted_events[-1]
 
     async def _actions_by_event_type(
         self, event: EventBase, context: EventContext

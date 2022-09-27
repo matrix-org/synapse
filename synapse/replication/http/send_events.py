@@ -23,7 +23,7 @@ from synapse.events.snapshot import EventContext
 from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, UserID
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -78,10 +78,11 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
+        events_and_context: List[Tuple[EventBase, EventContext]],
         store: "DataStore",
-        events_and_ctx: List[Tuple[EventBase, EventContext]],
         requester: Requester,
         ratelimit: bool,
+        extra_users: List[UserID],
     ) -> JsonDict:
         """
         Args:
@@ -92,7 +93,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
         """
         serialized_events = []
 
-        for event, context in events_and_ctx:
+        for event, context in events_and_context:
             serialized_context = await context.serialize(event, store)
             serialized_event = {
                 "event": event.get_pdu_json(),
@@ -104,6 +105,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
                 "context": serialized_context,
                 "requester": requester.serialize(),
                 "ratelimit": ratelimit,
+                "extra_users": [u.to_string() for u in extra_users],
             }
             serialized_events.append(serialized_event)
 
@@ -116,7 +118,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
     ) -> Tuple[int, JsonDict]:
         with Measure(self.clock, "repl_send_events_parse"):
             payload = parse_json_object_from_request(request)
-            events_and_ctx = []
+            events_and_context = []
             events = payload["events"]
 
             for event_payload in events:
@@ -138,7 +140,11 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
                 )
 
                 ratelimit = event_payload["ratelimit"]
-                events_and_ctx.append((event, context))
+                events_and_context.append((event, context))
+
+                extra_users = [
+                    UserID.from_string(u) for u in event_payload["extra_users"]
+                ]
 
                 logger.info(
                     "Got batch of events to send, last ID of batch is: %s, sending into room: %s",
@@ -147,8 +153,8 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
                 )
 
             last_event = (
-                await self.event_creation_handler.persist_and_notify_batched_events(
-                    requester, events_and_ctx, ratelimit
+                await self.event_creation_handler.persist_and_notify_client_events(
+                    requester, events_and_context, ratelimit, extra_users
                 )
             )
 
