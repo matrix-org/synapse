@@ -138,6 +138,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             get_current_hosts_in_room
         )
 
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
+            get_current_hosts_in_room
+        )
+
         async def get_users_in_room(room_id: str):
             return {str(u) for u in self.room_members}
 
