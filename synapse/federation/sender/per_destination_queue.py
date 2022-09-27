@@ -649,11 +649,12 @@ class _TransactionQueueManager:
         limit = MAX_EDUS_PER_TRANSACTION - 2
 
         # We prioritize to-device messages so that existing encryption channels
-        # work.
+        # work. We also keep a few slots spare (by reducing the limit) so that
+        # we can still trickle out some device list updates.
         (
             to_device_edus,
             device_stream_id,
-        ) = await self.queue._get_to_device_message_edus(limit)
+        ) = await self.queue._get_to_device_message_edus(limit - 10)
 
         if to_device_edus:
             self._device_stream_id = device_stream_id
