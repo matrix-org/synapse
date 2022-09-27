@@ -1839,12 +1839,12 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         """
         await self.db_pool.runInteraction(
             "write_partial_state_rooms_join_event_id",
-            self._store_partial_state_room_txn,
+            self._write_partial_state_rooms_join_event_id,
             room_id,
             join_event_id,
         )
 
-    async def _write_partial_state_rooms_join_event_id(
+    def _write_partial_state_rooms_join_event_id(
         self,
         txn: LoggingTransaction,
         room_id: str,
