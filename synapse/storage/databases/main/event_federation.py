@@ -739,8 +739,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         of the event extremities. If the `current_depth` is close to the depth
         of given oldest event, we can trigger a backfill.
 
-        We ignore extremities that have a greater depth than our `current_depth`
-        as:
+        We ignore extremities that are newer than the user's current scroll position
+        (ie, those with depth greater than `current_depth`) as:
             1. we don't really care about getting events that have happened
                after our current position; and
             2. by the nature of paginating and scrolling back, we have likely
