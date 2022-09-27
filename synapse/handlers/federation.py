@@ -284,7 +284,7 @@ class FederationHandler:
         # backfilling anyway just in case we do get relevant events.
         if not sorted_backfill_points and current_depth != MAX_DEPTH:
             logger.debug(
-                "_maybe_backfill_inner: all backfill points are *after* current depth. Backfilling anyway."
+                "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
             return await self._maybe_backfill_inner(
                 room_id=room_id,
@@ -292,13 +292,13 @@ class FederationHandler:
                 # time (all events are below the `MAX_DEPTH`)
                 current_depth=MAX_DEPTH,
                 limit=limit,
-                # We don't want to another timing observation from this nested
-                # recursive call. The top-most call can record the time overall
-                # otherwise the smaller one will throw off the results.
+                # We don't want to start another timing observation from this
+                # nested recursive call. The top-most call can record the time
+                # overall otherwise the smaller one will throw off the results.
                 processing_start_time=None,
             )
         elif not sorted_backfill_points and current_depth == MAX_DEPTH:
-            # Even after trying again with `MAX_DEPTH`, we didn't find any
+            # Even after recursing with `MAX_DEPTH`, we didn't find any
             # backward extremities to backfill from.
             logger.debug(
                 "_maybe_backfill_inner: Not backfilling as no backward extremeties found."
