@@ -162,9 +162,8 @@ which are no longer maintained.</p>
 summaries.</p>
 </li>
 <li>
-<p>If Synapse was installed using <a href="setup/installation.html#prebuilt-packages">prebuilt
-packages</a>, you will need to follow the
-normal process for upgrading those packages.</p>
+<p>If Synapse was installed using <a href="setup/installation.html#prebuilt-packages">prebuilt packages</a>,
+you will need to follow the normal process for upgrading those packages.</p>
 </li>
 <li>
 <p>If Synapse was installed using pip then upgrade to the latest
@@ -236,6 +235,13 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 <p>As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
 version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
 now require a recent Rust compiler.</p>
+<p>Installations using </p>
+<ul>
+<li>Docker images <a href="https://hub.docker.com/r/matrixdotorg/synapse">from <code>matrixdotorg</code></a>,</li>
+<li>Debian packages <a href="https://packages.matrix.org/">from Matrix.org</a>, or</li>
+<li>PyPI wheels via <code>pip install matrix-synapse</code> (on supported platforms and architectures)</li>
+</ul>
+<p>will not be affected.</p>
 <h1 id="upgrading-to-v1670"><a class="header" href="#upgrading-to-v1670">Upgrading to v1.67.0</a></h1>
 <h2 id="direct-tcp-replication-is-no-longer-supported-migrate-to-redis"><a class="header" href="#direct-tcp-replication-is-no-longer-supported-migrate-to-redis">Direct TCP replication is no longer supported: migrate to Redis</a></h2>
 <p>Redis support was added in v1.13.0 with it becoming the recommended method in
