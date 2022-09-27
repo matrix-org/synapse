@@ -353,11 +353,15 @@ class FederationSender(AbstractFederationSender):
                 last_token = await self.store.get_federation_out_pos("events")
                 (
                     next_token,
-                    events,
                     event_to_received_ts,
-                ) = await self.store.get_all_new_events_stream(
+                ) = await self.store.get_all_new_event_ids_stream(
                     last_token, self._last_poked_id, limit=100
                 )
+
+                event_entries = await self.store.get_events_from_cache_or_db(
+                    event_to_received_ts.keys()
+                )
+                events = [e.event for e in event_entries.values()]
 
                 logger.debug(
                     "Handling %i -> %i: %i events to send (current id %i)",

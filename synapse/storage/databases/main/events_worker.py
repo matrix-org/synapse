@@ -592,7 +592,6 @@ class EventsWorkerStore(SQLBaseStore):
         self,
         event_ids: Iterable[str],
         allow_rejected: bool = False,
-        get_prev_content: bool = False,
     ) -> Dict[str, EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
 
@@ -606,9 +605,6 @@ class EventsWorkerStore(SQLBaseStore):
 
             allow_rejected: Whether to include rejected events. If False,
                 rejected events are omitted from the response.
-
-            get_prev_content: add prev_content and prev_sender keys to the unsigned dict
-            when fetching redaction events. Has no effect on non-redaction events.
 
         Returns:
             map from event id to result
@@ -736,20 +732,6 @@ class EventsWorkerStore(SQLBaseStore):
                 for event_id, entry in event_entry_map.items()
                 if not entry.event.rejected_reason
             }
-
-        if get_prev_content:
-            for eventCache in event_entry_map.values():
-                event = eventCache.event
-                if "replaces_state" in event.unsigned:
-                    prev = await self.get_event(
-                        event.unsigned["replaces_state"],
-                        get_prev_content=False,
-                        allow_none=True,
-                    )
-                    if prev:
-                        event.unsigned = dict(event.unsigned)
-                        event.unsigned["prev_content"] = prev.content
-                        event.unsigned["prev_sender"] = prev.sender
 
         return event_entry_map
 
