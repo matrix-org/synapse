@@ -232,10 +232,22 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1680"><a class="header" href="#upgrading-to-v1680">Upgrading to v1.68.0</a></h1>
-<p>As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
-version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
-now require a recent Rust compiler.</p>
-<p>Installations using </p>
+<p>Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.</p>
+<h2 id="sqlite-version-requirement"><a class="header" href="#sqlite-version-requirement">SQLite version requirement</a></h2>
+<p>Synapse now requires a SQLite version of 3.27.0 or higher if SQLite is configured as
+Synapse's database.</p>
+<p>Installations using</p>
+<ul>
+<li>Docker images <a href="https://hub.docker.com/r/matrixdotorg/synapse">from <code>matrixdotorg</code></a>,</li>
+<li>Debian packages <a href="https://packages.matrix.org/">from Matrix.org</a>, or</li>
+<li>a PostgreSQL database</li>
+</ul>
+<p>are not affected.</p>
+<h2 id="rust-requirement-when-building-from-source"><a class="header" href="#rust-requirement-when-building-from-source">Rust requirement when building from source.</a></h2>
+<p>Building from a source checkout of Synapse now requires a recent Rust compiler
+(currently Rust 1.58.1, but see also the
+<a href="https://matrix-org.github.io/synapse/latest/deprecation_policy.html">Platform Dependency Policy</a>).</p>
+<p>Installations using</p>
 <ul>
 <li>Docker images <a href="https://hub.docker.com/r/matrixdotorg/synapse">from <code>matrixdotorg</code></a>,</li>
 <li>Debian packages <a href="https://packages.matrix.org/">from Matrix.org</a>, or</li>
@@ -264,11 +276,11 @@ will require a recent Rust compiler. Those using packages or
 <code>pip install matrix-synapse</code> will not be affected.</p>
 <p>The simplest way of installing Rust is via <a href="https://rustup.rs/">rustup.rs</a></p>
 <h2 id="sqlite-version-requirement-in-the-next-release"><a class="header" href="#sqlite-version-requirement-in-the-next-release">SQLite version requirement in the next release</a></h2>
-<p>From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+<p>From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
 higher. Synapse v1.67.0 will be the last major release supporting SQLite
 versions 3.22 to 3.26.</p>
 <p>Those using Docker images or Debian packages from Matrix.org will not be
-affected. If you have installed from source, you should check the version of 
+affected. If you have installed from source, you should check the version of
 SQLite used by Python with:</p>
 <pre><code class="language-shell">python -c &quot;import sqlite3; print(sqlite3.sqlite_version)&quot;
 </code></pre>
