@@ -730,9 +730,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         limit: int,
     ) -> List[Tuple[str, int]]:
         """
-        Gets the oldest events(backwards extremities) in the room along with the
-        approximate depth. Sorted by depth, highest to lowest (descending) so the closest
-        events to the `current_depth` are first in the list.
+        Get the backward extremities to backfill from in the room along with the
+        approximate depth. Only returns events that are at a depth lower than or
+        equal to the `current_depth`. Sorted by depth, highest to lowest (descending)
+        so the closest events to the `current_depth` are first in the list.
 
         We use this function so that we can compare and see if a client's
         `current_depth` at their current scrollback is within pagination range
@@ -884,8 +885,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         of the insertion event. If the `current_depth` is close to the depth
         of the given insertion event, we can trigger a backfill.
 
-        We ignore insertion events that have a greater depth than our `current_depth`
-        as:
+        We ignore insertion events that are newer than the user's current scroll
+        position (ie, those with depth greater than `current_depth`) as:
             1. we don't really care about getting events that have happened
                after our current position; and
             2. by the nature of paginating and scrolling back, we have likely
