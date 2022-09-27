@@ -62,10 +62,10 @@ Improved Documentation
 ----------------------
 
 - Note that `libpq` is required on ARM-based Macs. ([\#13480](https://github.com/matrix-org/synapse/issues/13480))
-- Fix a mistake in the config manual: the `event_cache_size` _is_ scaled by `caches.global_factor`. The documentation was incorrect since Synapse v1.22.0. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
+- Fix a mistake in the config manual introduced in Synapse v1.22.0: the `event_cache_size` _is_ scaled by `caches.global_factor`. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
 - Fix a typo in the documentation for the login ratelimiting configuration. ([\#13727](https://github.com/matrix-org/synapse/issues/13727))
 - Define Synapse's compatability policy for SQLite versions. ([\#13728](https://github.com/matrix-org/synapse/issues/13728))
-- Add docs for common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems. ([\#13785](https://github.com/matrix-org/synapse/issues/13785))
+- Add docs for the common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems. ([\#13785](https://github.com/matrix-org/synapse/issues/13785))
 - Update request log format documentation to mention the format used when the authenticated user is controlling another user. ([\#13794](https://github.com/matrix-org/synapse/issues/13794))
 
 
@@ -106,7 +106,7 @@ Internal Changes
 - Fix a memory leak when running the unit tests. ([\#13798](https://github.com/matrix-org/synapse/issues/13798))
 - Use partial indices on SQLite. ([\#13802](https://github.com/matrix-org/synapse/issues/13802))
 - Check that portdb generates the same postgres schema as that in the source tree. ([\#13808](https://github.com/matrix-org/synapse/issues/13808))
-- Fix Docker build when Rust .so has been build locally first. ([\#13811](https://github.com/matrix-org/synapse/issues/13811))
+- Fix Docker build when Rust .so has been built locally first. ([\#13811](https://github.com/matrix-org/synapse/issues/13811))
 - Complement: Initialise the Postgres database directly inside the target image instead of the base Postgres image to fix building using Buildah. ([\#13819](https://github.com/matrix-org/synapse/issues/13819))
 - Support providing an index predicate clause when doing upserts. ([\#13822](https://github.com/matrix-org/synapse/issues/13822))
 - Minor speedups to linting in CI. ([\#13827](https://github.com/matrix-org/synapse/issues/13827))
