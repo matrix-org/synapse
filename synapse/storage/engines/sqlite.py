@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
 
 
-class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
+class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(sqlite3, database_config)
 
@@ -119,6 +119,25 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
     ) -> None:
         # All transactions are SERIALIZABLE by default in sqlite
         pass
+
+    @staticmethod
+    def executescript(cursor: sqlite3.Cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Python's built-in SQLite driver does not allow you to do this with DBAPI2's
+        `execute`:
+
+        > execute() will only execute a single SQL statement. If you try to execute more
+        > than one statement with it, it will raise a Warning. Use executescript() if
+        > you want to execute multiple SQL statements with one call.
+
+        Though the docs for `executescript` warn:
+
+        > If there is a pending transaction, an implicit COMMIT statement is executed
+        > first. No other implicit transaction control is performed; any transaction
+        > control must be added to sql_script.
+        """
+        cursor.executescript(script)
 
 
 # Following functions taken from: https://github.com/coleifer/peewee
