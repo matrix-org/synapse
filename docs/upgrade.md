@@ -107,7 +107,7 @@ are not affected.
 
 ## Rust requirement when building from source.
 
-Building Synapse from a source checkout of Synapse now requires a recent Rust compiler
+Building from a source checkout of Synapse now requires a recent Rust compiler
 (currently Rust 1.58.1, but see also the
 [Platform Dependency Policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html)).
 
