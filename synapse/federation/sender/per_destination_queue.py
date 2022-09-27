@@ -648,17 +648,8 @@ class _TransactionQueueManager:
         # device messages. We have to keep 2 free slots for presence and rr_edus.
         limit = MAX_EDUS_PER_TRANSACTION - 2
 
-        device_update_edus, dev_list_id = await self.queue._get_device_update_edus(
-            limit
-        )
-
-        if device_update_edus:
-            self._device_list_id = dev_list_id
-        else:
-            self.queue._last_device_list_stream_id = dev_list_id
-
-        limit -= len(device_update_edus)
-
+        # We prioritize to-device messages so that existing encryption channels
+        # work.
         (
             to_device_edus,
             device_stream_id,
@@ -668,6 +659,17 @@ class _TransactionQueueManager:
             self._device_stream_id = device_stream_id
         else:
             self.queue._last_device_stream_id = device_stream_id
+
+        limit -= len(to_device_edus)
+
+        device_update_edus, dev_list_id = await self.queue._get_device_update_edus(
+            limit
+        )
+
+        if device_update_edus:
+            self._device_list_id = dev_list_id
+        else:
+            self.queue._last_device_list_stream_id = dev_list_id
 
         pending_edus = device_update_edus + to_device_edus
 
