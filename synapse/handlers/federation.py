@@ -221,8 +221,8 @@ class FederationHandler:
             room_id: The room to backfill in.
             current_depth: The depth to check at for any upcoming backfill points.
             limit: The max number of events to request from the remote federated server.
-            processing_start_time: The time when `maybe_backfill` started
-                processing. Only used for timing.
+            processing_start_time: The time when `maybe_backfill` started processing.
+                Only used for timing. If `None`, no timing observation will be made.
         """
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
