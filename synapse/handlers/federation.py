@@ -314,10 +314,6 @@ class FederationHandler:
         # chose more than one times the limit in case of failure, but choosing a
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
-        #
-        # XXX: shouldn't we do this *after* the filter by depth below? Again, we don't
-        # care about events that have happened after our current position.
-        #
         max_depth_of_backfill_points = sorted_backfill_points[0].depth
         if current_depth - 2 * limit > max_depth_of_backfill_points:
             logger.debug(
