@@ -1060,11 +1060,11 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             debug_body = event.content.get("body", event.type)
             return f"event_id={event.event_id},depth={event.depth},body={debug_body},prevs={event.prev_event_ids()}"
 
-        event_diff = set(expected_event_order) - set(
-            actual_events_in_room_chronological
+        event_id_diff = set([event.event_id for event in expected_event_order]) - set(
+            [event.event_id for event in actual_events_in_room_chronological]
         )
         event_diff_ordered = [
-            event for event in expected_event_order if event in event_diff
+            event for event in expected_event_order if event.event_id in event_id_diff
         ]
         assertion_message = (
             "Actual events missing from expected list: %s\nExpected event order: %s\nActual event order: %s"
