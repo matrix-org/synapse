@@ -960,6 +960,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             if not self.hs.is_mine_id(user_id):
                 continue
 
+            # Skip receipts with unknown event stream ordering
+            if stream_ordering is None:
+                continue
+
             txn.execute(
                 """
                 DELETE FROM event_push_actions
