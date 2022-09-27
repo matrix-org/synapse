@@ -902,7 +902,6 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         state_map = self.get_success(
             state_storage_controller.get_state_for_event(event_before.event_id)
         )
-        state_event_ids = list(state_map.values())
 
         room_create_event = state_map.get((EventTypes.Create, ""))
         pl_event = state_map.get((EventTypes.PowerLevels, ""))
@@ -916,7 +915,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             pl_event.event_id,
             as_membership_event.event_id,
         ]
-        historical_state_event_ids = [state_event_ids]
+        historical_state_event_ids = [
+            state_event.event_id for state_event in list(state_map.values())
+        ]
 
         batch_id = random_string(8)
         next_batch_id = random_string(8)
@@ -993,9 +994,36 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         ]
 
         self.get_success(
-            self._process_pulled_events(
+            self.hs.get_federation_event_handler()._process_pulled_events(
                 self.OTHER_SERVER_NAME,
                 pulled_events,
                 backfilled=True,
             )
+        )
+
+        from_token = self.get_success(
+            self.hs.get_event_sources().get_current_token_for_pagination(room_id)
+        )
+
+        events, _ = self.get_success(
+            main_store.paginate_room_events(
+                room_id, from_key=from_token.room_key, limit=100, direction="b"
+            )
+        )
+
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "test result events=%s",
+            [
+                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                % (
+                    event.event_id,
+                    event.depth,
+                    event.content.get("body", event.type),
+                    event.prev_event_ids(),
+                )
+                for event in events
+            ],
         )
