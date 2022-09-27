@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from optparse import Option
 from typing import List, Optional, Tuple
 
 import synapse.server
@@ -82,6 +83,11 @@ async def create_event(
     hs: synapse.server.HomeServer,
     room_version: Optional[str] = None,
     prev_event_ids: Optional[List[str]] = None,
+    *,
+    allow_no_prev_events: Optional[bool] = False,
+    auth_event_ids: Optional[List[str]] = None,
+    state_event_ids: Optional[List[str]] = None,
+    depth: Optional[int] = None,
     **kwargs,
 ) -> Tuple[EventBase, EventContext]:
     if room_version is None:
@@ -89,11 +95,20 @@ async def create_event(
             kwargs["room_id"]
         )
 
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info("kwargs=%s", kwargs)
     builder = hs.get_event_builder_factory().for_room_version(
         KNOWN_ROOM_VERSIONS[room_version], kwargs
     )
     event, context = await hs.get_event_creation_handler().create_new_client_event(
-        builder, prev_event_ids=prev_event_ids
+        builder,
+        allow_no_prev_events=allow_no_prev_events,
+        prev_event_ids=prev_event_ids,
+        auth_event_ids=auth_event_ids,
+        state_event_ids=state_event_ids,
+        depth=depth,
     )
 
     return event, context

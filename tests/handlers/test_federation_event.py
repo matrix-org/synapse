@@ -13,9 +13,12 @@
 # limitations under the License.
 from typing import Optional
 from unittest import mock
+from unittest.mock import Mock, patch
 
+from synapse.api.constants import EventContentFields, EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
+from synapse.appservice import ApplicationService
 from synapse.event_auth import (
     check_state_dependent_auth_rules,
     check_state_independent_auth_rules,
@@ -28,9 +31,11 @@ from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.state.v2 import _mainline_sort, _reverse_topological_power_sort
 from synapse.types import JsonDict
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils.event_injection import create_event, inject_event
 
 
 class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
@@ -45,9 +50,23 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         self.mock_federation_transport_client = mock.Mock(
             spec=["get_room_state_ids", "get_room_state", "get_event"]
         )
-        return super().setup_test_homeserver(
-            federation_transport_client=self.mock_federation_transport_client
+
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            # Note: this user does not have to match the regex above
+            sender="@as_main:test",
         )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            return super().setup_test_homeserver(
+                federation_transport_client=self.mock_federation_transport_client
+            )
 
     def test_process_pulled_event_with_missing_state(self) -> None:
         """Ensure that we correctly handle pulled events with lots of missing state
@@ -848,3 +867,135 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 bert_member_event.event_id,
                 "Rejected kick event unexpectedly became part of room state.",
             )
+
+    def test_process_pulled_events_asdf(self) -> None:
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
+
+        # create the room
+        room_creator = self.appservice.sender
+        room_id = self.helper.create_room_as(
+            room_creator=self.appservice.sender, tok=self.appservice.token
+        )
+
+        event_before = self.get_success(
+            inject_event(
+                self.hs,
+                room_id=room_id,
+                sender=room_creator,
+                type=EventTypes.Message,
+                content={"body": "eventIdBefore", "msgtype": "m.text"},
+            )
+        )
+
+        event_after = self.get_success(
+            inject_event(
+                self.hs,
+                room_id=room_id,
+                sender=room_creator,
+                type=EventTypes.Message,
+                content={"body": "eventIdAfter", "msgtype": "m.text"},
+            )
+        )
+
+        state_storage_controller = self.hs.get_storage_controllers().state
+        state_map = self.get_success(
+            state_storage_controller.get_state_for_event(event_before.event_id)
+        )
+        state_event_ids = list(state_map.values())
+
+        room_create_event = state_map.get((EventTypes.Create, ""))
+        pl_event = state_map.get((EventTypes.PowerLevels, ""))
+        as_membership_event = state_map.get((EventTypes.Member, room_creator))
+        assert room_create_event is not None
+        assert pl_event is not None
+        assert as_membership_event is not None
+
+        historical_auth_event_ids = [
+            room_create_event.event_id,
+            pl_event.event_id,
+            as_membership_event.event_id,
+        ]
+        historical_state_event_ids = [state_event_ids]
+
+        batch_id = random_string(8)
+        next_batch_id = random_string(8)
+        insertion_event, _ = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                sender=room_creator,
+                type=EventTypes.MSC2716_INSERTION,
+                content={
+                    EventContentFields.MSC2716_NEXT_BATCH_ID: next_batch_id,
+                    EventContentFields.MSC2716_HISTORICAL: True,
+                },
+                allow_no_prev_events=True,
+                prev_event_ids=[],
+                auth_event_ids=historical_auth_event_ids,
+                state_event_ids=historical_state_event_ids,
+            )
+        )
+        historical_message_event, _ = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                sender=room_creator,
+                type=EventTypes.Message,
+                content={"body": "Historical message", "msgtype": "m.text"},
+                prev_event_ids=[insertion_event.event_id],
+                auth_event_ids=historical_auth_event_ids,
+            )
+        )
+        batch_event, _ = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                sender=room_creator,
+                type=EventTypes.MSC2716_BATCH,
+                content={
+                    EventContentFields.MSC2716_BATCH_ID: batch_id,
+                    EventContentFields.MSC2716_HISTORICAL: True,
+                },
+                prev_event_ids=[historical_message_event.event_id],
+                auth_event_ids=historical_auth_event_ids,
+            )
+        )
+        base_insertion_event, _ = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                sender=room_creator,
+                type=EventTypes.MSC2716_INSERTION,
+                content={
+                    EventContentFields.MSC2716_NEXT_BATCH_ID: batch_id,
+                    EventContentFields.MSC2716_HISTORICAL: True,
+                },
+                prev_event_ids=[event_before.event_id],
+                auth_event_ids=historical_auth_event_ids,
+                state_event_ids=historical_state_event_ids,
+            )
+        )
+
+        pulled_events = [
+            # Beginning of room (oldest messages)
+            room_create_event,
+            pl_event,
+            event_before,
+            # HISTORICAL MESSAGE END
+            insertion_event,
+            historical_message_event,
+            batch_event,
+            base_insertion_event,
+            # HISTORICAL MESSAGE START
+            event_after,
+            # Latest in the room (newest messages)
+        ]
+
+        self.get_success(
+            self._process_pulled_events(
+                self.OTHER_SERVER_NAME,
+                pulled_events,
+                backfilled=True,
+            )
+        )

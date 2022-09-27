@@ -1081,6 +1081,11 @@ class EventCreationHandler:
         # Do a quick sanity check here, rather than waiting until we've created the
         # event and then try to auth it (which fails with a somewhat confusing "No
         # create event in auth events")
+        logger.info(
+            "create_new_client_event allow_no_prev_events=%s auth_event_ids=%s",
+            allow_no_prev_events,
+            auth_event_ids,
+        )
         if allow_no_prev_events:
             # We allow events with no `prev_events` but it better have some `auth_events`
             assert (
