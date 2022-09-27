@@ -94,8 +94,12 @@ As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
 version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
 now require a recent Rust compiler.
 
-Installations using Docker images or Debian packages from Matrix.org are not
-affected. Users installing from PyPI wheels on Linux via `pip install matrix-synapse`
+Installations using 
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- PyPI wheels via `pip install matrix-synapse` (on supported platforms and architectures)
+
 will not be affected.
 
 # Upgrading to v1.67.0
