@@ -750,9 +750,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         Args:
             room_id: Room where we want to find the oldest events
-            current_depth: The depth at the users current scrollback position
-                because we only care about finding events older than the given
-                `current_depth` when scrolling and paginating backwards.
+            current_depth: The depth at the user's current scrollback position
             limit: The max number of backfill points to return
 
         Returns:
@@ -897,9 +895,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         Args:
             room_id: Room where we want to find the oldest events
-            current_depth: The depth at the users current scrollback position because
-                we only care about finding events older than the given
-                `current_depth` when scrolling and paginating backwards.
+            current_depth: The depth at the user's current scrollback position
             limit: The max number of insertion event extremities to return
 
         Returns:
