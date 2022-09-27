@@ -309,21 +309,21 @@ in Python, evaluates to <code>True</code>.</p>
 </li>
 </ul>
 <h2 id="event_id-global-uniqueness"><a class="header" href="#event_id-global-uniqueness"><code>event_id</code> global uniqueness</a></h2>
-<p>In room versions <code>1</code> and <code>2</code> it's possible to end up with two events with the
-same <code>event_id</code> (in the same or different rooms). After room version <code>3</code>, that
-can only happen with a hash collision, which we basically hope will never
-happen.</p>
-<p>There are several places in Synapse and even Matrix APIs like <a href="https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid"><code>GET /_matrix/federation/v1/event/{eventId}</code></a>
-where we assume that event IDs are globally unique.</p>
-<p>But hash collisions are still possible, and by treating event IDs as room
-scoped, we can reduce the possibility of a hash collision. When scoping
-<code>event_id</code> in the database schema, it should be also accompanied by <code>room_id</code>
-(<code>PRIMARY KEY (room_id, event_id)</code>) and lookups should be done through the pair
-<code>(room_id, event_id)</code>.</p>
-<p>There has been a lot of debate on this in places like
-https://github.com/matrix-org/matrix-spec-proposals/issues/2779 and
+<p><code>event_id</code>'s can be considered globally unique although there has been a lot of
+debate on this topic in places like
+<a href="https://github.com/matrix-org/matrix-spec-proposals/issues/2779">MSC2779</a> and
 <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/2848">MSC2848</a> which
-has no resolution yet (as of 2022-09-01).</p>
+has no resolution yet (as of 2022-09-01). There are several places in Synapse
+and even in the Matrix APIs like <a href="https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid"><code>GET /_matrix/federation/v1/event/{eventId}</code></a>
+where we assume that event IDs are globally unique.</p>
+<p>When scoping <code>event_id</code> in a database schema, it is often nice to accompany it
+with <code>room_id</code> (<code>PRIMARY KEY (room_id, event_id)</code> and a <code>FOREIGN KEY(room_id) REFERENCES rooms(room_id)</code>) which makes flexible lookups easy. For example it
+makes it very easy to find and clean up everything in a room when it needs to be
+purged (no need to use sub-<code>select</code> query or join from the <code>events</code> table).</p>
+<p>A note on collisions: In room versions <code>1</code> and <code>2</code> it's possible to end up with
+two events with the same <code>event_id</code> (in the same or different rooms). After room
+version <code>3</code>, that can only happen with a hash collision, which we basically hope
+will never happen (SHA256 has a massive big key space).</p>
 
                     </main>
 
