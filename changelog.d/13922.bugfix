@@ -1,0 +1,1 @@
+Fix long-standing bug where device updates could cause delays sending out to-device messages over federation.
