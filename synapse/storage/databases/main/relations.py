@@ -845,6 +845,8 @@ class RelationsWorkerStore(SQLBaseStore):
             The event ID of the root event in the thread, if this event is part
             of a thread. None, otherwise.
         """
+        # Since event relations form a tree, we should only ever find 0 or 1
+        # results from the below query.
         sql = """
             WITH RECURSIVE related_events AS (
                 SELECT event_id, relates_to_id, relation_type

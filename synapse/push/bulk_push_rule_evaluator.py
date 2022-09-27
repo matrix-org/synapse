@@ -288,7 +288,7 @@ class BulkPushRuleEvaluator:
                 thread_id = relation.parent_id
             else:
                 # Since the event has not yet been persisted we check whether
-                # the parent is parent of a thread.
+                # the parent is part of a thread.
                 thread_id = await self.store.get_thread_id(relation.parent_id) or "main"
 
         evaluator = PushRuleEvaluatorForEvent(
