@@ -542,7 +542,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             for event_id, room_id, stream_ordering, actions, highlight in push_actions
             # Only include push actions with a stream ordering after any receipt, or without any
             # receipt present (invited to but never read rooms).
-            if stream_ordering > receipts_by_room.get(room_id, 0)
+            if stream_ordering > (receipts_by_room.get(room_id) or 0)
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
@@ -620,7 +620,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             for event_id, room_id, stream_ordering, actions, highlight, received_ts in push_actions
             # Only include push actions with a stream ordering after any receipt, or without any
             # receipt present (invited to but never read rooms).
-            if stream_ordering > receipts_by_room.get(room_id, 0)
+            if stream_ordering > (receipts_by_room.get(room_id) or 0)
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
