@@ -15,9 +15,8 @@ this document.
     The website <https://endoflife.date> also offers convenient
     summaries.
 
--   If Synapse was installed using [prebuilt
-    packages](setup/installation.md#prebuilt-packages), you will need to follow the
-    normal process for upgrading those packages.
+-   If Synapse was installed using [prebuilt packages](setup/installation.md#prebuilt-packages),
+    you will need to follow the normal process for upgrading those packages.
 
 -   If Synapse was installed using pip then upgrade to the latest
     version by running:
@@ -95,6 +94,13 @@ As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
 version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
 now require a recent Rust compiler.
 
+Installations using 
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- PyPI wheels via `pip install matrix-synapse` (on supported platforms and architectures)
+
+will not be affected.
 
 # Upgrading to v1.67.0
 
