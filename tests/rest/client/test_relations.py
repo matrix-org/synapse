@@ -728,7 +728,6 @@ class RelationsTestCase(BaseRelationsTestCase):
 
 
 class RelationPaginationTestCase(BaseRelationsTestCase):
-    @unittest.override_config({"experimental_features": {"msc3715_enabled": True}})
     def test_basic_paginate_relations(self) -> None:
         """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
@@ -771,7 +770,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/_matrix/client/v1/rooms/{self.room}/relations"
-            f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
+            f"/{self.parent_id}?limit=1&dir=f",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -788,7 +787,6 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             channel.json_body["chunk"][0],
         )
 
-    @unittest.override_config({"experimental_features": {"msc3715_enabled": True}})
     def test_repeated_paginate_relations(self) -> None:
         """Test that if we paginate using a limit and tokens then we get the
         expected events.
@@ -838,7 +836,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
             channel = self.make_request(
                 "GET",
-                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?org.matrix.msc3715.dir=f&limit=3{from_token}",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?dir=f&limit=3{from_token}",
                 access_token=self.user_token,
             )
             self.assertEqual(200, channel.code, channel.json_body)
