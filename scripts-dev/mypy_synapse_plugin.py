@@ -29,7 +29,7 @@ class SynapsePlugin(Plugin):
         self, fullname: str
     ) -> Optional[Callable[[MethodSigContext], CallableType]]:
         if fullname.startswith(
-            "synapse.util.caches.descriptors._CachedFunction.__call__"
+            "synapse.util.caches.descriptors.CachedFunction.__call__"
         ) or fullname.startswith(
             "synapse.util.caches.descriptors._LruCachedFunction.__call__"
         ):
@@ -38,7 +38,7 @@ class SynapsePlugin(Plugin):
 
 
 def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
-    """Fixes the `_CachedFunction.__call__` signature to be correct.
+    """Fixes the `CachedFunction.__call__` signature to be correct.
 
     It already has *almost* the correct signature, except:
 

@@ -1,1 +1,0 @@
-Add docs for common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems.
