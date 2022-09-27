@@ -708,13 +708,22 @@ class SsoHandler:
         try:
             uid = UserID.from_string(user_id)
 
-            # download picture
-            http_response = requests.get(picture_https_url)
+            # ensure picture size respects max_avatar_size defined in config
+            http_response = requests.options(picture_https_url)
             if http_response.status_code != 200:
                 http_response.raise_for_status()
 
             content_type = http_response.headers["Content-Type"]
             content_length = int(http_response.headers["Content-Length"])
+
+            if self._profile_handler.max_avatar_size is not None:
+                if content_length > self._profile_handler.max_avatar_size:
+                    raise Exception("sso avatar too big in size")
+
+            # download picture
+            http_response = requests.get(picture_https_url)
+            if http_response.status_code != 200:
+                http_response.raise_for_status()
 
             # convert image into BytesIO
             b = io.BytesIO(http_response.content)
