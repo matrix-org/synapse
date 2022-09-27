@@ -1,1 +1,1 @@
-Batch up events to be bulk persisted when creating a new room.
+Speed up creation of DM rooms.
