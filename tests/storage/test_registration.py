@@ -213,7 +213,7 @@ class ApprovalRequiredRegistrationTestCase(HomeserverTestCase):
 
         user = self.get_success(self.store.get_user_by_id(self.user_id))
         assert user is not None
-        self.assertEqual(user["approved"], 1)
+        self.assertTrue(user["approved"])
 
         approved = self.get_success(self.store.is_user_approved(self.user_id))
         self.assertTrue(approved)
@@ -226,7 +226,7 @@ class ApprovalRequiredRegistrationTestCase(HomeserverTestCase):
 
         user = self.get_success(self.store.get_user_by_id(self.user_id))
         assert user is not None
-        self.assertEqual(user["approved"], 0)
+        self.assertFalse(user["approved"])
 
         approved = self.get_success(self.store.is_user_approved(self.user_id))
         self.assertFalse(approved)

@@ -166,26 +166,34 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     @cached()
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Deprecated: use get_userinfo_by_id instead"""
-        return await self.db_pool.simple_select_one(
-            table="users",
-            keyvalues={"name": user_id},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "consent_version",
-                "consent_ts",
-                "consent_server_notice_sent",
-                "appservice_id",
-                "creation_ts",
-                "user_type",
-                "deactivated",
-                "shadow_banned",
-                "approved",
-            ],
-            allow_none=True,
+
+        def get_user_by_id_txn(txn: LoggingTransaction) -> Optional[Dict[str, Any]]:
+            # We could technically use simple_select_one here, but it would not perform
+            # the COALESCEs (unless hacked into the column names), which could yield
+            # confusing results.
+            txn.execute(
+                """
+                SELECT
+                    name, password_hash, is_guest, admin, consent_version, consent_ts,
+                    consent_server_notice_sent, appservice_id, creation_ts, user_type,
+                    deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
+                    COALESCE(approved, TRUE) AS approved
+                FROM users
+                WHERE name = ?
+                """,
+                (user_id,),
+            )
+
+            rows = self.db_pool.cursor_to_dict(txn)
+
+            if len(rows) == 0:
+                return None
+
+            return rows[0]
+
+        return await self.db_pool.runInteraction(
             desc="get_user_by_id",
+            func=get_user_by_id_txn,
         )
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:

@@ -15,4 +15,6 @@
 
 -- Add a column to the users table to track whether the user needs to be approved by an
 -- administrator.
+-- A NULL column means the user was created before this feature was supported by Synapse,
+-- and should be considered as TRUE.
 ALTER TABLE users ADD COLUMN approved BOOLEAN;

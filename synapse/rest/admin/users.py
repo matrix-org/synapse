@@ -390,9 +390,9 @@ class UserRestServletV2(RestServlet):
             if password is not None:
                 password_hash = await self.auth_handler.hash(password)
 
-            new_user_approved = False
-            if self._msc3866_enabled and approved is True:
-                new_user_approved = True
+            new_user_approved = True
+            if self._msc3866_enabled and approved is not None:
+                new_user_approved = approved
 
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
