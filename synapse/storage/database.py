@@ -916,7 +916,7 @@ class DatabasePool:
 
         start_time = monotonic_time()
 
-        def inner_func(conn, *args, **kwargs):
+        def inner_func(conn: adbapi.Connection, *args, **kwargs):
             # We shouldn't be in a transaction. If we are then something
             # somewhere hasn't committed after doing work. (This is likely only
             # possible during startup, as `run*` will ensure changes are
