@@ -662,30 +662,36 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         if not user_ids:
             return set()
 
-        def _get_users_server_still_shares_room_with_txn(
-            txn: LoggingTransaction,
-        ) -> Set[str]:
-            sql = """
-                SELECT state_key FROM current_state_events
-                WHERE
-                    type = 'm.room.member'
-                    AND membership = 'join'
-                    AND %s
-                GROUP BY state_key
-            """
-
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "state_key", user_ids
-            )
-
-            txn.execute(sql % (clause,), args)
-
-            return {row[0] for row in txn}
-
         return await self.db_pool.runInteraction(
             "get_users_server_still_shares_room_with",
-            _get_users_server_still_shares_room_with_txn,
+            self.get_users_server_still_shares_room_with_txn,
+            user_ids,
         )
+
+    def get_users_server_still_shares_room_with_txn(
+        self,
+        txn: LoggingTransaction,
+        user_ids: Collection[str],
+    ) -> Set[str]:
+        if not user_ids:
+            return set()
+
+        sql = """
+            SELECT state_key FROM current_state_events
+            WHERE
+                type = 'm.room.member'
+                AND membership = 'join'
+                AND %s
+            GROUP BY state_key
+        """
+
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "state_key", user_ids
+        )
+
+        txn.execute(sql % (clause,), args)
+
+        return {row[0] for row in txn}
 
     @cancellable
     async def get_rooms_for_user(

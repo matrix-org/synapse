@@ -51,10 +51,17 @@ import argparse
 import importlib
 import itertools
 import multiprocessing
+import os
+import signal
 import sys
-from typing import Any, Callable, List
+from types import FrameType
+from typing import Any, Callable, List, Optional
 
 from twisted.internet.main import installReactor
+
+# a list of the original signal handlers, before we installed our custom ones.
+# We restore these in our child processes.
+_original_signal_handlers: dict[int, Any] = {}
 
 
 class ProxiedReactor:
@@ -104,6 +111,11 @@ def _worker_entrypoint(
     """
 
     sys.argv = args
+
+    # reset the custom signal handlers that we installed, so that the children start
+    # from a clean slate.
+    for sig, handler in _original_signal_handlers.items():
+        signal.signal(sig, handler)
 
     from twisted.internet.epollreactor import EPollReactor
 
@@ -167,13 +179,29 @@ def main() -> None:
     update_proc.join()
     print("===== PREPARED DATABASE =====", file=sys.stderr)
 
+    processes: List[multiprocessing.Process] = []
+
+    # Install signal handlers to propagate signals to all our children, so that they
+    # shut down cleanly. This also inhibits our own exit, but that's good: we want to
+    # wait until the children have exited.
+    def handle_signal(signum: int, frame: Optional[FrameType]) -> None:
+        print(
+            f"complement_fork_starter: Caught signal {signum}. Stopping children.",
+            file=sys.stderr,
+        )
+        for p in processes:
+            if p.pid:
+                os.kill(p.pid, signum)
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        _original_signal_handlers[sig] = signal.signal(sig, handle_signal)
+
     # At this point, we've imported all the main entrypoints for all the workers.
     # Now we basically just fork() out to create the workers we need.
     # Because we're using fork(), all the workers get a clone of this launcher's
     # memory space and don't need to repeat the work of loading the code!
     # Instead of using fork() directly, we use the multiprocessing library,
     # which uses fork() on Unix platforms.
-    processes = []
     for (func, worker_args) in zip(worker_functions, args_by_worker):
         process = multiprocessing.Process(
             target=_worker_entrypoint, args=(func, proxy_reactor, worker_args)

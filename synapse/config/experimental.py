@@ -63,7 +63,8 @@ class ExperimentalConfig(Config):
         # MSC3706 (server-side support for partial state in /send_join responses)
         self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
 
-        # experimental support for faster joins over federation (msc2775, msc3706)
+        # experimental support for faster joins over federation
+        # (MSC2775, MSC3706, MSC3895)
         # requires a target server with msc3706_enabled enabled.
         self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
 
@@ -82,6 +83,8 @@ class ExperimentalConfig(Config):
         # MSC3786 (Add a default push rule to ignore m.room.server_acl events)
         self.msc3786_enabled: bool = experimental.get("msc3786_enabled", False)
 
+        # MSC3771: Thread read receipts
+        self.msc3771_enabled: bool = experimental.get("msc3771_enabled", False)
         # MSC3772: A push rule for mutual relations.
         self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)
 

@@ -1,0 +1,1 @@
+Faster room joins: Fix a bug introduced in 1.66.0 where an error would be logged when syncing after joining a room.
