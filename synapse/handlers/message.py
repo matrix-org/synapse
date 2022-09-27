@@ -1300,7 +1300,8 @@ class EventCreationHandler:
         extra_users: Optional[List[UserID]] = None,
         ignore_shadow_ban: bool = False,
     ) -> EventBase:
-        """Processes new events.
+        """Processes new events. Please note that if batch persisting events, an error in
+        handling any one of these events will result in all of the events being dropped.
 
         This includes deduplicating, checking auth, persisting,
         notifying users, sending to remote servers, etc.
@@ -1417,7 +1418,8 @@ class EventCreationHandler:
     ) -> EventBase:
         """Actually persists new events. Should only be called by
         `handle_new_client_event`, and see its docstring for documentation of
-        the arguments.
+        the arguments. Please note that if batch persisting events, an error in
+        handling any one of these events will result in all of the events being dropped.
 
         PartialStateConflictError: if attempting to persist a partial state event in
             a room that has been un-partial stated.
@@ -1462,8 +1464,7 @@ class EventCreationHandler:
                 # we return the one event that was persisted
                 event, _ = events_and_context[-1]
 
-                # We don't worry about de-duplicating batch persisted events
-                if event_id != event.event_id and len(events_and_context) == 1:
+                if event_id != event.event_id:
                     # If we get a different event back then it means that its
                     # been de-duplicated, so we replace the given event with the
                     # one already persisted.
@@ -1592,6 +1593,9 @@ class EventCreationHandler:
         calculated the push actions for the events, and checked auth.
 
         This should only be run on the instance in charge of persisting events.
+
+        Please note that if batch persisting events, an error in
+        handling any one of these events will result in all of the events being dropped.
 
         Returns:
             The persisted event, if one event is passed in, or the last event in the

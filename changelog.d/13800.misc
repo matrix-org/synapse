@@ -1,1 +1,2 @@
-Add support for persisting initial room creation events to the DB in a batch.
+Speed up creation of DM rooms.
+
