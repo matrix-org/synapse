@@ -1,17 +1,25 @@
-Synapse 1.68.0rc2 (2022-09-23)
-==============================
+Synapse 1.68.0 (2022-09-27)
+===========================
 
 Please note that Synapse will now refuse to start if configured to use a version of SQLite earlier than 3.27.
 
 In addition, please note that installing Synapse from a source checkout now requires a recent Rust compiler.
 Those using packages will not be affected. On most platforms, installing with `pip install matrix-synapse` will not be affected.
-See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1670).
-
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1680).
 
 Bugfixes
 --------
 
-- Fix building from packaged sdist. Broke in v1.68.0rc1. ([\#13866](https://github.com/matrix-org/synapse/issues/13866))
+- Fix packaging to include `Cargo.lock` in `sdist`. ([\#13909](https://github.com/matrix-org/synapse/issues/13909))
+
+
+Synapse 1.68.0rc2 (2022-09-23)
+==============================
+
+Bugfixes
+--------
+
+- Fix building from packaged sdist. Broken in v1.68.0rc1. ([\#13866](https://github.com/matrix-org/synapse/issues/13866))
 
 
 Internal Changes
@@ -19,7 +27,7 @@ Internal Changes
 
 - Fix the release script not publishing binary wheels. ([\#13850](https://github.com/matrix-org/synapse/issues/13850))
 - Lower minimum supported rustc version to 1.58.1. ([\#13857](https://github.com/matrix-org/synapse/issues/13857))
-- Lock Rust dependencies versions. ([\#13858](https://github.com/matrix-org/synapse/issues/13858))
+- Lock Rust dependencies' versions. ([\#13858](https://github.com/matrix-org/synapse/issues/13858))
 
 
 Synapse 1.68.0rc1 (2022-09-20)
