@@ -197,7 +197,7 @@ There are three separate aspects to this:
 
 `event_id`'s can be considered globally unique although there has been a lot of
 debate on this topic in places like
-https://github.com/matrix-org/matrix-spec-proposals/issues/2779 and
+[MSC2779](https://github.com/matrix-org/matrix-spec-proposals/issues/2779) and
 [MSC2848](https://github.com/matrix-org/matrix-spec-proposals/pull/2848) which
 has no resolution yet (as of 2022-09-01). There are several places in Synapse
 and even in the Matrix APIs like [`GET
