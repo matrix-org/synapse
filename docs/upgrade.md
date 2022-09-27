@@ -90,11 +90,28 @@ process, for example:
 
 # Upgrading to v1.68.0
 
-As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
-version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
-now require a recent Rust compiler.
+Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
 
-Installations using 
+## SQLite version requirement
+
+Synapse now requires a SQLite version of 3.27.0 or higher if SQLite is configured as
+Synapse's database.
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- a PostgreSQL database
+
+are not affected.
+
+## Rust requirement when building from source.
+
+Building from a source checkout of Synapse now requires a recent Rust compiler
+(currently Rust 1.58.1, but see also the
+[Platform Dependency Policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html)).
+
+Installations using
 
 - Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
 - Debian packages [from Matrix.org](https://packages.matrix.org/), or
@@ -134,12 +151,12 @@ The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
 
 ## SQLite version requirement in the next release
 
-From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
 higher. Synapse v1.67.0 will be the last major release supporting SQLite
 versions 3.22 to 3.26.
 
 Those using Docker images or Debian packages from Matrix.org will not be
-affected. If you have installed from source, you should check the version of 
+affected. If you have installed from source, you should check the version of
 SQLite used by Python with:
 
 ```shell
