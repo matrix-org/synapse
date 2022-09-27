@@ -169,13 +169,12 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
         sql = f"""
-            SELECT event_id, stream_ordering
+            SELECT event_id, event_stream_ordering
             FROM receipts_linearized
-            INNER JOIN events USING (room_id, event_id)
             WHERE {clause}
             AND user_id = ?
             AND room_id = ?
-            ORDER BY stream_ordering DESC
+            ORDER BY event_stream_ordering DESC
             LIMIT 1
         """
 
@@ -641,9 +640,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         # have to compare orderings of existing receipts
         if stream_ordering is not None:
             sql = (
-                "SELECT stream_ordering, event_id FROM events"
-                " INNER JOIN receipts_linearized AS r USING (event_id, room_id)"
-                " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
+                "SELECT event_stream_ordering, event_id FROM receipts_linearized"
+                " WHERE room_id = ? AND receipt_type = ? AND user_id = ?"
             )
             txn.execute(sql, (room_id, receipt_type, user_id))
 

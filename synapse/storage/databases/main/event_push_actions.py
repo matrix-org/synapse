@@ -470,9 +470,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
         sql = f"""
-            SELECT room_id, MAX(stream_ordering)
+            SELECT room_id, MAX(event_stream_ordering)
             FROM receipts_linearized
-            INNER JOIN events USING (room_id, event_id)
             WHERE {receipt_types_clause}
             AND user_id = ?
             GROUP BY room_id
@@ -932,11 +931,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
         sql = """
-            SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
-            FROM receipts_linearized AS r
-            INNER JOIN events AS e USING (event_id)
-            WHERE ? < r.stream_id AND r.stream_id <= ? AND user_id LIKE ?
-            ORDER BY r.stream_id ASC
+            SELECT stream_id, room_id, user_id, event_stream_ordering
+            FROM receipts_linearized
+            WHERE ? < stream_id AND stream_id <= ? AND user_id LIKE ?
+            ORDER BY stream_id ASC
             LIMIT ?
         """
 
