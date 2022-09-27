@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pprint
+import json
 from typing import Optional
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -23,7 +25,7 @@ from synapse.event_auth import (
     check_state_dependent_auth_rules,
     check_state_independent_auth_rules,
 )
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.federation.transport.client import StateRequestResponse
 from synapse.logging.context import LoggingContext
@@ -919,6 +921,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             state_event.event_id for state_event in list(state_map.values())
         ]
 
+        inherited_depth = event_after.depth
         batch_id = random_string(8)
         next_batch_id = random_string(8)
         insertion_event, _ = self.get_success(
@@ -935,6 +938,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 prev_event_ids=[],
                 auth_event_ids=historical_auth_event_ids,
                 state_event_ids=historical_state_event_ids,
+                depth=inherited_depth,
             )
         )
         historical_message_event, _ = self.get_success(
@@ -946,6 +950,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "Historical message", "msgtype": "m.text"},
                 prev_event_ids=[insertion_event.event_id],
                 auth_event_ids=historical_auth_event_ids,
+                depth=inherited_depth,
             )
         )
         batch_event, _ = self.get_success(
@@ -960,6 +965,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 },
                 prev_event_ids=[historical_message_event.event_id],
                 auth_event_ids=historical_auth_event_ids,
+                depth=inherited_depth,
             )
         )
         base_insertion_event, _ = self.get_success(
@@ -975,21 +981,37 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 prev_event_ids=[event_before.event_id],
                 auth_event_ids=historical_auth_event_ids,
                 state_event_ids=historical_state_event_ids,
+                depth=inherited_depth,
             )
         )
 
+        # Chronological
+        # pulled_events = [
+        #     # Beginning of room (oldest messages)
+        #     room_create_event,
+        #     pl_event,
+        #     event_before,
+        #     # HISTORICAL MESSAGE END
+        #     insertion_event,
+        #     historical_message_event,
+        #     batch_event,
+        #     base_insertion_event,
+        #     # HISTORICAL MESSAGE START
+        #     event_after,
+        #     # Latest in the room (newest messages)
+        # ]
+
+        # The random pattern that may make it be expected
         pulled_events = [
             # Beginning of room (oldest messages)
             room_create_event,
             pl_event,
             event_before,
-            # HISTORICAL MESSAGE END
-            insertion_event,
-            historical_message_event,
-            batch_event,
-            base_insertion_event,
-            # HISTORICAL MESSAGE START
             event_after,
+            base_insertion_event,
+            batch_event,
+            historical_message_event,
+            insertion_event,
             # Latest in the room (newest messages)
         ]
 
@@ -1004,26 +1026,67 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         from_token = self.get_success(
             self.hs.get_event_sources().get_current_token_for_pagination(room_id)
         )
-
-        events, _ = self.get_success(
+        actual_events_in_room_reverse_chronological, _ = self.get_success(
             main_store.paginate_room_events(
                 room_id, from_key=from_token.room_key, limit=100, direction="b"
             )
         )
 
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.info(
-            "test result events=%s",
-            [
-                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
-                % (
-                    event.event_id,
-                    event.depth,
-                    event.content.get("body", event.type),
-                    event.prev_event_ids(),
-                )
-                for event in events
-            ],
+        # We have to reverse the list to make it chronological.
+        actual_events_in_room_chronological = list(
+            reversed(actual_events_in_room_reverse_chronological)
         )
+
+        expected_event_order = [
+            # Beginning of room (oldest messages)
+            # *list(state_map.values()),
+            room_create_event,
+            as_membership_event,
+            pl_event,
+            state_map.get((EventTypes.JoinRules, "")),
+            state_map.get((EventTypes.RoomHistoryVisibility, "")),
+            event_before,
+            # HISTORICAL MESSAGE END
+            insertion_event,
+            historical_message_event,
+            batch_event,
+            base_insertion_event,
+            # HISTORICAL MESSAGE START
+            event_after,
+            # Latest in the room (newest messages)
+        ]
+
+        def _debug_event_string(event: EventBase) -> str:
+            debug_body = event.content.get("body", event.type)
+            return f"event_id={event.event_id},depth={event.depth},body={debug_body},prevs={event.prev_event_ids()}"
+
+        event_diff = set(expected_event_order) - set(
+            actual_events_in_room_chronological
+        )
+        event_diff_ordered = [
+            event for event in expected_event_order if event in event_diff
+        ]
+        assertion_message = (
+            "Actual events missing from expected list: %s\nExpected event order: %s\nActual event order: %s"
+            % (
+                json.dumps(
+                    [_debug_event_string(event) for event in event_diff_ordered],
+                    indent=4,
+                ),
+                json.dumps(
+                    [_debug_event_string(event) for event in expected_event_order],
+                    indent=4,
+                ),
+                json.dumps(
+                    [
+                        _debug_event_string(event)
+                        for event in actual_events_in_room_chronological
+                    ],
+                    indent=4,
+                ),
+            )
+        )
+
+        assert (
+            actual_events_in_room_chronological == expected_event_order
+        ), assertion_message
