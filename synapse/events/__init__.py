@@ -343,8 +343,8 @@ class EventBase(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @property
-    def membership(self) -> Optional[str]:
-        return self.content.get("membership")
+    def membership(self) -> str:
+        return self.content["membership"]
 
     def is_state(self) -> bool:
         return self.get_state_key() is not None
