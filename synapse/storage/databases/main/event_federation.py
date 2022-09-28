@@ -806,9 +806,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * means less than the given depth) because we're looking backwards
                      * from the `current_depth` when backfilling.
                      *
-                     *                           current_depth (ignore events that come after this, ignore 2-4)
-                     *                           |
-                     * <oldest-in-time> [0]<--[1]▼<--[2]<--[3]<--[4] <newest-in-time>
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
                      */
                     AND event.depth <= ? /* current_depth */
                     /**
@@ -922,9 +923,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * means less than the given depth) because we're looking backwards
                      * from the `current_depth` when backfilling.
                      *
-                     *                           current_depth (ignore events that come after this, ignore 2-4)
-                     *                           |
-                     * <oldest-in-time> [0]<--[1]▼<--[2]<--[3]<--[4] <newest-in-time>
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
                      */
                     AND event.depth <= ? /* current_depth */
                     /**
