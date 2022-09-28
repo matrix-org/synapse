@@ -37,11 +37,11 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
 
-from .baserules import FilteredPushRules, PushRule
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 if TYPE_CHECKING:
@@ -284,7 +284,8 @@ class BulkPushRuleEvaluator:
         thread_id = "main"
         if relation:
             relations = await self._get_mutual_relations(
-                relation.parent_id, itertools.chain(*rules_by_user.values())
+                relation.parent_id,
+                itertools.chain(*(r.rules() for r in rules_by_user.values())),
             )
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
@@ -337,7 +338,7 @@ class BulkPushRuleEvaluator:
                 # current user, it'll be added to the dict later.
                 actions_by_user[uid] = []
 
-            for rule, enabled in rules:
+            for rule, enabled in rules.rules():
                 if not enabled:
                     continue
 

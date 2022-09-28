@@ -56,15 +56,21 @@ class RelationPaginationServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         limit = parse_integer(request, "limit", default=5)
-        if self._msc3715_enabled:
-            direction = parse_string(
-                request,
-                "org.matrix.msc3715.dir",
-                default="b",
-                allowed_values=["f", "b"],
-            )
-        else:
-            direction = "b"
+        # Fetch the direction parameter, if provided.
+        #
+        # TODO Use PaginationConfig.from_request when the unstable parameter is
+        #      no longer needed.
+        direction = parse_string(request, "dir", allowed_values=["f", "b"])
+        if direction is None:
+            if self._msc3715_enabled:
+                direction = parse_string(
+                    request,
+                    "org.matrix.msc3715.dir",
+                    default="b",
+                    allowed_values=["f", "b"],
+                )
+            else:
+                direction = "b"
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 

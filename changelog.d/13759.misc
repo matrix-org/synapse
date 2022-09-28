@@ -1,1 +1,0 @@
-Add a check for editable installs if the Rust library needs rebuilding.

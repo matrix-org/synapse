@@ -1,3 +1,28 @@
+matrix-synapse-py3 (1.69.0~rc1+nmu1) UNRELEASED; urgency=medium
+
+  * The man page for the hash_password script has been updated to reflect
+    the correct default value of 'bcrypt_rounds'.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 26 Sep 2022 18:05:09 +0100
+
+matrix-synapse-py3 (1.68.0) stable; urgency=medium
+
+  * New Synapse release 1.68.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 27 Sep 2022 12:02:09 +0100
+
+matrix-synapse-py3 (1.68.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.68.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 23 Sep 2022 09:40:10 +0100
+
+matrix-synapse-py3 (1.68.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.68.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 20 Sep 2022 11:18:20 +0100
+
 matrix-synapse-py3 (1.67.0) stable; urgency=medium
 
   * New Synapse release 1.67.0.

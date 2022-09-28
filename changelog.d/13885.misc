@@ -1,0 +1,1 @@
+Correctly handle a race with device lists when a remote user leaves during a partial join.

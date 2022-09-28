@@ -1191,7 +1191,9 @@ class SyncHandler:
             room_id: The partial state room to find the remaining memberships for.
             members_to_fetch: The memberships to find.
             events_with_membership_auth: A mapping from user IDs to events whose auth
-                events are known to contain their membership.
+                events would contain their prior membership, if one exists.
+                Note that join events will not cite a prior membership if a user has
+                never been in a room before.
             found_state_ids: A dict from (type, state_key) -> state_event_id, containing
                 memberships that have been previously found. Entries in
                 `members_to_fetch` that have a membership in `found_state_ids` are
@@ -1200,6 +1202,10 @@ class SyncHandler:
         Returns:
             A dict from ("m.room.member", state_key) -> state_event_id, containing the
             memberships missing from `found_state_ids`.
+
+            When `events_with_membership_auth` contains a join event for a given user
+            which does not cite a prior membership, no membership is returned for that
+            user.
 
         Raises:
             KeyError: if `events_with_membership_auth` does not have an entry for a
@@ -1218,8 +1224,18 @@ class SyncHandler:
             if (EventTypes.Member, member) in found_state_ids:
                 continue
 
-            missing_members.add(member)
             event_with_membership_auth = events_with_membership_auth[member]
+            is_join = (
+                event_with_membership_auth.is_state()
+                and event_with_membership_auth.type == EventTypes.Member
+                and event_with_membership_auth.state_key == member
+                and event_with_membership_auth.content.get("membership")
+                == Membership.JOIN
+            )
+            if not is_join:
+                # The event must include the desired membership as an auth event, unless
+                # it's the first join event for a given user.
+                missing_members.add(member)
             auth_event_ids.update(event_with_membership_auth.auth_event_ids())
 
         auth_events = await self.store.get_events(auth_event_ids)
@@ -1243,7 +1259,7 @@ class SyncHandler:
                     auth_event.type == EventTypes.Member
                     and auth_event.state_key == member
                 ):
-                    missing_members.remove(member)
+                    missing_members.discard(member)
                     additional_state_ids[
                         (EventTypes.Member, member)
                     ] = auth_event.event_id
