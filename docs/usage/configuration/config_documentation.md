@@ -2229,6 +2229,9 @@ homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.
 
+As Spaces are just rooms under the hood, Space aliases may also be
+used.
+
 Example configuration:
 ```yaml
 auto_join_rooms:
@@ -2240,7 +2243,7 @@ auto_join_rooms:
 
 Where `auto_join_rooms` are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.
+homeserver registers. This option will not create Spaces.
 
 By default the auto-created rooms are publicly joinable from any federated
 server. Use the `autocreate_auto_join_rooms_federated` and
@@ -2258,7 +2261,7 @@ autocreate_auto_join_rooms: false
 ---
 ### `autocreate_auto_join_rooms_federated`
 
-Whether the rooms listen in `auto_join_rooms` that are auto-created are available
+Whether the rooms listed in `auto_join_rooms` that are auto-created are available
 via federation. Only has an effect if `autocreate_auto_join_rooms` is true.
 
 Note that whether a room is federated cannot be modified after
