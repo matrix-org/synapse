@@ -135,23 +135,24 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
 
-    async def get_last_receipt_event_id_for_user(
+    async def get_last_unthreaded_receipt_event_id_for_user(
         self, user_id: str, room_id: str, receipt_types: Collection[str]
     ) -> Optional[str]:
         """
-        Fetch the event ID for the latest receipt in a room with one of the given receipt types.
+        Fetch the event ID for the latest unthreaded receipt in a room with one
+        of the given receipt types.
 
         Args:
             user_id: The user to fetch receipts for.
             room_id: The room ID to fetch the receipt for.
-            receipt_type: The receipt types to fetch.
+            receipt_types: The receipt types to fetch.
 
         Returns:
             The latest receipt, if one exists.
         """
         result = await self.db_pool.runInteraction(
             "get_last_receipt_event_id_for_user",
-            self.get_last_receipt_for_user_txn,
+            self.get_last_unthreaded_receipt_for_user_txn,
             user_id,
             room_id,
             receipt_types,
@@ -162,7 +163,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         event_id, _ = result
         return event_id
 
-    def get_last_receipt_for_user_txn(
+    def get_last_unthreaded_receipt_for_user_txn(
         self,
         txn: LoggingTransaction,
         user_id: str,
@@ -170,13 +171,13 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipt_types: Collection[str],
     ) -> Optional[Tuple[str, int]]:
         """
-        Fetch the event ID and stream_ordering for the latest receipt in a room
-        with one of the given receipt types.
+        Fetch the event ID and stream_ordering for the latest unthreaded receipt
+        in a room with one of the given receipt types.
 
         Args:
             user_id: The user to fetch receipts for.
             room_id: The room ID to fetch the receipt for.
-            receipt_type: The receipt types to fetch.
+            receipt_types: The receipt types to fetch.
 
         Returns:
             The event ID and stream ordering of the latest receipt, if one exists.
@@ -193,6 +194,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             WHERE {clause}
             AND user_id = ?
             AND room_id = ?
+            AND thread_id IS NULL
             ORDER BY stream_ordering DESC
             LIMIT 1
         """

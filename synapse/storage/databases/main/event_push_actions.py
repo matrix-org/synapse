@@ -366,7 +366,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         user_id: str,
     ) -> NotifCounts:
         # Get the stream ordering of the user's latest receipt in the room.
-        result = self.get_last_receipt_for_user_txn(
+        result = self.get_last_unthreaded_receipt_for_user_txn(
             txn,
             user_id,
             room_id,

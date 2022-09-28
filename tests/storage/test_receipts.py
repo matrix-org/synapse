@@ -108,7 +108,7 @@ class ReceiptTestCase(HomeserverTestCase):
         self.assertEqual(res, {})
 
         res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
+            self.store.get_last_unthreaded_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id1,
                 [
@@ -229,7 +229,7 @@ class ReceiptTestCase(HomeserverTestCase):
 
         # Test we get the latest event when we want both private and public receipts
         res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
+            self.store.get_last_unthreaded_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id1,
                 [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
@@ -239,7 +239,7 @@ class ReceiptTestCase(HomeserverTestCase):
 
         # Test we get the older event when we want only public receipt
         res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
+            self.store.get_last_unthreaded_receipt_event_id_for_user(
                 OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
             )
         )
@@ -247,7 +247,7 @@ class ReceiptTestCase(HomeserverTestCase):
 
         # Test we get the latest event when we want only the private receipt
         res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
+            self.store.get_last_unthreaded_receipt_event_id_for_user(
                 OUR_USER_ID, self.room_id1, [ReceiptTypes.READ_PRIVATE]
             )
         )
@@ -260,7 +260,7 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
         res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
+            self.store.get_last_unthreaded_receipt_event_id_for_user(
                 OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
             )
         )
@@ -283,7 +283,7 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
         res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
+            self.store.get_last_unthreaded_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id2,
                 [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
