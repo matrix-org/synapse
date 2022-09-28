@@ -11,7 +11,7 @@ rust-version = "1.58.1"
 
 [lib]
 name = "synapse"
-# We generate a `cdylib` for Python and a standrad `lib` for running
+# We generate a `cdylib` for Python and a standard `lib` for running
 # tests/benchmarks.
 crate-type = ["lib", "cdylib"]
 
