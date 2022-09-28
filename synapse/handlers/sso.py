@@ -710,10 +710,9 @@ class SsoHandler:
         try:
             uid = UserID.from_string(user_id)
 
-            # OPTIONS request to find image size & mime type before download
-            response = await self._http_client.request("OPTIONS", picture_https_url)
+            # HEAD request to find image size & mime type before download
+            response = await self._http_client.request("HEAD", picture_https_url)
             if response.code != 200:
-                raise Exception("error sending OPTIONS request to get image size")
 
             content_type = None
             headers = response.headers.getAllRawHeaders()
@@ -721,6 +720,7 @@ class SsoHandler:
                 if header[0].decode("utf-8") == "Content-Type":
                     content_type = header[1][0].decode("utf-8")
                     break
+                raise Exception("error sending HEAD request to get image size")
             content_length = response.length
 
             # ensure picture size respects max_avatar_size defined in config
