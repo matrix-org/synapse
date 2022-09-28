@@ -1312,7 +1312,10 @@ class SyncHandler:
         )
 
         # Beeper: log for large gappy syncs (>1M room events)
-        if since_token and now_token.room_stream_id - since_token.room_stream_id > 1000000:
+        if (
+            since_token
+            and now_token.room_stream_id - since_token.room_stream_id > 1000000
+        ):
             logger.warning(
                 "Calculating large room gap sync for %r between %s and %s",
                 sync_config.user,
