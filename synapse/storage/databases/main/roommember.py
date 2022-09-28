@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Collection,
@@ -696,7 +695,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             desc="get_rooms_for_users",
         )
 
-        user_rooms: Dict[str, Set[str]] = defaultdict(set)
+        user_rooms: Dict[str, Set[str]] = {user_id: set() for user_id in user_ids}
+
         for row in rows:
             user_rooms[row["state_key"]].add(row["room_id"])
 
