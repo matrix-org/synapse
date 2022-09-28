@@ -1965,6 +1965,8 @@ as a publicly joinable room when the first user registers for the
 homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.</p>
+<p>As Spaces are just rooms under the hood, Space aliases may also be
+used.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">auto_join_rooms:
   - &quot;#exampleroom:example.com&quot;
@@ -1974,7 +1976,7 @@ relating to auto-joining rooms below.</p>
 <h3 id="autocreate_auto_join_rooms"><a class="header" href="#autocreate_auto_join_rooms"><code>autocreate_auto_join_rooms</code></a></h3>
 <p>Where <code>auto_join_rooms</code> are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.</p>
+homeserver registers. This option will not create Spaces.</p>
 <p>By default the auto-created rooms are publicly joinable from any federated
 server. Use the <code>autocreate_auto_join_rooms_federated</code> and
 <code>autocreate_auto_join_room_preset</code> settings to customise this behaviour.</p>
@@ -1986,7 +1988,7 @@ users cannot be auto-joined since they do not exist.</p>
 </code></pre>
 <hr />
 <h3 id="autocreate_auto_join_rooms_federated"><a class="header" href="#autocreate_auto_join_rooms_federated"><code>autocreate_auto_join_rooms_federated</code></a></h3>
-<p>Whether the rooms listen in <code>auto_join_rooms</code> that are auto-created are available
+<p>Whether the rooms listed in <code>auto_join_rooms</code> that are auto-created are available
 via federation. Only has an effect if <code>autocreate_auto_join_rooms</code> is true.</p>
 <p>Note that whether a room is federated cannot be modified after
 creation.</p>
