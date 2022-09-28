@@ -370,10 +370,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn,
             user_id,
             room_id,
-            receipt_types=(
-                ReceiptTypes.READ,
-                ReceiptTypes.READ_PRIVATE,
-            ),
+            receipt_types=(ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
         if result:
@@ -574,10 +571,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         receipt_types_clause, args = make_in_list_sql_clause(
             self.database_engine,
             "receipt_type",
-            (
-                ReceiptTypes.READ,
-                ReceiptTypes.READ_PRIVATE,
-            ),
+            (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
         sql = f"""
