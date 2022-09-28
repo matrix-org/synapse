@@ -1,1 +1,1 @@
-Adds support for handling avatar in SSO login. Contributed by @ashfame
+Adds support for handling avatar in SSO login. Contributed by @ashfame.
