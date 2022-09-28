@@ -1229,7 +1229,9 @@ class DeviceListUpdater:
             )
 
             if not position:
-                # This should only happen if there are no updates, so we bail.
+                # This should only happen if there are no updates, which
+                # shouldn't happen when we've passed in a non-empty set of
+                # device IDs.
                 continue
 
             self.device_handler.notifier.on_new_event(
