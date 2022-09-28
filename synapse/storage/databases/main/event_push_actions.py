@@ -654,6 +654,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             stream_ordering: The (exclusive) minimum stream ordering to consider.
             max_stream_ordering: The (inclusive) maximum stream ordering to consider.
                 If this is not given, then no maximum is applied.
+            thread_id: The thread ID to fetch unread counts for. If this is not provided
+                then the results for *all* threads is returned.
+
+                Note that if this is provided the resulting list will only have 0 or
+                1 tuples in it.
 
         Return:
             A tuple of the notif count and unread count in the given range for
@@ -676,6 +681,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             if max_stream_ordering <= stream_ordering:
                 return []
 
+        # Either limit the results to a specific thread or fetch all threads.
         thread_id_clause = ""
         if thread_id is not None:
             thread_id_clause = "AND thread_id = ?"
