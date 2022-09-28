@@ -293,7 +293,7 @@ class ReplicationCommandHandler:
 
         # fire off a background process to start processing the queue.
         run_as_background_process(
-            "process-replication-data", self._unsafe_process_queue, stream_name
+            f"process-replication-data-{stream_name}", self._unsafe_process_queue, stream_name
         )
 
     async def _unsafe_process_queue(self, stream_name: str) -> None:
