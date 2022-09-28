@@ -710,21 +710,30 @@ class SsoHandler:
         try:
             uid = UserID.from_string(user_id)
 
-            # ensure picture size respects max_avatar_size defined in config
+            # OPTIONS request to find image size & mime type before download
             response = await self._http_client.request("OPTIONS", picture_https_url)
             if response.code != 200:
                 raise Exception("error sending OPTIONS request to get image size")
 
-            content_length = response.length
+            content_type = None
             headers = response.headers.getAllRawHeaders()
             for header in headers:
                 if header[0].decode("utf-8") == "Content-Type":
                     content_type = header[1][0].decode("utf-8")
                     break
+            content_length = response.length
 
+            # ensure picture size respects max_avatar_size defined in config
             if self._profile_handler.max_avatar_size is not None:
                 if content_length > self._profile_handler.max_avatar_size:
                     raise Exception("sso avatar too big in size")
+
+            # ensure picture is of allowed mime type
+            if content_type is None and (
+                self._profile_handler.allowed_avatar_mimetypes
+                and content_type not in self._profile_handler.allowed_avatar_mimetypes
+            ):
+                raise Exception("mime type not allowed for sso avatar")
 
             # download picture
             response = await self._http_client.request("GET", picture_https_url)
@@ -736,7 +745,7 @@ class SsoHandler:
 
             # store it in media repository
             avatar_mxc_url = await self.media_repo.create_content(
-                content_type,
+                str(content_type),
                 None,
                 io.BytesIO(image),  # convert image into BytesIO
                 content_length,
