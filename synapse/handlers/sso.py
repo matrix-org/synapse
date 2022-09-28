@@ -735,7 +735,7 @@ class SsoHandler:
                 str(avatar_mxc_url),
             )
 
-            logger.info("successfully saved the user avatar via SSO: %s", user_id)
+            logger.info("successfully saved the user avatar")
         except Exception as e:
             logger.info("failed to save the user avatar via SSO: %s", user_id)
             logger.exception(e)
