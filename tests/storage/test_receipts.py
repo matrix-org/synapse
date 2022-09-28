@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Collection, Optional
 
 from synapse.api.constants import ReceiptTypes
 from synapse.types import UserID, create_requester
@@ -84,6 +85,33 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
 
+    def get_last_unthreaded_receipt(
+        self, receipt_types: Collection[str], room_id: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Fetch the event ID for the latest unthreaded receipt in the test room for the test user.
+
+        Args:
+            receipt_types: The receipt types to fetch.
+
+        Returns:
+            The latest receipt, if one exists.
+        """
+        result = self.get_success(
+            self.store.db_pool.runInteraction(
+                "get_last_receipt_event_id_for_user",
+                self.store.get_last_unthreaded_receipt_for_user_txn,
+                OUR_USER_ID,
+                room_id or self.room_id1,
+                receipt_types,
+            )
+        )
+        if not result:
+            return None
+
+        event_id, _ = result
+        return event_id
+
     def test_return_empty_with_no_data(self) -> None:
         res = self.get_success(
             self.store.get_receipts_for_user(
@@ -107,16 +135,10 @@ class ReceiptTestCase(HomeserverTestCase):
         )
         self.assertEqual(res, {})
 
-        res = self.get_success(
-            self.store.get_last_unthreaded_receipt_event_id_for_user(
-                OUR_USER_ID,
-                self.room_id1,
-                [
-                    ReceiptTypes.READ,
-                    ReceiptTypes.READ_PRIVATE,
-                ],
-            )
+        res = self.get_last_unthreaded_receipt(
+            [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
         )
+
         self.assertEqual(res, None)
 
     def test_get_receipts_for_user(self) -> None:
@@ -228,29 +250,17 @@ class ReceiptTestCase(HomeserverTestCase):
         )
 
         # Test we get the latest event when we want both private and public receipts
-        res = self.get_success(
-            self.store.get_last_unthreaded_receipt_event_id_for_user(
-                OUR_USER_ID,
-                self.room_id1,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
-            )
+        res = self.get_last_unthreaded_receipt(
+            [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
         )
         self.assertEqual(res, event1_2_id)
 
         # Test we get the older event when we want only public receipt
-        res = self.get_success(
-            self.store.get_last_unthreaded_receipt_event_id_for_user(
-                OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
-            )
-        )
+        res = self.get_last_unthreaded_receipt([ReceiptTypes.READ])
         self.assertEqual(res, event1_1_id)
 
         # Test we get the latest event when we want only the private receipt
-        res = self.get_success(
-            self.store.get_last_unthreaded_receipt_event_id_for_user(
-                OUR_USER_ID, self.room_id1, [ReceiptTypes.READ_PRIVATE]
-            )
-        )
+        res = self.get_last_unthreaded_receipt([ReceiptTypes.READ_PRIVATE])
         self.assertEqual(res, event1_2_id)
 
         # Test receipt updating
@@ -259,11 +269,7 @@ class ReceiptTestCase(HomeserverTestCase):
                 self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], None, {}
             )
         )
-        res = self.get_success(
-            self.store.get_last_unthreaded_receipt_event_id_for_user(
-                OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
-            )
-        )
+        res = self.get_last_unthreaded_receipt([ReceiptTypes.READ])
         self.assertEqual(res, event1_2_id)
 
         # Send some events into the second room
@@ -282,11 +288,7 @@ class ReceiptTestCase(HomeserverTestCase):
                 {},
             )
         )
-        res = self.get_success(
-            self.store.get_last_unthreaded_receipt_event_id_for_user(
-                OUR_USER_ID,
-                self.room_id2,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
-            )
+        res = self.get_last_unthreaded_receipt(
+            [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE], room_id=self.room_id2
         )
         self.assertEqual(res, event2_1_id)
