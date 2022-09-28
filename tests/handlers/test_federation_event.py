@@ -880,11 +880,16 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             room_creator=self.appservice.sender, tok=self.appservice.token
         )
 
+        user_alice = self.register_user("alice", "pass")
+        alice_membership_event = self.get_success(
+            event_injection.inject_member_event(self.hs, room_id, user_alice, "join")
+        )
+
         event_before = self.get_success(
             inject_event(
                 self.hs,
                 room_id=room_id,
-                sender=room_creator,
+                sender=user_alice,
                 type=EventTypes.Message,
                 content={"body": "eventIdBefore", "msgtype": "m.text"},
             )
@@ -894,7 +899,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             inject_event(
                 self.hs,
                 room_id=room_id,
-                sender=room_creator,
+                sender=user_alice,
                 type=EventTypes.Message,
                 content={"body": "eventIdAfter", "msgtype": "m.text"},
             )
@@ -1045,6 +1050,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             pl_event,
             state_map.get((EventTypes.JoinRules, "")),
             state_map.get((EventTypes.RoomHistoryVisibility, "")),
+            alice_membership_event,
             event_before,
             # HISTORICAL MESSAGE END
             insertion_event,
@@ -1058,7 +1064,8 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
 
         def _debug_event_string(event: EventBase) -> str:
             debug_body = event.content.get("body", event.type)
-            return f"event_id={event.event_id},depth={event.depth},body={debug_body},prevs={event.prev_event_ids()}"
+            maybe_state_key = getattr(event, "state_key", None)
+            return f"event_id={event.event_id},depth={event.depth},body={debug_body}({maybe_state_key}),prevs={event.prev_event_ids()}"
 
         event_id_diff = set([event.event_id for event in expected_event_order]) - set(
             [event.event_id for event in actual_events_in_room_chronological]
@@ -1066,11 +1073,24 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         event_diff_ordered = [
             event for event in expected_event_order if event.event_id in event_id_diff
         ]
+        event_id_extra = set(
+            [event.event_id for event in actual_events_in_room_chronological]
+        ) - set([event.event_id for event in expected_event_order])
+        event_extra_ordered = [
+            event
+            for event in actual_events_in_room_chronological
+            if event.event_id in event_id_extra
+        ]
         assertion_message = (
-            "Actual events missing from expected list: %s\nExpected event order: %s\nActual event order: %s"
+            "Actual events missing from expected list: %s\nActual events contain %d additional events compared to expected: %s\nExpected event order: %s\nActual event order: %s"
             % (
                 json.dumps(
                     [_debug_event_string(event) for event in event_diff_ordered],
+                    indent=4,
+                ),
+                len(event_extra_ordered),
+                json.dumps(
+                    [_debug_event_string(event) for event in event_extra_ordered],
                     indent=4,
                 ),
                 json.dumps(
@@ -1090,3 +1110,5 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         assert (
             actual_events_in_room_chronological == expected_event_order
         ), assertion_message
+
+        # self.assertEqual(actual_events_in_room_chronological, expected_event_order)

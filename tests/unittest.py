@@ -743,7 +743,7 @@ class HomeserverTestCase(TestCase):
         """
         Inject a membership event into a room.
 
-        Deprecated: use event_injection.inject_room_member directly
+        Deprecated: use event_injection.inject_member_event directly
 
         Args:
             room: Room ID to inject the event into.
