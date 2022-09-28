@@ -418,7 +418,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         txn: LoggingTransaction,
         room_id: str,
         user_id: str,
-        receipt_stream_ordering: int,
+        unthreaded_receipt_stream_ordering: int,
     ) -> RoomNotifCounts:
         """Get the number of unread messages for a user/room that have happened
         since the given stream ordering.
@@ -427,7 +427,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn: The database transaction.
             room_id: The room ID to get unread counts for.
             user_id: The user ID to get unread counts for.
-            receipt_stream_ordering: The stream ordering of the user's latest
+            unthreaded_receipt_stream_ordering: The stream ordering of the user's latest
                 unthreaded receipt in the room. If there are no unthreaded receipts,
                 the stream ordering of the user's join event.
 
@@ -451,13 +451,17 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
+        # A clause to get the latest receipt stream ordering taking into account
+        # both unthreaded and threaded receipts. This takes a single parameter:
+        # receipt_stream_ordering.
+        #
         # PostgreSQL and SQLite differ in comparing scalar numerics.
         if isinstance(self.database_engine, PostgresEngine):
             # GREATEST ignores NULLs.
-            receipt_stream_clause = "GREATEST(receipt_stream_ordering, ?)"
+            receipt_stream_clause = "GREATEST(threaded_receipt_stream_ordering, ?)"
         else:
             # MAX returns NULL if any are NULL, so COALESCE to 0 first.
-            receipt_stream_clause = "MAX(COALESCE(receipt_stream_ordering, 0), ?)"
+            receipt_stream_clause = "MAX(COALESCE(threaded_receipt_stream_ordering, 0), ?)"
 
         # First we pull the counts from the summary table.
         #
@@ -477,7 +481,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 SELECT notif_count, COALESCE(unread_count, 0), thread_id
                 FROM event_push_summary
                 LEFT JOIN (
-                    SELECT thread_id, MAX(stream_ordering) AS receipt_stream_ordering
+                    SELECT thread_id, MAX(stream_ordering) AS threaded_receipt_stream_ordering
                     FROM receipts_linearized
                     LEFT JOIN events USING (room_id, event_id)
                     WHERE
@@ -498,8 +502,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 *receipts_args,
                 room_id,
                 user_id,
-                receipt_stream_ordering,
-                receipt_stream_ordering,
+                unthreaded_receipt_stream_ordering,
+                unthreaded_receipt_stream_ordering,
             ),
         )
         summarised_threads = set()
@@ -513,7 +517,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         sql = f"""
             SELECT COUNT(*), thread_id FROM event_push_actions
             LEFT JOIN (
-                SELECT thread_id, MAX(stream_ordering) AS receipt_stream_ordering
+                SELECT thread_id, MAX(stream_ordering) AS threaded_receipt_stream_ordering
                 FROM receipts_linearized
                 LEFT JOIN events USING (room_id, event_id)
                 WHERE
@@ -536,7 +540,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 *receipts_args,
                 user_id,
                 room_id,
-                receipt_stream_ordering,
+                unthreaded_receipt_stream_ordering,
             ),
         )
         for highlight_count, thread_id in txn:
@@ -590,7 +594,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 thread_id
             FROM event_push_actions
             LEFT JOIN (
-                SELECT thread_id, MAX(stream_ordering) AS receipt_stream_ordering
+                SELECT thread_id, MAX(stream_ordering) AS threaded_receipt_stream_ordering
                 FROM receipts_linearized
                 LEFT JOIN events USING (room_id, event_id)
                 WHERE
@@ -613,7 +617,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 *receipts_args,
                 user_id,
                 room_id,
-                receipt_stream_ordering,
+                unthreaded_receipt_stream_ordering,
                 *thread_id_args,
             ),
         )
