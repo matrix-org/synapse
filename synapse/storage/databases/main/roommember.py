@@ -686,7 +686,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             column="state_key",
             iterable=user_ids,
             retcols=(
-                "user_id",
+                "state_key",
                 "room_id",
             ),
             keyvalues={
@@ -698,7 +698,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         user_rooms: Dict[str, Set[str]] = defaultdict(set)
         for row in rows:
-            user_rooms[row["user_id"]].add(row["room_id"])
+            user_rooms[row["state_key"]].add(row["room_id"])
 
         return {key: frozenset(rooms) for key, rooms in user_rooms.items()}
 
