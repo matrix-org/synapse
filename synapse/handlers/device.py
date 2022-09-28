@@ -195,7 +195,9 @@ class DeviceWorkerHandler:
         possibly_changed = set(changed)
         possibly_left = set()
         for room_id in rooms_changed:
-            current_state_ids = await self._state_storage.get_current_state_ids(room_id)
+            current_state_ids = await self._state_storage.get_current_state_ids(
+                room_id, await_full_state=False
+            )
 
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
@@ -234,7 +236,8 @@ class DeviceWorkerHandler:
 
             # mapping from event_id -> state_dict
             prev_state_ids = await self._state_storage.get_state_ids_for_events(
-                event_ids
+                event_ids,
+                await_full_state=False,
             )
 
             # Check if we've joined the room? If so we just blindly add all the users to
@@ -686,11 +689,15 @@ class DeviceHandler(DeviceWorkerHandler):
                     # Ignore any users that aren't ours
                     if self.hs.is_mine_id(user_id):
                         hosts = set(
-                            await self._storage_controllers.state.get_current_hosts_in_room(
+                            await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
                                 room_id
                             )
                         )
                         hosts.discard(self.server_name)
+                        # For rooms with partial state, `hosts` is merely an
+                        # approximation. When we transition to a full state room, we
+                        # will have to send out device list updates to any servers we
+                        # missed.
 
                     # Check if we've already sent this update to some hosts
                     if current_stream_id == stream_id:

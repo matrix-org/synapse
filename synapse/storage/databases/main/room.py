@@ -25,6 +25,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
@@ -1133,6 +1134,22 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
+    async def get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
+        """Gets the list of servers in a partial state room at the time we joined it.
+
+        Returns:
+            The `servers_in_room` list from the `/send_join` response for partial state
+            rooms. May not be accurate or complete, as it comes from a remote
+            homeserver.
+            An empty list for full state rooms.
+        """
+        return await self.db_pool.simple_select_onecol(
+            "partial_state_rooms_servers",
+            keyvalues={"room_id": room_id},
+            retcol="server_name",
+            desc="get_partial_state_servers_at_join",
+        )
+
     async def get_partial_state_rooms_and_servers(
         self,
     ) -> Mapping[str, Collection[str]]:
@@ -1760,28 +1777,46 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         room_id: str,
         servers: Collection[str],
+        device_lists_stream_id: int,
     ) -> None:
-        """Mark the given room as containing events with partial state
+        """Mark the given room as containing events with partial state.
+
+        We also store additional data that describes _when_ we first partial-joined this
+        room, which helps us to keep other homeservers in sync when we finally fully
+        join this room.
+
+        We do not include a `join_event_id` here---we need to wait for the join event
+        to be persisted first.
 
         Args:
             room_id: the ID of the room
             servers: other servers known to be in the room
+            device_lists_stream_id: the device_lists stream ID at the time when we first
+                joined the room.
         """
         await self.db_pool.runInteraction(
             "store_partial_state_room",
             self._store_partial_state_room_txn,
             room_id,
             servers,
+            device_lists_stream_id,
         )
 
     def _store_partial_state_room_txn(
-        self, txn: LoggingTransaction, room_id: str, servers: Collection[str]
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        servers: Collection[str],
+        device_lists_stream_id: int,
     ) -> None:
         DatabasePool.simple_insert_txn(
             txn,
             table="partial_state_rooms",
             values={
                 "room_id": room_id,
+                "device_lists_stream_id": device_lists_stream_id,
+                # To be updated later once the join event is persisted.
+                "join_event_id": None,
             },
         )
         DatabasePool.simple_insert_many_txn(
@@ -1791,6 +1826,36 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             values=((room_id, s) for s in servers),
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+
+    async def write_partial_state_rooms_join_event_id(
+        self,
+        room_id: str,
+        join_event_id: str,
+    ) -> None:
+        """Record the join event which resulted from a partial join.
+
+        We do this separately to `store_partial_state_room` because we need to wait for
+        the join event to be persisted. Otherwise we violate a foreign key constraint.
+        """
+        await self.db_pool.runInteraction(
+            "write_partial_state_rooms_join_event_id",
+            self._write_partial_state_rooms_join_event_id,
+            room_id,
+            join_event_id,
+        )
+
+    def _write_partial_state_rooms_join_event_id(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        join_event_id: str,
+    ) -> None:
+        DatabasePool.simple_update_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            updatevalues={"join_event_id": join_event_id},
+        )
 
     async def maybe_store_room_on_outlier_membership(
         self, room_id: str, room_version: RoomVersion
