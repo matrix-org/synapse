@@ -255,6 +255,9 @@ Make sure that you have saved all your files.</p>
 was broken. They are slower than the linters but will typically catch more errors.</p>
 <pre><code class="language-sh">poetry run trial tests
 </code></pre>
+<p>You can run unit tests in parallel by specifying <code>-jX</code> argument to <code>trial</code> where <code>X</code> is the number of parallel runners you want. To use 4 cpu cores, you would run them like:</p>
+<pre><code class="language-sh">poetry run trial -j4 tests
+</code></pre>
 <p>If you wish to only run <em>some</em> unit tests, you may specify
 another module instead of <code>tests</code> - or a test class or a method:</p>
 <pre><code class="language-sh">poetry run trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
