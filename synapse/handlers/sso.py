@@ -713,15 +713,14 @@ class SsoHandler:
             # HEAD request to find image size & mime type before download
             response = await self._http_client.request("HEAD", picture_https_url)
             if response.code != 200:
-
-            content_type = None
-            headers = response.headers.getAllRawHeaders()
-            for header in headers:
-                if header[0].decode("utf-8") == "Content-Type":
-                    content_type = header[1][0].decode("utf-8")
-                    break
                 raise Exception("error sending HEAD request to get image size")
-            content_length = response.length
+
+            content_length = int(
+                response.headers.getRawHeaders(b"Content-Length")[0].decode("utf-8")
+            )
+            content_type = response.headers.getRawHeaders(b"Content-Type")[0].decode(
+                "utf-8"
+            )
 
             # ensure picture size respects max_avatar_size defined in config
             if self._profile_handler.max_avatar_size is not None:
@@ -729,7 +728,7 @@ class SsoHandler:
                     raise Exception("sso avatar too big in size")
 
             # ensure picture is of allowed mime type
-            if content_type is None and (
+            if (
                 self._profile_handler.allowed_avatar_mimetypes
                 and content_type not in self._profile_handler.allowed_avatar_mimetypes
             ):
