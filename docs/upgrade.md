@@ -88,6 +88,18 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.69.0
+
+## Changes to the receipts replication streams
+
+Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.
+
 # Upgrading to v1.68.0
 
 Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
