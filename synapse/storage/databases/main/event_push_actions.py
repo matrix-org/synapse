@@ -461,7 +461,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             receipt_stream_clause = "GREATEST(threaded_receipt_stream_ordering, ?)"
         else:
             # MAX returns NULL if any are NULL, so COALESCE to 0 first.
-            receipt_stream_clause = "MAX(COALESCE(threaded_receipt_stream_ordering, 0), ?)"
+            receipt_stream_clause = (
+                "MAX(COALESCE(threaded_receipt_stream_ordering, 0), ?)"
+            )
 
         # First we pull the counts from the summary table.
         #
