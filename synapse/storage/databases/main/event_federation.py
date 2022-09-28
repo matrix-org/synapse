@@ -731,7 +731,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     ) -> List[Tuple[str, int]]:
         """
         Get the backward extremities to backfill from in the room along with the
-        approximate depth. Only returns events that are at a depth lower than or
+        approximate depth.
+
+        Only returns events that are at a depth lower than or
         equal to the `current_depth`. Sorted by depth, highest to lowest (descending)
         so the closest events to the `current_depth` are first in the list.
 
