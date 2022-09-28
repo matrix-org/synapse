@@ -73,12 +73,20 @@ pdus_pruned_from_federation_queue = Counter(
 
 logger = logging.getLogger(__name__)
 
-BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS: int = int(
-    datetime.timedelta(days=7).total_seconds()
-)
+BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS = 8
 BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS: int = int(
     datetime.timedelta(hours=1).total_seconds()
 )
+# The longest backoff period is then:
+# _LONGEST_BACKOFF_PERIOD_SECONDS = (
+#     (1 << BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS)
+#     * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
+# )
+# which is 2 ** 8 hours = 256 hours ≈ 10 days. This number needs to fit
+# in a 32 bit signed int, or else Postgres will error.
+# assert _LONGEST_BACKOFF_PERIOD_SECONDS < ((2 ** 31) - 1)
+# (We could use a bigint, but bigint overflows still cause errors. This
+# at least avoids CASTing in the queries below.)
 
 
 # All the info we need while iterating the DAG while backfilling
@@ -803,7 +811,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + {least_function}((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
+                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+                            * ? /* step */
+                        )
                     )
                 /**
                  * Sort from highest to the lowest depth. Then tie-break on
@@ -819,8 +830,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     room_id,
                     False,
                     self._clock.time_msec(),
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
-                    1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
                 ),
             )
 
@@ -888,7 +899,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + {least_function}((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
+                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+                            * ? /* step */
+                        )
                     )
                 /**
                  * Sort from highest to the lowest depth. Then tie-break on
@@ -903,8 +917,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 (
                     room_id,
                     self._clock.time_msec(),
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
-                    1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
                 ),
             )
             return cast(List[Tuple[str, int]], txn.fetchall())
