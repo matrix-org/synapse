@@ -314,6 +314,8 @@ class DeviceWorkerHandler:
         gone from partial to full state.
         """
 
+        # TODO(faster_joins): worker mode support
+        #   https://github.com/matrix-org/synapse/issues/12994
         logger.error(
             "Trying handling device list state for partial join: not supported on workers."
         )

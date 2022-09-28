@@ -1233,7 +1233,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         else:
             sql = """
                 DELETE FROM device_lists_remote_pending
-                WHERE stream_id < ?
+                WHERE stream_id <= ?
             """
             txn.execute(sql, (device_lists_stream_id,))
 
