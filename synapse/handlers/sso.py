@@ -140,7 +140,7 @@ class UserAttributes:
     localpart: Optional[str]
     confirm_localpart: bool = False
     display_name: Optional[str] = None
-    picture: str = ""
+    picture: Optional[str] = None
     emails: Collection[str] = attr.Factory(list)
 
 
