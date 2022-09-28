@@ -563,7 +563,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             if thread_id not in summarised_threads:
                 continue
 
-            if thread_id == "main":
+            if thread_id == MAIN_TIMELINE:
                 counts.notify_count += notif_count
                 counts.unread_count += unread_count
             elif thread_id in thread_counts:

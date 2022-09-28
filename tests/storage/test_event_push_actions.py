@@ -16,6 +16,7 @@ from typing import Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import MAIN_TIMELINE
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
@@ -312,7 +313,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _rotate() -> None:
             self.get_success(self.store._rotate_notifs())
 
-        def _mark_read(event_id: str, thread_id: str = "main") -> None:
+        def _mark_read(event_id: str, thread_id: str = MAIN_TIMELINE) -> None:
             self.get_success(
                 self.store.insert_receipt(
                     room_id,
@@ -531,7 +532,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _mark_read(event_id)
         _assert_counts(1, 0, 1, 0)
 
-        _mark_read(last_event_id, "main")
+        _mark_read(last_event_id, MAIN_TIMELINE)
         _mark_read(last_event_id, thread_id)
         _assert_counts(0, 0, 0, 0)
 
@@ -572,9 +573,9 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         # right counts.
         _mark_read(event_id)
         _assert_counts(1, 0, 1, 0)
-        _mark_read(event_id, "main")
+        _mark_read(event_id, MAIN_TIMELINE)
         _assert_counts(1, 0, 1, 0)
-        _mark_read(last_event_id, "main")
+        _mark_read(last_event_id, MAIN_TIMELINE)
         _assert_counts(0, 0, 1, 0)
         _mark_read(last_event_id, thread_id)
         _assert_counts(0, 0, 0, 0)
