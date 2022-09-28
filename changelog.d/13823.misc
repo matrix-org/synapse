@@ -1,0 +1,1 @@
+Faster Remote Room Joins: tell remote homeservers that we are unable to authorise them if they query a room which has partial state on our server.

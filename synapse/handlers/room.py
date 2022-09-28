@@ -301,8 +301,7 @@ class RoomCreationHandler:
         # now send the tombstone
         await self.event_creation_handler.handle_new_client_event(
             requester=requester,
-            event=tombstone_event,
-            context=tombstone_context,
+            events_and_context=[(tombstone_event, tombstone_context)],
         )
 
         state_filter = StateFilter.from_types(
@@ -716,7 +715,7 @@ class RoomCreationHandler:
 
         if (
             self._server_notices_mxid is not None
-            and requester.user.to_string() == self._server_notices_mxid
+            and user_id == self._server_notices_mxid
         ):
             # allow the server notices mxid to create rooms
             is_requester_admin = True
@@ -1042,7 +1041,9 @@ class RoomCreationHandler:
         creator_join_profile: Optional[JsonDict] = None,
         ratelimit: bool = True,
     ) -> Tuple[int, str, int]:
-        """Sends the initial events into a new room.
+        """Sends the initial events into a new room. Sends the room creation, membership,
+        and power level events into the room sequentially, then creates and batches up the
+        rest of the events to persist as a batch to the DB.
 
         `power_level_content_override` doesn't apply when initial state has
         power level state event content.
@@ -1053,13 +1054,23 @@ class RoomCreationHandler:
         """
 
         creator_id = creator.user.to_string()
-
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
-
         depth = 1
+
+        # the last event sent/persisted to the db
         last_sent_event_id: Optional[str] = None
 
-        def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
+        # the most recently created event
+        prev_event: List[str] = []
+        # a map of event types, state keys -> event_ids. We collect these mappings this as events are
+        # created (but not persisted to the db) to determine state for future created events
+        # (as this info can't be pulled from the db)
+        state_map: MutableStateMap[str] = {}
+        # current_state_group of last event created. Used for computing event context of
+        # events to be batched
+        current_state_group = None
+
+        def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
 
             e.update(event_keys)
@@ -1067,32 +1078,51 @@ class RoomCreationHandler:
 
             return e
 
-        async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
-            nonlocal last_sent_event_id
+        async def create_event(
+            etype: str,
+            content: JsonDict,
+            for_batch: bool,
+            **kwargs: Any,
+        ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
             nonlocal depth
+            nonlocal prev_event
 
-            event = create(etype, content, **kwargs)
-            logger.debug("Sending %s in new room", etype)
-            # Allow these events to be sent even if the user is shadow-banned to
-            # allow the room creation to complete.
-            (
-                sent_event,
-                last_stream_id,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+            event_dict = create_event_dict(etype, content, **kwargs)
+
+            new_event, new_context = await self.event_creation_handler.create_event(
                 creator,
-                event,
+                event_dict,
+                prev_event_ids=prev_event,
+                depth=depth,
+                state_map=state_map,
+                for_batch=for_batch,
+                current_state_group=current_state_group,
+            )
+            depth += 1
+            prev_event = [new_event.event_id]
+            state_map[(new_event.type, new_event.state_key)] = new_event.event_id
+
+            return new_event, new_context
+
+        async def send(
+            event: EventBase,
+            context: synapse.events.snapshot.EventContext,
+            creator: Requester,
+        ) -> int:
+            nonlocal last_sent_event_id
+
+            ev = await self.event_creation_handler.handle_new_client_event(
+                requester=creator,
+                events_and_context=[(event, context)],
                 ratelimit=False,
                 ignore_shadow_ban=True,
-                # Note: we don't pass state_event_ids here because this triggers
-                # an additional query per event to look them up from the events table.
-                prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
-                depth=depth,
             )
 
-            last_sent_event_id = sent_event.event_id
-            depth += 1
+            last_sent_event_id = ev.event_id
 
-            return last_stream_id
+            # we know it was persisted, so must have a stream ordering
+            assert ev.internal_metadata.stream_ordering
+            return ev.internal_metadata.stream_ordering
 
         try:
             config = self._presets_dict[preset_config]
@@ -1102,9 +1132,13 @@ class RoomCreationHandler:
             )
 
         creation_content.update({"creator": creator_id})
-        await send(etype=EventTypes.Create, content=creation_content)
+        creation_event, creation_context = await create_event(
+            EventTypes.Create, creation_content, False
+        )
 
         logger.debug("Sending %s in new room", EventTypes.Member)
+        await send(creation_event, creation_context, creator)
+
         # Room create event must exist at this point
         assert last_sent_event_id is not None
         member_event_id, _ = await self.room_member_handler.update_membership(
@@ -1118,15 +1152,22 @@ class RoomCreationHandler:
             prev_event_ids=[last_sent_event_id],
             depth=depth,
         )
-        last_sent_event_id = member_event_id
+        prev_event = [member_event_id]
+
+        # update the depth and state map here as the membership event has been created
+        # through a different code path
+        depth += 1
+        state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
-            last_sent_stream_id = await send(
-                etype=EventTypes.PowerLevels, content=pl_content
+            power_event, power_context = await create_event(
+                EventTypes.PowerLevels, pl_content, False
             )
+            current_state_group = power_context._state_group
+            await send(power_event, power_context, creator)
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1169,48 +1210,71 @@ class RoomCreationHandler:
             # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
-
-            last_sent_stream_id = await send(
-                etype=EventTypes.PowerLevels, content=power_level_content
+            pl_event, pl_context = await create_event(
+                EventTypes.PowerLevels,
+                power_level_content,
+                False,
             )
+            current_state_group = pl_context._state_group
+            await send(pl_event, pl_context, creator)
 
+        events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            last_sent_stream_id = await send(
-                etype=EventTypes.CanonicalAlias,
-                content={"alias": room_alias.to_string()},
+            room_alias_event, room_alias_context = await create_event(
+                EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True
             )
+            current_state_group = room_alias_context._state_group
+            events_to_send.append((room_alias_event, room_alias_context))
 
         if (EventTypes.JoinRules, "") not in initial_state:
-            last_sent_stream_id = await send(
-                etype=EventTypes.JoinRules, content={"join_rule": config["join_rules"]}
+            join_rules_event, join_rules_context = await create_event(
+                EventTypes.JoinRules,
+                {"join_rule": config["join_rules"]},
+                True,
             )
+            current_state_group = join_rules_context._state_group
+            events_to_send.append((join_rules_event, join_rules_context))
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            last_sent_stream_id = await send(
-                etype=EventTypes.RoomHistoryVisibility,
-                content={"history_visibility": config["history_visibility"]},
+            visibility_event, visibility_context = await create_event(
+                EventTypes.RoomHistoryVisibility,
+                {"history_visibility": config["history_visibility"]},
+                True,
             )
+            current_state_group = visibility_context._state_group
+            events_to_send.append((visibility_event, visibility_context))
 
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
-                last_sent_stream_id = await send(
-                    etype=EventTypes.GuestAccess,
-                    content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
+                guest_access_event, guest_access_context = await create_event(
+                    EventTypes.GuestAccess,
+                    {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
+                    True,
                 )
+                current_state_group = guest_access_context._state_group
+                events_to_send.append((guest_access_event, guest_access_context))
 
         for (etype, state_key), content in initial_state.items():
-            last_sent_stream_id = await send(
-                etype=etype, state_key=state_key, content=content
+            event, context = await create_event(
+                etype, content, True, state_key=state_key
             )
+            current_state_group = context._state_group
+            events_to_send.append((event, context))
 
         if config["encrypted"]:
-            last_sent_stream_id = await send(
-                etype=EventTypes.RoomEncryption,
+            encryption_event, encryption_context = await create_event(
+                EventTypes.RoomEncryption,
+                {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
+                True,
                 state_key="",
-                content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
             )
+            events_to_send.append((encryption_event, encryption_context))
 
-        return last_sent_stream_id, last_sent_event_id, depth
+        last_event = await self.event_creation_handler.handle_new_client_event(
+            creator, events_to_send, ignore_shadow_ban=True
+        )
+        assert last_event.internal_metadata.stream_ordering is not None
+        return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.

@@ -1,0 +1,1 @@
+Faster remote room joins: correctly handle remote device list updates during a partial join.

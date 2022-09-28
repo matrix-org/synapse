@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin
@@ -21,8 +23,6 @@ from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
-
-USER_ID = "@user:example.com"
 
 
 class EventPushActionsStoreTestCase(HomeserverTestCase):
@@ -38,21 +38,13 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         assert persist_events_store is not None
         self.persist_events_store = persist_events_store
 
-    def test_get_unread_push_actions_for_user_in_range_for_http(self) -> None:
-        self.get_success(
-            self.store.get_unread_push_actions_for_user_in_range_for_http(
-                USER_ID, 0, 1000, 20
-            )
-        )
+    def _create_users_and_room(self) -> Tuple[str, str, str, str, str]:
+        """
+        Creates two users and a shared room.
 
-    def test_get_unread_push_actions_for_user_in_range_for_email(self) -> None:
-        self.get_success(
-            self.store.get_unread_push_actions_for_user_in_range_for_email(
-                USER_ID, 0, 1000, 20
-            )
-        )
-
-    def test_count_aggregation(self) -> None:
+        Returns:
+            Tuple of (user 1 ID, user 1 token, user 2 ID, user 2 token, room ID).
+        """
         # Create a user to receive notifications and send receipts.
         user_id = self.register_user("user1235", "pass")
         token = self.login("user1235", "pass")
@@ -64,6 +56,70 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         # Create a room and put both users in it.
         room_id = self.helper.create_room_as(user_id, tok=token)
         self.helper.join(room_id, other_id, tok=other_token)
+
+        return user_id, token, other_id, other_token, room_id
+
+    def test_get_unread_push_actions_for_user_in_range(self) -> None:
+        """Test getting unread push actions for HTTP and email pushers."""
+        user_id, token, _, other_token, room_id = self._create_users_and_room()
+
+        # Create two events, one of which is a highlight.
+        self.helper.send_event(
+            room_id,
+            type="m.room.message",
+            content={"msgtype": "m.text", "body": "msg"},
+            tok=other_token,
+        )
+        event_id = self.helper.send_event(
+            room_id,
+            type="m.room.message",
+            content={"msgtype": "m.text", "body": user_id},
+            tok=other_token,
+        )["event_id"]
+
+        # Fetch unread actions for HTTP pushers.
+        http_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_http(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual(2, len(http_actions))
+
+        # Fetch unread actions for email pushers.
+        email_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_email(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual(2, len(email_actions))
+
+        # Send a receipt, which should clear any actions.
+        self.get_success(
+            self.store.insert_receipt(
+                room_id,
+                "m.read",
+                user_id=user_id,
+                event_ids=[event_id],
+                thread_id=None,
+                data={},
+            )
+        )
+        http_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_http(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual([], http_actions)
+        email_actions = self.get_success(
+            self.store.get_unread_push_actions_for_user_in_range_for_email(
+                user_id, 0, 1000, 20
+            )
+        )
+        self.assertEqual([], email_actions)
+
+    def test_count_aggregation(self) -> None:
+        # Create a user to receive notifications and send receipts.
+        user_id, token, _, other_token, room_id = self._create_users_and_room()
 
         last_event_id: str
 
@@ -106,6 +162,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     "m.read",
                     user_id=user_id,
                     event_ids=[event_id],
+                    thread_id=None,
                     data={},
                 )
             )

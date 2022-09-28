@@ -95,6 +95,8 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
     "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
     "event_push_summary": "event_push_summary_unique_index",
+    "receipts_linearized": "receipts_linearized_unique_index",
+    "receipts_graph": "receipts_graph_unique_index",
 }
 
 
@@ -390,6 +392,14 @@ class LoggingTransaction:
 
     def executemany(self, sql: str, *args: Any) -> None:
         self._do_execute(self.txn.executemany, sql, *args)
+
+    def executescript(self, sql: str) -> None:
+        if isinstance(self.database_engine, Sqlite3Engine):
+            self._do_execute(self.txn.executescript, sql)  # type: ignore[attr-defined]
+        else:
+            raise NotImplementedError(
+                f"executescript only exists for sqlite driver, not {type(self.database_engine)}"
+            )
 
     def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"

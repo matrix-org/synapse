@@ -379,8 +379,7 @@ class RoomBatchHandler:
                 await self.create_requester_for_user_id_from_app_service(
                     event.sender, app_service_requester.app_service
                 ),
-                event=event,
-                context=context,
+                events_and_context=[(event, context)],
             )
 
         return event_ids

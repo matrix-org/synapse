@@ -705,7 +705,7 @@ class _ByteProducer:
         self._request = None
 
 
-def _encode_json_bytes(json_object: Any) -> bytes:
+def _encode_json_bytes(json_object: object) -> bytes:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
@@ -746,7 +746,7 @@ def respond_with_json(
         return None
 
     if canonical_json:
-        encoder = encode_canonical_json
+        encoder: Callable[[object], bytes] = encode_canonical_json
     else:
         encoder = _encode_json_bytes
 

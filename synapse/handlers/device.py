@@ -195,7 +195,9 @@ class DeviceWorkerHandler:
         possibly_changed = set(changed)
         possibly_left = set()
         for room_id in rooms_changed:
-            current_state_ids = await self._state_storage.get_current_state_ids(room_id)
+            current_state_ids = await self._state_storage.get_current_state_ids(
+                room_id, await_full_state=False
+            )
 
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
@@ -234,7 +236,8 @@ class DeviceWorkerHandler:
 
             # mapping from event_id -> state_dict
             prev_state_ids = await self._state_storage.get_state_ids_for_events(
-                event_ids
+                event_ids,
+                await_full_state=False,
             )
 
             # Check if we've joined the room? If so we just blindly add all the users to
@@ -305,6 +308,17 @@ class DeviceWorkerHandler:
             "master_key": master_key,
             "self_signing_key": self_signing_key,
         }
+
+    async def handle_room_un_partial_stated(self, room_id: str) -> None:
+        """Handles sending appropriate device list updates in a room that has
+        gone from partial to full state.
+        """
+
+        # TODO(faster_joins): worker mode support
+        #   https://github.com/matrix-org/synapse/issues/12994
+        logger.error(
+            "Trying handling device list state for partial join: not supported on workers."
+        )
 
 
 class DeviceHandler(DeviceWorkerHandler):
@@ -688,11 +702,15 @@ class DeviceHandler(DeviceWorkerHandler):
                     # Ignore any users that aren't ours
                     if self.hs.is_mine_id(user_id):
                         hosts = set(
-                            await self._storage_controllers.state.get_current_hosts_in_room(
+                            await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
                                 room_id
                             )
                         )
                         hosts.discard(self.server_name)
+                        # For rooms with partial state, `hosts` is merely an
+                        # approximation. When we transition to a full state room, we
+                        # will have to send out device list updates to any servers we
+                        # missed.
 
                     # Check if we've already sent this update to some hosts
                     if current_stream_id == stream_id:
@@ -738,6 +756,15 @@ class DeviceHandler(DeviceWorkerHandler):
 
         finally:
             self._handle_new_device_update_is_processing = False
+
+    async def handle_room_un_partial_stated(self, room_id: str) -> None:
+        """Handles sending appropriate device list updates in a room that has
+        gone from partial to full state.
+        """
+
+        # We defer to the device list updater implementation as we're on the
+        # right worker.
+        await self.device_list_updater.handle_room_un_partial_stated(room_id)
 
 
 def _update_device_from_client_ips(
@@ -828,6 +855,16 @@ class DeviceListUpdater:
                 }
             )
             return
+
+        # Check if we are partially joining any rooms. If so we need to store
+        # all device list updates so that we can handle them correctly once we
+        # know who is in the room.
+        partial_rooms = await self.store.get_partial_state_rooms_and_servers()
+        if partial_rooms:
+            await self.store.add_remote_device_list_to_pending(
+                user_id,
+                device_id,
+            )
 
         room_ids = await self.store.get_rooms_for_user(user_id)
         if not room_ids:
@@ -1168,3 +1205,35 @@ class DeviceListUpdater:
             device_ids.append(verify_key.version)
 
         return device_ids
+
+    async def handle_room_un_partial_stated(self, room_id: str) -> None:
+        """Handles sending appropriate device list updates in a room that has
+        gone from partial to full state.
+        """
+
+        pending_updates = (
+            await self.store.get_pending_remote_device_list_updates_for_room(room_id)
+        )
+
+        for user_id, device_id in pending_updates:
+            logger.info(
+                "Got pending device list update in room %s: %s / %s",
+                room_id,
+                user_id,
+                device_id,
+            )
+            position = await self.store.add_device_change_to_streams(
+                user_id,
+                [device_id],
+                room_ids=[room_id],
+            )
+
+            if not position:
+                # This should only happen if there are no updates, which
+                # shouldn't happen when we've passed in a non-empty set of
+                # device IDs.
+                continue
+
+            self.device_handler.notifier.on_new_event(
+                StreamKeyType.DEVICE_LIST, position, rooms=[room_id]
+            )

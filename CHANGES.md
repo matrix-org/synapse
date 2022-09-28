@@ -1,12 +1,37 @@
-Synapse 1.68.0rc1 (2022-09-20)
-==============================
+Synapse 1.68.0 (2022-09-27)
+===========================
 
-Please note that Synapse will now refuse to start if configured to use a version of SQLite earlier than 3.27.
+Please note that Synapse will now refuse to start if configured to use a version of SQLite older than 3.27.
 
 In addition, please note that installing Synapse from a source checkout now requires a recent Rust compiler.
 Those using packages will not be affected. On most platforms, installing with `pip install matrix-synapse` will not be affected.
-See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1670).
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.68/upgrade.html#upgrading-to-v1680).
 
+Bugfixes
+--------
+
+- Fix packaging to include `Cargo.lock` in `sdist`. ([\#13909](https://github.com/matrix-org/synapse/issues/13909))
+
+
+Synapse 1.68.0rc2 (2022-09-23)
+==============================
+
+Bugfixes
+--------
+
+- Fix building from packaged sdist. Broken in v1.68.0rc1. ([\#13866](https://github.com/matrix-org/synapse/issues/13866))
+
+
+Internal Changes
+----------------
+
+- Fix the release script not publishing binary wheels. ([\#13850](https://github.com/matrix-org/synapse/issues/13850))
+- Lower minimum supported rustc version to 1.58.1. ([\#13857](https://github.com/matrix-org/synapse/issues/13857))
+- Lock Rust dependencies' versions. ([\#13858](https://github.com/matrix-org/synapse/issues/13858))
+
+
+Synapse 1.68.0rc1 (2022-09-20)
+==============================
 
 Features
 --------
@@ -23,7 +48,7 @@ Features
 Bugfixes
 --------
 
-- Fix a bug introduced in Synapse v1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`). ([\#13506](https://github.com/matrix-org/synapse/issues/13506))
+- Fix a bug introduced in Synapse 1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`). ([\#13506](https://github.com/matrix-org/synapse/issues/13506))
 - Fix a long-standing bug where previously rejected events could end up in room state because they pass auth checks given the current state of the room. ([\#13723](https://github.com/matrix-org/synapse/issues/13723))
 - Fix a long-standing bug where Synapse fails to start if a signing key file contains an empty line. ([\#13738](https://github.com/matrix-org/synapse/issues/13738))
 - Fix a long-standing bug where Synapse would fail to handle malformed user IDs or room aliases gracefully in certain cases. ([\#13746](https://github.com/matrix-org/synapse/issues/13746))
@@ -37,10 +62,10 @@ Improved Documentation
 ----------------------
 
 - Note that `libpq` is required on ARM-based Macs. ([\#13480](https://github.com/matrix-org/synapse/issues/13480))
-- Fix a mistake in the config manual: the `event_cache_size` _is_ scaled by `caches.global_factor`. The documentation was incorrect since Synapse v1.22.0. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
+- Fix a mistake in the config manual introduced in Synapse 1.22.0: the `event_cache_size` _is_ scaled by `caches.global_factor`. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
 - Fix a typo in the documentation for the login ratelimiting configuration. ([\#13727](https://github.com/matrix-org/synapse/issues/13727))
 - Define Synapse's compatability policy for SQLite versions. ([\#13728](https://github.com/matrix-org/synapse/issues/13728))
-- Add docs for common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems. ([\#13785](https://github.com/matrix-org/synapse/issues/13785))
+- Add docs for the common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems. ([\#13785](https://github.com/matrix-org/synapse/issues/13785))
 - Update request log format documentation to mention the format used when the authenticated user is controlling another user. ([\#13794](https://github.com/matrix-org/synapse/issues/13794))
 
 
@@ -81,7 +106,7 @@ Internal Changes
 - Fix a memory leak when running the unit tests. ([\#13798](https://github.com/matrix-org/synapse/issues/13798))
 - Use partial indices on SQLite. ([\#13802](https://github.com/matrix-org/synapse/issues/13802))
 - Check that portdb generates the same postgres schema as that in the source tree. ([\#13808](https://github.com/matrix-org/synapse/issues/13808))
-- Fix Docker build when Rust .so has been build locally first. ([\#13811](https://github.com/matrix-org/synapse/issues/13811))
+- Fix Docker build when Rust .so has been built locally first. ([\#13811](https://github.com/matrix-org/synapse/issues/13811))
 - Complement: Initialise the Postgres database directly inside the target image instead of the base Postgres image to fix building using Buildah. ([\#13819](https://github.com/matrix-org/synapse/issues/13819))
 - Support providing an index predicate clause when doing upserts. ([\#13822](https://github.com/matrix-org/synapse/issues/13822))
 - Minor speedups to linting in CI. ([\#13827](https://github.com/matrix-org/synapse/issues/13827))
@@ -135,7 +160,7 @@ Bugfixes
 - Fix [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) `/timestamp_to_event` endpoint to return the correct next event when the events have the same timestamp. ([\#13658](https://github.com/matrix-org/synapse/issues/13658))
 - Fix bug where we wedge media plugins if clients disconnect early. Introduced in v1.22.0. ([\#13660](https://github.com/matrix-org/synapse/issues/13660))
 - Fix a long-standing bug which meant that keys for unwhitelisted servers were not returned by `/_matrix/key/v2/query`. ([\#13683](https://github.com/matrix-org/synapse/issues/13683))
-- Fix a bug introduced in Synapse v1.20.0 that would cause the unstable unread counts from [MSC2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654) to be calculated even if the feature is disabled. ([\#13694](https://github.com/matrix-org/synapse/issues/13694))
+- Fix a bug introduced in Synapse 1.20.0 that would cause the unstable unread counts from [MSC2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654) to be calculated even if the feature is disabled. ([\#13694](https://github.com/matrix-org/synapse/issues/13694))
 
 
 Updates to the Docker image
@@ -162,7 +187,7 @@ Deprecations and Removals
 
 - Drop support for calling `/_matrix/client/v3/rooms/{roomId}/invite` without an `id_access_token`, which was not permitted by the spec. Contributed by @Vetchu. ([\#13241](https://github.com/matrix-org/synapse/issues/13241))
 - Remove redundant `_get_joined_users_from_context` cache. Contributed by Nick @ Beeper (@fizzadar). ([\#13569](https://github.com/matrix-org/synapse/issues/13569))
-- Remove the ability to use direct TCP replication with workers. Direct TCP replication was deprecated in Synapse v1.18.0. Workers now require using Redis. ([\#13647](https://github.com/matrix-org/synapse/issues/13647))
+- Remove the ability to use direct TCP replication with workers. Direct TCP replication was deprecated in Synapse 1.18.0. Workers now require using Redis. ([\#13647](https://github.com/matrix-org/synapse/issues/13647))
 - Remove support for unstable [private read receipts](https://github.com/matrix-org/matrix-spec-proposals/pull/2285). ([\#13653](https://github.com/matrix-org/synapse/issues/13653), [\#13692](https://github.com/matrix-org/synapse/issues/13692))
 
 
@@ -206,7 +231,7 @@ was originally planned for Synapse 1.64, but was later deferred until now. See
 the [upgrade notes](https://matrix-org.github.io/synapse/v1.66/upgrade.html#upgrading-to-v1660) for more details.
 
 Deployments with multiple workers should note that the direct TCP replication
-configuration was deprecated in Synapse v1.18.0 and will be removed in Synapse
+configuration was deprecated in Synapse 1.18.0 and will be removed in Synapse
 v1.67.0. In particular, the TCP `replication` [listener](https://matrix-org.github.io/synapse/v1.66/usage/configuration/config_documentation.html#listeners)
 type (not to be confused with the `replication` resource on the `http` listener
 type) and the `worker_replication_port` config option will be removed .
@@ -336,7 +361,7 @@ Bugfixes
 --------
 
 - Update the version of the LDAP3 auth provider module included in the `matrixdotorg/synapse` DockerHub images and the Debian packages hosted on packages.matrix.org to 0.2.2. This version fixes a regression in the module. ([\#13470](https://github.com/matrix-org/synapse/issues/13470))
-- Fix a bug introduced in Synapse v1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`) (this was reverted in v1.65.0rc2, see changelog notes above). ([\#13365](https://github.com/matrix-org/synapse/issues/13365))
+- Fix a bug introduced in Synapse 1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`) (this was reverted in v1.65.0rc2, see changelog notes above). ([\#13365](https://github.com/matrix-org/synapse/issues/13365))
 - Fix a bug introduced in Synapse 0.24.0 that would respond with the wrong error status code to `/joined_members` requests when the requester is not a current member of the room. Contributed by @andrewdoh. ([\#13374](https://github.com/matrix-org/synapse/issues/13374))
 - Fix bug in handling of typing events for appservices. Contributed by Nick @ Beeper (@fizzadar). ([\#13392](https://github.com/matrix-org/synapse/issues/13392))
 - Fix a bug introduced in Synapse 1.57.0 where rooms listed in `exclude_rooms_from_sync` in the configuration file would not be properly excluded from incremental syncs. ([\#13408](https://github.com/matrix-org/synapse/issues/13408))
@@ -401,7 +426,7 @@ No significant changes since 1.64.0rc2.
 Deprecation Warning
 -------------------
 
-Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
+Synapse 1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
 
 If you require your homeserver to verify e-mail addresses or to support password resets via e-mail, please configure your homeserver with SMTP access so that it can send e-mails on its own behalf.
 [Consult the configuration documentation for more information.](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
@@ -410,7 +435,7 @@ If you require your homeserver to verify e-mail addresses or to support password
 Synapse 1.64.0rc2 (2022-07-29)
 ==============================
 
-This RC reintroduces support for `account_threepid_delegates.email`, which was removed in 1.64.0rc1. It remains deprecated and will be removed altogether in Synapse v1.66.0. ([\#13406](https://github.com/matrix-org/synapse/issues/13406))
+This RC reintroduces support for `account_threepid_delegates.email`, which was removed in 1.64.0rc1. It remains deprecated and will be removed altogether in Synapse 1.66.0. ([\#13406](https://github.com/matrix-org/synapse/issues/13406))
 
 
 Synapse 1.64.0rc1 (2022-07-26)
@@ -659,7 +684,7 @@ Bugfixes
 - Fix a bug introduced in Synapse 1.58 where Synapse would not report full version information when installed from a git checkout. This is a best-effort affair and not guaranteed to be stable. ([\#12973](https://github.com/matrix-org/synapse/issues/12973))
 - Fix a bug introduced in Synapse 1.60 where Synapse would fail to start if the `sqlite3` module was not available. ([\#12979](https://github.com/matrix-org/synapse/issues/12979))
 - Fix a bug where non-standard information was required when requesting the `/hierarchy` API over federation. Introduced
-  in Synapse v1.41.0. ([\#12991](https://github.com/matrix-org/synapse/issues/12991))
+  in Synapse 1.41.0. ([\#12991](https://github.com/matrix-org/synapse/issues/12991))
 - Fix a long-standing bug which meant that rate limiting was not restrictive enough in some cases. ([\#13018](https://github.com/matrix-org/synapse/issues/13018))
 - Fix a bug introduced in Synapse 1.58 where profile requests for a malformed user ID would ccause an internal error. Synapse now returns 400 Bad Request in this situation. ([\#13041](https://github.com/matrix-org/synapse/issues/13041))
 - Fix some inconsistencies in the event authentication code. ([\#13087](https://github.com/matrix-org/synapse/issues/13087), [\#13088](https://github.com/matrix-org/synapse/issues/13088))
@@ -1252,7 +1277,7 @@ If you have already upgraded to Synapse 1.57.0 without problem, then you have no
 Updates to the Docker image
 ---------------------------
 
-- Include version 0.2.0 of the Synapse LDAP Auth Provider module in the Docker image. This matches the version that was present in the Docker image for Synapse v1.56.0. ([\#12512](https://github.com/matrix-org/synapse/issues/12512))
+- Include version 0.2.0 of the Synapse LDAP Auth Provider module in the Docker image. This matches the version that was present in the Docker image for Synapse 1.56.0. ([\#12512](https://github.com/matrix-org/synapse/issues/12512))
 
 
 Synapse 1.57.0 (2022-04-19)
@@ -1504,10 +1529,10 @@ Features
 Bugfixes
 --------
 
-- Use the proper serialization format for bundled thread aggregations. The bug has existed since Synapse v1.48.0. ([\#12090](https://github.com/matrix-org/synapse/issues/12090))
+- Use the proper serialization format for bundled thread aggregations. The bug has existed since Synapse 1.48.0. ([\#12090](https://github.com/matrix-org/synapse/issues/12090))
 - Fix a long-standing bug when redacting events with relations. ([\#12113](https://github.com/matrix-org/synapse/issues/12113), [\#12121](https://github.com/matrix-org/synapse/issues/12121), [\#12130](https://github.com/matrix-org/synapse/issues/12130), [\#12189](https://github.com/matrix-org/synapse/issues/12189))
 - Fix a bug introduced in Synapse 1.7.2 whereby background updates are never run with the default background batch size. ([\#12157](https://github.com/matrix-org/synapse/issues/12157))
-- Fix a bug where non-standard information was returned from the `/hierarchy` API. Introduced in Synapse v1.41.0. ([\#12175](https://github.com/matrix-org/synapse/issues/12175))
+- Fix a bug where non-standard information was returned from the `/hierarchy` API. Introduced in Synapse 1.41.0. ([\#12175](https://github.com/matrix-org/synapse/issues/12175))
 - Fix a bug introduced in Synapse 1.54.0 that broke background updates on sqlite homeservers while search was disabled. ([\#12215](https://github.com/matrix-org/synapse/issues/12215))
 - Fix a long-standing bug when a `filter` argument with `event_fields` which did not include the `unsigned` field could result in a 500 error on `/sync`. ([\#12234](https://github.com/matrix-org/synapse/issues/12234))
 
@@ -1892,15 +1917,15 @@ Bugfixes
 - Fix a long-standing issue which could cause Synapse to incorrectly accept data in the unsigned field of events
   received over federation. ([\#11530](https://github.com/matrix-org/synapse/issues/11530))
 - Fix a long-standing bug where Synapse wouldn't cache a response indicating that a remote user has no devices. ([\#11587](https://github.com/matrix-org/synapse/issues/11587))
-- Fix an error that occurs whilst trying to get the federation status of a destination server that was working normally. This admin API was newly introduced in Synapse v1.49.0. ([\#11593](https://github.com/matrix-org/synapse/issues/11593))
+- Fix an error that occurs whilst trying to get the federation status of a destination server that was working normally. This admin API was newly introduced in Synapse 1.49.0. ([\#11593](https://github.com/matrix-org/synapse/issues/11593))
 - Fix bundled aggregations not being included in the `/sync` response, per [MSC2675](https://github.com/matrix-org/matrix-doc/pull/2675). ([\#11612](https://github.com/matrix-org/synapse/issues/11612), [\#11659](https://github.com/matrix-org/synapse/issues/11659), [\#11791](https://github.com/matrix-org/synapse/issues/11791))
 - Fix the `/_matrix/client/v1/room/{roomId}/hierarchy` endpoint returning incorrect fields which have been present since Synapse 1.49.0. ([\#11667](https://github.com/matrix-org/synapse/issues/11667))
 - Fix preview of some GIF URLs (like tenor.com). Contributed by Philippe Daouadi. ([\#11669](https://github.com/matrix-org/synapse/issues/11669))
-- Fix a bug where only the first 50 rooms from a space were returned from the `/hierarchy` API. This has existed since the introduction of the API in Synapse v1.41.0. ([\#11695](https://github.com/matrix-org/synapse/issues/11695))
-- Fix a bug introduced in Synapse v1.18.0 where password reset and address validation emails would not be sent if their subject was configured to use the 'app' template variable. Contributed by @br4nnigan. ([\#11710](https://github.com/matrix-org/synapse/issues/11710), [\#11745](https://github.com/matrix-org/synapse/issues/11745))
+- Fix a bug where only the first 50 rooms from a space were returned from the `/hierarchy` API. This has existed since the introduction of the API in Synapse 1.41.0. ([\#11695](https://github.com/matrix-org/synapse/issues/11695))
+- Fix a bug introduced in Synapse 1.18.0 where password reset and address validation emails would not be sent if their subject was configured to use the 'app' template variable. Contributed by @br4nnigan. ([\#11710](https://github.com/matrix-org/synapse/issues/11710), [\#11745](https://github.com/matrix-org/synapse/issues/11745))
 - Make the 'List Rooms' Admin API sort stable. Contributed by Daniël Sonck. ([\#11737](https://github.com/matrix-org/synapse/issues/11737))
 - Fix a long-standing bug where space hierarchy over federation would only work correctly some of the time. ([\#11775](https://github.com/matrix-org/synapse/issues/11775))
-- Fix a bug introduced in Synapse v1.46.0 that prevented `on_logged_out` module callbacks from being correctly awaited by Synapse. ([\#11786](https://github.com/matrix-org/synapse/issues/11786))
+- Fix a bug introduced in Synapse 1.46.0 that prevented `on_logged_out` module callbacks from being correctly awaited by Synapse. ([\#11786](https://github.com/matrix-org/synapse/issues/11786))
 
 
 Improved Documentation
@@ -1980,8 +2005,8 @@ This release candidate fixes a federation-breaking regression introduced in Syna
 Bugfixes
 --------
 
-- Fix a bug introduced in Synapse v1.0.0 whereby some device list updates would not be sent to remote homeservers if there were too many to send at once. ([\#11729](https://github.com/matrix-org/synapse/issues/11729))
-- Fix a bug introduced in Synapse v1.50.0rc1 whereby outbound federation could fail because too many EDUs were produced for device updates. ([\#11730](https://github.com/matrix-org/synapse/issues/11730))
+- Fix a bug introduced in Synapse 1.0.0 whereby some device list updates would not be sent to remote homeservers if there were too many to send at once. ([\#11729](https://github.com/matrix-org/synapse/issues/11729))
+- Fix a bug introduced in Synapse 1.50.0rc1 whereby outbound federation could fail because too many EDUs were produced for device updates. ([\#11730](https://github.com/matrix-org/synapse/issues/11730))
 
 
 Improved Documentation
