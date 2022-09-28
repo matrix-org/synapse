@@ -757,7 +757,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             else:
                 raise RuntimeError("Unknown database engine")
 
-            sql = """
+            sql = f"""
                 SELECT backward_extrem.event_id, event.depth FROM events AS event
                 /**
                  * Get the edge connections from the event_edges table
@@ -803,7 +803,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + {least_function}((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest to the lowest depth. Then tie-break on
@@ -814,7 +814,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             """
 
             txn.execute(
-                sql % (least_function,),
+                sql,
                 (
                     room_id,
                     False,
@@ -860,7 +860,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             else:
                 raise RuntimeError("Unknown database engine")
 
-            sql = """
+            sql = f"""
                 SELECT
                     insertion_event_extremity.event_id, event.depth
                 /* We only want insertion events that are also marked as backwards extremities */
@@ -888,7 +888,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + {least_function}((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
                  * Sort from highest to the lowest depth. Then tie-break on
@@ -899,7 +899,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             """
 
             txn.execute(
-                sql % (least_function,),
+                sql,
                 (
                     room_id,
                     self._clock.time_msec(),
