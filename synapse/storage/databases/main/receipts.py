@@ -151,7 +151,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """
         result = await self.db_pool.runInteraction(
             "get_last_receipt_event_id_for_user",
-            self.get_last_receipt_for_user_txn,
+            self.get_last_unthreaded_receipt_for_user_txn,
             user_id,
             room_id,
             receipt_types,
@@ -162,7 +162,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         event_id, _ = result
         return event_id
 
-    def get_last_receipt_for_user_txn(
+    def get_last_unthreaded_receipt_for_user_txn(
         self,
         txn: LoggingTransaction,
         user_id: str,
