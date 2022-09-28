@@ -649,26 +649,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         if rooms:
             return frozenset(r.room_id for r in rooms)
 
-        return await self.db_pool.runInteraction(
-            "get_rooms_for_user",
-            self._get_rooms_for_user_txn,
-            user_id,
+        room_ids = await self.db_pool.simple_select_onecol(
+            table="current_state_events",
+            keyvalues={
+                "type": EventTypes.Member,
+                "membership": Membership.JOIN,
+                "state_key": user_id,
+            },
+            retcol="room_id",
+            desc="get_rooms_for_user",
         )
 
-    def _get_rooms_for_user_txn(
-        self, txn: LoggingTransaction, user_id: str
-    ) -> FrozenSet[str]:
-        sql = """
-            SELECT room_id
-            FROM current_state_events AS c
-            WHERE
-                c.type = 'm.room.member'
-                AND c.state_key = ?
-                AND c.membership = ?
-        """
-
-        txn.execute(sql, (user_id, Membership.JOIN))
-        return frozenset(row[0] for row in txn)
+        return frozenset(room_ids)
 
     @cachedList(
         cached_method_name="get_rooms_for_user",
