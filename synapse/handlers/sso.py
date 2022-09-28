@@ -30,9 +30,9 @@ from typing import (
 from urllib.parse import urlencode
 
 import attr
-import requests
 from typing_extensions import NoReturn, Protocol
 
+from twisted.web.client import readBody
 from twisted.web.iweb import IRequest
 from twisted.web.server import Request
 
@@ -44,6 +44,7 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
+from synapse.logging.context import make_deferred_yieldable
 from synapse.types import (
     JsonDict,
     UserID,
@@ -195,6 +196,7 @@ class SsoHandler:
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
         self.media_repo = hs.get_media_repository()
+        self._http_client = hs.get_proxied_http_client()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
@@ -709,30 +711,34 @@ class SsoHandler:
             uid = UserID.from_string(user_id)
 
             # ensure picture size respects max_avatar_size defined in config
-            http_response = requests.options(picture_https_url)
-            if http_response.status_code != 200:
-                http_response.raise_for_status()
+            response = await self._http_client.request("OPTIONS", picture_https_url)
+            if response.code != 200:
+                raise Exception("error sending OPTIONS request to get image size")
 
-            content_type = http_response.headers["Content-Type"]
-            content_length = int(http_response.headers["Content-Length"])
+            content_length = response.length
+            headers = response.headers.getAllRawHeaders()
+            for header in headers:
+                if header[0].decode("utf-8") == "Content-Type":
+                    content_type = header[1][0].decode("utf-8")
+                    break
 
             if self._profile_handler.max_avatar_size is not None:
                 if content_length > self._profile_handler.max_avatar_size:
                     raise Exception("sso avatar too big in size")
 
             # download picture
-            http_response = requests.get(picture_https_url)
-            if http_response.status_code != 200:
-                http_response.raise_for_status()
-
-            # convert image into BytesIO
-            b = io.BytesIO(http_response.content)
+            response = await self._http_client.request("GET", picture_https_url)
+            if response.code != 200:
+                raise Exception(
+                    "error sending GET request to provided sso avatar image"
+                )
+            image = await make_deferred_yieldable(readBody(response))
 
             # store it in media repository
             avatar_mxc_url = await self.media_repo.create_content(
                 content_type,
                 None,
-                b,
+                io.BytesIO(image),  # convert image into BytesIO
                 content_length,
                 uid,
             )
