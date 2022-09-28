@@ -749,6 +749,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             # persisted in our database yet (meaning we don't know their depth
             # specifically). So we need to look for the approximate depth from
             # the events connected to the current backwards extremeties.
+
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "least"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "min"
+            else:
+                raise RuntimeError("Unknown database engine")
+
             sql = """
                 SELECT backward_extrem.event_id, event.depth FROM events AS event
                 /**
@@ -805,13 +813,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 ORDER BY event.depth DESC, backward_extrem.event_id DESC
             """
 
-            if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
-            else:
-                raise RuntimeError("Unknown database engine")
-
             txn.execute(
                 sql % (least_function,),
                 (
@@ -852,6 +853,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         def get_insertion_event_backward_extremities_in_room_txn(
             txn: LoggingTransaction, room_id: str
         ) -> List[Tuple[str, int]]:
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "least"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "min"
+            else:
+                raise RuntimeError("Unknown database engine")
+
             sql = """
                 SELECT
                     insertion_event_extremity.event_id, event.depth
@@ -889,13 +897,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                  */
                 ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
             """
-
-            if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
-            else:
-                raise RuntimeError("Unknown database engine")
 
             txn.execute(
                 sql % (least_function,),
