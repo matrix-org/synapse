@@ -150,6 +150,7 @@ class FederationHandler:
         self._replication = hs.get_replication_data_handler()
         self._federation_event_handler = hs.get_federation_event_handler()
         self._device_handler = hs.get_device_handler()
+        self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
             hs
@@ -957,9 +958,15 @@ class FederationHandler:
         )
 
         context = EventContext.for_outlier(self._storage_controllers)
-        await self._federation_event_handler.persist_events_and_notify(
-            event.room_id, [(event, context)]
-        )
+
+        await self._bulk_push_rule_evaluator.action_for_event_by_user(event, context)
+        try:
+            await self._federation_event_handler.persist_events_and_notify(
+                event.room_id, [(event, context)]
+            )
+        except Exception:
+            await self.store.remove_push_actions_from_staging(event.event_id)
+            raise
 
         return event
 
