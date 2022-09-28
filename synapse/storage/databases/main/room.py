@@ -1256,6 +1256,22 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         return entry is not None
 
+    async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
+        self, room_id: str
+    ) -> Tuple[str, int]:
+        """Get the event ID of the initial join that started the partial
+        join, and the device list stream ID at the point we started the partial
+        join.
+        """
+
+        result = await self.db_pool.simple_select_one(
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            retcols=("join_event_id", "device_lists_stream_id"),
+            desc="get_join_event_id_for_partial_state",
+        )
+        return result["join_event_id"], result["device_lists_stream_id"]
+
 
 class _BackgroundUpdates:
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
