@@ -763,7 +763,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_backfill_points_in_room(room_id)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
+        self.assertEqual(
             backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
         )
 
@@ -800,7 +800,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Only the backfill points that we didn't record earlier exist here.
-        self.assertListEqual(backfill_event_ids, ["b6", "2", "b1"])
+        self.assertEqual(backfill_event_ids, ["b6", "2", "b1"])
 
     def test_get_backfill_points_in_room_attempted_event_retry_after_backoff_duration(
         self,
@@ -845,7 +845,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_backfill_points_in_room(room_id)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2"])
+        self.assertEqual(backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2"])
 
         # Now advance time by 20 hours (above 2^4 because we made 4 attemps) and
         # see if we can now backfill it
@@ -856,7 +856,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_backfill_points_in_room(room_id)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
+        self.assertEqual(
             backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
         )
 
@@ -947,7 +947,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_insertion_event_backward_extremities_in_room(room_id)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
+        self.assertEqual(
             backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
         )
 
@@ -978,7 +978,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Only the backfill points that we didn't record earlier exist here.
-        self.assertListEqual(backfill_event_ids, ["insertion_eventB"])
+        self.assertEqual(backfill_event_ids, ["insertion_eventB"])
 
     def test_get_insertion_event_backward_extremities_in_room_attempted_event_retry_after_backoff_duration(
         self,
@@ -1033,7 +1033,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_insertion_event_backward_extremities_in_room(room_id)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(backfill_event_ids, ["insertion_eventB"])
+        self.assertEqual(backfill_event_ids, ["insertion_eventB"])
 
         # Now advance time by 20 hours (above 2^4 because we made 4 attemps) and
         # see if we can now backfill it
@@ -1045,7 +1045,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_insertion_event_backward_extremities_in_room(room_id)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
+        self.assertEqual(
             backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
         )
 
@@ -1085,7 +1085,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # We should aim to fetch A (the backoff period has expired) and to fetch B
         # (we haven't tried to fetch it yet).
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
+        self.assertEqual(
             backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
         )
 
