@@ -103,10 +103,8 @@ def _rule_to_template(rule: PushRule) -> Optional[Dict[str, Any]]:
         # with PRIORITY_CLASS_INVERSE_MAP.
         raise ValueError("Unexpected template_name: %s" % (template_name,))
 
-    if unscoped_rule_id:
-        templaterule["rule_id"] = unscoped_rule_id
-    if rule.default:
-        templaterule["default"] = True
+    templaterule["rule_id"] = unscoped_rule_id
+    templaterule["default"] = rule.default
     return templaterule
 
 
