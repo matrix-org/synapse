@@ -278,7 +278,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     def _get_e2e_device_keys_txn(
         self,
         txn: LoggingTransaction,
-        query_list: Collection[Tuple[str, str]],
+        query_list: Collection[Tuple[str, Optional[str]]],
         include_all_devices: bool = False,
         include_deleted_devices: bool = False,
     ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
@@ -323,6 +323,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         result: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]] = {}
         for (user_id, device_id, display_name, key_json) in txn:
+            assert device_id is not None
             if include_deleted_devices:
                 deleted_devices.remove((user_id, device_id))
             result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
@@ -331,6 +332,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         if include_deleted_devices:
             for user_id, device_id in deleted_devices:
+                if device_id is None:
+                    continue
                 result.setdefault(user_id, {})[device_id] = None
 
         return result
