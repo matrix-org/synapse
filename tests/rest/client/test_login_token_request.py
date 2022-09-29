@@ -24,6 +24,7 @@ from tests.unittest import override_config
 
 endpoint = "/_matrix/client/unstable/org.matrix.msc3882/login/token"
 
+
 class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
