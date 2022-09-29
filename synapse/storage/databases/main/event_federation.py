@@ -81,7 +81,8 @@ logger = logging.getLogger(__name__)
 # Each successive backoff period is twice as long as the last. However we cap this
 # period at a maximum of 2^8 = 256 hours: a little over 10 days. (This is the smallest
 # power of 2 which yields a maximum backoff period of at least 7 days---which was the
-# original maximum backoff period.)
+# original maximum backoff period.) Even when we hit this cap, we will continue to
+# make backfill attempts once every 10 days.
 BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS = 8
 BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS = int(
     datetime.timedelta(hours=1).total_seconds() * 1000
