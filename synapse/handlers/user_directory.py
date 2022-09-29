@@ -416,8 +416,8 @@ class UserDirectoryHandler(StateDeltasHandler):
                         (joining_user_id, other_user_id)
                     )
 
-            # Next, we need an update for every local user in the room that they
-            # now share a room with the joining user
+            # Next, we need an update for every other local user in the room
+            # that they now share a room with the joining user.
             for other_user_id in other_users_in_room:
                 if self.is_mine_id(other_user_id):
                     updates_to_users_who_share_rooms.add(
