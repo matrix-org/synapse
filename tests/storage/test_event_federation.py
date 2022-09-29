@@ -860,6 +860,47 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
         )
 
+    def test_repeated_get_backfill_points_in_room_succeed(self) -> None:
+        """
+        A test that reproduces #13929 (Postgres only).
+
+        We should be able to backoff repeatedly, even if the backoff formula would tell
+        us to wait for more seconds than can be expressed in a 32 bit signed int.
+        """
+        setup_info = self._setup_room_for_backfill_tests()
+        room_id = setup_info.room_id
+
+        # Pretend that we have tried and failed 10 times to backfill event b1.
+        for _ in range(10):
+            self.get_success(
+                self.store.record_event_failed_pull_attempt(
+                    room_id, "b1", "fake cause"
+                )
+            )
+
+        # If the backoff periods grow without limit:
+        # After the first failed attempt, we would have backed off for 1 << 1 = 2 hours.
+        # After the second failed attempt we would have backed off for 1 << 2 = 4 hours,
+        # so after the 10th failed attempt we should backoff for 1 << 10 == 1024 hours.
+        # Wait 1100 hours just so we have a nice round number.
+        self.reactor.advance(datetime.timedelta(hours=1100).total_seconds())
+
+        # 1024 hours in milliseconds is 1024 * 3600000, which exceeds the largest 32 bit
+        # signed integer. The bug we're reproducing is that this overflow causes an
+        # error in postgres preventing us from fetching a set of backwards extremities
+        # to retry fetching.
+        backfill_points = self.get_success(
+            self.store.get_backfill_points_in_room(room_id)
+        )
+
+        # We should aim to fetch all backoff points: b1's latest backoff period has
+        # expired, and we haven't tried the rest.
+        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
+        self.assertEqual(
+            backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
+        )
+
+
     def _setup_room_for_insertion_backfill_tests(self) -> _BackfillSetupInfo:
         """
         Sets up a room with various insertion event backward extremities to test
@@ -1049,45 +1090,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
         )
 
-    def test_repeated_backfill_failures_are_retried_appropriately(self) -> None:
-        """
-        A test that reproduces #13929 (Postgres only).
-
-        We should be able to backoff repeatedly, even if the backoff formula would tell
-        us to wait for more seconds than can be expressed in a 32 bit signed int.
-        """
-        setup_info = self._setup_room_for_insertion_backfill_tests()
-        room_id = setup_info.room_id
-
-        # Pretend that we have tried and failed 10 times to backfill event A.
-        for _ in range(10):
-            self.get_success(
-                self.store.record_event_failed_pull_attempt(
-                    room_id, "insertion_eventA", "fake cause"
-                )
-            )
-
-        # If the backoff periods grow without limit:
-        # After the first failed attempt, we would have backed off for 1 << 1 = 2 hours.
-        # After the second failed attempt we would have backed off for 1 << 2 = 4 hours,
-        # so after the 10th failed attempt we should backoff for 1 << 10 == 1024 hours.
-        # Wait 1100 hours just so we have a nice round number.
-        self.reactor.advance(datetime.timedelta(hours=1100).total_seconds())
-
-        # 1024 hours in milliseconds is 1024 * 3600000, which exceeds the largest 32 bit
-        # signed integer. The bug we're reproducing is that this overflow causes an
-        # error in postgres preventing us from fetching a set of backwards extremities
-        # to retry fetching.
-        backfill_points = self.get_success(
-            self.store.get_insertion_event_backward_extremities_in_room(room_id)
-        )
-
-        # We should aim to fetch A (the backoff period has expired) and to fetch B
-        # (we haven't tried to fetch it yet).
-        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertEqual(
-            backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
-        )
 
 
 @attr.s
