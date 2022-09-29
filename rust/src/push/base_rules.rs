@@ -262,6 +262,7 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
         priority_class: 1,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelationMatch {
             rel_type: Cow::Borrowed("m.thread"),
+            event_type_pattern: None,
             sender: None,
             sender_type: Some(Cow::Borrowed("user_id")),
         })]),
