@@ -897,11 +897,13 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             self.assertEqual(destination, self.OTHER_SERVER_NAME)
             known_event_info = known_event_dict.get(event_id)
             if known_event_info is None:
-                self.fail(f"Event ({event_id}) not part of our known events list")
+                self.fail(
+                    f"stubbed get_room_state_ids: Event ({event_id}) not part of our known events list"
+                )
 
             known_event, known_event_state_list = known_event_info
             logger.info(
-                "stubbed get_room_state_ids destination=%s event_id=%s auth_event_ids=%s",
+                "stubbed get_room_state_ids: destination=%s event_id=%s auth_event_ids=%s",
                 destination,
                 event_id,
                 known_event.auth_event_ids(),
@@ -921,11 +923,13 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             self.assertEqual(destination, self.OTHER_SERVER_NAME)
             known_event_info = known_event_dict.get(event_id)
             if known_event_info is None:
-                self.fail(f"Event ({event_id}) not part of our known events list")
+                self.fail(
+                    f"stubbed get_room_state: Event ({event_id}) not part of our known events list"
+                )
 
             known_event, known_event_state_list = known_event_info
             logger.info(
-                "stubbed get_room_state destination=%s event_id=%s auth_event_ids=%s",
+                "stubbed get_room_state: destination=%s event_id=%s auth_event_ids=%s",
                 destination,
                 event_id,
                 known_event.auth_event_ids(),
@@ -937,7 +941,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 known_event_info = known_event_dict.get(event_id)
                 if known_event_info is None:
                     self.fail(
-                        f"Auth event ({auth_event_id}) is not part of our known events list"
+                        f"stubbed get_room_state: Auth event ({auth_event_id}) is not part of our known events list"
                     )
                 known_auth_event, _ = known_event_info
                 auth_events.append(known_auth_event)
@@ -947,12 +951,25 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 auth_events=auth_events,
             )
 
+        async def get_event(destination: str, event_id: str, timeout=None):
+            self.assertEqual(destination, self.OTHER_SERVER_NAME)
+            known_event_info = known_event_dict.get(event_id)
+            if known_event_info is None:
+                self.fail(
+                    f"stubbed get_event: Event ({event_id}) not part of our known events list"
+                )
+
+            known_event, _ = known_event_info
+            return {"pdus": [known_event.get_pdu_json()]}
+
         self.mock_federation_transport_client.get_room_state_ids.side_effect = (
             get_room_state_ids
         )
         self.mock_federation_transport_client.get_room_state.side_effect = (
             get_room_state
         )
+
+        self.mock_federation_transport_client.get_event.side_effect = get_event
 
         # create the room
         room_creator = self.appservice.sender
@@ -997,17 +1014,46 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         for state_event in state_map.values():
             _add_to_known_event_list(state_event)
 
-        historical_auth_event_ids = [
+        # This should be the successor of the event we want to insert next to
+        # (the successor of event_before is event_after).
+        inherited_depth = event_after.depth
+
+        historical_base_auth_event_ids = [
             room_create_event.event_id,
             pl_event.event_id,
-            as_membership_event.event_id,
         ]
         historical_state_events = list(state_map.values())
         historical_state_event_ids = [
             state_event.event_id for state_event in historical_state_events
         ]
 
-        inherited_depth = event_after.depth
+        maria_mxid = "@maria:test"
+        maria_membership_event, _ = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                sender=maria_mxid,
+                state_key=maria_mxid,
+                type=EventTypes.Member,
+                content={
+                    "membership": "join",
+                },
+                # It all works when I add a prev_event for the floating
+                # insertion event but the event no longer floats.
+                # It's able to resolve state at the prev_events though.
+                # prev_event_ids=[event_before.event_id],
+                allow_no_prev_events=True,
+                prev_event_ids=[],
+                auth_event_ids=historical_base_auth_event_ids,
+                state_event_ids=historical_state_event_ids,
+                depth=inherited_depth,
+            )
+        )
+        _add_to_known_event_list(maria_membership_event, historical_state_events)
+
+        historical_state_events.append(maria_membership_event)
+        historical_state_event_ids.append(maria_membership_event.event_id)
+
         batch_id = random_string(8)
         next_batch_id = random_string(8)
         insertion_event, _ = self.get_success(
@@ -1020,13 +1066,16 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_NEXT_BATCH_ID: next_batch_id,
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
-                # It all works when I add a prev_event for the floating
-                # insertion event but the event no longer floats.
-                # It's able to resolve state at the prev_events though.
-                prev_event_ids=[event_before.event_id],
+                # The difference from the actual room /batch_send is that this is normally
+                # floating as well. But seems to work once we connect it to the
+                # floating historical state chain.
+                prev_event_ids=[maria_membership_event.event_id],
                 # allow_no_prev_events=True,
                 # prev_event_ids=[],
-                auth_event_ids=historical_auth_event_ids,
+                auth_event_ids=[
+                    *historical_base_auth_event_ids,
+                    as_membership_event.event_id,
+                ],
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
             )
@@ -1036,11 +1085,14 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             create_event(
                 self.hs,
                 room_id=room_id,
-                sender=room_creator,
+                sender=maria_mxid,
                 type=EventTypes.Message,
                 content={"body": "Historical message", "msgtype": "m.text"},
                 prev_event_ids=[insertion_event.event_id],
-                auth_event_ids=historical_auth_event_ids,
+                auth_event_ids=[
+                    *historical_base_auth_event_ids,
+                    maria_membership_event.event_id,
+                ],
                 depth=inherited_depth,
             )
         )
@@ -1056,7 +1108,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
                 prev_event_ids=[historical_message_event.event_id],
-                auth_event_ids=historical_auth_event_ids,
+                auth_event_ids=[
+                    *historical_base_auth_event_ids,
+                    as_membership_event.event_id,
+                ],
                 depth=inherited_depth,
             )
         )
@@ -1072,7 +1127,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
                 prev_event_ids=[event_before.event_id],
-                auth_event_ids=historical_auth_event_ids,
+                auth_event_ids=[
+                    *historical_base_auth_event_ids,
+                    as_membership_event.event_id,
+                ],
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
             )
@@ -1215,7 +1273,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             if event.event_id in event_id_extra
         ]
         assertion_message = (
-            "Actual events missing from expected list: %s\nActual events contain %d additional events compared to expected: %s\nExpected event order: %s\nActual event order: %s"
+            "Debug info:\nActual events missing from expected list: %s\nActual events contain %d additional events compared to expected: %s\nExpected event order: %s\nActual event order: %s"
             % (
                 json.dumps(
                     [_debug_event_string(event) for event in event_diff_ordered],

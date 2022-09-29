@@ -660,7 +660,7 @@ class FederationEventHandler:
             # thrashing.
             reverse_chronological_events = events
             # `[::-1]` is just syntax to reverse the list and give us a copy
-            # chronological_events = reverse_chronological_events[::-1]
+            chronological_events = reverse_chronological_events[::-1]
 
             logger.info(
                 "backfill assumed reverse_chronological_events=%s",
@@ -716,8 +716,8 @@ class FederationEventHandler:
                 # Expecting to persist in chronological order here (oldest ->
                 # newest) so that events are persisted before they're referenced
                 # as a `prev_event`.
-                # chronological_events,
-                #reverse_chronological_events,
+                chronological_events,
+                # reverse_chronological_events,
                 backfilled=True,
             )
 

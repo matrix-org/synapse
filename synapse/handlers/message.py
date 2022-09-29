@@ -1106,6 +1106,13 @@ class EventCreationHandler:
             depth=depth,
         )
 
+        logger.info(
+            "create_new_client_event(event=%s) state_event_ids=%s resultant auth_event_ids=%s",
+            event.event_id,
+            state_event_ids,
+            auth_event_ids,
+        )
+
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
