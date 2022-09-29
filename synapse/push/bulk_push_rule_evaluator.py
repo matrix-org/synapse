@@ -338,7 +338,7 @@ class BulkPushRuleEvaluator:
                 actions_by_user[uid] = []
 
             actions = evaluator.run(rules, uid, display_name)
-            if actions and "notify" in actions:
+            if "notify" in actions:
                 # Push rules say we should notify the user of this event
                 actions_by_user[uid] = actions
 
