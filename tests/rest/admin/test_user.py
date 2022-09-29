@@ -25,10 +25,10 @@ from parameterized import parameterized, parameterized_class
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import UserTypes
+from synapse.api.constants import UserTypes, LoginType
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
-from synapse.rest.client import devices, login, logout, profile, room, sync
+from synapse.rest.client import devices, login, logout, profile, room, sync, register
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID
@@ -1355,6 +1355,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets,
         login.register_servlets,
         sync.register_servlets,
+        register.register_servlets,
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -2633,16 +2634,19 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """Tests that approving an account correctly sets the approved flag for the user."""
         url = self.url_prefix % "@bob:test"
 
-        # Create user
+        # Create the user using the client-server API since otherwise the user will be
+        # marked as approved automatically.
         channel = self.make_request(
-            "PUT",
-            url,
-            access_token=self.admin_user_tok,
-            content={"password": "abc123"},
+            "POST",
+            "register",
+            {
+                "username": "bob",
+                "password": "test",
+                "auth": {"type": LoginType.DUMMY},
+            },
         )
-
-        self.assertEqual(201, channel.code, msg=channel.json_body)
-        self.assertEqual(0, channel.json_body["approved"])
+        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
 
         # Get user
         channel = self.make_request(
@@ -2652,7 +2656,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertEqual(0, channel.json_body["approved"])
+        self.assertFalse(channel.json_body["approved"])
 
         # Approve user
         channel = self.make_request(
@@ -2663,7 +2667,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertEqual(1, channel.json_body["approved"])
+        self.assertTrue(channel.json_body["approved"])
 
         # Check that the user is now approved
         channel = self.make_request(
@@ -2673,7 +2677,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertEqual(1, channel.json_body["approved"])
+        self.assertTrue(channel.json_body["approved"])
 
     @override_config(
         {
