@@ -41,7 +41,7 @@ class PushRuleEvaluator:
         self,
         flattened_keys: Mapping[str, str],
         room_member_count: int,
-        sender_power_level: int,
+        sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
         relations: Mapping[str, Set[Tuple[str, str]]],
         relation_match_enabled: bool,

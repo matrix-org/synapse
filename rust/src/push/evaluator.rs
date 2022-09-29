@@ -56,8 +56,9 @@ pub struct PushRuleEvaluator {
     /// Is running "relation" conditions enabled?
     relation_match_enabled: bool,
 
-    /// The power level of the sender of the event
-    sender_power_level: i64,
+    /// The power level of the sender of the event, or None if event is an
+    /// outlier.
+    sender_power_level: Option<i64>,
 }
 
 #[pymethods]
@@ -67,7 +68,7 @@ impl PushRuleEvaluator {
     pub fn py_new(
         flattened_keys: BTreeMap<String, String>,
         room_member_count: u64,
-        sender_power_level: i64,
+        sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
         relations: BTreeMap<String, BTreeSet<(String, String)>>,
         relation_match_enabled: bool,
@@ -190,13 +191,17 @@ impl PushRuleEvaluator {
                 }
             }
             KnownCondition::SenderNotificationPermission { key } => {
-                let required_level = self
-                    .notification_power_levels
-                    .get(key.as_ref())
-                    .copied()
-                    .unwrap_or(50);
+                if let Some(sender_power_level) = &self.sender_power_level {
+                    let required_level = self
+                        .notification_power_levels
+                        .get(key.as_ref())
+                        .copied()
+                        .unwrap_or(50);
 
-                self.sender_power_level >= required_level
+                    *sender_power_level >= required_level
+                } else {
+                    false
+                }
             }
             KnownCondition::RelationMatch {
                 rel_type,
