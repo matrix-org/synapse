@@ -961,16 +961,11 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         )
         room_version = self.get_success(main_store.get_room_version(room_id))
 
-        user_alice = self.register_user("alice", "pass")
-        alice_membership_event = self.get_success(
-            event_injection.inject_member_event(self.hs, room_id, user_alice, "join")
-        )
-
         event_before = self.get_success(
             inject_event(
                 self.hs,
                 room_id=room_id,
-                sender=user_alice,
+                sender=room_creator,
                 type=EventTypes.Message,
                 content={"body": "eventBefore0", "msgtype": "m.text"},
             )
@@ -981,7 +976,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             inject_event(
                 self.hs,
                 room_id=room_id,
-                sender=user_alice,
+                sender=room_creator,
                 type=EventTypes.Message,
                 content={"body": "eventAfter0", "msgtype": "m.text"},
             )
@@ -1089,7 +1084,6 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         #     as_membership_event,
         #     state_map.get((EventTypes.JoinRules, "")),
         #     state_map.get((EventTypes.RoomHistoryVisibility, "")),
-        #     alice_membership_event,
         #     event_before,
         #     # HISTORICAL MESSAGE END
         #     insertion_event,
@@ -1112,7 +1106,6 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             as_membership_event,
             state_map.get((EventTypes.JoinRules, "")),
             state_map.get((EventTypes.RoomHistoryVisibility, "")),
-            alice_membership_event,
             event_before,
             event_after,
             base_insertion_event,
@@ -1173,7 +1166,6 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             pl_event,
             state_map.get((EventTypes.JoinRules, "")),
             state_map.get((EventTypes.RoomHistoryVisibility, "")),
-            alice_membership_event,
             event_before,
             # HISTORICAL MESSAGE END
             insertion_event,
