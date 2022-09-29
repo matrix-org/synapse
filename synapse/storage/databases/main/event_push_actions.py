@@ -1068,7 +1068,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 limit,
             ),
         )
-        rows = txn.fetchall()
+        rows = cast(List[Tuple[int, str, str, int]], txn.fetchall())
 
         # For each new read receipt we delete push actions from before it and
         # recalculate the summary.
@@ -1113,18 +1113,18 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # We always update `event_push_summary_last_receipt_stream_id` to
         # ensure that we don't rescan the same receipts for remote users.
 
-        upper_limit = max_receipts_stream_id
+        receipts_last_processed_stream_id = max_receipts_stream_id
         if len(rows) >= limit:
             # If we pulled out a limited number of rows we only update the
             # position to the last receipt we processed, so we continue
             # processing the rest next iteration.
-            upper_limit = rows[-1][0]
+            receipts_last_processed_stream_id = rows[-1][0]
 
         self.db_pool.simple_update_txn(
             txn,
             table="event_push_summary_last_receipt_stream_id",
             keyvalues={},
-            updatevalues={"stream_id": upper_limit},
+            updatevalues={"stream_id": receipts_last_processed_stream_id},
         )
 
         return len(rows) < limit
