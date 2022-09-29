@@ -568,6 +568,20 @@ class UnredactedContentDeletedError(SynapseError):
         return cs_error(self.msg, self.errcode, **extra)
 
 
+class NotApprovedError(SynapseError):
+    def __init__(
+        self,
+        msg: str,
+        approval_notice_medium: str,
+    ):
+        super().__init__(
+            code=403,
+            msg=msg,
+            errcode=Codes.USER_AWAITING_APPROVAL,
+            additional_fields={"approval_notice_medium": approval_notice_medium},
+        )
+
+
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
     """Utility method for constructing an error response for client-server
     interactions.

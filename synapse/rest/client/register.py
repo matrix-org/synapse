@@ -21,10 +21,15 @@ from twisted.web.server import Request
 import synapse
 import synapse.api.auth
 import synapse.types
-from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
+from synapse.api.constants import (
+    APP_SERVICE_REGISTRATION_TYPE,
+    ApprovalNoticeMedium,
+    LoginType,
+)
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
+    NotApprovedError,
     SynapseError,
     ThreepidValidationError,
     UnrecognizedRequestError,
@@ -740,10 +745,9 @@ class RegisterRestServlet(RestServlet):
             )
 
             if self._require_approval:
-                raise SynapseError(
-                    code=403,
-                    errcode=Codes.USER_AWAITING_APPROVAL,
+                raise NotApprovedError(
                     msg="This account needs to be approved by an administrator before it can be used.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
                 )
 
         return 200, return_dict

@@ -25,7 +25,7 @@ from parameterized import parameterized, parameterized_class
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType, UserTypes
+from synapse.api.constants import ApprovalNoticeMedium, LoginType, UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import devices, login, logout, profile, register, room, sync
@@ -2647,6 +2647,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(403, channel.code, channel.result)
         self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
 
         # Get user
         channel = self.make_request(

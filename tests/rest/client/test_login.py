@@ -23,7 +23,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType
+from synapse.api.constants import ApprovalNoticeMedium, LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import devices, login, logout, register
@@ -431,6 +431,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(403, channel.code, channel.result)
         self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
 
         params = {
             "type": LoginType.PASSWORD,
@@ -440,6 +443,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", LOGIN_URL, params)
         self.assertEqual(403, channel.code, channel.result)
         self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")

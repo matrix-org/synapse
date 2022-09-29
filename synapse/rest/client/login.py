@@ -28,7 +28,14 @@ from typing import (
 
 from typing_extensions import TypedDict
 
-from synapse.api.errors import Codes, InvalidClientTokenError, LoginError, SynapseError
+from synapse.api.constants import ApprovalNoticeMedium
+from synapse.api.errors import (
+    Codes,
+    InvalidClientTokenError,
+    LoginError,
+    NotApprovedError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
@@ -229,10 +236,9 @@ class LoginRestServlet(RestServlet):
         if self._require_approval:
             approved = await self.auth_handler.is_user_approved(result["user_id"])
             if not approved:
-                raise SynapseError(
-                    code=403,
-                    errcode=Codes.USER_AWAITING_APPROVAL,
+                raise NotApprovedError(
                     msg="This account is pending approval by a server administrator.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
                 )
 
         well_known_data = self._well_known_builder.get_well_known()

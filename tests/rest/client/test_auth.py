@@ -20,7 +20,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType
+from synapse.api.constants import ApprovalNoticeMedium, LoginType
 from synapse.api.errors import Codes
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client import account, auth, devices, login, logout, register
@@ -587,6 +587,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         login_resp = self.helper.login_via_oidc("username", expected_status=403)
 
         self.assertEqual(login_resp["errcode"], Codes.USER_AWAITING_APPROVAL)
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, login_resp["approval_notice_medium"]
+        )
 
         # Check that we didn't register a device for the user during the login attempt.
         devices = self.get_success(

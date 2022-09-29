@@ -22,7 +22,11 @@ import pkg_resources
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
+from synapse.api.constants import (
+    APP_SERVICE_REGISTRATION_TYPE,
+    ApprovalNoticeMedium,
+    LoginType,
+)
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import account, account_validity, login, logout, register, sync
@@ -787,6 +791,9 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(403, channel.code, channel.result)
         self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
