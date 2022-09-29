@@ -451,6 +451,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                     receipt_type="m.read",
                     user_id=self.local_user,
                     event_ids=[f"$eventid_{i}"],
+                    thread_id=None,
                     data={},
                 )
             )

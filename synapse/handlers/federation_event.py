@@ -238,7 +238,7 @@ class FederationEventHandler:
         #
         # Note that if we were never in the room then we would have already
         # dropped the event, since we wouldn't know the room version.
-        is_in_room = await self._event_auth_handler.check_host_in_room(
+        is_in_room = await self._event_auth_handler.is_host_in_room(
             room_id, self._server_name
         )
         if not is_in_room:
@@ -2170,6 +2170,7 @@ class FederationEventHandler:
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
             # here as that is what we default to in `max_request_body_size(..)`
+            result = {}
             try:
                 for batch in batch_iter(event_and_contexts, 200):
                     result = await self._send_events(

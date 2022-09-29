@@ -129,12 +129,16 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         async def check_host_in_room(room_id: str, server_name: str) -> bool:
             return room_id == ROOM_ID
 
-        hs.get_event_auth_handler().check_host_in_room = check_host_in_room
+        hs.get_event_auth_handler().is_host_in_room = check_host_in_room
 
         async def get_current_hosts_in_room(room_id: str):
             return {member.domain for member in self.room_members}
 
         hs.get_storage_controllers().state.get_current_hosts_in_room = (
+            get_current_hosts_in_room
+        )
+
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
             get_current_hosts_in_room
         )
 

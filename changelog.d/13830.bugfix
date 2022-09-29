@@ -1,0 +1,1 @@
+Fix a long-standing bug where typing events would be accepted from remote servers not present in a room. Also fix a bug where incoming typing events would cause other incoming events to get stuck during a fast join.

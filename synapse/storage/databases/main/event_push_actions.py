@@ -366,14 +366,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         user_id: str,
     ) -> NotifCounts:
         # Get the stream ordering of the user's latest receipt in the room.
-        result = self.get_last_receipt_for_user_txn(
+        result = self.get_last_unthreaded_receipt_for_user_txn(
             txn,
             user_id,
             room_id,
-            receipt_types=(
-                ReceiptTypes.READ,
-                ReceiptTypes.READ_PRIVATE,
-            ),
+            receipt_types=(ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
         if result:
@@ -559,14 +556,22 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
     def _get_receipts_by_room_txn(
         self, txn: LoggingTransaction, user_id: str
-    ) -> List[Tuple[str, int]]:
+    ) -> Dict[str, int]:
+        """
+        Generate a map of room ID to the latest stream ordering that has been
+        read by the given user.
+
+        Args:
+            txn:
+            user_id: The user to fetch receipts for.
+
+        Returns:
+            A map of room ID to stream ordering for all rooms the user has a receipt in.
+        """
         receipt_types_clause, args = make_in_list_sql_clause(
             self.database_engine,
             "receipt_type",
-            (
-                ReceiptTypes.READ,
-                ReceiptTypes.READ_PRIVATE,
-            ),
+            (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
         sql = f"""
@@ -580,7 +585,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         args.extend((user_id,))
         txn.execute(sql, args)
-        return cast(List[Tuple[str, int]], txn.fetchall())
+        return {
+            room_id: latest_stream_ordering
+            for room_id, latest_stream_ordering in txn.fetchall()
+        }
 
     async def get_unread_push_actions_for_user_in_range_for_http(
         self,
@@ -605,12 +613,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             The list will have between 0~limit entries.
         """
 
-        receipts_by_room = dict(
-            await self.db_pool.runInteraction(
-                "get_unread_push_actions_for_user_in_range_http_receipts",
-                self._get_receipts_by_room_txn,
-                user_id=user_id,
-            ),
+        receipts_by_room = await self.db_pool.runInteraction(
+            "get_unread_push_actions_for_user_in_range_http_receipts",
+            self._get_receipts_by_room_txn,
+            user_id=user_id,
         )
 
         def get_push_actions_txn(
@@ -679,12 +685,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             The list will have between 0~limit entries.
         """
 
-        receipts_by_room = dict(
-            await self.db_pool.runInteraction(
-                "get_unread_push_actions_for_user_in_range_email_receipts",
-                self._get_receipts_by_room_txn,
-                user_id=user_id,
-            ),
+        receipts_by_room = await self.db_pool.runInteraction(
+            "get_unread_push_actions_for_user_in_range_email_receipts",
+            self._get_receipts_by_room_txn,
+            user_id=user_id,
         )
 
         def get_push_actions_txn(
@@ -1064,7 +1068,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 limit,
             ),
         )
-        rows = txn.fetchall()
+        rows = cast(List[Tuple[int, str, str, int]], txn.fetchall())
 
         # For each new read receipt we delete push actions from before it and
         # recalculate the summary.
@@ -1109,18 +1113,18 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # We always update `event_push_summary_last_receipt_stream_id` to
         # ensure that we don't rescan the same receipts for remote users.
 
-        upper_limit = max_receipts_stream_id
+        receipts_last_processed_stream_id = max_receipts_stream_id
         if len(rows) >= limit:
             # If we pulled out a limited number of rows we only update the
             # position to the last receipt we processed, so we continue
             # processing the rest next iteration.
-            upper_limit = rows[-1][0]
+            receipts_last_processed_stream_id = rows[-1][0]
 
         self.db_pool.simple_update_txn(
             txn,
             table="event_push_summary_last_receipt_stream_id",
             keyvalues={},
-            updatevalues={"stream_id": upper_limit},
+            updatevalues={"stream_id": receipts_last_processed_stream_id},
         )
 
         return len(rows) < limit
