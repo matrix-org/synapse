@@ -966,7 +966,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             event_injection.inject_member_event(self.hs, room_id, user_alice, "join")
         )
 
-        event_before0 = self.get_success(
+        event_before = self.get_success(
             inject_event(
                 self.hs,
                 room_id=room_id,
@@ -975,19 +975,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "eventBefore0", "msgtype": "m.text"},
             )
         )
-        _add_to_known_event_list(event_before0)
-        event_before1 = self.get_success(
-            inject_event(
-                self.hs,
-                room_id=room_id,
-                sender=user_alice,
-                type=EventTypes.Message,
-                content={"body": "eventBefore1", "msgtype": "m.text"},
-            )
-        )
-        _add_to_known_event_list(event_before1)
+        _add_to_known_event_list(event_before)
 
-        event_after0 = self.get_success(
+        event_after = self.get_success(
             inject_event(
                 self.hs,
                 room_id=room_id,
@@ -996,20 +986,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "eventAfter0", "msgtype": "m.text"},
             )
         )
-        _add_to_known_event_list(event_after0)
-        event_after1 = self.get_success(
-            inject_event(
-                self.hs,
-                room_id=room_id,
-                sender=user_alice,
-                type=EventTypes.Message,
-                content={"body": "eventAfter1", "msgtype": "m.text"},
-            )
-        )
-        _add_to_known_event_list(event_after1)
+        _add_to_known_event_list(event_after)
 
         state_map = self.get_success(
-            state_storage_controller.get_state_for_event(event_before1.event_id)
+            state_storage_controller.get_state_for_event(event_before.event_id)
         )
 
         room_create_event = state_map.get((EventTypes.Create, ""))
@@ -1032,7 +1012,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             state_event.event_id for state_event in historical_state_events
         ]
 
-        inherited_depth = event_after0.depth
+        inherited_depth = event_after.depth
         batch_id = random_string(8)
         next_batch_id = random_string(8)
         insertion_event, _ = self.get_success(
@@ -1092,7 +1072,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_NEXT_BATCH_ID: batch_id,
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
-                prev_event_ids=[event_before1.event_id],
+                prev_event_ids=[event_before.event_id],
                 auth_event_ids=historical_auth_event_ids,
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
@@ -1105,25 +1085,25 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         #     # Beginning of room (oldest messages)
         #     # *list(state_map.values()),
         #     room_create_event,
-        #     as_membership_event,
         #     pl_event,
+        #     as_membership_event,
         #     state_map.get((EventTypes.JoinRules, "")),
         #     state_map.get((EventTypes.RoomHistoryVisibility, "")),
         #     alice_membership_event,
-        #     event_before0,
-        #     event_before1,
+        #     event_before,
         #     # HISTORICAL MESSAGE END
         #     insertion_event,
         #     historical_message_event,
         #     batch_event,
         #     base_insertion_event,
         #     # HISTORICAL MESSAGE START
-        #     event_after0,
-        #     event_after1,
+        #     event_after,
         #     # Latest in the room (newest messages)
         # ]
 
-        # The random pattern that may make it be expected
+        # The order that we get after passing reverse chronological events in
+        # that mostly passes. Only the insertion event is rejected but the
+        # historical messages appear /messages scrollback.
         pulled_events: List[EventBase] = [
             # Beginning of room (oldest messages)
             # *list(state_map.values()),
@@ -1133,14 +1113,12 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             state_map.get((EventTypes.JoinRules, "")),
             state_map.get((EventTypes.RoomHistoryVisibility, "")),
             alice_membership_event,
-            event_before0,
-            event_before1,
-            event_after0,
+            event_before,
+            event_after,
             base_insertion_event,
             batch_event,
             historical_message_event,
             insertion_event,
-            event_after1,
             # Latest in the room (newest messages)
         ]
 
@@ -1196,16 +1174,14 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             state_map.get((EventTypes.JoinRules, "")),
             state_map.get((EventTypes.RoomHistoryVisibility, "")),
             alice_membership_event,
-            event_before0,
-            event_before1,
+            event_before,
             # HISTORICAL MESSAGE END
             insertion_event,
             historical_message_event,
             batch_event,
             base_insertion_event,
             # HISTORICAL MESSAGE START
-            event_after0,
-            event_after1,
+            event_after,
             # Latest in the room (newest messages)
         ]
 
