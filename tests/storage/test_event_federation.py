@@ -871,7 +871,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
-    def test_get_backfill_points_in_room_works_after_many_failed_pull_attempts_that_could_naively_overflow(self) -> None:
+    def test_get_backfill_points_in_room_works_after_many_failed_pull_attempts_that_could_naively_overflow(
+        self,
+    ) -> None:
         """
         A test that reproduces #13929 (Postgres only).
 
@@ -902,13 +904,13 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # error in postgres preventing us from fetching a set of backwards extremities
         # to retry fetching.
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id, depth_map["b1"], limit=100)
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
 
         # We should aim to fetch all backoff points: b1's latest backoff period has
         # expired, and we haven't tried the rest.
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertEqual(backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"])
+        self.assertEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
     def _setup_room_for_insertion_backfill_tests(self) -> _BackfillSetupInfo:
         """
