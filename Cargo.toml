@@ -5,7 +5,7 @@
 members = ["rust"]
 
 [profile.release]
-panic = "abort"
+panic = "unwind"
 codegen-units = 1
 lto = true
 
