@@ -1150,8 +1150,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         logger.info("Transferring room state from %s to %s", old_room_id, room_id)
 
         # Find all local users that were in the old room and copy over each user's state
-        users = await self.store.get_users_in_room(old_room_id)
-        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
+        local_users = await self.store.get_local_users_in_room(old_room_id)
+        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, local_users)
 
         # Add new room to the room directory if the old room was there
         # Remove old room from the room directory
