@@ -871,6 +871,11 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             )
 
     def test_process_pulled_events_asdf(self) -> None:
+        def _debug_event_string(event: EventBase) -> str:
+            debug_body = event.content.get("body", event.type)
+            maybe_state_key = getattr(event, "state_key", None)
+            return f"event_id={event.event_id},depth={event.depth},body={debug_body}({maybe_state_key}),prevs={event.prev_event_ids()}"
+
         OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
         main_store = self.hs.get_datastores().main
 
@@ -885,29 +890,47 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             event_injection.inject_member_event(self.hs, room_id, user_alice, "join")
         )
 
-        event_before = self.get_success(
+        event_before0 = self.get_success(
             inject_event(
                 self.hs,
                 room_id=room_id,
                 sender=user_alice,
                 type=EventTypes.Message,
-                content={"body": "eventIdBefore", "msgtype": "m.text"},
+                content={"body": "eventBefore0", "msgtype": "m.text"},
+            )
+        )
+        event_before1 = self.get_success(
+            inject_event(
+                self.hs,
+                room_id=room_id,
+                sender=user_alice,
+                type=EventTypes.Message,
+                content={"body": "eventBefore1", "msgtype": "m.text"},
             )
         )
 
-        event_after = self.get_success(
+        event_after0 = self.get_success(
             inject_event(
                 self.hs,
                 room_id=room_id,
                 sender=user_alice,
                 type=EventTypes.Message,
-                content={"body": "eventIdAfter", "msgtype": "m.text"},
+                content={"body": "eventAfter0", "msgtype": "m.text"},
+            )
+        )
+        event_after1 = self.get_success(
+            inject_event(
+                self.hs,
+                room_id=room_id,
+                sender=user_alice,
+                type=EventTypes.Message,
+                content={"body": "eventAfter1", "msgtype": "m.text"},
             )
         )
 
         state_storage_controller = self.hs.get_storage_controllers().state
         state_map = self.get_success(
-            state_storage_controller.get_state_for_event(event_before.event_id)
+            state_storage_controller.get_state_for_event(event_before1.event_id)
         )
 
         room_create_event = state_map.get((EventTypes.Create, ""))
@@ -926,7 +949,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             state_event.event_id for state_event in list(state_map.values())
         ]
 
-        inherited_depth = event_after.depth
+        inherited_depth = event_after0.depth
         batch_id = random_string(8)
         next_batch_id = random_string(8)
         insertion_event, _ = self.get_success(
@@ -983,7 +1006,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_NEXT_BATCH_ID: batch_id,
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
-                prev_event_ids=[event_before.event_id],
+                prev_event_ids=[event_before1.event_id],
                 auth_event_ids=historical_auth_event_ids,
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
@@ -993,8 +1016,13 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Chronological
         # pulled_events = [
         #     # Beginning of room (oldest messages)
+        #     # *list(state_map.values()),
         #     room_create_event,
+        #     as_membership_event,
         #     pl_event,
+        #     state_map.get((EventTypes.JoinRules, "")),
+        #     state_map.get((EventTypes.RoomHistoryVisibility, "")),
+        #     alice_membership_event,
         #     event_before,
         #     # HISTORICAL MESSAGE END
         #     insertion_event,
@@ -1009,16 +1037,34 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # The random pattern that may make it be expected
         pulled_events = [
             # Beginning of room (oldest messages)
+            # *list(state_map.values()),
             room_create_event,
             pl_event,
-            event_before,
-            event_after,
+            as_membership_event,
+            state_map.get((EventTypes.JoinRules, "")),
+            state_map.get((EventTypes.RoomHistoryVisibility, "")),
+            alice_membership_event,
+            event_before0,
+            event_before1,
+            event_after0,
             base_insertion_event,
             batch_event,
             historical_message_event,
             insertion_event,
+            event_after1,
             # Latest in the room (newest messages)
         ]
+
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "pulled_events=%s",
+            json.dumps(
+                [_debug_event_string(event) for event in pulled_events],
+                indent=4,
+            ),
+        )
 
         self.get_success(
             self.hs.get_federation_event_handler()._process_pulled_events(
@@ -1051,21 +1097,18 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             state_map.get((EventTypes.JoinRules, "")),
             state_map.get((EventTypes.RoomHistoryVisibility, "")),
             alice_membership_event,
-            event_before,
+            event_before0,
+            event_before1,
             # HISTORICAL MESSAGE END
             insertion_event,
             historical_message_event,
             batch_event,
             base_insertion_event,
             # HISTORICAL MESSAGE START
-            event_after,
+            event_after0,
+            event_after1,
             # Latest in the room (newest messages)
         ]
-
-        def _debug_event_string(event: EventBase) -> str:
-            debug_body = event.content.get("body", event.type)
-            maybe_state_key = getattr(event, "state_key", None)
-            return f"event_id={event.event_id},depth={event.depth},body={debug_body}({maybe_state_key}),prevs={event.prev_event_ids()}"
 
         event_id_diff = set([event.event_id for event in expected_event_order]) - set(
             [event.event_id for event in actual_events_in_room_chronological]
