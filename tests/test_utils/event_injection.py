@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from optparse import Option
 from typing import List, Optional, Tuple
 
 import synapse.server
@@ -104,7 +103,8 @@ async def create_event(
     )
     event, context = await hs.get_event_creation_handler().create_new_client_event(
         builder,
-        allow_no_prev_events=allow_no_prev_events,
+        # Why does this need another default to pass: `Argument "allow_no_prev_events" to "create_new_client_event" of "EventCreationHandler" has incompatible type "Optional[bool]"; expected "bool"`
+        allow_no_prev_events=allow_no_prev_events or False,
         prev_event_ids=prev_event_ids,
         auth_event_ids=auth_event_ids,
         state_event_ids=state_event_ids,

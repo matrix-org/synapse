@@ -14,6 +14,7 @@
 
 import collections
 import itertools
+import json
 import logging
 from http import HTTPStatus
 from typing import (
@@ -659,7 +660,7 @@ class FederationEventHandler:
             # thrashing.
             reverse_chronological_events = events
             # `[::-1]` is just syntax to reverse the list and give us a copy
-            chronological_events = reverse_chronological_events[::-1]
+            # chronological_events = reverse_chronological_events[::-1]
 
             logger.info(
                 "backfill assumed reverse_chronological_events=%s",
@@ -715,8 +716,8 @@ class FederationEventHandler:
                 # Expecting to persist in chronological order here (oldest ->
                 # newest) so that events are persisted before they're referenced
                 # as a `prev_event`.
-                chronological_events,
-                # reverse_chronological_events,
+                # chronological_events,
+                reverse_chronological_events,
                 backfilled=True,
             )
 
@@ -869,17 +870,20 @@ class FederationEventHandler:
 
         logger.info(
             "backfill sorted_events=%s",
-            [
-                "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
-                % (
-                    event.event_id,
-                    event.depth,
-                    event.content.get("body", event.type),
-                    getattr(event, "state_key", None),
-                    event.prev_event_ids(),
-                )
-                for event in sorted_events
-            ],
+            json.dumps(
+                [
+                    "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
+                    % (
+                        event.event_id,
+                        event.depth,
+                        event.content.get("body", event.type),
+                        getattr(event, "state_key", None),
+                        event.prev_event_ids(),
+                    )
+                    for event in sorted_events
+                ],
+                indent=4,
+            ),
         )
 
         for ev in sorted_events:
@@ -1160,10 +1164,17 @@ class FederationEventHandler:
             destination, room_id, event_id=event_id
         )
 
-        logger.debug(
-            "state_ids returned %i state events, %i auth events",
+        logger.info(
+            "_get_state_ids_after_missing_prev_event(event_id=%s): state_ids returned %i state events, %i auth events",
+            event_id,
             len(state_event_ids),
             len(auth_event_ids),
+        )
+        logger.info(
+            "_get_state_ids_after_missing_prev_event(event_id=%s): state_event_ids=%s auth_event_ids=%s",
+            event_id,
+            state_event_ids,
+            auth_event_ids,
         )
 
         # Start by checking events we already have in the DB

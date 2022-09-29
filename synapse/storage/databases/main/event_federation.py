@@ -972,7 +972,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
                 ),
             )
-            return cast(List[Tuple[str, int]], txn.fetchall())
+            return cast(List[Tuple[str, int, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_insertion_event_backward_extremities_in_room",

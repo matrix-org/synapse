@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pprint
 import json
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -871,19 +870,96 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             )
 
     def test_process_pulled_events_asdf(self) -> None:
+        main_store = self.hs.get_datastores().main
+        state_storage_controller = self.hs.get_storage_controllers().state
+
         def _debug_event_string(event: EventBase) -> str:
             debug_body = event.content.get("body", event.type)
             maybe_state_key = getattr(event, "state_key", None)
             return f"event_id={event.event_id},depth={event.depth},body={debug_body}({maybe_state_key}),prevs={event.prev_event_ids()}"
 
-        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
-        main_store = self.hs.get_datastores().main
+        known_event_dict: Dict[str, Tuple[EventBase, List[EventBase]]] = {}
+
+        def _add_to_known_event_list(
+            event: EventBase, state_events: Optional[List[EventBase]] = None
+        ) -> None:
+            if state_events is None:
+                state_map = self.get_success(
+                    state_storage_controller.get_state_for_event(event.event_id)
+                )
+                state_events = list(state_map.values())
+
+            known_event_dict[event.event_id] = (event, state_events)
+
+        async def get_room_state_ids(
+            destination: str, room_id: str, event_id: str
+        ) -> JsonDict:
+            self.assertEqual(destination, self.OTHER_SERVER_NAME)
+            known_event_info = known_event_dict.get(event_id)
+            if known_event_info is None:
+                self.fail(f"Event ({event_id}) not part of our known events list")
+
+            known_event, known_event_state_list = known_event_info
+            logger.info(
+                "stubbed get_room_state_ids destination=%s event_id=%s auth_event_ids=%s",
+                destination,
+                event_id,
+                known_event.auth_event_ids(),
+            )
+
+            # self.assertEqual(event_id, missing_event.event_id)
+            return {
+                "pdu_ids": [
+                    state_event.event_id for state_event in known_event_state_list
+                ],
+                "auth_chain_ids": known_event.auth_event_ids(),
+            }
+
+        async def get_room_state(
+            room_version: RoomVersion, destination: str, room_id: str, event_id: str
+        ) -> StateRequestResponse:
+            self.assertEqual(destination, self.OTHER_SERVER_NAME)
+            known_event_info = known_event_dict.get(event_id)
+            if known_event_info is None:
+                self.fail(f"Event ({event_id}) not part of our known events list")
+
+            known_event, known_event_state_list = known_event_info
+            logger.info(
+                "stubbed get_room_state destination=%s event_id=%s auth_event_ids=%s",
+                destination,
+                event_id,
+                known_event.auth_event_ids(),
+            )
+
+            auth_event_ids = known_event.auth_event_ids()
+            auth_events = []
+            for auth_event_id in auth_event_ids:
+                known_event_info = known_event_dict.get(event_id)
+                if known_event_info is None:
+                    self.fail(
+                        f"Auth event ({auth_event_id}) is not part of our known events list"
+                    )
+                known_auth_event, _ = known_event_info
+                auth_events.append(known_auth_event)
+
+            return StateRequestResponse(
+                state=known_event_state_list,
+                auth_events=auth_events,
+            )
+
+        self.mock_federation_transport_client.get_room_state_ids.side_effect = (
+            get_room_state_ids
+        )
+        self.mock_federation_transport_client.get_room_state.side_effect = (
+            get_room_state
+        )
 
         # create the room
         room_creator = self.appservice.sender
         room_id = self.helper.create_room_as(
             room_creator=self.appservice.sender, tok=self.appservice.token
         )
+        room_version = self.get_success(main_store.get_room_version(room_id))
 
         user_alice = self.register_user("alice", "pass")
         alice_membership_event = self.get_success(
@@ -899,6 +975,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "eventBefore0", "msgtype": "m.text"},
             )
         )
+        _add_to_known_event_list(event_before0)
         event_before1 = self.get_success(
             inject_event(
                 self.hs,
@@ -908,6 +985,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "eventBefore1", "msgtype": "m.text"},
             )
         )
+        _add_to_known_event_list(event_before1)
 
         event_after0 = self.get_success(
             inject_event(
@@ -918,6 +996,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "eventAfter0", "msgtype": "m.text"},
             )
         )
+        _add_to_known_event_list(event_after0)
         event_after1 = self.get_success(
             inject_event(
                 self.hs,
@@ -927,8 +1006,8 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 content={"body": "eventAfter1", "msgtype": "m.text"},
             )
         )
+        _add_to_known_event_list(event_after1)
 
-        state_storage_controller = self.hs.get_storage_controllers().state
         state_map = self.get_success(
             state_storage_controller.get_state_for_event(event_before1.event_id)
         )
@@ -940,13 +1019,17 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         assert pl_event is not None
         assert as_membership_event is not None
 
+        for state_event in state_map.values():
+            _add_to_known_event_list(state_event)
+
         historical_auth_event_ids = [
             room_create_event.event_id,
             pl_event.event_id,
             as_membership_event.event_id,
         ]
+        historical_state_events = list(state_map.values())
         historical_state_event_ids = [
-            state_event.event_id for state_event in list(state_map.values())
+            state_event.event_id for state_event in historical_state_events
         ]
 
         inherited_depth = event_after0.depth
@@ -969,6 +1052,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 depth=inherited_depth,
             )
         )
+        _add_to_known_event_list(insertion_event, historical_state_events)
         historical_message_event, _ = self.get_success(
             create_event(
                 self.hs,
@@ -981,6 +1065,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 depth=inherited_depth,
             )
         )
+        _add_to_known_event_list(historical_message_event, historical_state_events)
         batch_event, _ = self.get_success(
             create_event(
                 self.hs,
@@ -996,7 +1081,8 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 depth=inherited_depth,
             )
         )
-        base_insertion_event, _ = self.get_success(
+        _add_to_known_event_list(batch_event, historical_state_events)
+        base_insertion_event, base_insertion_event_context = self.get_success(
             create_event(
                 self.hs,
                 room_id=room_id,
@@ -1012,9 +1098,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 depth=inherited_depth,
             )
         )
+        _add_to_known_event_list(base_insertion_event, historical_state_events)
 
         # Chronological
-        # pulled_events = [
+        # pulled_events: List[EventBase] = [
         #     # Beginning of room (oldest messages)
         #     # *list(state_map.values()),
         #     room_create_event,
@@ -1035,7 +1122,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # ]
 
         # The random pattern that may make it be expected
-        pulled_events = [
+        pulled_events: List[EventBase] = [
             # Beginning of room (oldest messages)
             # *list(state_map.values()),
             room_create_event,
@@ -1066,10 +1153,20 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             ),
         )
 
+        for event, _ in known_event_dict.values():
+            if event.internal_metadata.outlier:
+                self.fail("Our pristine events should not be marked as an outlier")
+
         self.get_success(
             self.hs.get_federation_event_handler()._process_pulled_events(
                 self.OTHER_SERVER_NAME,
-                pulled_events,
+                [
+                    # Make copies of events since Synapse modifies the
+                    # internal_metadata in place and we want to keep our
+                    # pristine copies
+                    make_event_from_dict(pulled_event.get_pdu_json(), room_version)
+                    for pulled_event in pulled_events
+                ],
                 backfilled=True,
             )
         )
@@ -1110,15 +1207,15 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             # Latest in the room (newest messages)
         ]
 
-        event_id_diff = set([event.event_id for event in expected_event_order]) - set(
-            [event.event_id for event in actual_events_in_room_chronological]
-        )
+        event_id_diff = {event.event_id for event in expected_event_order} - {
+            event.event_id for event in actual_events_in_room_chronological
+        }
         event_diff_ordered = [
             event for event in expected_event_order if event.event_id in event_id_diff
         ]
-        event_id_extra = set(
-            [event.event_id for event in actual_events_in_room_chronological]
-        ) - set([event.event_id for event in expected_event_order])
+        event_id_extra = {
+            event.event_id for event in actual_events_in_room_chronological
+        } - {event.event_id for event in expected_event_order}
         event_extra_ordered = [
             event
             for event in actual_events_in_room_chronological
