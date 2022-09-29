@@ -472,11 +472,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # updated the counts in `event_push_summary` to reflect that; in that case we
         # simply ignore `event_push_summary` counts.
         #
-        # We then do a manual count of all of the rows in the `event_push_actions` table
+        # We then do a manual count of all the rows in the `event_push_actions` table
         # for any user/room/thread which did not have a valid summary found.
         #
-        # If `last_receipt_stream_ordering` is null then that means it's up to
-        # date (as the row was written by an older version of Synapse that
+        # If `last_receipt_stream_ordering` is null then that means it's up-to-date
+        # (as the row was written by an older version of Synapse that
         # updated `event_push_summary` synchronously when persisting a new read
         # receipt).
         txn.execute(
