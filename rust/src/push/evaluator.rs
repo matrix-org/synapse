@@ -29,7 +29,8 @@ use super::{
 };
 
 lazy_static! {
-    static ref INEQUALITY_EXPR: Regex = Regex::new(r"^([=<>]*)([0-9]*)$").expect("valid regex");
+    /// Used to parse the `is` clause in the room member count condition.
+    static ref INEQUALITY_EXPR: Regex = Regex::new(r"^([=<>]*)([0-9]+)$").expect("valid regex");
 }
 
 /// Allows running a set of push rules against a particular event.
@@ -143,7 +144,7 @@ impl PushRuleEvaluator {
             Ok(false) => false,
             Err(err) => {
                 warn!("Condition match failed {err}");
-                true
+                false
             }
         }
     }

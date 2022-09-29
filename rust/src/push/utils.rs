@@ -21,7 +21,7 @@ use regex::Regex;
 use regex::RegexBuilder;
 
 lazy_static! {
-    /// Matches runs of "glob" style wild cards
+    /// Matches runs of non-wildcard characters followed by wildcard characters.
     static ref WILDCARD_RUN: Regex = Regex::new(r"([^\?\*]*)([\?\*]*)").expect("valid regex");
 }
 
