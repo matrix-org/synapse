@@ -66,6 +66,17 @@ def _is_dev_dependency(req: Requirement) -> bool:
     )
 
 
+def _should_ignore_runtime_requirement(req: Requirement) -> bool:
+    # This is a build-time dependency. Irritatingly, `poetry build` ignores the
+    # requirements listed in the [build-system] section of pyproject.toml, so in order
+    # to support `poetry install --no-dev` we have to mark it as a runtime dependency.
+    # Workaround this by ignoring it here. (It might be slightly cleaner to put
+    # `setuptools_rust` in a `build` extra or similar, but . But for now I'
+    if req.name == "setuptools_rust":
+        return True
+    return False
+
+
 class Dependency(NamedTuple):
     requirement: Requirement
     must_be_installed: bool
@@ -77,7 +88,7 @@ def _generic_dependencies() -> Iterable[Dependency]:
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
-        if _is_dev_dependency(req):
+        if _is_dev_dependency(req) or _should_ignore_runtime_requirement(req):
             continue
 
         # https://packaging.pypa.io/en/latest/markers.html#usage notes that
