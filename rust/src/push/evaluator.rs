@@ -362,7 +362,7 @@ fn push_rule_evaluator() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         10,
-        0,
+        Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
         true,
