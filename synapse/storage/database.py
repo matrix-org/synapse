@@ -1180,9 +1180,18 @@ class DatabasePool:
         ignore the `lock` argument). Otherwise this class will use an emulated upsert,
         in which case we want the safer option unless we been VERY CAREFUL.
 
-        [*]: This class is aware that some tables have unique indices added as
-             background updates. It checks at runtime to see if those updates are
-             pending: if not, they are deemed safe for use with native upserts.
+        [*]: Some tables have unique indices added to them in the background. Those
+             tables `T` are keys in the dictionary UNIQUE_INDEX_BACKGROUND_UPDATES,
+             where `T` maps to the background update that adds a unique index to `T`.
+             This dictionary is maintained by hand.
+
+             At runtime, we constantly check to see if each of these background updates
+             has run. If so, we deem the coresponding table safe to upsert into, because
+             we can now use a native insert to do so. If not, we deem the table unsafe
+             to upsert into and require an emulated upsert.
+
+             Tables that do not appear in this dictionary are assumed to have an
+             appropriate unique index and therefore be safe to upsert into.
 
         Args:
             table: The table to upsert into
