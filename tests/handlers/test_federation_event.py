@@ -1110,14 +1110,16 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         #     state_map.get((EventTypes.JoinRules, "")),
         #     state_map.get((EventTypes.RoomHistoryVisibility, "")),
         #     alice_membership_event,
-        #     event_before,
+        #     event_before0,
+        #     event_before1,
         #     # HISTORICAL MESSAGE END
         #     insertion_event,
         #     historical_message_event,
         #     batch_event,
         #     base_insertion_event,
         #     # HISTORICAL MESSAGE START
-        #     event_after,
+        #     event_after0,
+        #     event_after1,
         #     # Latest in the room (newest messages)
         # ]
 
