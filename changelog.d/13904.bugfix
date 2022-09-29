@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.66 where some required fields in the pushrules sent to clients were not present anymore. Contributed by Nico.

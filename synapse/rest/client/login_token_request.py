@@ -47,7 +47,9 @@ class LoginTokenRequestServlet(RestServlet):
     }
     """
 
-    PATTERNS = client_patterns("/login/token$")
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3882/login/token$", releases=[], v1=False, unstable=True
+    )
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

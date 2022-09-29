@@ -726,17 +726,35 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     async def get_backfill_points_in_room(
         self,
         room_id: str,
+        current_depth: int,
+        limit: int,
     ) -> List[Tuple[str, int]]:
         """
-        Gets the oldest events(backwards extremities) in the room along with the
-        approximate depth. Sorted by depth, highest to lowest (descending).
+        Get the backward extremities to backfill from in the room along with the
+        approximate depth.
+
+        Only returns events that are at a depth lower than or
+        equal to the `current_depth`. Sorted by depth, highest to lowest (descending)
+        so the closest events to the `current_depth` are first in the list.
+
+        We ignore extremities that are newer than the user's current scroll position
+        (ie, those with depth greater than `current_depth`) as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that extremity, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those extremities.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the user's current scrollback position
+            limit: The max number of backfill points to return
 
         Returns:
             List of (event_id, depth) tuples. Sorted by depth, highest to lowest
-            (descending)
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
         def get_backfill_points_in_room_txn(
@@ -785,6 +803,18 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND edge.is_state is ? /* False */
                     /**
+                     * We only want backwards extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                    /**
                      * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
                      *
@@ -798,11 +828,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                         OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
-                 * Sort from highest to the lowest depth. Then tie-break on
-                 * alphabetical order of the event_ids so we get a consistent
-                 * ordering which is nice when asserting things in tests.
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
                  */
                 ORDER BY event.depth DESC, backward_extrem.event_id DESC
+                LIMIT ?
             """
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -817,9 +849,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 (
                     room_id,
                     False,
+                    current_depth,
                     self._clock.time_msec(),
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
                     1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                    limit,
                 ),
             )
 
@@ -835,18 +869,34 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     async def get_insertion_event_backward_extremities_in_room(
         self,
         room_id: str,
+        current_depth: int,
+        limit: int,
     ) -> List[Tuple[str, int]]:
         """
         Get the insertion events we know about that we haven't backfilled yet
-        along with the approximate depth. Sorted by depth, highest to lowest
-        (descending).
+        along with the approximate depth. Only returns insertion events that are
+        at a depth lower than or equal to the `current_depth`. Sorted by depth,
+        highest to lowest (descending) so the closest events to the
+        `current_depth` are first in the list.
+
+        We ignore insertion events that are newer than the user's current scroll
+        position (ie, those with depth greater than `current_depth`) as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that insertion event, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those insertion event.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the user's current scrollback position
+            limit: The max number of insertion event extremities to return
 
         Returns:
             List of (event_id, depth) tuples. Sorted by depth, highest to lowest
-            (descending)
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
         def get_insertion_event_backward_extremities_in_room_txn(
@@ -870,6 +920,18 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 WHERE
                     insertion_event_extremity.room_id = ?
                     /**
+                     * We only want extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                    /**
                      * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
                      *
@@ -883,11 +945,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                         OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
                     )
                 /**
-                 * Sort from highest to the lowest depth. Then tie-break on
-                 * alphabetical order of the event_ids so we get a consistent
-                 * ordering which is nice when asserting things in tests.
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
                  */
                 ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
+                LIMIT ?
             """
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -901,9 +965,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 sql % (least_function,),
                 (
                     room_id,
+                    current_depth,
                     self._clock.time_msec(),
                     1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
                     1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                    limit,
                 ),
             )
             return cast(List[Tuple[str, int]], txn.fetchall())
