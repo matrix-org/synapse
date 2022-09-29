@@ -417,6 +417,15 @@ class FederationHandler:
 
         async def try_backfill(domains: Collection[str]) -> bool:
             # TODO: Should we try multiple of these at a time?
+
+            # Number of contacted remote homeservers that have denied our backfill
+            # request with a 4xx code.
+            denied_count = 0
+
+            # Maximum number of contacted remote homeservers that can deny our
+            # backfill request with 4xx codes before we give up.
+            max_denied_count = 5
+
             for dom in domains:
                 # We don't want to ask our own server for information we don't have
                 if dom == self.server_name:
@@ -435,13 +444,33 @@ class FederationHandler:
                     continue
                 except HttpResponseException as e:
                     if 400 <= e.code < 500:
-                        raise e.to_synapse_error()
+                        logger.warning(
+                            "Backfill denied from %s because %s [%d/%d]",
+                            dom,
+                            e,
+                            denied_count,
+                            max_denied_count,
+                        )
+                        denied_count += 1
+                        if denied_count >= max_denied_count:
+                            return False
+                        continue
 
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
                 except CodeMessageException as e:
                     if 400 <= e.code < 500:
-                        raise
+                        logger.warning(
+                            "Backfill denied from %s because %s [%d/%d]",
+                            dom,
+                            e,
+                            denied_count,
+                            max_denied_count,
+                        )
+                        denied_count += 1
+                        if denied_count >= max_denied_count:
+                            return False
+                        continue
 
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
