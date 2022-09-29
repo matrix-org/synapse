@@ -172,15 +172,11 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        member_list = await store.get_users_in_room(
-            room_id, on_invalidate=cache_context.invalidate
+        app_service_users_in_room = await store.get_app_service_users_in_room(
+            room_id, self, on_invalidate=cache_context.invalidate
         )
 
-        # check joined member events
-        for user_id in member_list:
-            if self.is_interested_in_user(user_id):
-                return True
-        return False
+        return len(app_service_users_in_room) > 0
 
     def is_interested_in_user(
         self,

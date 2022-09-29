@@ -392,6 +392,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
+            # TODO: get_local_users_in_room here
             users_in_room = await self.store.get_users_in_room(room_id)
             other_users_in_room = [
                 other

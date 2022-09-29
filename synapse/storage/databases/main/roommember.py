@@ -152,13 +152,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         `get_current_hosts_in_room()` and so we can re-use the cache but it's
         not horrible to have here either.
 
-        Uses `m.room.member`s in the room state at the current forward extremities to
-        determine which users are in the room.
+        Uses `m.room.member`s in the room state at the current forward
+        extremities to determine which users are in the room.
 
-        Will return inaccurate results for rooms with partial state, since the state for
-        the forward extremities of those rooms will exclude most members. We may also
-        calculate room state incorrectly for such rooms and believe that a member is or
-        is not in the room when the opposite is true.
+        Will return inaccurate results for rooms with partial state, since the
+        state for the forward extremities of those rooms will exclude most
+        members. We may also calculate room state incorrectly for such rooms and
+        believe that a member is or is not in the room when the opposite is
+        true.
+
+        Note: If you only care about users in the room local to the homeserver,
+        use `get_local_users_in_room(...)` instead which will be more
+        performant.
         """
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id

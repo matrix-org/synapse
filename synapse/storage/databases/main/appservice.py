@@ -157,7 +157,19 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         app_service: "ApplicationService",
         cache_context: _CacheContext,
     ) -> List[str]:
-        users_in_room = await self.get_users_in_room(
+        """
+        Get all users in a room that the appservice controls.
+
+        Args:
+            room_id: The room to check in.
+            app_service: The application service to check interest/control against
+
+        Returns:
+            List of user IDs that the appservice controls.
+        """
+        # We can use `get_local_users_in_room(...)` here because an application
+        # service can only act on behalf of users of the server it's on.
+        users_in_room = await self.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
         return list(filter(app_service.is_interested_in_user, users_in_room))
