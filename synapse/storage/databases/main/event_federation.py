@@ -759,9 +759,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             # the events connected to the current backwards extremeties.
 
             if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
+                least_function = "LEAST"
             elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
+                least_function = "MIN"
             else:
                 raise RuntimeError("Unknown database engine")
 
@@ -865,9 +865,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             txn: LoggingTransaction, room_id: str
         ) -> List[Tuple[str, int]]:
             if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
+                least_function = "LEAST"
             elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
+                least_function = "MIN"
             else:
                 raise RuntimeError("Unknown database engine")
 
