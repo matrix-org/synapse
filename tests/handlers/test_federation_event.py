@@ -1041,9 +1041,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 # It all works when I add a prev_event for the floating
                 # insertion event but the event no longer floats.
                 # It's able to resolve state at the prev_events though.
-                # prev_event_ids=[event_before.event_id],
-                allow_no_prev_events=True,
-                prev_event_ids=[],
+                prev_event_ids=[event_before.event_id],
+                # allow_no_prev_events=True,
+                # prev_event_ids=[],
                 auth_event_ids=historical_base_auth_event_ids,
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,

@@ -153,6 +153,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 await self.room_batch_handler.persist_state_events_at_start(
                     state_events_at_start=body["state_events_at_start"],
                     room_id=room_id,
+                    initial_prev_event_ids=prev_event_ids_from_query,
                     initial_state_event_ids=state_event_ids,
                     app_service_requester=requester,
                 )
@@ -222,6 +223,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,
             inherited_depth=inherited_depth,
+            # Connect the historical batch to the state chain
+            state_chain_event_id_to_connect_to=state_event_ids_at_start[-1],
             initial_state_event_ids=state_event_ids,
             app_service_requester=requester,
         )

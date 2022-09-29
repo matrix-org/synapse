@@ -153,6 +153,7 @@ class RoomBatchHandler:
         self,
         state_events_at_start: List[JsonDict],
         room_id: str,
+        initial_prev_event_ids: List[str],
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
@@ -178,10 +179,8 @@ class RoomBatchHandler:
         state_event_ids_at_start = []
         state_event_ids = initial_state_event_ids.copy()
 
-        # Make the state events float off on their own by specifying no
-        # prev_events for the first one in the chain so we don't have a bunch of
-        # `@mxid joined the room` noise between each batch.
-        prev_event_ids_for_state_chain: List[str] = []
+        # TODO: Here
+        prev_event_ids_for_state_chain: List[str] = initial_prev_event_ids
 
         for index, state_event in enumerate(state_events_at_start):
             assert_params_in_dict(
@@ -269,6 +268,7 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         inherited_depth: int,
+        state_chain_event_id_to_connect_to: str,
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
@@ -301,10 +301,8 @@ class RoomBatchHandler:
         # We expect the last event in a historical batch to be an batch event
         assert events_to_create[-1]["type"] == EventTypes.MSC2716_BATCH
 
-        # Make the historical event chain float off on its own by specifying no
-        # prev_events for the first event in the chain which causes the HS to
-        # ask for the state at the start of the batch later.
-        prev_event_ids: List[str] = []
+        # TODO: Here
+        prev_event_ids: List[str] = [state_chain_event_id_to_connect_to]
 
         event_ids = []
         events_to_persist = []
@@ -390,6 +388,7 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         batch_id_to_connect_to: str,
+        state_chain_event_id_to_connect_to: str,
         inherited_depth: int,
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
@@ -458,6 +457,7 @@ class RoomBatchHandler:
             events_to_create=events_to_create,
             room_id=room_id,
             inherited_depth=inherited_depth,
+            state_chain_event_id_to_connect_to=state_chain_event_id_to_connect_to,
             initial_state_event_ids=initial_state_event_ids,
             app_service_requester=app_service_requester,
         )
