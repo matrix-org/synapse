@@ -1,0 +1,1 @@
+Fix performance bottleneck with heavy appservice and bridged users in Synapse by checking appservice user interest against the local users instead of all users.
