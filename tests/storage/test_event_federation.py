@@ -871,12 +871,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
-    def test_repeated_get_backfill_points_in_room_succeed(self) -> None:
+    def test_get_backfill_points_in_room_works_after_many_failed_pull_attempts_that_could_naively_overflow(self) -> None:
         """
         A test that reproduces #13929 (Postgres only).
 
-        We should be able to backoff repeatedly, even if the backoff formula would tell
-        us to wait for more seconds than can be expressed in a 32 bit signed int.
+        Test to make sure we can still get backfill points after many failed pull
+        attempts that cause us to backoff to the limit. Even if the backoff formula
+        would tell us to wait for more seconds than can be expressed in a 32 bit
+        signed int.
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
