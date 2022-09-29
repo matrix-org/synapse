@@ -187,6 +187,21 @@ class SendEmailHandler:
         multipart_msg["To"] = email_address
         multipart_msg["Date"] = email.utils.formatdate()
         multipart_msg["Message-ID"] = email.utils.make_msgid()
+        # A Microsoft Exchange user can configure an automatic reply (e.g. "I'm out of
+        # office until the 1st of January") to be sent to all incoming emails for a
+        # duration. But Exchange will NOT generate an automatic reply if the incoming
+        # message includes the following obscure, non-standard(?) and barely documented
+        # header with an appropriate value. The header does NOT mark the email as being
+        # auto-generated; it's more of a "don't reply to me" marker.
+        #
+        # The best reference I could find was
+        #    https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmail/ced68690-498a-4567-9d14-5c01f974d8b1
+        # which seems to suggest it can take the value "All" to mean "suppress all
+        # auto-replies", or a comma separated list of auto-reply classes to suppress.
+        # The following stack overflow question has a little more context:
+        #    https://stackoverflow.com/a/25324691/5252017
+        #    https://stackoverflow.com/a/61646381/5252017
+        multipart_msg["X-Auto-Response-Suppress"] = "All"
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
 
