@@ -73,20 +73,29 @@ pdus_pruned_from_federation_queue = Counter(
 
 logger = logging.getLogger(__name__)
 
+# Parameters controlling exponential backoff between backfill failures.
+# After the first failure to backfill, we wait 2 hours before trying again. If the
+# second attempt fails, we wait 4 hours before trying again. If the third attempt fails,
+# we wait 8 hours before trying again, ... and so on.
+#
+# Each successive backoff period is twice as long as the last. However we cap this
+# period at a maximum of 2^8 = 256 hours: a little over 10 days. (This is the smallest
+# power of 2 which yields a maximum backoff period of at least 7 days---which was the
+# original maximum backoff period.)
 BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS = 8
 BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS = int(
     datetime.timedelta(hours=1).total_seconds() * 1000
 )
-# The longest backoff period is then:
-# _LONGEST_BACKOFF_PERIOD_SECONDS = (
-#     (1 << BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS)
-#     * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
-# )
-# which is 2 ** 8 hours = 256 hours ≈ 10 days. This number needs to fit
-# in a 32 bit signed int, or else Postgres will error.
-# assert _LONGEST_BACKOFF_PERIOD_SECONDS < ((2 ** 31) - 1)
-# (We could use a bigint, but bigint overflows still cause errors. This
-# at least avoids CASTing in the queries below.)
+
+# We need a cap on the power of 2 or else the backoff period
+#   2^N * (milliseconds per hour)
+# will overflow when calcuated within the database. We ensure overflow does not occur
+# by checking that the largest backoff period fits in a 32-bit signed integer.
+_LONGEST_BACKOFF_PERIOD_MILLISECONDS = (
+    (2 ** BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS)
+    * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+)
+assert 0 < _LONGEST_BACKOFF_PERIOD_MILLISECONDS <= ((2 ** 31) - 1)
 
 
 # All the info we need while iterating the DAG while backfilling
