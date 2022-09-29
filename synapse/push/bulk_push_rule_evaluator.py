@@ -172,7 +172,11 @@ class BulkPushRuleEvaluator:
 
     async def _get_power_levels_and_sender_level(
         self, event: EventBase, context: EventContext
-    ) -> Tuple[dict, int]:
+    ) -> Tuple[dict, Optional[int]]:
+        # There are no power levels and sender levels possible to get from outlier
+        if event.internal_metadata.is_outlier():
+            return {}, None
+
         event_types = auth_types_for_event(event.room_version, event)
         prev_state_ids = await context.get_prev_state_ids(
             StateFilter.from_types(event_types)
@@ -249,8 +253,8 @@ class BulkPushRuleEvaluator:
         should increment the unread count, and insert the results into the
         event_push_actions_staging table.
         """
-        if event.internal_metadata.is_outlier():
-            # This can happen due to out of band memberships
+        if not event.internal_metadata.is_notifiable():
+            # Push rules for events that aren't notifiable can't be processed by this
             return
 
         # Disable counting as unread unless the experimental configuration is
