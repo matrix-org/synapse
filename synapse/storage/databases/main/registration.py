@@ -200,6 +200,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             # If we're using SQLite our boolean values will be integers. Because we
             # present some of this data as is to e.g. server admins via REST APIs, we
             # want to make sure we're returning the right type of data.
+            # Note: when adding a column name to this list, be wary of NULLable columns,
+            # since NULL values will be turned into False.
             boolean_columns = ["admin", "deactivated", "shadow_banned", "approved"]
             for column in boolean_columns:
                 if not isinstance(row[column], bool):
