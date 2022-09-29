@@ -1044,7 +1044,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             is the next value to pass as `from_id` (it will either be the
             stream_ordering of the last returned event, or, if fewer than `limit`
             events were found, the `current_id`). The `event_to_received_ts` is
-            a dictionary mapping event ID to the event `received_ts`.
+            a dictionary mapping event ID to the event `received_ts`, sorted by ascending
+            stream_ordering.
         """
 
         def get_all_new_event_ids_stream_txn(

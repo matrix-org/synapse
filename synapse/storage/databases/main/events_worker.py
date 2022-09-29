@@ -474,7 +474,7 @@ class EventsWorkerStore(SQLBaseStore):
             return []
 
         # there may be duplicates so we cast the list to a set
-        event_entry_map = await self.get_events_from_cache_or_db(
+        event_entry_map = await self.get_unredacted_events_from_cache_or_db(
             set(event_ids), allow_rejected=allow_rejected
         )
 
@@ -509,7 +509,9 @@ class EventsWorkerStore(SQLBaseStore):
                     continue
 
                 redacted_event_id = entry.event.redacts
-                event_map = await self.get_events_from_cache_or_db([redacted_event_id])
+                event_map = await self.get_unredacted_events_from_cache_or_db(
+                    [redacted_event_id]
+                )
                 original_event_entry = event_map.get(redacted_event_id)
                 if not original_event_entry:
                     # we don't have the redacted event (or it was rejected).
@@ -588,12 +590,14 @@ class EventsWorkerStore(SQLBaseStore):
         return events
 
     @cancellable
-    async def get_events_from_cache_or_db(
+    async def get_unredacted_events_from_cache_or_db(
         self,
         event_ids: Iterable[str],
         allow_rejected: bool = False,
     ) -> Dict[str, EventCacheEntry]:
-        """Fetch a bunch of events from the cache or the database.
+        """Fetch a bunch of events from the cache or the database. Please note that the
+        events pulled by this function will not have any redactions applied, and no guarantee
+        is made about the ordering of the events returned.
 
         If events are pulled from the database, they will be cached for future lookups.
 

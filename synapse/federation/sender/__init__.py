@@ -358,20 +358,19 @@ class FederationSender(AbstractFederationSender):
                     last_token, self._last_poked_id, limit=100
                 )
 
-                event_entries = await self.store.get_events_from_cache_or_db(
+                event_entries = await self.store.get_unredacted_events_from_cache_or_db(
                     event_to_received_ts.keys()
                 )
-                events = [e.event for e in event_entries.values()]
 
                 logger.debug(
                     "Handling %i -> %i: %i events to send (current id %i)",
                     last_token,
                     next_token,
-                    len(events),
+                    len(event_entries),
                     self._last_poked_id,
                 )
 
-                if not events and next_token >= self._last_poked_id:
+                if not event_entries and next_token >= self._last_poked_id:
                     logger.debug("All events processed")
                     break
 
@@ -512,7 +511,9 @@ class FederationSender(AbstractFederationSender):
                             await handle_event(event)
 
                 events_by_room: Dict[str, List[EventBase]] = {}
-                for event in events:
+
+                for event_cache in event_entries.values():
+                    event = event_cache.event
                     events_by_room.setdefault(event.room_id, []).append(event)
 
                 await make_deferred_yieldable(
@@ -528,9 +529,10 @@ class FederationSender(AbstractFederationSender):
                 logger.debug("Successfully handled up to %i", next_token)
                 await self.store.update_federation_out_pos("events", next_token)
 
-                if events:
+                if event_entries:
                     now = self.clock.time_msec()
-                    ts = event_to_received_ts[events[-1].event_id]
+                    last_id = list(event_entries.keys())[-1]
+                    ts = event_to_received_ts[last_id]
                     assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
@@ -540,7 +542,7 @@ class FederationSender(AbstractFederationSender):
                         "federation_sender"
                     ).set(ts)
 
-                    events_processed_counter.inc(len(events))
+                    events_processed_counter.inc(len(event_entries))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
                         len(events_by_room)
