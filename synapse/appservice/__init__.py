@@ -172,11 +172,26 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        app_service_users_in_room = await store.get_app_service_users_in_room(
-            room_id, self, on_invalidate=cache_context.invalidate
+        # We can use `get_local_users_in_room(...)` here because an application
+        # service can only act on behalf of users of the server it's on.
+        #
+        # In the future, we can consider re-using
+        # `store.get_app_service_users_in_room` which is very similar to this
+        # function but has a slightly worse performance than this because we
+        # have an early escape-hatch if we find a single user that the
+        # appservice is interested in. The juice would be worth the squeeze if
+        # `store.get_app_service_users_in_room` was used in more places besides
+        # an experimental MSC. But for now we can avoid doing more work and
+        # barely using it later.
+        member_list = await store.get_local_users_in_room(
+            room_id, on_invalidate=cache_context.invalidate
         )
 
-        return len(app_service_users_in_room) > 0
+        # check joined member events
+        for user_id in member_list:
+            if self.is_interested_in_user(user_id):
+                return True
+        return False
 
     def is_interested_in_user(
         self,
