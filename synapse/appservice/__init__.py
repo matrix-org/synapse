@@ -183,12 +183,12 @@ class ApplicationService:
         # `store.get_app_service_users_in_room` was used in more places besides
         # an experimental MSC. But for now we can avoid doing more work and
         # barely using it later.
-        member_list = await store.get_local_users_in_room(
+        local_user_ids = await store.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
 
         # check joined member events
-        for user_id in member_list:
+        for user_id in local_user_ids:
             if self.is_interested_in_user(user_id):
                 return True
         return False
