@@ -1020,8 +1020,12 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_NEXT_BATCH_ID: next_batch_id,
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
-                allow_no_prev_events=True,
-                prev_event_ids=[],
+                # It all works when I add a prev_event for the floating
+                # insertion event but the event no longer floats.
+                # It's able to resolve state at the prev_events though.
+                prev_event_ids=[event_before.event_id],
+                # allow_no_prev_events=True,
+                # prev_event_ids=[],
                 auth_event_ids=historical_auth_event_ids,
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
@@ -1076,6 +1080,25 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         _add_to_known_event_list(base_insertion_event, historical_state_events)
 
         # Chronological
+        pulled_events: List[EventBase] = [
+            # Beginning of room (oldest messages)
+            # *list(state_map.values()),
+            room_create_event,
+            pl_event,
+            as_membership_event,
+            state_map.get((EventTypes.JoinRules, "")),
+            state_map.get((EventTypes.RoomHistoryVisibility, "")),
+            event_before,
+            # HISTORICAL MESSAGE END
+            insertion_event,
+            historical_message_event,
+            batch_event,
+            base_insertion_event,
+            # HISTORICAL MESSAGE START
+            event_after,
+            # Latest in the room (newest messages)
+        ]
+
         # pulled_events: List[EventBase] = [
         #     # Beginning of room (oldest messages)
         #     # *list(state_map.values()),
@@ -1098,22 +1121,22 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # The order that we get after passing reverse chronological events in
         # that mostly passes. Only the insertion event is rejected but the
         # historical messages appear /messages scrollback.
-        pulled_events: List[EventBase] = [
-            # Beginning of room (oldest messages)
-            # *list(state_map.values()),
-            room_create_event,
-            pl_event,
-            as_membership_event,
-            state_map.get((EventTypes.JoinRules, "")),
-            state_map.get((EventTypes.RoomHistoryVisibility, "")),
-            event_before,
-            event_after,
-            base_insertion_event,
-            batch_event,
-            historical_message_event,
-            insertion_event,
-            # Latest in the room (newest messages)
-        ]
+        # pulled_events: List[EventBase] = [
+        #     # Beginning of room (oldest messages)
+        #     # *list(state_map.values()),
+        #     room_create_event,
+        #     pl_event,
+        #     as_membership_event,
+        #     state_map.get((EventTypes.JoinRules, "")),
+        #     state_map.get((EventTypes.RoomHistoryVisibility, "")),
+        #     event_before,
+        #     event_after,
+        #     base_insertion_event,
+        #     batch_event,
+        #     historical_message_event,
+        #     insertion_event,
+        #     # Latest in the room (newest messages)
+        # ]
 
         import logging
 
@@ -1217,8 +1240,12 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             )
         )
 
-        assert (
-            actual_events_in_room_chronological == expected_event_order
-        ), assertion_message
+        # assert (
+        #     actual_events_in_room_chronological == expected_event_order
+        # ), assertion_message
 
-        # self.assertEqual(actual_events_in_room_chronological, expected_event_order)
+        self.assertEqual(
+            [event.event_id for event in actual_events_in_room_chronological],
+            [event.event_id for event in expected_event_order],
+            assertion_message,
+        )

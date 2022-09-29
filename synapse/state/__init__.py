@@ -307,6 +307,7 @@ class StateHandler:
             state_ids_before_event,
             event.content.get("body", event.type),
             getattr(event, "state_key", None),
+            # stack_info=True,
         )
 
         if state_ids_before_event:
@@ -370,7 +371,7 @@ class StateHandler:
             state_ids_before_event = None
 
             logger.info(
-                "compute_event_context(event=%s) entry.state_group=%s state_group_before_event_prev_group=%s deltas_to_state_group_before_event=%s - %s (%s)",
+                "compute_event_context(event=%s) resolve_state_groups_for_events entry.state_group=%s state_group_before_event_prev_group=%s deltas_to_state_group_before_event=%s - %s (%s)",
                 event.event_id,
                 entry.state_group,
                 state_group_before_event_prev_group,
@@ -456,6 +457,13 @@ class StateHandler:
                     ),
                 }
             )
+            logger.info(
+                "compute_event_context(event=%s) Done creating context=%s for non-state event - %s (%s)",
+                event.event_id,
+                event_context,
+                event.content.get("body", event.type),
+                getattr(event, "state_key", None),
+            )
 
             return event_context
 
@@ -527,6 +535,11 @@ class StateHandler:
 
         state_group_ids = state_groups.values()
 
+        logger.info(
+            "resolve_state_groups_for_events: state_group_ids=%s state_groups=%s",
+            state_group_ids,
+            state_groups,
+        )
         log_kv({"state_group_ids": state_group_ids, "state_groups": state_groups})
 
         # check if each event has same state group id, if so there's no state to resolve
@@ -538,6 +551,11 @@ class StateHandler:
                 delta_ids,
             ) = await self._state_storage_controller.get_state_group_delta(
                 state_group_id
+            )
+            logger.info(
+                "resolve_state_groups_for_events: Returning state_group_id=%s prev_group=%s",
+                state_group_id,
+                prev_group,
             )
             log_kv(
                 {
@@ -553,6 +571,9 @@ class StateHandler:
                 delta_ids=delta_ids,
             )
         elif len(state_group_ids_set) == 0:
+            logger.info(
+                "resolve_state_groups_for_events: Returning empty state group since there are no state_group_ids"
+            )
             log_kv(
                 {
                     "message": "Returning empty state group since there are no state_group_ids",
@@ -572,6 +593,11 @@ class StateHandler:
             state_to_resolve,
             None,
             state_res_store=StateResolutionStore(self.store),
+        )
+        logger.info(
+            "resolve_state_groups_for_events: RResolving state groups and returning result state_to_resolve=%s result=%s",
+            state_to_resolve,
+            result,
         )
         log_kv(
             {

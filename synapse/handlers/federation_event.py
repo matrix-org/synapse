@@ -717,7 +717,7 @@ class FederationEventHandler:
                 # newest) so that events are persisted before they're referenced
                 # as a `prev_event`.
                 # chronological_events,
-                reverse_chronological_events,
+                #reverse_chronological_events,
                 backfilled=True,
             )
 
@@ -1935,8 +1935,10 @@ class FederationEventHandler:
         )
 
         logger.info(
-            "_check_event_auth(event=%s) claimed_auth_events=%s calculated_auth_event_ids=%s - %s (%s)",
+            "_check_event_auth(event=%s) match=%s claimed_auth_events=%s calculated_auth_event_ids=%s - %s (%s)",
             event.event_id,
+            collections.Counter(event.auth_event_ids())
+            == collections.Counter(calculated_auth_event_ids),
             event.auth_event_ids(),
             calculated_auth_event_ids,
             event.content.get("body", event.type),
