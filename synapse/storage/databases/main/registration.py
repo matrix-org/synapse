@@ -191,10 +191,21 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
             return rows[0]
 
-        return await self.db_pool.runInteraction(
+        row = await self.db_pool.runInteraction(
             desc="get_user_by_id",
             func=get_user_by_id_txn,
         )
+
+        if row is not None:
+            # If we're using SQLite our boolean values will be integers. Because we
+            # present some of this data as is to e.g. server admins via REST APIs, we
+            # want to make sure we're returning the right type of data.
+            boolean_columns = ["admin", "deactivated", "shadow_banned", "approved"]
+            for column in boolean_columns:
+                if not isinstance(row[column], bool):
+                    row[column] = bool(row[column])
+
+        return row
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get a UserInfo object for a user by user ID.

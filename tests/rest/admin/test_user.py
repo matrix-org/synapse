@@ -2656,7 +2656,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertFalse(channel.json_body["approved"])
+        self.assertIs(False, channel.json_body["approved"])
 
         # Approve user
         channel = self.make_request(
@@ -2667,7 +2667,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertTrue(channel.json_body["approved"])
+        self.assertIs(True, channel.json_body["approved"])
 
         # Check that the user is now approved
         channel = self.make_request(
@@ -2677,7 +2677,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertTrue(channel.json_body["approved"])
+        self.assertIs(True, channel.json_body["approved"])
 
     @override_config(
         {
