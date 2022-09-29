@@ -95,7 +95,6 @@ from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
-    PostgresEngine,
 )
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
@@ -448,20 +447,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
-        # A clause to get the latest receipt stream ordering taking into account
-        # both unthreaded and threaded receipts. This takes a single parameter:
-        # receipt_stream_ordering.
-        #
-        # PostgreSQL and SQLite differ in comparing scalar numerics.
-        if isinstance(self.database_engine, PostgresEngine):
-            # GREATEST ignores NULLs.
-            receipt_stream_clause = "GREATEST(threaded_receipt_stream_ordering, ?)"
-        else:
-            # MAX returns NULL if any are NULL, so COALESCE to 0 first.
-            receipt_stream_clause = (
-                "MAX(COALESCE(threaded_receipt_stream_ordering, 0), ?)"
-            )
-
         # First we pull the counts from the summary table.
         #
         # We check that `last_receipt_stream_ordering` matches the stream ordering of the
@@ -490,18 +475,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     WHERE
                         user_id = ?
                         AND room_id = ?
+                        AND stream_ordering > ?
                         AND {receipt_types_clause}
                     GROUP BY thread_id
                 ) AS receipts USING (thread_id)
                 WHERE room_id = ? AND user_id = ?
                 AND (
-                    (last_receipt_stream_ordering IS NULL AND stream_ordering > {receipt_stream_clause})
-                    OR last_receipt_stream_ordering = {receipt_stream_clause}
+                    (last_receipt_stream_ordering IS NULL AND stream_ordering > COALESCE(threaded_receipt_stream_ordering, ?))
+                    OR last_receipt_stream_ordering = COALESCE(threaded_receipt_stream_ordering, ?)
                 ) AND (notif_count != 0 OR COALESCE(unread_count, 0) != 0)
             """,
             (
                 user_id,
                 room_id,
+                unthreaded_receipt_stream_ordering,
                 *receipts_args,
                 room_id,
                 user_id,
@@ -526,12 +513,13 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 WHERE
                     user_id = ?
                     AND room_id = ?
+                    AND stream_ordering > ?
                     AND {receipt_types_clause}
                 GROUP BY thread_id
             ) AS receipts USING (thread_id)
             WHERE user_id = ?
                 AND room_id = ?
-                AND stream_ordering > {receipt_stream_clause}
+                AND stream_ordering > COALESCE(threaded_receipt_stream_ordering, ?)
                 AND highlight = 1
             GROUP BY thread_id
         """
@@ -540,6 +528,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (
                 user_id,
                 room_id,
+                unthreaded_receipt_stream_ordering,
                 *receipts_args,
                 user_id,
                 room_id,
@@ -603,12 +592,13 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 WHERE
                     user_id = ?
                     AND room_id = ?
+                    AND stream_ordering > ?
                     AND {receipt_types_clause}
                 GROUP BY thread_id
             ) AS receipts USING (thread_id)
             WHERE user_id = ?
                 AND room_id = ?
-                AND stream_ordering > {receipt_stream_clause}
+                AND stream_ordering > COALESCE(threaded_receipt_stream_ordering, ?)
                 AND NOT {thread_id_clause}
             GROUP BY thread_id
         """
@@ -617,6 +607,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (
                 user_id,
                 room_id,
+                unthreaded_receipt_stream_ordering,
                 *receipts_args,
                 user_id,
                 room_id,
