@@ -3,3 +3,11 @@
 
 [workspace]
 members = ["rust"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+
+## needs cargo >= 1.59 (https://doc.rust-lang.org/cargo/reference/unstable.html#profile-strip-option)
+# strip = true
