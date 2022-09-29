@@ -343,6 +343,13 @@ class BulkPushRuleEvaluator:
             count_as_unread_by_user,
         )
 
+        logger.info(
+            "Staged %d push actions to %d users for event %s",
+            sum(len(actions) for actions in actions_by_user.values()),
+            len(actions_by_user),
+            event.event_id,
+        )
+
 
 MemberMap = Dict[str, Optional[EventIdMembership]]
 Rule = Dict[str, dict]
