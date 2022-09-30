@@ -174,8 +174,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertGreater(result, 0)
 
         result = self.get_success(self.store.user_last_seen_monthly_active(user_id3))
-        assert result is not None
-        self.assertNotEqual(result, 0)
+        self.assertIsNone(result)
 
     @override_config({"max_mau_value": 5})
     def test_reap_monthly_active_users(self):
