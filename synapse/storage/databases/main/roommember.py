@@ -160,7 +160,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     def get_users_in_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[str]:
         """Returns a list of users in the room."""
         sql = """
-            SELECT c.state_key FROM current_state_events
+            SELECT state_key FROM current_state_events
             WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
         """
 
