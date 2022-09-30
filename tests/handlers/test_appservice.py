@@ -431,7 +431,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         Test to make sure that a interesting user (local or remote) in the room is notified
         when someone else in the room sends a message.
         """
-        # Register an application service that's interested in local and remote user
+        # Register an application service that's interested in the `interesting_user`
         interested_appservice = self._register_application_service(
             namespaces={
                 ApplicationService.NS_USERS: [
