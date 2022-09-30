@@ -412,7 +412,7 @@ the stream writer for the `presence` stream:
 There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
-stats is enabled).
+stats is enabled). This worker doesn't handle any REST endpoints itself.
 
 To enable this, the worker must have a `worker_name` and can be configured to run
 background tasks. For example, to move background tasks to a dedicated worker,
@@ -459,8 +459,8 @@ worker application type.
 #### Notifying Application Services
 
 You can designate one generic worker to send output traffic to Application Services.
-
-Specify its name in the shared configuration as follows:
+Doesn't handle any REST endpoints itself, but you should specify its name in the
+shared configuration as follows:
 
 ```yaml
 notify_appservices_from_worker: worker_name
