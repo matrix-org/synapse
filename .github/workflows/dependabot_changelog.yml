@@ -1,0 +1,19 @@
+on:
+  pull_request:
+    types:
+      - opened
+      - edited      # DMR test
+      - synchronize # DMR TEST
+
+jobs:
+  add-changelog:
+    runs-on: 'ubuntu-latest'
+    if: github.actor == 'dependabot[bot]' || github.actor == 'dmrobertson'  # DMR TEST
+    steps:
+      - uses: actions/checkout@v3
+      - name: Write and commit changelog
+        run: |
+          echo ${{ toJSON(github.event) }}
+        shell: bash
+      - name: Push commit to PR
+          echo
