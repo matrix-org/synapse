@@ -425,9 +425,10 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_match_local_room_members(self):
+    @parameterized.expand(["@local_as_user:test", "@interesting_user:remote"])
+    def test_match_interesting_room_members(self, interesting_user):
         """
-        Test to make sure that a user local to the server and in the room is notified
+        Test to make sure that a interesting user (local or remote) in the room is notified
         when someone else in the room sends a message.
         """
         # Register an application service that's interested in local and remote user
@@ -435,8 +436,8 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             namespaces={
                 ApplicationService.NS_USERS: [
                     {
-                        "regex": "@local_as_user:test",
-                        "exclusive": True,
+                        "regex": interesting_user,
+                        "exclusive": False,
                     },
                 ],
             },
@@ -449,71 +450,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Join the interesting user to the room
         self.get_success(
             event_injection.inject_member_event(
-                self.hs, room_id, "@local_as_user:test", "join"
-            )
-        )
-        # Kick the appservice into checking this membership event to get it out of the
-        # way
-        self._notify_interested_services()
-        # We don't care about the interesting user join event (this test is making sure
-        # the next thing works)
-        self.send_mock.reset_mock()
-
-        # Send a message from an uninteresting user
-        self.helper.send_event(
-            room_id,
-            type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "message from uninteresting user",
-            },
-            tok=alice_access_token,
-        )
-        # Kick the appservice into checking this new event
-        self._notify_interested_services()
-
-        self.send_mock.assert_called_once()
-        (
-            service,
-            events,
-            _ephemeral,
-            _to_device_messages,
-            _otks,
-            _fbks,
-            _device_list_summary,
-        ) = self.send_mock.call_args[0]
-
-        # Even though the message came from an uninsteresting user, it should still
-        # notify us because the interesting user is joined to the room.
-        self.assertEqual(service, interested_appservice)
-        self.assertEqual(events[0]["type"], "m.room.message")
-        self.assertEqual(events[0]["sender"], alice)
-
-    def test_match_remote_room_members(self):
-        """
-        Test to make sure that a remote user that is in the room is notified when
-        someone else in the room sends a message.
-        """
-        # Register an application service that's interested in a remote user
-        interested_appservice = self._register_application_service(
-            namespaces={
-                ApplicationService.NS_USERS: [
-                    {
-                        "regex": "@interesting_user:remote",
-                        "exclusive": True,
-                    },
-                ],
-            },
-        )
-
-        alice = self.register_user("alice", "pass")
-        alice_access_token = self.login("alice", "pass")
-        room_id = self.helper.create_room_as(room_creator=alice, tok=alice_access_token)
-
-        # Join the interesting user to the room
-        self.get_success(
-            event_injection.inject_member_event(
-                self.hs, room_id, "@interesting_user:remote", "join"
+                self.hs, room_id, interesting_user, "join"
             )
         )
         # Kick the appservice into checking this membership event to get it out of the
