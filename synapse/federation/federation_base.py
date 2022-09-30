@@ -92,7 +92,7 @@ class FederationBase:
         """
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
-        except Exception as exc:
+        except InvalidEventSignatureError as exc:
             if record_failure_callback:
                 await record_failure_callback(pdu, str(exc))
             raise exc
