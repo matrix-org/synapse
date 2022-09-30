@@ -3,8 +3,6 @@ on:
   pull_request:
     types:
       - opened
-      - edited      # DMR test
-      - synchronize # DMR TEST
 
 jobs:
   add-changelog:
@@ -12,12 +10,10 @@ jobs:
     if: github.actor == 'dependabot[bot]' || github.actor == 'dmrobertson'  # DMR TEST
     steps:
       - uses: actions/checkout@v3
-      - name: Write and commit changelog
+      - name: Write, commit and push changelog
         run: |
-          echo <<EOF
-          ${{ toJSON(github.event) }}
-          EOF
+          echo "${{ github.pull_request.title }}" > "changelog.d/${{ github.pull_request.number }}".docker
+          git add changelog.d
+          git commit -m "Changelog"
+          git push
         shell: bash
-      - name: Push commit to PR
-        run:
-          echo hello
