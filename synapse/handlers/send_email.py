@@ -192,11 +192,10 @@ class SendEmailHandler:
         # header is present with any value other than "no". See
         #     https://www.rfc-editor.org/rfc/rfc3834.html#section-5.1
         multipart_msg["Auto-Submitted"] = "auto-generated"
-        # We also include a barely-documented Microsoft-Exchange specific header.
-        # The best reference I could find was
+        # Also include a Microsoft-Exchange specific header:
         #    https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmail/ced68690-498a-4567-9d14-5c01f974d8b1
-        # which seems to suggest it can take the value "All" to mean "suppress all
-        # auto-replies", or a comma separated list of auto-reply classes to suppress.
+        # which suggests it can take the value "All" to "suppress all auto-replies",
+        # or a comma separated list of auto-reply classes to suppress.
         # The following stack overflow question has a little more context:
         #    https://stackoverflow.com/a/25324691/5252017
         #    https://stackoverflow.com/a/61646381/5252017
