@@ -158,14 +158,14 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         cache_context: _CacheContext,
     ) -> List[str]:
         """
-        Get all users in a room that the appservice controls.
+        Get all users in a room that the appservice is interested in.
 
         Args:
             room_id: The room to check in.
-            app_service: The application service to check interest/control against
+            app_service: The application service to check interest against
 
         Returns:
-            List of user IDs that the appservice controls.
+            List of user IDs that the appservice is interested in.
         """
         # We can use `get_local_users_in_room(...)` here because an application
         # service can only act on behalf of users of the server it's on.
