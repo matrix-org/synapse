@@ -1249,8 +1249,7 @@ class RoomJoinTestCase(RoomBase):
             expect_errcode=return_value[0],
             tok=self.tok2,
             expect_additional_fields=return_value[1],
-        )ub
-
+        )
 
 
 class RoomJoinRatelimitTestCase(RoomBase):
