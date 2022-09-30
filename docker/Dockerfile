@@ -125,6 +125,9 @@ COPY --from=requirements /synapse/requirements.txt /synapse/requirements.txt
 # installing packages that use it, so we just hack past it by ignoring the pinned setuptools version. Ugh.
 RUN cp /synapse/requirements.txt /synapse/requirements-with-setuptools.txt && rm -f /synapse/requirements.txt
 RUN cat /synapse/requirements-with-setuptools.txt | grep -v "setuptools==" > /synapse/requirements.txt
+# pyston base image pip version isn't high enough
+RUN pip install pip -U
+
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/install" --no-deps --no-warn-script-location -r /synapse/requirements.txt
 
