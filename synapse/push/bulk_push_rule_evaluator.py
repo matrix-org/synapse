@@ -344,7 +344,7 @@ class BulkPushRuleEvaluator:
             self.store, actions_by_user.keys(), event, context
         )
 
-        for user_id in set(uids_with_visibility).difference(uids_with_visibility):
+        for user_id in set(actions_by_user).difference(uids_with_visibility):
             actions_by_user.pop(user_id, None)
 
         # Mark in the DB staging area the push actions for users who should be
