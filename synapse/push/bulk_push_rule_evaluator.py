@@ -332,6 +332,11 @@ class BulkPushRuleEvaluator:
                 # Push rules say we should notify the user of this event
                 actions_by_user[uid] = actions
 
+        # If there aren't any actions then we can skip the rest of the
+        # processing.
+        if not actions_by_user:
+            return
+
         # This is a check for the case where user joins a room without being
         # allowed to see history, and then the server receives a delayed event
         # from before the user joined, which they should not be pushed for
