@@ -842,6 +842,8 @@ class ModuleApi:
         however invalidation that needs to go to other workers needs to call `invalidate_cache`
         on the module API instead.
 
+        Added in Synapse v1.69.0.
+
         Args:
             cached_function: The cached function that will be registered to receive invalidation
             locally and from other workers.
@@ -855,6 +857,8 @@ class ModuleApi:
     ) -> None:
         """Invalidate a cache entry of a cached function across workers. The cached function
         needs to be registered on all workers first with `register_cached_function`.
+
+        Added in Synapse v1.69.0.
 
         Args:
             cached_function: The cached function that needs an invalidation

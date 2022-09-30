@@ -1,0 +1,1 @@
+Correctly handle sending local device list updates to remote servers during a partial join.
