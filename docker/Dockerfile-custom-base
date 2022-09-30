@@ -53,7 +53,7 @@ RUN \
     libxml++2.6-dev \
     libxslt1-dev \
     openssl \
-    rustc \
+    curl \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -89,6 +89,14 @@ RUN cat /synapse/requirements-with-setuptools.txt | grep -v "setuptools==" > /sy
 # This is aiming at installing the `[tool.poetry.depdendencies]` from pyproject.toml.
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/install" --no-deps --no-warn-script-location -r /synapse/requirements.txt
+
+# Install rust and ensure its in the PATH
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+RUN mkdir /rust /cargo
+
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable
 
 # Beeper: install shared secret authenticator
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location \

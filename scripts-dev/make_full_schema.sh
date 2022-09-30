@@ -9,8 +9,10 @@
 export PGHOST="localhost"
 POSTGRES_DB_NAME="synapse_full_schema.$$"
 
-SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
-POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
+SQLITE_SCHEMA_FILE="schema.sql.sqlite"
+SQLITE_ROWS_FILE="rows.sql.sqlite"
+POSTGRES_SCHEMA_FILE="full.sql.postgres"
+POSTGRES_ROWS_FILE="rows.sql.postgres"
 
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
@@ -22,7 +24,7 @@ usage() {
   echo "  Username to connect to local postgres instance. The password will be requested"
   echo "  during script execution."
   echo "-c"
-  echo "  CI mode. Enables coverage tracking and prints every command that the script runs."
+  echo "  CI mode. Prints every command that the script runs."
   echo "-o <path>"
   echo "  Directory to output full schema files to."
   echo "-h"
@@ -37,11 +39,6 @@ while getopts "p:co:h" opt; do
     c)
       # Print all commands that are being executed
       set -x
-
-      # Modify required dependencies for coverage
-      REQUIRED_DEPS+=("coverage" "coverage-enable-subprocess")
-
-      COVERAGE=1
       ;;
     o)
       command -v realpath > /dev/null || (echo "The -o flag requires the 'realpath' binary to be installed" && exit 1)
@@ -102,6 +99,7 @@ SQLITE_DB=$TMPDIR/homeserver.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
+# TODO: the trap should also drop the temp postgres DB
 trap 'rm -rf $TMPDIR' EXIT
 
 cat > "$SQLITE_CONFIG" <<EOF
@@ -147,48 +145,34 @@ python -m synapse.app.homeserver --generate-keys -c "$SQLITE_CONFIG"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 echo "Running db background jobs..."
-synapse/_scripts/update_synapse_database.py --database-config --run-background-updates "$SQLITE_CONFIG"
+synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" --run-background-updates
 
 # Create the PostgreSQL database.
 echo "Creating postgres database..."
 createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_DB_NAME"
 
-echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
-if [ -z "$COVERAGE" ]; then
-  # No coverage needed
-  synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
-else
-  # Coverage desired
-  coverage run synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
-fi
+echo "Running db background jobs..."
+synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
+
 
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
 # Also delete any shadow tables from fts4
-# This needs to be done after synapse_port_db is run
 echo "Dropping unwanted db tables..."
 SQL="
 DROP TABLE schema_version;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
-DROP TABLE event_search_content;
-DROP TABLE event_search_segments;
-DROP TABLE event_search_segdir;
-DROP TABLE event_search_docsize;
-DROP TABLE event_search_stat;
-DROP TABLE user_directory_search_content;
-DROP TABLE user_directory_search_segments;
-DROP TABLE user_directory_search_segdir;
-DROP TABLE user_directory_search_docsize;
-DROP TABLE user_directory_search_stat;
 "
 sqlite3 "$SQLITE_DB" <<< "$SQL"
 psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
 
-echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
-sqlite3 "$SQLITE_DB" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"
+echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_SCHEMA_FILE' and '$OUTPUT_DIR/$SQLITE_ROWS_FILE'..."
+sqlite3 "$SQLITE_DB" ".schema --indent" > "$OUTPUT_DIR/$SQLITE_SCHEMA_FILE"
+sqlite3 "$SQLITE_DB" ".dump --data-only --nosys" > "$OUTPUT_DIR/$SQLITE_ROWS_FILE"
 
-echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE'..."
-pg_dump --format=plain --no-tablespaces --no-acl --no-owner $POSTGRES_DB_NAME | sed -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE"
+echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE' and '$OUTPUT_DIR/$POSTGRES_ROWS_FILE'..."
+pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_SCHEMA_FILE"
+pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_DB_NAME" | sed -e '/^$/d' -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_ROWS_FILE"
 
 echo "Cleaning up temporary Postgres database..."
 dropdb $POSTGRES_DB_NAME

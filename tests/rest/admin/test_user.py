@@ -2580,6 +2580,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("appservice_id", content)
         self.assertIn("consent_server_notice_sent", content)
         self.assertIn("consent_version", content)
+        self.assertIn("consent_ts", content)
         self.assertIn("external_ids", content)
 
         # This key was removed intentionally. Ensure it is not accidentally re-included.
@@ -4138,4 +4139,91 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             {"b": 2},
             channel.json_body["account_data"]["rooms"]["test_room"]["m.per_room"],
+        )
+
+
+class UsersByExternalIdTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.get_success(
+            self.store.record_user_external_id(
+                "the-auth-provider", "the-external-id", self.other_user
+            )
+        )
+        self.get_success(
+            self.store.record_user_external_id(
+                "another-auth-provider", "a:complex@external/id", self.other_user
+            )
+        )
+
+    def test_no_auth(self) -> None:
+        """Try to lookup a user without authentication."""
+        url = (
+            "/_synapse/admin/v1/auth_providers/the-auth-provider/users/the-external-id"
+        )
+
+        channel = self.make_request(
+            "GET",
+            url,
+        )
+
+        self.assertEqual(401, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_binding_does_not_exist(self) -> None:
+        """Tests that a lookup for an external ID that does not exist returns a 404"""
+        url = "/_synapse/admin/v1/auth_providers/the-auth-provider/users/unknown-id"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_success(self) -> None:
+        """Tests a successful external ID lookup"""
+        url = (
+            "/_synapse/admin/v1/auth_providers/the-auth-provider/users/the-external-id"
+        )
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            {"user_id": self.other_user},
+            channel.json_body,
+        )
+
+    def test_success_urlencoded(self) -> None:
+        """Tests a successful external ID lookup with an url-encoded ID"""
+        url = "/_synapse/admin/v1/auth_providers/another-auth-provider/users/a%3Acomplex%40external%2Fid"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            {"user_id": self.other_user},
+            channel.json_body,
         )

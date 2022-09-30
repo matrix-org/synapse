@@ -862,7 +862,15 @@ class FederationEventHandler:
             self._sanity_check_event(event)
         except SynapseError as err:
             logger.warning("Event %s failed sanity check: %s", event_id, err)
+            await self._store.record_event_failed_pull_attempt(
+                event.room_id, event_id, str(err)
+            )
             return
+        except Exception as exc:
+            await self._store.record_event_failed_pull_attempt(
+                event.room_id, event_id, str(exc)
+            )
+            raise exc
 
         try:
             try:
@@ -897,10 +905,19 @@ class FederationEventHandler:
                     backfilled=backfilled,
                 )
         except FederationError as e:
+            await self._store.record_event_failed_pull_attempt(
+                event.room_id, event_id, str(e)
+            )
+
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
             else:
                 raise
+        except Exception as exc:
+            await self._store.record_event_failed_pull_attempt(
+                event.room_id, event_id, str(exc)
+            )
+            raise exc
 
     @trace
     async def _compute_event_context_with_maybe_missing_prevs(

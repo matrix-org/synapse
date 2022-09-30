@@ -1,0 +1,25 @@
+[package]
+# We name the package `synapse` so that things like logging have the right
+# logging target.
+name = "synapse"
+
+# dummy version. See pyproject.toml for the Synapse's version number.
+version = "0.1.0"
+
+edition = "2021"
+rust-version = "1.58.1"
+
+[lib]
+name = "synapse"
+crate-type = ["cdylib"]
+
+[package.metadata.maturin]
+# This is where we tell maturin where to place the built library.
+name = "synapse.synapse_rust"
+
+[dependencies]
+pyo3 = { version = "0.16.5", features = ["extension-module", "macros", "abi3", "abi3-py37"] }
+
+[build-dependencies]
+blake2 = "0.10.4"
+hex = "0.4.3"

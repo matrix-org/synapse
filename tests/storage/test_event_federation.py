@@ -513,7 +513,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         def prev_event_format(prev_event_id: str) -> Union[Tuple[str, dict], str]:
             """Account for differences in prev_events format across room versions"""
-            if room_version.event_format == EventFormatVersions.V1:
+            if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
                 return prev_event_id, {}
 
             return prev_event_id

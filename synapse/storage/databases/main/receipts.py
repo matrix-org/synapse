@@ -115,6 +115,24 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             prefilled_cache=receipts_stream_prefill,
         )
 
+        self.db_pool.updates.register_background_index_update(
+            "receipts_linearized_unique_index",
+            index_name="receipts_linearized_unique_index",
+            table="receipts_linearized",
+            columns=["room_id", "receipt_type", "user_id"],
+            where_clause="thread_id IS NULL",
+            unique=True,
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            "receipts_graph_unique_index",
+            index_name="receipts_graph_unique_index",
+            table="receipts_graph",
+            columns=["room_id", "receipt_type", "user_id"],
+            where_clause="thread_id IS NULL",
+            unique=True,
+        )
+
     def get_max_receipt_stream_id(self) -> int:
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
@@ -690,6 +708,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
                 "event_id": event_id,
                 "event_stream_ordering": stream_ordering,
                 "data": json_encoder.encode(data),
+                "thread_id": None,
             },
             # receipts_linearized has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
@@ -826,7 +845,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
-        self.db_pool.simple_delete_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="receipts_graph",
             keyvalues={
@@ -834,17 +853,14 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
                 "receipt_type": receipt_type,
                 "user_id": user_id,
             },
-        )
-        self.db_pool.simple_insert_txn(
-            txn,
-            table="receipts_graph",
             values={
-                "room_id": room_id,
-                "receipt_type": receipt_type,
-                "user_id": user_id,
                 "event_ids": json_encoder.encode(event_ids),
                 "data": json_encoder.encode(data),
+                "thread_id": None,
             },
+            # receipts_graph has a unique constraint on
+            # (user_id, room_id, receipt_type), so no need to lock
+            lock=False,
         )
 
 

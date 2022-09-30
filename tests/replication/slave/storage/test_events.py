@@ -404,6 +404,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                 event.event_id,
                 {user_id: actions for user_id, actions in push_actions},
                 {user_id: False for user_id, _ in push_actions},
+                "main",
             )
         )
         return event, context

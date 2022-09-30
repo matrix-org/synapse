@@ -15,9 +15,8 @@ this document.
     The website <https://endoflife.date> also offers convenient
     summaries.
 
--   If Synapse was installed using [prebuilt
-    packages](setup/installation.md#prebuilt-packages), you will need to follow the
-    normal process for upgrading those packages.
+-   If Synapse was installed using [prebuilt packages](setup/installation.md#prebuilt-packages),
+    you will need to follow the normal process for upgrading those packages.
 
 -   If Synapse was installed using pip then upgrade to the latest
     version by running:
@@ -89,6 +88,20 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.68.0
+
+As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
+version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
+now require a recent Rust compiler.
+
+Installations using 
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- PyPI wheels via `pip install matrix-synapse` (on supported platforms and architectures)
+
+will not be affected.
+
 # Upgrading to v1.67.0
 
 ## Direct TCP replication is no longer supported: migrate to Redis
@@ -125,7 +138,7 @@ From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
 higher. Synapse v1.67.0 will be the last major release supporting SQLite
 versions 3.22 to 3.26.
 
-Those using docker images or Debian packages from Matrix.org will not be
+Those using Docker images or Debian packages from Matrix.org will not be
 affected. If you have installed from source, you should check the version of 
 SQLite used by Python with:
 
@@ -134,6 +147,7 @@ python -c "import sqlite3; print(sqlite3.sqlite_version)"
 ```
 
 If this is too old, refer to your distribution for advice on upgrading.
+
 
 # Upgrading to v1.66.0
 
