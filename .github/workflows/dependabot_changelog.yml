@@ -16,4 +16,5 @@ jobs:
           echo ${{ toJSON(github.event) }}
         shell: bash
       - name: Push commit to PR
-          echo
+        run:
+          echo hello
