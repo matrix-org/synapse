@@ -26,11 +26,7 @@ class PushRules:
 
 class FilteredPushRules:
     def __init__(
-        self,
-        push_rules: PushRules,
-        enabled_map: Dict[str, bool],
-        msc3786_enabled: bool,
-        msc3772_enabled: bool,
+        self, push_rules: PushRules, enabled_map: Dict[str, bool], msc3772_enabled: bool
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
