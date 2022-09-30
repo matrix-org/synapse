@@ -149,6 +149,13 @@ RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
     pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
   fi
 
+# Beeper: pyston fixes
+# For *reasons* installing synapse with pip under pyston leaves the rust shared object in the
+# build directory not the /install/lib/... directory.
+RUN if [ -f "/synapse/build/lib/synapse/synapse_rust.abi3.so" ]; then \
+    mv /synapse/build/lib/synapse/synapse_rust.abi3.so /install/lib/*/site-packages/synapse/; \
+  fi
+
 ###
 ### Stage 2: runtime
 ###
