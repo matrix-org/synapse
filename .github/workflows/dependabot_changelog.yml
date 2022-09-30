@@ -8,7 +8,7 @@ on:
 jobs:
   add-changelog:
     runs-on: 'ubuntu-latest'
-    if: github.actor == 'dependabot[bot]' || github.actor == 'dmrobertson'  # DMR TEST
+    if: github.actor == 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v3
         with:
