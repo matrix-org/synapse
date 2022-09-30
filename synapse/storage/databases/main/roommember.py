@@ -146,14 +146,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000, iterable=True)
     async def get_users_in_room(self, room_id: str) -> List[str]:
-        """
-        Returns a list of users in the room sorted by longest in the room first
-        (aka. with the lowest depth). This is done to match the sort in
-        `get_current_hosts_in_room()` and so we can re-use the cache but it's
-        not horrible to have here either.
-
-        Uses `m.room.member`s in the room state at the current forward extremities to
-        determine which users are in the room.
+        """Returns a list of users in the room.
 
         Will return inaccurate results for rooms with partial state, since the state for
         the forward extremities of those rooms will exclude most members. We may also
@@ -165,19 +158,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     def get_users_in_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[str]:
-        """
-        Returns a list of users in the room sorted by longest in the room first
-        (aka. with the lowest depth). This is done to match the sort in
-        `get_current_hosts_in_room()` and so we can re-use the cache but it's
-        not horrible to have here either.
-        """
+        """Returns a list of users in the room."""
         sql = """
-            SELECT c.state_key FROM current_state_events as c
-            /* Get the depth of the event from the events table */
-            INNER JOIN events AS e USING (event_id)
-            WHERE c.type = 'm.room.member' AND c.room_id = ? AND membership = ?
-            /* Sorted by lowest depth first */
-            ORDER BY e.depth ASC;
+            SELECT c.state_key FROM current_state_events
+            WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
         """
 
         txn.execute(sql, (room_id, Membership.JOIN))
@@ -931,13 +915,52 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return True
 
     @cached(iterable=True, max_entries=10000)
-    async def get_current_hosts_in_room(self, room_id: str) -> List[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+        """Get current hosts in room based on current state."""
+
+        # First we check if we already have `get_users_in_room` in the cache, as
+        # we can just calculate result from that
+        users = self.get_users_in_room.cache.get_immediate(
+            (room_id,), None, update_metrics=False
+        )
+        if users is not None:
+            return {get_domain_from_id(u) for u in users}
+
+        if isinstance(self.database_engine, Sqlite3Engine):
+            # If we're using SQLite then let's just always use
+            # `get_users_in_room` rather than funky SQL.
+            users = await self.get_users_in_room(room_id)
+            return {get_domain_from_id(u) for u in users}
+
+        # For PostgreSQL we can use a regex to pull out the domains from the
+        # joined users in `current_state_events` via regex.
+
+        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
+            sql = """
+                SELECT DISTINCT substring(state_key FROM '@[^:]*:(.*)$')
+                FROM current_state_events
+                WHERE
+                    type = 'm.room.member'
+                    AND membership = 'join'
+                    AND room_id = ?
+            """
+            txn.execute(sql, (room_id,))
+            return {d for d, in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_current_hosts_in_room", get_current_hosts_in_room_txn
+        )
+
+    @cached(iterable=True, max_entries=10000)
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
         """
         Get current hosts in room based on current state.
 
         The heuristic of sorting by servers who have been in the room the
         longest is good because they're most likely to have anything we ask
         about.
+
+        For SQLite the returned list is not ordered (for performance reasons).
 
         Uses `m.room.member`s in the room state at the current forward extremities to
         determine which hosts are in the room.
@@ -952,35 +975,23 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             sorted by join with the lowest depth first).
         """
 
-        # First we check if we already have `get_users_in_room` in the cache, as
-        # we can just calculate result from that
-        users = self.get_users_in_room.cache.get_immediate(
-            (room_id,), None, update_metrics=False
-        )
-        if users is None and isinstance(self.database_engine, Sqlite3Engine):
+        if isinstance(self.database_engine, Sqlite3Engine):
             # If we're using SQLite then let's just always use
             # `get_users_in_room` rather than funky SQL.
             users = await self.get_users_in_room(room_id)
 
-        if users is not None:
-            # Because `users` is sorted from lowest -> highest depth, the list
-            # of domains will also be sorted that way.
-            domains: List[str] = []
-            # We use a `Set` just for fast lookups
-            domain_set: Set[str] = set()
+            domains: Set[str] = set()
             for u in users:
                 if ":" not in u:
                     continue
                 domain = get_domain_from_id(u)
-                if domain not in domain_set:
-                    domain_set.add(domain)
-                    domains.append(domain)
-            return domains
+                domains.add(domain)
+            return list(domains)
 
         # For PostgreSQL we can use a regex to pull out the domains from the
         # joined users in `current_state_events` via regex.
 
-        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> List[str]:
+        def get_current_hosts_in_room_ordered_txn(txn: LoggingTransaction) -> List[str]:
             # Returns a list of servers currently joined in the room sorted by
             # longest in the room first (aka. with the lowest depth). The
             # heuristic of sorting by servers who have been in the room the
@@ -1008,7 +1019,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return [d for d, in txn if d is not None]
 
         return await self.db_pool.runInteraction(
-            "get_current_hosts_in_room", get_current_hosts_in_room_txn
+            "get_current_hosts_in_room_ordered", get_current_hosts_in_room_ordered_txn
         )
 
     async def get_joined_hosts(

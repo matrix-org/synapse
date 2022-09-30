@@ -24,6 +24,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
 )
 
@@ -529,7 +530,18 @@ class StateStorageController:
         )
         return state_map.get(key)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> List[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+        """Get current hosts in room based on current state.
+
+        Blocks until we have full state for the given room. This only happens for rooms
+        with partial state.
+        """
+
+        await self._partial_state_room_tracker.await_full_state(room_id)
+
+        return await self.stores.main.get_current_hosts_in_room(room_id)
+
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
         """Get current hosts in room based on current state.
 
         Blocks until we have full state for the given room. This only happens for rooms
@@ -542,7 +554,7 @@ class StateStorageController:
 
         await self._partial_state_room_tracker.await_full_state(room_id)
 
-        return await self.stores.main.get_current_hosts_in_room(room_id)
+        return await self.stores.main.get_current_hosts_in_room_ordered(room_id)
 
     async def get_current_hosts_in_room_or_partial_state_approximation(
         self, room_id: str
