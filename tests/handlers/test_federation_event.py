@@ -1044,7 +1044,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 prev_event_ids=[event_before.event_id],
                 # allow_no_prev_events=True,
                 # prev_event_ids=[],
-                auth_event_ids=historical_base_auth_event_ids,
+                # auth_event_ids=historical_base_auth_event_ids,
+                #
+                # Because we're creating all of these events without persisting them yet,
+                # we have to explicitly provide some auth_events. For member events, we do it this way.
                 state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
             )
@@ -1072,11 +1075,13 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 prev_event_ids=[maria_membership_event.event_id],
                 # allow_no_prev_events=True,
                 # prev_event_ids=[],
+                # Because we're creating all of these events without persisting them yet,
+                # we have to explicitly provide some auth_events
                 auth_event_ids=[
                     *historical_base_auth_event_ids,
                     as_membership_event.event_id,
                 ],
-                state_event_ids=historical_state_event_ids,
+                # state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
             )
         )
@@ -1089,6 +1094,8 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 type=EventTypes.Message,
                 content={"body": "Historical message", "msgtype": "m.text"},
                 prev_event_ids=[insertion_event.event_id],
+                # Because we're creating all of these events without persisting them yet,
+                # we have to explicitly provide some auth_events
                 auth_event_ids=[
                     *historical_base_auth_event_ids,
                     maria_membership_event.event_id,
@@ -1108,6 +1115,8 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
                 prev_event_ids=[historical_message_event.event_id],
+                # Because we're creating all of these events without persisting them yet,
+                # we have to explicitly provide some auth_events
                 auth_event_ids=[
                     *historical_base_auth_event_ids,
                     as_membership_event.event_id,
@@ -1127,11 +1136,13 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                     EventContentFields.MSC2716_HISTORICAL: True,
                 },
                 prev_event_ids=[event_before.event_id],
+                # Because we're creating all of these events without persisting them yet,
+                # we have to explicitly provide some auth_events
                 auth_event_ids=[
                     *historical_base_auth_event_ids,
                     as_membership_event.event_id,
                 ],
-                state_event_ids=historical_state_event_ids,
+                # state_event_ids=historical_state_event_ids,
                 depth=inherited_depth,
             )
         )

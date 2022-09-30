@@ -132,6 +132,11 @@ class EventBuilder:
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 self, state_ids
             )
+            logger.info(
+                "builder.build state_ids=%s auth_event_ids=%s",
+                state_ids,
+                auth_event_ids,
+            )
 
         format_version = self.room_version.event_format
         # The types of auth/prev events changes between event versions.
