@@ -153,19 +153,30 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         calculate room state incorrectly for such rooms and believe that a member is or
         is not in the room when the opposite is true.
         """
-        return await self.db_pool.runInteraction(
-            "get_users_in_room", self.get_users_in_room_txn, room_id
+        return await self.db_pool.simple_select_onecol(
+            table="current_state_events",
+            keyvalues={
+                "type": EventTypes.Member,
+                "room_id": room_id,
+                "membership": Membership.JOIN,
+            },
+            retcol="state_key",
+            desc="get_users_in_room",
         )
 
     def get_users_in_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[str]:
         """Returns a list of users in the room."""
-        sql = """
-            SELECT state_key FROM current_state_events
-            WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
-        """
 
-        txn.execute(sql, (room_id, Membership.JOIN))
-        return [r[0] for r in txn]
+        return self.db_pool.simple_select_onecol_txn(
+            txn,
+            table="current_state_events",
+            keyvalues={
+                "type": EventTypes.Member,
+                "room_id": room_id,
+                "membership": Membership.JOIN,
+            },
+            retcol="state_key",
+        )
 
     @cached()
     def get_user_in_room_with_profile(
@@ -960,15 +971,16 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         longest is good because they're most likely to have anything we ask
         about.
 
-        For SQLite the returned list is not ordered (for performance reasons).
+        For SQLite the returned list is not ordered, as SQLite doesn't support
+        the appropriate SQL.
 
-        Uses `m.room.member`s in the room state at the current forward extremities to
-        determine which hosts are in the room.
+        Uses `m.room.member`s in the room state at the current forward
+        extremities to determine which hosts are in the room.
 
-        Will return inaccurate results for rooms with partial state, since the state for
-        the forward extremities of those rooms will exclude most members. We may also
-        calculate room state incorrectly for such rooms and believe that a host is or
-        is not in the room when the opposite is true.
+        Will return inaccurate results for rooms with partial state, since the
+        state for the forward extremities of those rooms will exclude most
+        members. We may also calculate room state incorrectly for such rooms and
+        believe that a host is or is not in the room when the opposite is true.
 
         Returns:
             Returns a list of servers sorted by longest in the room first. (aka.
@@ -978,14 +990,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         if isinstance(self.database_engine, Sqlite3Engine):
             # If we're using SQLite then let's just always use
             # `get_users_in_room` rather than funky SQL.
-            users = await self.get_users_in_room(room_id)
 
-            domains: Set[str] = set()
-            for u in users:
-                if ":" not in u:
-                    continue
-                domain = get_domain_from_id(u)
-                domains.add(domain)
+            domains = await self.get_current_hosts_in_room(room_id)
             return list(domains)
 
         # For PostgreSQL we can use a regex to pull out the domains from the
