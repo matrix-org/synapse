@@ -543,12 +543,7 @@ In the `media_repository` worker configuration file, configure the
 expose the `media` resource. For example:
 
 ```yaml
-worker_listeners:
- - type: http
-   port: 8085
-   resources:
-     - names:
-       - media
+{{#include systemd-with-workers/workers/media_worker.yaml}}
 ```
 
 Note that if running multiple media repositories they must be on the same server
