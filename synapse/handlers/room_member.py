@@ -432,8 +432,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         with opentracing.start_active_span("handle_new_client_event"):
             result_event = await self.event_creation_handler.handle_new_client_event(
                 requester,
-                event,
-                context,
+                events_and_context=[(event, context)],
                 extra_users=[target],
                 ratelimit=ratelimit,
             )
@@ -1252,7 +1251,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 raise SynapseError(403, "This room has been blocked on this server")
 
         event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[target_user], ratelimit=ratelimit
+            requester,
+            events_and_context=[(event, context)],
+            extra_users=[target_user],
+            ratelimit=ratelimit,
         )
 
         prev_member_event_id = prev_state_ids.get(
@@ -1860,8 +1862,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         result_event = await self.event_creation_handler.handle_new_client_event(
             requester,
-            event,
-            context,
+            events_and_context=[(event, context)],
             extra_users=[UserID.from_string(target_user)],
         )
         # we know it was persisted, so must have a stream ordering

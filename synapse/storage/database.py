@@ -95,6 +95,8 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
     "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
     "event_push_summary": "event_push_summary_unique_index",
+    "receipts_linearized": "receipts_linearized_unique_index",
+    "receipts_graph": "receipts_graph_unique_index",
 }
 
 
@@ -390,6 +392,14 @@ class LoggingTransaction:
 
     def executemany(self, sql: str, *args: Any) -> None:
         self._do_execute(self.txn.executemany, sql, *args)
+
+    def executescript(self, sql: str) -> None:
+        if isinstance(self.database_engine, Sqlite3Engine):
+            self._do_execute(self.txn.executescript, sql)  # type: ignore[attr-defined]
+        else:
+            raise NotImplementedError(
+                f"executescript only exists for sqlite driver, not {type(self.database_engine)}"
+            )
 
     def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
@@ -1131,17 +1141,57 @@ class DatabasePool:
         desc: str = "simple_upsert",
         lock: bool = True,
     ) -> bool:
-        """
+        """Insert a row with values + insertion_values; on conflict, update with values.
 
-        `lock` should generally be set to True (the default), but can be set
-        to False if either of the following are true:
-            1. there is a UNIQUE INDEX on the key columns. In this case a conflict
-            will cause an IntegrityError in which case this function will retry
-            the update.
-            2. we somehow know that we are the only thread which will be updating
-            this table.
-        As an additional note, this parameter only matters for old SQLite versions
-        because we will use native upserts otherwise.
+        All of our supported databases accept the nonstandard "upsert" statement in
+        their dialect of SQL. We call this a "native upsert". The syntax looks roughly
+        like:
+
+            INSERT INTO table VALUES (values + insertion_values)
+            ON CONFLICT (keyvalues)
+            DO UPDATE SET (values); -- overwrite `values` columns only
+
+        If (values) is empty, the resulting query is slighlty simpler:
+
+            INSERT INTO table VALUES (insertion_values)
+            ON CONFLICT (keyvalues)
+            DO NOTHING;             -- do not overwrite any columns
+
+        This function is a helper to build such queries.
+
+        In order for upserts to make sense, the database must be able to determine when
+        an upsert CONFLICTs with an existing row. Postgres and SQLite ensure this by
+        requiring that a unique index exist on the column names used to detect a
+        conflict (i.e. `keyvalues.keys()`).
+
+        If there is no such index, we can "emulate" an upsert with a SELECT followed
+        by either an INSERT or an UPDATE. This is unsafe: we cannot make the same
+        atomicity guarantees that a native upsert can and are very vulnerable to races
+        and crashes. Therefore if we wish to upsert without an appropriate unique index,
+        we must either:
+
+        1. Acquire a table-level lock before the emulated upsert (`lock=True`), or
+        2. VERY CAREFULLY ensure that we are the only thread and worker which will be
+           writing to this table, in which case we can proceed without a lock
+           (`lock=False`).
+
+        Generally speaking, you should use `lock=True`. If the table in question has a
+        unique index[*], this class will use a native upsert (which is atomic and so can
+        ignore the `lock` argument). Otherwise this class will use an emulated upsert,
+        in which case we want the safer option unless we been VERY CAREFUL.
+
+        [*]: Some tables have unique indices added to them in the background. Those
+             tables `T` are keys in the dictionary UNIQUE_INDEX_BACKGROUND_UPDATES,
+             where `T` maps to the background update that adds a unique index to `T`.
+             This dictionary is maintained by hand.
+
+             At runtime, we constantly check to see if each of these background updates
+             has run. If so, we deem the coresponding table safe to upsert into, because
+             we can now use a native insert to do so. If not, we deem the table unsafe
+             to upsert into and require an emulated upsert.
+
+             Tables that do not appear in this dictionary are assumed to have an
+             appropriate unique index and therefore be safe to upsert into.
 
         Args:
             table: The table to upsert into
@@ -1191,6 +1241,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
+        where_clause: Optional[str] = None,
         lock: bool = True,
     ) -> bool:
         """
@@ -1203,6 +1254,7 @@ class DatabasePool:
             keyvalues: The unique key tables and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            where_clause: An index predicate to apply to the upsert.
             lock: True to lock the table when doing the upsert. Unused when performing
                 a native upsert.
         Returns:
@@ -1213,7 +1265,12 @@ class DatabasePool:
 
         if table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_txn_native_upsert(
-                txn, table, keyvalues, values, insertion_values=insertion_values
+                txn,
+                table,
+                keyvalues,
+                values,
+                insertion_values=insertion_values,
+                where_clause=where_clause,
             )
         else:
             return self.simple_upsert_txn_emulated(
@@ -1222,6 +1279,7 @@ class DatabasePool:
                 keyvalues,
                 values,
                 insertion_values=insertion_values,
+                where_clause=where_clause,
                 lock=lock,
             )
 
@@ -1232,6 +1290,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
+        where_clause: Optional[str] = None,
         lock: bool = True,
     ) -> bool:
         """
@@ -1240,6 +1299,7 @@ class DatabasePool:
             keyvalues: The unique key tables and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            where_clause: An index predicate to apply to the upsert.
             lock: True to lock the table when doing the upsert.
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
@@ -1259,14 +1319,17 @@ class DatabasePool:
             else:
                 return "%s = ?" % (key,)
 
+        # Generate a where clause of each keyvalue and optionally the provided
+        # index predicate.
+        where = [_getwhere(k) for k in keyvalues]
+        if where_clause:
+            where.append(where_clause)
+
         if not values:
             # If `values` is empty, then all of the values we care about are in
             # the unique key, so there is nothing to UPDATE. We can just do a
             # SELECT instead to see if it exists.
-            sql = "SELECT 1 FROM %s WHERE %s" % (
-                table,
-                " AND ".join(_getwhere(k) for k in keyvalues),
-            )
+            sql = "SELECT 1 FROM %s WHERE %s" % (table, " AND ".join(where))
             sqlargs = list(keyvalues.values())
             txn.execute(sql, sqlargs)
             if txn.fetchall():
@@ -1277,7 +1340,7 @@ class DatabasePool:
             sql = "UPDATE %s SET %s WHERE %s" % (
                 table,
                 ", ".join("%s = ?" % (k,) for k in values),
-                " AND ".join(_getwhere(k) for k in keyvalues),
+                " AND ".join(where),
             )
             sqlargs = list(values.values()) + list(keyvalues.values())
 
@@ -1307,6 +1370,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
+        where_clause: Optional[str] = None,
     ) -> bool:
         """
         Use the native UPSERT functionality in PostgreSQL.
@@ -1316,6 +1380,7 @@ class DatabasePool:
             keyvalues: The unique key tables and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            where_clause: An index predicate to apply to the upsert.
 
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
@@ -1331,11 +1396,12 @@ class DatabasePool:
             allvalues.update(values)
             latter = "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in values)
 
-        sql = ("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s") % (
+        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) %s DO %s" % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
             ", ".join(k for k in keyvalues),
+            f"WHERE {where_clause}" if where_clause else "",
             latter,
         )
         txn.execute(sql, list(allvalues.values()))

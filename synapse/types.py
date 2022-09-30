@@ -835,6 +835,7 @@ class ReadReceipt:
     receipt_type: str
     user_id: str
     event_ids: List[str]
+    thread_id: Optional[str]
     data: JsonDict
 
 
