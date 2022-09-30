@@ -1271,6 +1271,8 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
             appservice_user_id=self.appservice_user,
         )
 
+        self.main_store = self.hs.get_datastores().main
+
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
 
@@ -1291,26 +1293,70 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
         return hs
 
     def test_send_event_ts(self) -> None:
+        """Test sending a non-state event with a custom timestamp."""
         ts = 1
-        event_id = self._send(ts)
-        # check that the event was successfully persisted to the database with the correct timestamp.
-        res = self.get_success(self.hs.get_datastore().get_event(event_id))
-        self.assertEquals(ts, res.origin_server_ts)
 
-    def _send(self, ts: int) -> str:
         url_params = {
             "user_id": self.appservice_user,
             "ts": ts,
         }
         channel = self.make_request(
             "PUT",
-            path=f"/_matrix/client/r0/rooms/{self.room}/send/m.room.message/{None}?"
+            path=f"/_matrix/client/r0/rooms/{self.room}/send/m.room.message/1234?"
             + urlparse.urlencode(url_params),
-            content={"membership": "invite"},
+            content={"body": "test", "msgtype": "m.text"},
             access_token=self.appservice.token,
         )
-        self.assertEqual(channel.code, 200)
-        return channel.json_body["event_id"]
+        self.assertEqual(channel.code, 200, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        # Ensure the event was persisted with the correct timestamp.
+        res = self.get_success(self.main_store.get_event(event_id))
+        self.assertEquals(ts, res.origin_server_ts)
+
+    def test_send_state_event_ts(self) -> None:
+        """Test sending a state event with a custom timestamp."""
+        ts = 1
+
+        url_params = {
+            "user_id": self.appservice_user,
+            "ts": ts,
+        }
+        channel = self.make_request(
+            "PUT",
+            path=f"/_matrix/client/r0/rooms/{self.room}/state/m.room.name?"
+            + urlparse.urlencode(url_params),
+            content={"name": "test"},
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        # Ensure the event was persisted with the correct timestamp.
+        res = self.get_success(self.main_store.get_event(event_id))
+        self.assertEquals(ts, res.origin_server_ts)
+
+    def test_send_membership_event_ts(self) -> None:
+        """Test sending a membership event with a custom timestamp."""
+        ts = 1
+
+        url_params = {
+            "user_id": self.appservice_user,
+            "ts": ts,
+        }
+        channel = self.make_request(
+            "PUT",
+            path=f"/_matrix/client/r0/rooms/{self.room}/state/m.room.member/{self.appservice_user}?"
+            + urlparse.urlencode(url_params),
+            content={"membership": "join", "display_name": "test"},
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        # Ensure the event was persisted with the correct timestamp.
+        res = self.get_success(self.main_store.get_event(event_id))
+        self.assertEquals(ts, res.origin_server_ts)
 
 
 class RoomJoinRatelimitTestCase(RoomBase):

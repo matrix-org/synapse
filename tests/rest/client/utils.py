@@ -29,7 +29,6 @@ from typing import (
     MutableMapping,
     Optional,
     Tuple,
-    Union,
     overload,
 )
 from unittest.mock import patch
@@ -136,9 +135,13 @@ class RestHelper:
             content["visibility"] = "public" if is_public else "private"
         if room_version:
             content["room_version"] = room_version
-        path = self._append_query_params(
-            path, {"access_token": tok, "user_id": appservice_user_id}
-        )
+        args = {}
+        if tok:
+            args["access_token"] = tok
+        if appservice_user_id:
+            args["user_id"] = appservice_user_id
+        if args:
+            path = path + "?" + urlencode(args)
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -164,8 +167,6 @@ class RestHelper:
         targ: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         tok: Optional[str] = None,
-        appservice_user_id: Optional[str] = None,
-        msc3316_ts: Optional[int] = None,
     ) -> None:
         self.change_membership(
             room=room,
@@ -174,8 +175,6 @@ class RestHelper:
             tok=tok,
             membership=Membership.INVITE,
             expect_code=expect_code,
-            msc3316_ts=msc3316_ts,
-            appservice_user_id=appservice_user_id,
         )
 
     def join(
@@ -280,8 +279,7 @@ class RestHelper:
         expect_code: int = HTTPStatus.OK,
         expect_errcode: Optional[str] = None,
         expect_additional_fields: Optional[dict] = None,
-        msc3316_ts: Optional[int] = None,
-    ) -> Optional[str]:
+    ) -> None:
         """
         Send a membership state event into a room.
 
@@ -297,12 +295,6 @@ class RestHelper:
                 using an application service access token in `tok`.
             expect_code: The expected HTTP response code
             expect_errcode: The expected Matrix error code
-            msc3316_ts: If the user is an appservice, msc3316_ts will be used as the event's
-                "original_server_ts"
-
-        Returns:
-            The id of the created event.
-
         """
         temp_id = self.auth_user_id
         self.auth_user_id = src
@@ -313,14 +305,11 @@ class RestHelper:
         if tok:
             url_params["access_token"] = tok
 
-        path = self._append_query_params(
-            path,
-            {
-                "access_token": tok,
-                "org.matrix.msc3316.ts": msc3316_ts,
-                "user_id": appservice_user_id,
-            },
-        )
+        if appservice_user_id:
+            url_params["user_id"] = appservice_user_id
+
+        if url_params:
+            path += "?" + urlencode(url_params)
 
         data = {"membership": membership}
         data.update(extra_data or {})
@@ -365,18 +354,6 @@ class RestHelper:
 
         self.auth_user_id = temp_id
 
-        return channel.json_body.get("event_id")
-
-    def _append_query_params(
-        self, path: str, query_params_dict: Dict[str, Union[str, None, int]]
-    ) -> str:
-        query_params = urlencode(
-            {k: v for k, v in query_params_dict.items() if v is not None}
-        )
-        if query_params:
-            path += "?%s" % query_params
-        return path
-
     def send(
         self,
         room_id: str,
@@ -385,9 +362,6 @@ class RestHelper:
         tok: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-        ts: Optional[int] = None,
-        msc3316_ts: Optional[int] = None,
-        appservice_user_id: Optional[str] = None,
     ) -> JsonDict:
         if body is None:
             body = "body_text_here"
@@ -402,9 +376,6 @@ class RestHelper:
             tok,
             expect_code,
             custom_headers=custom_headers,
-            ts=ts,
-            msc3316_ts=msc3316_ts,
-            appservice_user_id=appservice_user_id,
         )
 
     def send_event(
@@ -416,23 +387,13 @@ class RestHelper:
         tok: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-        ts: Optional[int] = None,
-        msc3316_ts: Optional[int] = None,
-        appservice_user_id: Optional[str] = None,
     ) -> JsonDict:
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
         path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
-        path = self._append_query_params(
-            path,
-            {
-                "access_token": tok,
-                "user_id": appservice_user_id,
-                "ts": ts,
-                "org.matrix.msc3316.ts": msc3316_ts,
-            },
-        )
+        if tok:
+            path = path + "?access_token=%s" % tok
 
         channel = make_request(
             self.hs.get_reactor(),
