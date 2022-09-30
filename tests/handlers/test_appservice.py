@@ -426,6 +426,10 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_match_local_room_members(self):
+        """
+        Test to make sure that a user local to the server and in the room is notified
+        when someone else in the room sends a message.
+        """
         # Register an application service that's interested in local and remote user
         interested_appservice = self._register_application_service(
             namespaces={
@@ -486,6 +490,10 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(events[0]["sender"], alice)
 
     def test_match_remote_room_members(self):
+        """
+        Test to make sure that a remote user that is in the room is notified when
+        someone else in the room sends a message.
+        """
         # Register an application service that's interested in a remote user
         interested_appservice = self._register_application_service(
             namespaces={
