@@ -27,7 +27,7 @@ class SetPasswordHandler:
     """Handler which deals with changing user account passwords"""
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
 

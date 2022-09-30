@@ -2,11 +2,11 @@
 
 This API allows you to manage tokens which can be used to authenticate
 registration requests, as proposed in
-[MSC3231](https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md).
+[MSC3231](https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md)
+and stabilised in version 1.2 of the Matrix specification.
 To use it, you will need to enable the `registration_requires_token` config
 option, and authenticate by providing an `access_token` for a server admin:
-see [Admin API](../../usage/administration/admin_api).
-Note that this API is still experimental; not all clients may support it yet.
+see [Admin API](../admin_api).
 
 
 ## Registration token objects

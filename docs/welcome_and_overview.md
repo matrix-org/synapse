@@ -7,10 +7,10 @@ team.
 ## Installing and using Synapse
 
 This documentation covers topics for **installation**, **configuration** and
-**maintainence** of your Synapse process:
+**maintenance** of your Synapse process:
 
 * Learn how to [install](setup/installation.md) and
-  [configure](usage/configuration/index.html) your own instance, perhaps with [Single
+  [configure](usage/configuration/config_documentation.md) your own instance, perhaps with [Single
   Sign-On](usage/configuration/user_authentication/index.html).
 
 * See how to [upgrade](upgrade.md) between Synapse versions.
@@ -65,7 +65,7 @@ following documentation:
 
 Want to help keep Synapse going but don't know how to code? Synapse is a
 [Matrix.org Foundation](https://matrix.org) project. Consider becoming a
-supportor on [Liberapay](https://liberapay.com/matrixdotorg),
+supporter on [Liberapay](https://liberapay.com/matrixdotorg),
 [Patreon](https://patreon.com/matrixdotorg) or through
 [PayPal](https://paypal.me/matrixdotorg) via a one-time donation.
 

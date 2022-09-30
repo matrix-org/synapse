@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Generator, Optional, Tuple, Union
 import attr
 from zope.interface import implementer
 
+from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IAddress, IReactorTime
 from twisted.python.failure import Failure
 from twisted.web.http import HTTPChannel
@@ -71,10 +72,12 @@ class SynapseRequest(Request):
         site: "SynapseSite",
         *args: Any,
         max_request_body_size: int = 1024,
+        request_id_header: Optional[str] = None,
         **kw: Any,
     ):
         super().__init__(channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
+        self.request_id_header = request_id_header
         self.synapse_site = site
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
@@ -90,6 +93,14 @@ class SynapseRequest(Request):
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
+
+        # The `Deferred` to cancel if the client disconnects early and
+        # `is_render_cancellable` is set. Expected to be set by `Resource.render`.
+        self.render_deferred: Optional["Deferred[None]"] = None
+        # A boolean indicating whether `render_deferred` should be cancelled if the
+        # client disconnects early. Expected to be set by the coroutine started by
+        # `Resource.render`, if rendering is asynchronous.
+        self.is_render_cancellable = False
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -163,7 +174,14 @@ class SynapseRequest(Request):
         self._opentracing_span = span
 
     def get_request_id(self) -> str:
-        return "%s-%i" % (self.get_method(), self.request_seq)
+        request_id_value = None
+        if self.request_id_header:
+            request_id_value = self.getHeader(self.request_id_header)
+
+        if request_id_value is None:
+            request_id_value = str(self.request_seq)
+
+        return "%s-%s" % (self.get_method(), request_id_value)
 
     def get_redacted_uri(self) -> str:
         """Gets the redacted URI associated with the request (or placeholder if the URI
@@ -217,7 +235,7 @@ class SynapseRequest(Request):
 
             # If this is a request where the target user doesn't match the user who
             # authenticated (e.g. and admin is puppetting a user) then we return both.
-            if self._requester.user.to_string() != authenticated_entity:
+            if requester != authenticated_entity:
                 return requester, authenticated_entity
 
             return requester, None
@@ -238,7 +256,7 @@ class SynapseRequest(Request):
             request_id,
             request=ContextRequest(
                 request_id=request_id,
-                ip_address=self.getClientIP(),
+                ip_address=self.getClientAddress().host,
                 site_tag=self.synapse_site.site_tag,
                 # The requester is going to be unknown at this point.
                 requester=None,
@@ -357,7 +375,21 @@ class SynapseRequest(Request):
                     {"event": "client connection lost", "reason": str(reason.value)}
                 )
 
-            if not self._is_processing:
+            if self._is_processing:
+                if self.is_render_cancellable:
+                    if self.render_deferred is not None:
+                        # Throw a cancellation into the request processing, in the hope
+                        # that it will finish up sooner than it normally would.
+                        # The `self.processing()` context manager will call
+                        # `_finished_processing()` when done.
+                        with PreserveLoggingContext():
+                            self.render_deferred.cancel()
+                    else:
+                        logger.error(
+                            "Connection from client lost, but have no Deferred to "
+                            "cancel even though the request is marked as cancellable."
+                        )
+            else:
                 self._finished_processing()
 
     def _started_processing(self, servlet_name: str) -> None:
@@ -381,7 +413,7 @@ class SynapseRequest(Request):
 
         self.synapse_site.access_logger.debug(
             "%s - %s - Received request: %s %s",
-            self.getClientIP(),
+            self.getClientAddress().host,
             self.synapse_site.site_tag,
             self.get_method(),
             self.get_redacted_uri(),
@@ -429,7 +461,7 @@ class SynapseRequest(Request):
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
-            self.getClientIP(),
+            self.getClientAddress().host,
             self.synapse_site.site_tag,
             requester,
             processing_time,
@@ -588,12 +620,15 @@ class SynapseSite(Site):
         proxied = config.http_options.x_forwarded
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
+        request_id_header = config.http_options.request_id_header
+
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
                 channel,
                 self,
                 max_request_body_size=max_request_body_size,
                 queued=queued,
+                request_id_header=request_id_header,
             )
 
         self.requestFactory = request_factory  # type: ignore

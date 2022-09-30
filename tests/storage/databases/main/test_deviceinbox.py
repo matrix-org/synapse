@@ -26,7 +26,7 @@ class DeviceInboxBackgroundUpdateStoreTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
 
     def test_background_remove_deleted_devices_from_device_inbox(self):

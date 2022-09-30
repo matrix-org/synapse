@@ -37,7 +37,7 @@ KEY_2 = decode_verify_key_base64(
 
 class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
     def test_get_server_verify_keys(self):
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         key_id_1 = "ed25519:key1"
         key_id_2 = "ed25519:KEY_ID_2"
@@ -74,7 +74,7 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
     def test_cache(self):
         """Check that updates correctly invalidate the cache."""
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         key_id_1 = "ed25519:key1"
         key_id_2 = "ed25519:key2"

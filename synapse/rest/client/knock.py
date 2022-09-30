@@ -15,8 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 
-from twisted.web.server import Request
-
 from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
 from synapse.http.server import HttpServer
@@ -97,7 +95,7 @@ class KnockRoomAliasServlet(RestServlet):
         return 200, {"room_id": room_id}
 
     def on_PUT(
-        self, request: Request, room_identifier: str, txn_id: str
+        self, request: SynapseRequest, room_identifier: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
         set_tag("txn_id", txn_id)
 

@@ -58,6 +58,15 @@ class Command(metaclass=abc.ABCMeta):
         # by default, we just use the command name.
         return self.NAME
 
+    def redis_channel_name(self, prefix: str) -> str:
+        """
+        Returns the Redis channel name upon which to publish this command.
+
+        Args:
+            prefix: The prefix for the channel.
+        """
+        return prefix
+
 
 SC = TypeVar("SC", bound="_SimpleCommand")
 
@@ -356,7 +365,7 @@ class UserIpCommand(Command):
         access_token: str,
         ip: str,
         user_agent: str,
-        device_id: str,
+        device_id: Optional[str],
         last_seen: int,
     ):
         self.user_id = user_id
@@ -388,6 +397,15 @@ class UserIpCommand(Command):
                 )
             )
         )
+
+    def __repr__(self) -> str:
+        return (
+            f"UserIpCommand({self.user_id!r}, .., {self.ip!r}, "
+            f"{self.user_agent!r}, {self.device_id!r}, {self.last_seen})"
+        )
+
+    def redis_channel_name(self, prefix: str) -> str:
+        return f"{prefix}/USER_IP"
 
 
 class RemoteServerUpCommand(_SimpleCommand):

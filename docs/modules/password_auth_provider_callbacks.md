@@ -263,7 +263,7 @@ class MyAuthProvider:
             return None
 
         if self.credentials.get(username) == login_dict.get("my_field"):
-            return self.api.get_qualified_user_id(username)
+            return (self.api.get_qualified_user_id(username), None)
 
     async def check_pass(
         self,
@@ -280,5 +280,5 @@ class MyAuthProvider:
             return None
 
         if self.credentials.get(username) == login_dict.get("password"):
-            return self.api.get_qualified_user_id(username)
+            return (self.api.get_qualified_user_id(username), None)
 ```

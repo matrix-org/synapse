@@ -63,7 +63,7 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.device_list_updater = hs.get_device_handler().device_list_updater
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
 
     @staticmethod

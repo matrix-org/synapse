@@ -52,7 +52,7 @@ def make_awaitable(result: TV) -> Awaitable[TV]:
     This uses Futures as they can be awaited multiple times so can be returned
     to multiple callers.
     """
-    future = Future()  # type: ignore
+    future: Future[TV] = Future()
     future.set_result(result)
     return future
 
@@ -69,7 +69,7 @@ def setup_awaitable_errors() -> Callable[[], None]:
 
     # State shared between unraisablehook and check_for_unraisable_exceptions.
     unraisable_exceptions = []
-    orig_unraisablehook = sys.unraisablehook  # type: ignore
+    orig_unraisablehook = sys.unraisablehook
 
     def unraisablehook(unraisable):
         unraisable_exceptions.append(unraisable.exc_value)
@@ -78,11 +78,11 @@ def setup_awaitable_errors() -> Callable[[], None]:
         """
         A method to be used as a clean-up that fails a test-case if there are any new unraisable exceptions.
         """
-        sys.unraisablehook = orig_unraisablehook  # type: ignore
+        sys.unraisablehook = orig_unraisablehook
         if unraisable_exceptions:
             raise unraisable_exceptions.pop()
 
-    sys.unraisablehook = unraisablehook  # type: ignore
+    sys.unraisablehook = unraisablehook
 
     return cleanup
 

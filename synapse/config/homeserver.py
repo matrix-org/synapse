@@ -16,6 +16,7 @@ from .account_validity import AccountValidityConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .auth import AuthConfig
+from .background_updates import BackgroundUpdateConfig
 from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
@@ -24,7 +25,6 @@ from .database import DatabaseConfig
 from .emailconfig import EmailConfig
 from .experimental import ExperimentalConfig
 from .federation import FederationConfig
-from .groups import GroupsConfig
 from .jwt import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
@@ -88,7 +88,6 @@ class HomeServerConfig(RootConfig):
         PushConfig,
         SpamCheckerConfig,
         RoomConfig,
-        GroupsConfig,
         UserDirectoryConfig,
         ConsentConfig,
         StatsConfig,
@@ -99,4 +98,5 @@ class HomeServerConfig(RootConfig):
         WorkerConfig,
         RedisConfig,
         ExperimentalConfig,
+        BackgroundUpdateConfig,
     ]

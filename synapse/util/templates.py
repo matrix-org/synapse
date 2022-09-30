@@ -64,6 +64,7 @@ def build_jinja_env(
         {
             "format_ts": _format_ts_filter,
             "mxc_to_http": _create_mxc_to_http_filter(config.server.public_baseurl),
+            "localpart_from_email": _localpart_from_email_filter,
         }
     )
 
@@ -112,3 +113,7 @@ def _create_mxc_to_http_filter(
 
 def _format_ts_filter(value: int, format: str) -> str:
     return time.strftime(format, time.localtime(value / 1000))
+
+
+def _localpart_from_email_filter(address: str) -> str:
+    return address.rsplit("@", 1)[0]

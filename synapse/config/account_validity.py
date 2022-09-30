@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Any
 
 from synapse.config._base import Config, ConfigError
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ LEGACY_TEMPLATE_DIR_WARNING = """
 This server's configuration file is using the deprecated 'template_dir' setting in the
 'account_validity' section. Support for this setting has been deprecated and will be
 removed in a future version of Synapse. Server admins should instead use the new
-'custom_templates_directory' setting documented here:
+'custom_template_directory' setting documented here:
 https://matrix-org.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
@@ -29,7 +31,7 @@ https://matrix-org.github.io/synapse/latest/templates.html
 class AccountValidityConfig(Config):
     section = "account_validity"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         """Parses the old account validity config. The config format looks like this:
 
         account_validity:

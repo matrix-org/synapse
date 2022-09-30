@@ -98,6 +98,7 @@ class EventsStreamEventRow(BaseEventsStreamRow):
     relates_to: Optional[str]
     membership: Optional[str]
     rejected: bool
+    outlier: bool
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -124,7 +125,7 @@ class EventsStream(Stream):
     NAME = "events"
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             self._store._stream_id_gen.get_current_token_for_writer,

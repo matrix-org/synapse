@@ -103,7 +103,7 @@ class SortedSet(MutableSet[_T], Sequence[_T]):
         self,
         start: Optional[int] = ...,
         stop: Optional[int] = ...,
-        reverse=bool,
+        reverse: bool = ...,
     ) -> Iterator[_T]: ...
     def irange(
         self,

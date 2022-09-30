@@ -30,7 +30,7 @@ from tests.unittest import HomeserverTestCase
 
 class EventChainStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._next_stream_ordering = 1
 
     def test_simple(self):
@@ -393,7 +393,8 @@ class EventChainStoreTestCase(HomeserverTestCase):
             # We need to persist the events to the events and state_events
             # tables.
             persist_events_store._store_event_txn(
-                txn, [(e, EventContext()) for e in events]
+                txn,
+                [(e, EventContext(self.hs.get_storage_controllers())) for e in events],
             )
 
             # Actually call the function that calculates the auth chain stuff.
@@ -492,7 +493,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
         self.requester = create_requester(self.user_id)
@@ -530,7 +531,9 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
         self.get_success(
-            event_handler.handle_new_client_event(self.requester, event, context)
+            event_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
         )
         state1 = set(self.get_success(context.get_current_state_ids()).values())
 
@@ -548,7 +551,9 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
         self.get_success(
-            event_handler.handle_new_client_event(self.requester, event, context)
+            event_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
         )
         state2 = set(self.get_success(context.get_current_state_ids()).values())
 

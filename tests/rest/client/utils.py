@@ -19,6 +19,7 @@ import json
 import re
 import time
 import urllib.parse
+from http import HTTPStatus
 from typing import (
     Any,
     AnyStr,
@@ -41,6 +42,8 @@ from twisted.web.resource import Resource
 from twisted.web.server import Site
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes
+from synapse.server import HomeServer
 from synapse.types import JsonDict
 
 from tests.server import FakeChannel, FakeSite, make_request
@@ -48,15 +51,15 @@ from tests.test_utils import FakeResponse
 from tests.test_utils.html_parsers import TestHtmlParser
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """
 
-    hs = attr.ib()
-    site = attr.ib(type=Site)
-    auth_user_id = attr.ib()
+    hs: HomeServer
+    site: Site
+    auth_user_id: Optional[str]
 
     @overload
     def create_room_as(
@@ -89,10 +92,10 @@ class RestHelper:
     def create_room_as(
         self,
         room_creator: Optional[str] = None,
-        is_public: Optional[bool] = None,
+        is_public: Optional[bool] = True,
         room_version: Optional[str] = None,
         tok: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         appservice_user_id: Optional[str] = None,
@@ -103,9 +106,12 @@ class RestHelper:
         Args:
             room_creator: The user ID to create the room with.
             is_public: If True, the `visibility` parameter will be set to
-                "public". If False, it will be set to "private". If left
-                unspecified, the server will set it to an appropriate default
-                (which should be "private" as per the CS spec).
+                "public". If False, it will be set to "private".
+                If None, doesn't specify the `visibility` parameter in which
+                case the server is supposed to make the room private according to
+                the CS API.
+                Defaults to public, since that is commonly needed in tests
+                for convenience where room privacy is not a problem.
             room_version: The room version to create the room as. Defaults to Synapse's
                 default room version.
             tok: The access token to use in the request.
@@ -139,29 +145,29 @@ class RestHelper:
             self.site,
             "POST",
             path,
-            json.dumps(content).encode("utf8"),
+            content,
             custom_headers=custom_headers,
         )
 
-        assert channel.result["code"] == b"%d" % expect_code, channel.result
+        assert channel.code == expect_code, channel.result
         self.auth_user_id = temp_id
 
-        if expect_code == 200:
+        if expect_code == HTTPStatus.OK:
             return channel.json_body["room_id"]
         else:
             return None
 
     def invite(
         self,
-        room=None,
-        src=None,
-        targ=None,
-        expect_code=200,
-        tok=None,
-        appservice_user_id=None,
-        msc3316_ts=None,
-    ):
-        return self.change_membership(
+        room: str,
+        src: Optional[str] = None,
+        targ: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
+        msc3316_ts: Optional[int] = None,
+    ) -> None:
+        self.change_membership(
             room=room,
             src=src,
             targ=targ,
@@ -176,9 +182,11 @@ class RestHelper:
         self,
         room: str,
         user: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         tok: Optional[str] = None,
         appservice_user_id: Optional[str] = None,
+        expect_errcode: Optional[Codes] = None,
+        expect_additional_fields: Optional[dict] = None,
     ) -> None:
         self.change_membership(
             room=room,
@@ -188,9 +196,18 @@ class RestHelper:
             appservice_user_id=appservice_user_id,
             membership=Membership.JOIN,
             expect_code=expect_code,
+            expect_errcode=expect_errcode,
+            expect_additional_fields=expect_additional_fields,
         )
 
-    def knock(self, room=None, user=None, reason=None, expect_code=200, tok=None):
+    def knock(
+        self,
+        room: Optional[str] = None,
+        user: Optional[str] = None,
+        reason: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+    ) -> None:
         temp_id = self.auth_user_id
         self.auth_user_id = user
         path = "/knock/%s" % room
@@ -206,20 +223,24 @@ class RestHelper:
             self.site,
             "POST",
             path,
-            json.dumps(data).encode("utf8"),
+            data,
         )
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
         self.auth_user_id = temp_id
 
-    def leave(self, room=None, user=None, expect_code=200, tok=None):
+    def leave(
+        self,
+        room: str,
+        user: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+    ) -> None:
         self.change_membership(
             room=room,
             src=user,
@@ -229,14 +250,22 @@ class RestHelper:
             expect_code=expect_code,
         )
 
-    def ban(self, room: str, src: str, targ: str, **kwargs: object):
+    def ban(
+        self,
+        room: str,
+        src: str,
+        targ: str,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+    ) -> None:
         """A convenience helper: `change_membership` with `membership` preset to "ban"."""
         self.change_membership(
             room=room,
             src=src,
             targ=targ,
+            tok=tok,
             membership=Membership.BAN,
-            **kwargs,
+            expect_code=expect_code,
         )
 
     def change_membership(
@@ -248,10 +277,11 @@ class RestHelper:
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         appservice_user_id: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         expect_errcode: Optional[str] = None,
+        expect_additional_fields: Optional[dict] = None,
         msc3316_ts: Optional[int] = None,
-    ) -> None:
+    ) -> Optional[str]:
         """
         Send a membership state event into a room.
 
@@ -300,14 +330,12 @@ class RestHelper:
             self.site,
             "PUT",
             path,
-            json.dumps(data).encode("utf8"),
+            data,
         )
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -320,13 +348,28 @@ class RestHelper:
                 channel.result["body"],
             )
 
+        if expect_additional_fields is not None:
+            for expect_key, expect_value in expect_additional_fields.items():
+                assert expect_key in channel.json_body, "Expected field %s, got %s" % (
+                    expect_key,
+                    channel.json_body,
+                )
+                assert (
+                    channel.json_body[expect_key] == expect_value
+                ), "Expected: %s at %s, got: %s, resp: %s" % (
+                    expect_value,
+                    expect_key,
+                    channel.json_body[expect_key],
+                    channel.json_body,
+                )
+
         self.auth_user_id = temp_id
 
         return channel.json_body.get("event_id")
 
     def _append_query_params(
         self, path: str, query_params_dict: Dict[str, Union[str, None, int]]
-    ):
+    ) -> str:
         query_params = urlencode(
             {k: v for k, v in query_params_dict.items() if v is not None}
         )
@@ -336,16 +379,16 @@ class RestHelper:
 
     def send(
         self,
-        room_id,
-        body=None,
-        txn_id=None,
-        tok=None,
-        expect_code=200,
+        room_id: str,
+        body: Optional[str] = None,
+        txn_id: Optional[str] = None,
+        tok: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         ts: Optional[int] = None,
         msc3316_ts: Optional[int] = None,
         appservice_user_id: Optional[str] = None,
-    ):
+    ) -> JsonDict:
         if body is None:
             body = "body_text_here"
 
@@ -366,17 +409,17 @@ class RestHelper:
 
     def send_event(
         self,
-        room_id,
-        type,
+        room_id: str,
+        type: str,
         content: Optional[dict] = None,
-        txn_id=None,
-        tok=None,
-        expect_code=200,
+        txn_id: Optional[str] = None,
+        tok: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-        ts=None,
-        msc3316_ts=None,
+        ts: Optional[int] = None,
+        msc3316_ts: Optional[int] = None,
         appservice_user_id: Optional[str] = None,
-    ):
+    ) -> JsonDict:
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
@@ -396,15 +439,13 @@ class RestHelper:
             self.site,
             "PUT",
             path,
-            json.dumps(content or {}).encode("utf8"),
+            content or {},
             custom_headers=custom_headers,
         )
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -415,11 +456,11 @@ class RestHelper:
         room_id: str,
         event_type: str,
         body: Optional[Dict[str, Any]],
-        tok: str,
-        expect_code: int = 200,
+        tok: Optional[str],
+        expect_code: int = HTTPStatus.OK,
         state_key: str = "",
         method: str = "GET",
-    ) -> Dict:
+    ) -> JsonDict:
         """Read or write some state from a given room
 
         Args:
@@ -453,11 +494,9 @@ class RestHelper:
 
         channel = make_request(self.hs.get_reactor(), self.site, method, path, content)
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -468,9 +507,9 @@ class RestHelper:
         room_id: str,
         event_type: str,
         tok: str,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         state_key: str = "",
-    ):
+    ) -> JsonDict:
         """Gets some state from a room
 
         Args:
@@ -495,10 +534,10 @@ class RestHelper:
         room_id: str,
         event_type: str,
         body: Dict[str, Any],
-        tok: str,
-        expect_code: int = 200,
+        tok: Optional[str],
+        expect_code: int = HTTPStatus.OK,
         state_key: str = "",
-    ):
+    ) -> JsonDict:
         """Set some state in a room
 
         Args:
@@ -525,8 +564,8 @@ class RestHelper:
         image_data: bytes,
         tok: str,
         filename: str = "test.png",
-        expect_code: int = 200,
-    ) -> dict:
+        expect_code: int = HTTPStatus.OK,
+    ) -> JsonDict:
         """Upload a piece of test media to the media repo
         Args:
             resource: The resource that will handle the upload request
@@ -549,14 +588,18 @@ class RestHelper:
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
         return channel.json_body
 
-    def login_via_oidc(self, remote_user_id: str) -> JsonDict:
-        """Log in (as a new user) via OIDC
+    def login_via_oidc(
+        self,
+        remote_user_id: str,
+        expected_status: int = 200,
+    ) -> JsonDict:
+        """Log in via OIDC
 
         Returns the result of the final token login.
 
@@ -571,7 +614,7 @@ class RestHelper:
         channel = self.auth_via_oidc({"sub": remote_user_id}, client_redirect_url)
 
         # expect a confirmation page
-        assert channel.code == 200, channel.result
+        assert channel.code == HTTPStatus.OK, channel.result
 
         # fish the matrix login token out of the body of the confirmation page
         m = re.search(
@@ -590,7 +633,9 @@ class RestHelper:
             "/login",
             content={"type": "m.login.token", "token": login_token},
         )
-        assert channel.code == 200
+        assert (
+            channel.code == expected_status
+        ), f"unexpected status in response: {channel.code}"
         return channel.json_body
 
     def auth_via_oidc(
@@ -695,11 +740,16 @@ class RestHelper:
             (TEST_OIDC_USERINFO_ENDPOINT, user_info_dict),
         ]
 
-        async def mock_req(method: str, uri: str, data=None, headers=None):
+        async def mock_req(
+            method: str,
+            uri: str,
+            data: Optional[dict] = None,
+            headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        ):
             (expected_uri, resp_obj) = expected_requests.pop(0)
             assert uri == expected_uri
             resp = FakeResponse(
-                code=200,
+                code=HTTPStatus.OK,
                 phrase=b"OK",
                 body=json.dumps(resp_obj).encode("utf-8"),
             )
@@ -797,7 +847,7 @@ class RestHelper:
             self.hs.get_reactor(), self.site, "GET", sso_redirect_endpoint
         )
         # that should serve a confirmation page
-        assert channel.code == 200, channel.text_body
+        assert channel.code == HTTPStatus.OK, channel.text_body
         channel.extract_cookies(cookies)
 
         # parse the confirmation page to fish out the link.

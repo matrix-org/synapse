@@ -23,61 +23,61 @@ class TreeCacheTestCase(unittest.TestCase):
         cache = TreeCache()
         cache[("a",)] = "A"
         cache[("b",)] = "B"
-        self.assertEquals(cache.get(("a",)), "A")
-        self.assertEquals(cache.get(("b",)), "B")
-        self.assertEquals(len(cache), 2)
+        self.assertEqual(cache.get(("a",)), "A")
+        self.assertEqual(cache.get(("b",)), "B")
+        self.assertEqual(len(cache), 2)
 
     def test_pop_onelevel(self):
         cache = TreeCache()
         cache[("a",)] = "A"
         cache[("b",)] = "B"
-        self.assertEquals(cache.pop(("a",)), "A")
-        self.assertEquals(cache.pop(("a",)), None)
-        self.assertEquals(cache.get(("b",)), "B")
-        self.assertEquals(len(cache), 1)
+        self.assertEqual(cache.pop(("a",)), "A")
+        self.assertEqual(cache.pop(("a",)), None)
+        self.assertEqual(cache.get(("b",)), "B")
+        self.assertEqual(len(cache), 1)
 
     def test_get_set_twolevel(self):
         cache = TreeCache()
         cache[("a", "a")] = "AA"
         cache[("a", "b")] = "AB"
         cache[("b", "a")] = "BA"
-        self.assertEquals(cache.get(("a", "a")), "AA")
-        self.assertEquals(cache.get(("a", "b")), "AB")
-        self.assertEquals(cache.get(("b", "a")), "BA")
-        self.assertEquals(len(cache), 3)
+        self.assertEqual(cache.get(("a", "a")), "AA")
+        self.assertEqual(cache.get(("a", "b")), "AB")
+        self.assertEqual(cache.get(("b", "a")), "BA")
+        self.assertEqual(len(cache), 3)
 
     def test_pop_twolevel(self):
         cache = TreeCache()
         cache[("a", "a")] = "AA"
         cache[("a", "b")] = "AB"
         cache[("b", "a")] = "BA"
-        self.assertEquals(cache.pop(("a", "a")), "AA")
-        self.assertEquals(cache.get(("a", "a")), None)
-        self.assertEquals(cache.get(("a", "b")), "AB")
-        self.assertEquals(cache.pop(("b", "a")), "BA")
-        self.assertEquals(cache.pop(("b", "a")), None)
-        self.assertEquals(len(cache), 1)
+        self.assertEqual(cache.pop(("a", "a")), "AA")
+        self.assertEqual(cache.get(("a", "a")), None)
+        self.assertEqual(cache.get(("a", "b")), "AB")
+        self.assertEqual(cache.pop(("b", "a")), "BA")
+        self.assertEqual(cache.pop(("b", "a")), None)
+        self.assertEqual(len(cache), 1)
 
     def test_pop_mixedlevel(self):
         cache = TreeCache()
         cache[("a", "a")] = "AA"
         cache[("a", "b")] = "AB"
         cache[("b", "a")] = "BA"
-        self.assertEquals(cache.get(("a", "a")), "AA")
+        self.assertEqual(cache.get(("a", "a")), "AA")
         popped = cache.pop(("a",))
-        self.assertEquals(cache.get(("a", "a")), None)
-        self.assertEquals(cache.get(("a", "b")), None)
-        self.assertEquals(cache.get(("b", "a")), "BA")
-        self.assertEquals(len(cache), 1)
+        self.assertEqual(cache.get(("a", "a")), None)
+        self.assertEqual(cache.get(("a", "b")), None)
+        self.assertEqual(cache.get(("b", "a")), "BA")
+        self.assertEqual(len(cache), 1)
 
-        self.assertEquals({"AA", "AB"}, set(iterate_tree_cache_entry(popped)))
+        self.assertEqual({"AA", "AB"}, set(iterate_tree_cache_entry(popped)))
 
     def test_clear(self):
         cache = TreeCache()
         cache[("a",)] = "A"
         cache[("b",)] = "B"
         cache.clear()
-        self.assertEquals(len(cache), 0)
+        self.assertEqual(len(cache), 0)
 
     def test_contains(self):
         cache = TreeCache()

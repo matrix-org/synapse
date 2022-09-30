@@ -21,7 +21,7 @@ from twisted.internet.interfaces import IAddress, IConnector
 from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership, ReceiptTypes
 from synapse.federation import send_queue
 from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
@@ -30,7 +30,6 @@ from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
-    GroupServerStream,
     PushersStream,
     PushRulesStream,
     ReceiptsStream,
@@ -43,7 +42,7 @@ from synapse.replication.tcp.streams.events import (
     EventsStreamEventRow,
     EventsStreamRow,
 )
-from synapse.types import PersistedEventPosition, ReadReceipt, UserID
+from synapse.types import PersistedEventPosition, ReadReceipt, StreamKeyType, UserID
 from synapse.util.async_helpers import Linearizer, timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -111,7 +110,7 @@ class ReplicationDataHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self._reactor = hs.get_reactor()
         self._clock = hs.get_clock()
@@ -153,19 +152,19 @@ class ReplicationDataHandler:
         if stream_name == TypingStream.NAME:
             self._typing_handler.process_replication_rows(token, rows)
             self.notifier.on_new_event(
-                "typing_key", token, rooms=[row.room_id for row in rows]
+                StreamKeyType.TYPING, token, rooms=[row.room_id for row in rows]
             )
         elif stream_name == PushRulesStream.NAME:
             self.notifier.on_new_event(
-                "push_rules_key", token, users=[row.user_id for row in rows]
+                StreamKeyType.PUSH_RULES, token, users=[row.user_id for row in rows]
             )
         elif stream_name in (AccountDataStream.NAME, TagAccountDataStream.NAME):
             self.notifier.on_new_event(
-                "account_data_key", token, users=[row.user_id for row in rows]
+                StreamKeyType.ACCOUNT_DATA, token, users=[row.user_id for row in rows]
             )
         elif stream_name == ReceiptsStream.NAME:
             self.notifier.on_new_event(
-                "receipt_key", token, rooms=[row.room_id for row in rows]
+                StreamKeyType.RECEIPT, token, rooms=[row.room_id for row in rows]
             )
             await self._pusher_pool.on_new_receipts(
                 token, token, {row.room_id for row in rows}
@@ -173,24 +172,26 @@ class ReplicationDataHandler:
         elif stream_name == ToDeviceStream.NAME:
             entities = [row.entity for row in rows if row.entity.startswith("@")]
             if entities:
-                self.notifier.on_new_event("to_device_key", token, users=entities)
+                self.notifier.on_new_event(
+                    StreamKeyType.TO_DEVICE, token, users=entities
+                )
         elif stream_name == DeviceListsStream.NAME:
             all_room_ids: Set[str] = set()
             for row in rows:
                 if row.entity.startswith("@"):
                     room_ids = await self.store.get_rooms_for_user(row.entity)
                     all_room_ids.update(room_ids)
-            self.notifier.on_new_event("device_list_key", token, rooms=all_room_ids)
-        elif stream_name == GroupServerStream.NAME:
             self.notifier.on_new_event(
-                "groups_key", token, users=[row.user_id for row in rows]
+                StreamKeyType.DEVICE_LIST, token, rooms=all_room_ids
             )
         elif stream_name == PushersStream.NAME:
             for row in rows:
                 if row.deleted:
                     self.stop_pusher(row.user_id, row.app_id, row.pushkey)
                 else:
-                    await self.start_pusher(row.user_id, row.app_id, row.pushkey)
+                    await self.process_pusher_change(
+                        row.user_id, row.app_id, row.pushkey
+                    )
         elif stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so
             # we don't need to optimise this for multiple rows.
@@ -219,6 +220,21 @@ class ReplicationDataHandler:
                     state_key=row.data.state_key,
                     membership=row.data.membership,
                 )
+
+                # If this event is a join, make a note of it so we have an accurate
+                # cross-worker room rate limit.
+                # TODO: Erik said we should exclude rows that came from ex_outliers
+                #  here, but I don't see how we can determine that. I guess we could
+                #  add a flag to row.data?
+                if (
+                    row.data.type == EventTypes.Member
+                    and row.data.membership == Membership.JOIN
+                    and not row.data.outlier
+                ):
+                    # TODO retrieve the previous state, and exclude join -> join transitions
+                    self.notifier.notify_user_joined_room(
+                        row.data.event_id, row.data.room_id
+                    )
 
         await self._presence_handler.process_replication_rows(
             stream_name, instance_name, token, rows
@@ -320,13 +336,15 @@ class ReplicationDataHandler:
         logger.info("Stopping pusher %r / %r", user_id, key)
         pusher.on_stop()
 
-    async def start_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:
+    async def process_pusher_change(
+        self, user_id: str, app_id: str, pushkey: str
+    ) -> None:
         if not self._notify_pushers:
             return
 
         key = "%s:%s" % (app_id, pushkey)
         logger.info("Starting pusher %r / %r", user_id, key)
-        await self._pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
+        await self._pusher_pool.process_pusher_change_by_id(app_id, pushkey, user_id)
 
 
 class FederationSenderHandler:
@@ -340,7 +358,7 @@ class FederationSenderHandler:
     def __init__(self, hs: "HomeServer"):
         assert hs.should_send_federation()
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._is_mine_id = hs.is_mine_id
         self._hs = hs
 
@@ -380,7 +398,7 @@ class FederationSenderHandler:
             # changes.
             hosts = {row.entity for row in rows if not row.entity.startswith("@")}
             for host in hosts:
-                self.federation_sender.send_device_messages(host)
+                self.federation_sender.send_device_messages(host, immediate=False)
 
         elif stream_name == ToDeviceStream.NAME:
             # The to_device stream includes stuff to be pushed to both local
@@ -401,17 +419,16 @@ class FederationSenderHandler:
             # we only want to send on receipts for our own users
             if not self._is_mine_id(receipt.user_id):
                 continue
-            if (
-                receipt.data.get("hidden", False)
-                and self._hs.config.experimental.msc2285_enabled
-            ):
+            # Private read receipts never get sent over federation.
+            if receipt.receipt_type == ReceiptTypes.READ_PRIVATE:
                 continue
             receipt_info = ReadReceipt(
                 receipt.room_id,
                 receipt.receipt_type,
                 receipt.user_id,
                 [receipt.event_id],
-                receipt.data,
+                thread_id=receipt.thread_id,
+                data=receipt.data,
             )
             await self.federation_sender.send_read_receipt(receipt_info)
 
@@ -451,7 +468,7 @@ class FederationSenderHandler:
             # service for robustness? Or could we replace it with an assertion that
             # we're not being re-entered?
 
-            with (await self._fed_position_linearizer.queue(None)):
+            async with self._fed_position_linearizer.queue(None):
                 # We persist and ack the same position, so we take a copy of it
                 # here as otherwise it can get modified from underneath us.
                 current_position = self.federation_position
@@ -462,6 +479,8 @@ class FederationSenderHandler:
 
                 # We ACK this token over replication so that the master can drop
                 # its in memory queues
-                self._hs.get_tcp_replication().send_federation_ack(current_position)
+                self._hs.get_replication_command_handler().send_federation_ack(
+                    current_position
+                )
         except Exception:
             logger.exception("Error updating federation stream position")

@@ -14,7 +14,8 @@
 # limitations under the License.
 import logging
 from io import BytesIO
-from typing import Tuple
+from types import TracebackType
+from typing import Optional, Tuple, Type
 
 from PIL import Image
 
@@ -45,6 +46,9 @@ class Thumbnailer:
         Image.MAX_IMAGE_PIXELS = max_image_pixels
 
     def __init__(self, input_path: str):
+        # Have we closed the image?
+        self._closed = False
+
         try:
             self.image = Image.open(input_path)
         except OSError as e:
@@ -89,7 +93,8 @@ class Thumbnailer:
             # Safety: `transpose` takes an int rather than e.g. an IntEnum.
             # self.transpose_method is set above to be a value in
             # EXIF_TRANSPOSE_MAPPINGS, and that only contains correct values.
-            self.image = self.image.transpose(self.transpose_method)  # type: ignore[arg-type]
+            with self.image:
+                self.image = self.image.transpose(self.transpose_method)  # type: ignore[arg-type]
             self.width, self.height = self.image.size
             self.transpose_method = None
             # We don't need EXIF any more
@@ -121,10 +126,12 @@ class Thumbnailer:
         #
         # If the image has transparency, use RGBA instead.
         if self.image.mode in ["1", "L", "P"]:
-            mode = "RGB"
             if self.image.info.get("transparency", None) is not None:
-                mode = "RGBA"
-            self.image = self.image.convert(mode)
+                with self.image:
+                    self.image = self.image.convert("RGBA")
+            else:
+                with self.image:
+                    self.image = self.image.convert("RGB")
         return self.image.resize((width, height), Image.ANTIALIAS)
 
     def scale(self, width: int, height: int, output_type: str) -> BytesIO:
@@ -133,8 +140,8 @@ class Thumbnailer:
         Returns:
             BytesIO: the bytes of the encoded image ready to be written to disk
         """
-        scaled = self._resize(width, height)
-        return self._encode_image(scaled, output_type)
+        with self._resize(width, height) as scaled:
+            return self._encode_image(scaled, output_type)
 
     def crop(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales and crops the image to the given dimensions preserving
@@ -151,18 +158,21 @@ class Thumbnailer:
             BytesIO: the bytes of the encoded image ready to be written to disk
         """
         if width * self.height > height * self.width:
+            scaled_width = width
             scaled_height = (width * self.height) // self.width
-            scaled_image = self._resize(width, scaled_height)
             crop_top = (scaled_height - height) // 2
             crop_bottom = height + crop_top
-            cropped = scaled_image.crop((0, crop_top, width, crop_bottom))
+            crop = (0, crop_top, width, crop_bottom)
         else:
             scaled_width = (height * self.width) // self.height
-            scaled_image = self._resize(scaled_width, height)
+            scaled_height = height
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
-            cropped = scaled_image.crop((crop_left, 0, crop_right, height))
-        return self._encode_image(cropped, output_type)
+            crop = (crop_left, 0, crop_right, height)
+
+        with self._resize(scaled_width, scaled_height) as scaled_image:
+            with scaled_image.crop(crop) as cropped:
+                return self._encode_image(cropped, output_type)
 
     def _encode_image(self, output_image: Image.Image, output_type: str) -> BytesIO:
         output_bytes_io = BytesIO()
@@ -171,3 +181,42 @@ class Thumbnailer:
             output_image = output_image.convert("RGB")
         output_image.save(output_bytes_io, fmt, quality=80)
         return output_bytes_io
+
+    def close(self) -> None:
+        """Closes the underlying image file.
+
+        Once closed no other functions can be called.
+
+        Can be called multiple times.
+        """
+
+        if self._closed:
+            return
+
+        self._closed = True
+
+        # Since we run this on the finalizer then we need to handle `__init__`
+        # raising an exception before it can define `self.image`.
+        image = getattr(self, "image", None)
+        if image is None:
+            return
+
+        image.close()
+
+    def __enter__(self) -> "Thumbnailer":
+        """Make `Thumbnailer` a context manager that calls `close` on
+        `__exit__`.
+        """
+        return self
+
+    def __exit__(
+        self,
+        type: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        # Make sure we actually do close the image, rather than leak data.
+        self.close()

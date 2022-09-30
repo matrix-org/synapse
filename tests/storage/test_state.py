@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 class StateStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
-        self.storage = hs.get_storage()
+        self.store = hs.get_datastores().main
+        self.storage = hs.get_storage_controllers()
         self.state_datastore = self.storage.state.stores.state
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -369,8 +369,8 @@ class StateStoreTestCase(HomeserverTestCase):
         state_dict_ids = cache_entry.value
 
         self.assertEqual(cache_entry.full, False)
-        self.assertEqual(cache_entry.known_absent, {(e1.type, e1.state_key)})
-        self.assertDictEqual(state_dict_ids, {(e1.type, e1.state_key): e1.event_id})
+        self.assertEqual(cache_entry.known_absent, set())
+        self.assertDictEqual(state_dict_ids, {})
 
         ############################################
         # test that things work with a partial cache
@@ -387,7 +387,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(is_all, False)
-        self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
+        self.assertDictEqual({}, state_dict)
 
         room_id = self.room.to_string()
         (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
@@ -412,7 +412,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(is_all, False)
-        self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
+        self.assertDictEqual({}, state_dict)
 
         (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
@@ -443,7 +443,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(is_all, False)
-        self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
+        self.assertDictEqual({}, state_dict)
 
         (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
@@ -991,4 +991,113 @@ class StateFilterDifferenceTestCase(TestCase):
             StateFilter.all(),
             StateFilter.none(),
             StateFilter.all(),
+        )
+
+
+class StateFilterTestCase(TestCase):
+    def test_return_expanded(self):
+        """
+        Tests the behaviour of the return_expanded() function that expands
+        StateFilters to include more state types (for the sake of cache hit rate).
+        """
+
+        self.assertEqual(StateFilter.all().return_expanded(), StateFilter.all())
+
+        self.assertEqual(StateFilter.none().return_expanded(), StateFilter.none())
+
+        # Concrete-only state filters stay the same
+        # (Case: mixed filter)
+        self.assertEqual(
+            StateFilter.freeze(
+                {
+                    EventTypes.Member: {"@wombat:test", "@alicia:test"},
+                    "some.other.state.type": {""},
+                },
+                include_others=False,
+            ).return_expanded(),
+            StateFilter.freeze(
+                {
+                    EventTypes.Member: {"@wombat:test", "@alicia:test"},
+                    "some.other.state.type": {""},
+                },
+                include_others=False,
+            ),
+        )
+
+        # Concrete-only state filters stay the same
+        # (Case: non-member-only filter)
+        self.assertEqual(
+            StateFilter.freeze(
+                {"some.other.state.type": {""}}, include_others=False
+            ).return_expanded(),
+            StateFilter.freeze({"some.other.state.type": {""}}, include_others=False),
+        )
+
+        # Concrete-only state filters stay the same
+        # (Case: member-only filter)
+        self.assertEqual(
+            StateFilter.freeze(
+                {
+                    EventTypes.Member: {"@wombat:test", "@alicia:test"},
+                },
+                include_others=False,
+            ).return_expanded(),
+            StateFilter.freeze(
+                {
+                    EventTypes.Member: {"@wombat:test", "@alicia:test"},
+                },
+                include_others=False,
+            ),
+        )
+
+        # Wildcard member-only state filters stay the same
+        self.assertEqual(
+            StateFilter.freeze(
+                {EventTypes.Member: None},
+                include_others=False,
+            ).return_expanded(),
+            StateFilter.freeze(
+                {EventTypes.Member: None},
+                include_others=False,
+            ),
+        )
+
+        # If there is a wildcard in the non-member portion of the filter,
+        # it's expanded to include ALL non-member events.
+        # (Case: mixed filter)
+        self.assertEqual(
+            StateFilter.freeze(
+                {
+                    EventTypes.Member: {"@wombat:test", "@alicia:test"},
+                    "some.other.state.type": None,
+                },
+                include_others=False,
+            ).return_expanded(),
+            StateFilter.freeze(
+                {EventTypes.Member: {"@wombat:test", "@alicia:test"}},
+                include_others=True,
+            ),
+        )
+
+        # If there is a wildcard in the non-member portion of the filter,
+        # it's expanded to include ALL non-member events.
+        # (Case: non-member-only filter)
+        self.assertEqual(
+            StateFilter.freeze(
+                {
+                    "some.other.state.type": None,
+                },
+                include_others=False,
+            ).return_expanded(),
+            StateFilter.freeze({EventTypes.Member: set()}, include_others=True),
+        )
+        self.assertEqual(
+            StateFilter.freeze(
+                {
+                    "some.other.state.type": None,
+                    "yet.another.state.type": {"wombat"},
+                },
+                include_others=False,
+            ).return_expanded(),
+            StateFilter.freeze({EventTypes.Member: set()}, include_others=True),
         )

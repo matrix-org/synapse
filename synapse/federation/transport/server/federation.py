@@ -24,9 +24,9 @@ from typing import (
     Union,
 )
 
-from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import Literal
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -41,6 +41,7 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.types import JsonDict
+from synapse.util import SYNAPSE_VERSION
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 if TYPE_CHECKING:
@@ -108,9 +109,12 @@ class FederationSendServlet(BaseFederationServerServlet):
             )
 
             if issue_8631_logger.isEnabledFor(logging.DEBUG):
-                DEVICE_UPDATE_EDUS = ["m.device_list_update", "m.signing_key_update"]
+                DEVICE_UPDATE_EDUS = [
+                    EduTypes.DEVICE_LIST_UPDATE,
+                    EduTypes.SIGNING_KEY_UPDATE,
+                ]
                 device_list_updates = [
-                    edu.content
+                    edu.get("content", {})
                     for edu in transaction_data.get("edus", [])
                     if edu.get("edu_type") in DEVICE_UPDATE_EDUS
                 ]
@@ -160,7 +164,7 @@ class FederationStateV1Servlet(BaseFederationServerServlet):
         return await self.handler.on_room_state_request(
             origin,
             room_id,
-            parse_string_from_args(query, "event_id", None, required=False),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
@@ -545,8 +549,7 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
 
 
 class FederationGetMissingEventsServlet(BaseFederationServerServlet):
-    # TODO(paul): Why does this path alone end with "/?" optional?
-    PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
+    PATH = "/get_missing_events/(?P<room_id>[^/]*)"
 
     async def on_POST(
         self,
@@ -618,84 +621,9 @@ class FederationVersionServlet(BaseFederationServlet):
             {
                 "server": {
                     "name": "Synapse",
-                    "version": get_distribution_version_string("matrix-synapse"),
+                    "version": SYNAPSE_VERSION,
                 }
             },
-        )
-
-
-class FederationSpaceSummaryServlet(BaseFederationServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
-    PATH = "/spaces/(?P<room_id>[^/]*)"
-
-    def __init__(
-        self,
-        hs: "HomeServer",
-        authenticator: Authenticator,
-        ratelimiter: FederationRateLimiter,
-        server_name: str,
-    ):
-        super().__init__(hs, authenticator, ratelimiter, server_name)
-        self.handler = hs.get_room_summary_handler()
-
-    async def on_GET(
-        self,
-        origin: str,
-        content: Literal[None],
-        query: Mapping[bytes, Sequence[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
-
-        max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
-        if max_rooms_per_space is not None and max_rooms_per_space < 0:
-            raise SynapseError(
-                400,
-                "Value for 'max_rooms_per_space' must be a non-negative integer",
-                Codes.BAD_JSON,
-            )
-
-        exclude_rooms = parse_strings_from_args(query, "exclude_rooms", default=[])
-
-        return 200, await self.handler.federation_space_summary(
-            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
-        )
-
-    # TODO When switching to the stable endpoint, remove the POST handler.
-    async def on_POST(
-        self,
-        origin: str,
-        content: JsonDict,
-        query: Mapping[bytes, Sequence[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        suggested_only = content.get("suggested_only", False)
-        if not isinstance(suggested_only, bool):
-            raise SynapseError(
-                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
-            )
-
-        exclude_rooms = content.get("exclude_rooms", [])
-        if not isinstance(exclude_rooms, list) or any(
-            not isinstance(x, str) for x in exclude_rooms
-        ):
-            raise SynapseError(400, "bad value for 'exclude_rooms'", Codes.BAD_JSON)
-
-        max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None:
-            if not isinstance(max_rooms_per_space, int):
-                raise SynapseError(
-                    400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
-                )
-            if max_rooms_per_space < 0:
-                raise SynapseError(
-                    400,
-                    "Value for 'max_rooms_per_space' must be a non-negative integer",
-                    Codes.BAD_JSON,
-                )
-
-        return 200, await self.handler.federation_space_summary(
-            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
         )
 
 
@@ -725,10 +653,6 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         )
 
 
-class FederationRoomHierarchyUnstableServlet(FederationRoomHierarchyServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
-
-
 class RoomComplexityServlet(BaseFederationServlet):
     """
     Indicates to other servers how complex (and therefore likely
@@ -746,7 +670,7 @@ class RoomComplexityServlet(BaseFederationServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self._store = self.hs.get_datastore()
+        self._store = self.hs.get_datastores().main
 
     async def on_GET(
         self,
@@ -764,6 +688,40 @@ class RoomComplexityServlet(BaseFederationServlet):
 
         complexity = await self._store.get_room_complexity(room_id)
         return 200, complexity
+
+
+class FederationAccountStatusServlet(BaseFederationServerServlet):
+    PATH = "/query/account_status"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720"
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self._account_handler = hs.get_account_handler()
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        if "user_ids" not in content:
+            raise SynapseError(
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
+            )
+
+        statuses, failures = await self._account_handler.get_account_statuses(
+            content["user_ids"],
+            allow_remote=False,
+        )
+
+        return 200, {"account_statuses": statuses, "failures": failures}
 
 
 FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
@@ -792,9 +750,8 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-    FederationSpaceSummaryServlet,
     FederationRoomHierarchyServlet,
-    FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
+    FederationAccountStatusServlet,
 )

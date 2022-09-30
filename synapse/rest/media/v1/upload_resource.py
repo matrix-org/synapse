@@ -37,7 +37,7 @@ class UploadResource(DirectServeJsonResource):
 
         self.media_repo = media_repo
         self.filepaths = media_repo.filepaths
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
@@ -101,6 +101,8 @@ class UploadResource(DirectServeJsonResource):
             # the default 404, as that would just be confusing.
             raise SynapseError(400, "Bad content")
 
-        logger.info("Uploaded content with URI %r", content_uri)
+        logger.info("Uploaded content with URI '%s'", content_uri)
 
-        respond_with_json(request, 200, {"content_uri": content_uri}, send_cors=True)
+        respond_with_json(
+            request, 200, {"content_uri": str(content_uri)}, send_cors=True
+        )

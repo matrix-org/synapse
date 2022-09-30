@@ -1,0 +1,16 @@
+worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_main_http_uri: http://localhost:8008/
+
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml

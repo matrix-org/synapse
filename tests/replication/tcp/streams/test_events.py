@@ -136,7 +136,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # this is the point in the DAG where we make a fork
         fork_point: List[str] = self.get_success(
-            self.hs.get_datastore().get_latest_event_ids_in_room(self.room_id)
+            self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
         events = [
@@ -291,7 +291,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # this is the point in the DAG where we make a fork
         fork_point: List[str] = self.get_success(
-            self.hs.get_datastore().get_latest_event_ids_in_room(self.room_id)
+            self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
         events: List[EventBase] = []
@@ -420,7 +420,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # Manually send an old RDATA command, which should get dropped. This
         # re-uses the row from above, but with an earlier stream token.
-        self.hs.get_tcp_replication().send_command(
+        self.hs.get_replication_command_handler().send_command(
             RdataCommand("events", "master", 1, row)
         )
 

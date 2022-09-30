@@ -21,10 +21,6 @@ Newly created users see their own presence in /initialSync (SYT-34)
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1396
 Should reject keys claiming to belong to a different user
 
-# Blacklisted due to https://github.com/matrix-org/matrix-doc/pull/2314 removing
-# this requirement from the spec
-Inbound federation of state requires event_id as a mandatory paramater
-
 # Blacklisted until MSC2753 is implemented
 Local users can peek into world_readable rooms by room ID
 We can't peek into rooms with shared history_visibility

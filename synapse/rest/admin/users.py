@@ -66,9 +66,10 @@ class UsersRestServletV2(RestServlet):
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
@@ -95,6 +96,13 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
+        # If support for MSC3866 is not enabled, apply no filtering based on the
+        # `approved` column.
+        if self._msc3866_enabled:
+            approved = parse_boolean(request, "approved", default=True)
+        else:
+            approved = True
+
         order_by = parse_string(
             request,
             "order_by",
@@ -115,8 +123,22 @@ class UsersRestServletV2(RestServlet):
         direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
 
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, name, guests, deactivated, order_by, direction
+            start,
+            limit,
+            user_id,
+            name,
+            guests,
+            deactivated,
+            order_by,
+            direction,
+            approved,
         )
+
+        # If support for MSC3866 is not enabled, don't show the approval flag.
+        if not self._msc3866_enabled:
+            for user in users:
+                del user["approved"]
+
         ret = {"users": users, "total": total}
         if (start + limit) < total:
             ret["next_token"] = str(start + len(users))
@@ -156,13 +178,14 @@ class UserRestServletV2(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.set_password_handler = hs.get_set_password_handler()
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
         self.registration_handler = hs.get_registration_handler()
         self.pusher_pool = hs.get_pusherpool()
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -183,7 +206,7 @@ class UserRestServletV2(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         target_user = UserID.from_string(user_id)
         body = parse_json_object_from_request(request)
@@ -226,11 +249,27 @@ class UserRestServletV2(RestServlet):
             if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
 
+        logout_devices = body.get("logout_devices", True)
+        if not isinstance(logout_devices, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "'logout_devices' parameter is not of type boolean",
+            )
+
         deactivate = body.get("deactivated", False)
         if not isinstance(deactivate, bool):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "'deactivated' parameter is not of type boolean"
             )
+
+        approved: Optional[bool] = None
+        if "approved" in body and self._msc3866_enabled:
+            approved = body["approved"]
+            if not isinstance(approved, bool):
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "'approved' parameter is not of type boolean",
+                )
 
         # convert List[Dict[str, str]] into List[Tuple[str, str]]
         if external_ids is not None:
@@ -305,7 +344,6 @@ class UserRestServletV2(RestServlet):
                     await self.store.set_server_admin(target_user, set_admin_to)
 
             if password is not None:
-                logout_devices = True
                 new_password_hash = await self.auth_handler.hash(password)
 
                 await self.set_password_handler.set_password(
@@ -337,6 +375,9 @@ class UserRestServletV2(RestServlet):
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)
 
+            if approved is not None:
+                await self.store.update_user_approval_status(target_user, approved)
+
             user = await self.admin_handler.get_user(target_user)
             assert user is not None
 
@@ -349,6 +390,10 @@ class UserRestServletV2(RestServlet):
             if password is not None:
                 password_hash = await self.auth_handler.hash(password)
 
+            new_user_approved = True
+            if self._msc3866_enabled and approved is not None:
+                new_user_approved = approved
+
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
                 password_hash=password_hash,
@@ -356,6 +401,7 @@ class UserRestServletV2(RestServlet):
                 default_display_name=displayname,
                 user_type=user_type,
                 by_admin=True,
+                approved=new_user_approved,
             )
 
             if threepids is not None:
@@ -367,8 +413,9 @@ class UserRestServletV2(RestServlet):
                     if (
                         self.hs.config.email.email_enable_notifs
                         and self.hs.config.email.email_notif_for_new_users
+                        and medium == "email"
                     ):
-                        await self.pusher_pool.add_pusher(
+                        await self.pusher_pool.add_or_update_pusher(
                             user_id=user_id,
                             access_token=None,
                             kind="email",
@@ -376,7 +423,7 @@ class UserRestServletV2(RestServlet):
                             app_display_name="Email Notifications",
                             device_display_name=address,
                             pushkey=address,
-                            lang=None,  # We don't know a user's language here
+                            lang=None,
                             data={},
                         )
 
@@ -543,6 +590,7 @@ class UserRegisterServlet(RestServlet):
             user_type=user_type,
             default_display_name=displayname,
             by_admin=True,
+            approved=True,
         )
 
         result = await register._create_registration_details(user_id, body)
@@ -568,10 +616,9 @@ class WhoisRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
-        auth_user = requester.user
 
-        if target_user != auth_user:
-            await assert_user_is_admin(self.auth, auth_user)
+        if target_user != requester.user:
+            await assert_user_is_admin(self.auth, requester)
 
         if not self.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only whois a local user")
@@ -588,13 +635,13 @@ class DeactivateAccountRestServlet(RestServlet):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_POST(
         self, request: SynapseRequest, target_user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         if not self.is_mine(UserID.from_string(target_user_id)):
             raise SynapseError(
@@ -674,7 +721,7 @@ class ResetPasswordRestServlet(RestServlet):
     PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self._set_password_handler = hs.get_set_password_handler()
@@ -686,7 +733,7 @@ class ResetPasswordRestServlet(RestServlet):
         This needs user to have administrator access in Synapse.
         """
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         UserID.from_string(target_user_id)
 
@@ -717,7 +764,7 @@ class SearchUsersRestServlet(RestServlet):
     PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
 
@@ -775,7 +822,7 @@ class UserAdminServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
 
@@ -800,7 +847,7 @@ class UserAdminServlet(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
         auth_user = requester.user
 
         target_user = UserID.from_string(user_id)
@@ -835,7 +882,7 @@ class UserMembershipRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -864,7 +911,7 @@ class PushersRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_GET(
@@ -905,7 +952,7 @@ class UserTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/login$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.is_mine_id = hs.is_mine_id
@@ -914,7 +961,7 @@ class UserTokenRestServlet(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
         auth_user = requester.user
 
         if not self.is_mine_id(user_id):
@@ -974,7 +1021,7 @@ class ShadowBanRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/shadow_ban$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine_id = hs.is_mine_id
 
@@ -1026,7 +1073,7 @@ class RateLimitRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/override_ratelimit$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine_id = hs.is_mine_id
 
@@ -1129,7 +1176,7 @@ class AccountDataRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._is_mine_id = hs.is_mine_id
 
     async def on_GET(
@@ -1150,3 +1197,30 @@ class AccountDataRestServlet(RestServlet):
                 "rooms": by_room_data,
             },
         }
+
+
+class UserByExternalId(RestServlet):
+    """Find a user based on an external ID from an auth provider"""
+
+    PATTERNS = admin_patterns(
+        "/auth_providers/(?P<provider>[^/]*)/users/(?P<external_id>[^/]*)"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self,
+        request: SynapseRequest,
+        provider: str,
+        external_id: str,
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        user_id = await self._store.get_user_by_external_id(provider, external_id)
+
+        if user_id is None:
+            raise NotFoundError("User not found")
+
+        return HTTPStatus.OK, {"user_id": user_id}

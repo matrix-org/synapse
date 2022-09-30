@@ -50,12 +50,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         # Register a pusher
         user_dict = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_dict.token_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
                 access_token=token_id,
                 kind="http",

@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
+from typing import Any
 
-MISSING_JWT = """Missing jwt library. This is required for jwt login.
+from synapse.types import JsonDict
+from synapse.util.check_dependencies import check_requirements
 
-    Install by running:
-        pip install pyjwt
-    """
+from ._base import Config
 
 
 class JWTConfig(Config):
     section = "jwt"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         jwt_config = config.get("jwt_config", None)
         if jwt_config:
             self.jwt_enabled = jwt_config.get("enabled", False)
@@ -37,13 +36,7 @@ class JWTConfig(Config):
             # that the claims exist on the JWT.
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
-
-            try:
-                import jwt
-
-                jwt  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_JWT)
+            check_requirements("jwt")
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
@@ -51,67 +44,3 @@ class JWTConfig(Config):
             self.jwt_subject_claim = None
             self.jwt_issuer = None
             self.jwt_audiences = None
-
-    def generate_config_section(self, **kwargs):
-        return """\
-        # JSON web token integration. The following settings can be used to make
-        # Synapse JSON web tokens for authentication, instead of its internal
-        # password database.
-        #
-        # Each JSON Web Token needs to contain a "sub" (subject) claim, which is
-        # used as the localpart of the mxid.
-        #
-        # Additionally, the expiration time ("exp"), not before time ("nbf"),
-        # and issued at ("iat") claims are validated if present.
-        #
-        # Note that this is a non-standard login type and client support is
-        # expected to be non-existent.
-        #
-        # See https://matrix-org.github.io/synapse/latest/jwt.html.
-        #
-        #jwt_config:
-            # Uncomment the following to enable authorization using JSON web
-            # tokens. Defaults to false.
-            #
-            #enabled: true
-
-            # This is either the private shared secret or the public key used to
-            # decode the contents of the JSON web token.
-            #
-            # Required if 'enabled' is true.
-            #
-            #secret: "provided-by-your-issuer"
-
-            # The algorithm used to sign the JSON web token.
-            #
-            # Supported algorithms are listed at
-            # https://pyjwt.readthedocs.io/en/latest/algorithms.html
-            #
-            # Required if 'enabled' is true.
-            #
-            #algorithm: "provided-by-your-issuer"
-
-            # Name of the claim containing a unique identifier for the user.
-            #
-            # Optional, defaults to `sub`.
-            #
-            #subject_claim: "sub"
-
-            # The issuer to validate the "iss" claim against.
-            #
-            # Optional, if provided the "iss" claim will be required and
-            # validated for all JSON web tokens.
-            #
-            #issuer: "provided-by-your-issuer"
-
-            # A list of audiences to validate the "aud" claim against.
-            #
-            # Optional, if provided the "aud" claim will be required and
-            # validated for all JSON web tokens.
-            #
-            # Note that if the "aud" claim is included in a JSON web token then
-            # validation will fail without configuring audiences.
-            #
-            #audiences:
-            #    - "provided-by-your-issuer"
-        """

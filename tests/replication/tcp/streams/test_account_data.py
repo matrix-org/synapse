@@ -23,7 +23,7 @@ from tests.replication._base import BaseStreamTestCase
 class AccountDataStreamTestCase(BaseStreamTestCase):
     def test_update_function_room_account_data_limit(self):
         """Test replication with many room account data updates"""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # generate lots of account data updates
         updates = []
@@ -69,7 +69,7 @@ class AccountDataStreamTestCase(BaseStreamTestCase):
 
     def test_update_function_global_account_data_limit(self):
         """Test replication with many global account data updates"""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # generate lots of account data updates
         updates = []

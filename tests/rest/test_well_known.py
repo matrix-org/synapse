@@ -19,7 +19,7 @@ from tests import unittest
 
 
 class WellKnownTests(unittest.HomeserverTestCase):
-    def create_test_resource(self):
+    def create_test_resource(self) -> Resource:
         # replace the JsonResource with a Resource wrapping the WellKnownResource
         res = Resource()
         res.putChild(b".well-known", well_known_resource(self.hs))
@@ -31,7 +31,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "default_identity_server": "https://testis",
         }
     )
-    def test_client_well_known(self):
+    def test_client_well_known(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
@@ -50,15 +50,37 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "public_baseurl": None,
         }
     )
-    def test_client_well_known_no_public_baseurl(self):
+    def test_client_well_known_no_public_baseurl(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
         self.assertEqual(channel.code, 404)
 
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://tesths",
+            "default_identity_server": "https://testis",
+            "extra_well_known_client_content": {"custom": False},
+        }
+    )
+    def test_client_well_known_custom(self) -> None:
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/client", shorthand=False
+        )
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body,
+            {
+                "m.homeserver": {"base_url": "https://tesths/"},
+                "m.identity_server": {"base_url": "https://testis"},
+                "custom": False,
+            },
+        )
+
     @unittest.override_config({"serve_server_wellknown": True})
-    def test_server_well_known(self):
+    def test_server_well_known(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/server", shorthand=False
         )
@@ -69,7 +91,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             {"m.server": "test:443"},
         )
 
-    def test_server_well_known_disabled(self):
+    def test_server_well_known_disabled(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/server", shorthand=False
         )

@@ -72,8 +72,10 @@ class CapabilitiesRestServlet(RestServlet):
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
 
-        if self.config.experimental.msc3440_enabled:
-            response["capabilities"]["io.element.thread"] = {"enabled": True}
+        if self.config.experimental.msc3720_enabled:
+            response["capabilities"]["org.matrix.msc3720.account_status"] = {
+                "enabled": True,
+            }
 
         return HTTPStatus.OK, response
 

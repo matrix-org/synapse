@@ -31,7 +31,11 @@ from twisted.internet.endpoints import (
     TCP4ClientEndpoint,
     TCP6ClientEndpoint,
 )
-from twisted.internet.interfaces import IPushProducer, IStreamClientEndpoint
+from twisted.internet.interfaces import (
+    IPushProducer,
+    IReactorTCP,
+    IStreamClientEndpoint,
+)
 from twisted.internet.protocol import Factory, Protocol
 from twisted.internet.tcp import Connection
 from twisted.python.failure import Failure
@@ -59,14 +63,14 @@ class LogProducer:
     _buffer: Deque[logging.LogRecord]
     _paused: bool = attr.ib(default=False, init=False)
 
-    def pauseProducing(self):
+    def pauseProducing(self) -> None:
         self._paused = True
 
-    def stopProducing(self):
+    def stopProducing(self) -> None:
         self._paused = True
         self._buffer = deque()
 
-    def resumeProducing(self):
+    def resumeProducing(self) -> None:
         # If we're already producing, nothing to do.
         self._paused = False
 
@@ -102,8 +106,8 @@ class RemoteHandler(logging.Handler):
         host: str,
         port: int,
         maximum_buffer: int = 1000,
-        level=logging.NOTSET,
-        _reactor=None,
+        level: int = logging.NOTSET,
+        _reactor: Optional[IReactorTCP] = None,
     ):
         super().__init__(level=level)
         self.host = host
@@ -118,7 +122,7 @@ class RemoteHandler(logging.Handler):
         if _reactor is None:
             from twisted.internet import reactor
 
-            _reactor = reactor
+            _reactor = reactor  # type: ignore[assignment]
 
         try:
             ip = ip_address(self.host)
@@ -139,7 +143,7 @@ class RemoteHandler(logging.Handler):
         self._stopping = False
         self._connect()
 
-    def close(self):
+    def close(self) -> None:
         self._stopping = True
         self._service.stopService()
 

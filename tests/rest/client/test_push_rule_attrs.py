@@ -27,7 +27,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
     ]
     hijack_auth = False
 
-    def test_enabled_on_creation(self):
+    def test_enabled_on_creation(self) -> None:
         """
         Tests the GET and PUT of push rules' `enabled` endpoints.
         Tests that a rule is enabled upon creation, even though a rule with that
@@ -56,7 +56,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["enabled"], True)
 
-    def test_enabled_on_recreation(self):
+    def test_enabled_on_recreation(self) -> None:
         """
         Tests the GET and PUT of push rules' `enabled` endpoints.
         Tests that a rule is enabled upon creation, even if a rule with that
@@ -113,7 +113,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["enabled"], True)
 
-    def test_enabled_disable(self):
+    def test_enabled_disable(self) -> None:
         """
         Tests the GET and PUT of push rules' `enabled` endpoints.
         Tests that a rule is disabled and enabled when we ask for it.
@@ -166,7 +166,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["enabled"], True)
 
-    def test_enabled_404_when_get_non_existent(self):
+    def test_enabled_404_when_get_non_existent(self) -> None:
         """
         Tests that `enabled` gives 404 when the rule doesn't exist.
         """
@@ -212,7 +212,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_enabled_404_when_get_non_existent_server_rule(self):
+    def test_enabled_404_when_get_non_existent_server_rule(self) -> None:
         """
         Tests that `enabled` gives 404 when the server-default rule doesn't exist.
         """
@@ -226,7 +226,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_enabled_404_when_put_non_existent_rule(self):
+    def test_enabled_404_when_put_non_existent_rule(self) -> None:
         """
         Tests that `enabled` gives 404 when we put to a rule that doesn't exist.
         """
@@ -243,7 +243,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_enabled_404_when_put_non_existent_server_rule(self):
+    def test_enabled_404_when_put_non_existent_server_rule(self) -> None:
         """
         Tests that `enabled` gives 404 when we put to a server-default rule that doesn't exist.
         """
@@ -260,7 +260,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_actions_get(self):
+    def test_actions_get(self) -> None:
         """
         Tests that `actions` gives you what you expect on a fresh rule.
         """
@@ -289,7 +289,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
             channel.json_body["actions"], ["notify", {"set_tweak": "highlight"}]
         )
 
-    def test_actions_put(self):
+    def test_actions_put(self) -> None:
         """
         Tests that PUT on actions updates the value you'd get from GET.
         """
@@ -325,7 +325,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["actions"], ["dont_notify"])
 
-    def test_actions_404_when_get_non_existent(self):
+    def test_actions_404_when_get_non_existent(self) -> None:
         """
         Tests that `actions` gives 404 when the rule doesn't exist.
         """
@@ -365,7 +365,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_actions_404_when_get_non_existent_server_rule(self):
+    def test_actions_404_when_get_non_existent_server_rule(self) -> None:
         """
         Tests that `actions` gives 404 when the server-default rule doesn't exist.
         """
@@ -379,7 +379,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_actions_404_when_put_non_existent_rule(self):
+    def test_actions_404_when_put_non_existent_rule(self) -> None:
         """
         Tests that `actions` gives 404 when putting to a rule that doesn't exist.
         """
@@ -396,7 +396,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-    def test_actions_404_when_put_non_existent_server_rule(self):
+    def test_actions_404_when_put_non_existent_server_rule(self) -> None:
         """
         Tests that `actions` gives 404 when putting to a server-default rule that doesn't exist.
         """

@@ -239,7 +239,7 @@ class BackfillStream(Stream):
     ROW_TYPE = BackfillStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             self._current_token,
@@ -267,7 +267,7 @@ class PresenceStream(Stream):
     ROW_TYPE = PresenceStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
 
         if hs.get_instance_name() in hs.config.worker.writers.presence:
             # on the presence writer, query the presence handler
@@ -316,7 +316,19 @@ class PresenceFederationStream(Stream):
 class TypingStream(Stream):
     @attr.s(slots=True, frozen=True, auto_attribs=True)
     class TypingStreamRow:
+        """
+        An entry in the typing stream.
+        Describes all the users that are 'typing' right now in one room.
+
+        When a user stops typing, it will be streamed as a new update with that
+        user absent; you can think of the `user_ids` list as overwriting the
+        entire list that was there previously.
+        """
+
+        # The room that this update is for.
         room_id: str
+
+        # All the users that are 'typing' right now in the specified room.
         user_ids: List[str]
 
     NAME = "typing"
@@ -349,13 +361,14 @@ class ReceiptsStream(Stream):
         receipt_type: str
         user_id: str
         event_id: str
+        thread_id: Optional[str]
         data: dict
 
     NAME = "receipts"
     ROW_TYPE = ReceiptsStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_max_receipt_stream_id),
@@ -374,7 +387,7 @@ class PushRulesStream(Stream):
     ROW_TYPE = PushRulesStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         super().__init__(
             hs.get_instance_name(),
@@ -401,7 +414,7 @@ class PushersStream(Stream):
     ROW_TYPE = PushersStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
 
         super().__init__(
             hs.get_instance_name(),
@@ -434,7 +447,7 @@ class CachesStream(Stream):
     ROW_TYPE = CachesStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             store.get_cache_stream_token_for_writer,
@@ -455,7 +468,7 @@ class DeviceListsStream(Stream):
     ROW_TYPE = DeviceListsStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_device_stream_token),
@@ -474,7 +487,7 @@ class ToDeviceStream(Stream):
     ROW_TYPE = ToDeviceStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_to_device_stream_token),
@@ -495,7 +508,7 @@ class TagAccountDataStream(Stream):
     ROW_TYPE = TagAccountDataStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_max_account_data_stream_id),
@@ -516,7 +529,7 @@ class AccountDataStream(Stream):
     ROW_TYPE = AccountDataStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(self.store.get_max_account_data_stream_id),
@@ -573,26 +586,6 @@ class AccountDataStream(Stream):
         return updates, to_token, limited
 
 
-class GroupServerStream(Stream):
-    @attr.s(slots=True, frozen=True, auto_attribs=True)
-    class GroupsStreamRow:
-        group_id: str
-        user_id: str
-        type: str
-        content: JsonDict
-
-    NAME = "groups"
-    ROW_TYPE = GroupsStreamRow
-
-    def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
-        super().__init__(
-            hs.get_instance_name(),
-            current_token_without_instance(store.get_group_stream_token),
-            store.get_all_groups_changes,
-        )
-
-
 class UserSignatureStream(Stream):
     """A user has signed their own device with their user-signing key"""
 
@@ -604,7 +597,7 @@ class UserSignatureStream(Stream):
     ROW_TYPE = UserSignatureStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_device_stream_token),

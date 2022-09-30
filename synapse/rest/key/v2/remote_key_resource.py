@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Set
 
 from signedjson.sign import sign_json
 
@@ -94,7 +94,7 @@ class RemoteKey(DirectServeJsonResource):
         super().__init__()
 
         self.fetcher = ServerKeyFetcher(hs)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
@@ -135,13 +135,6 @@ class RemoteKey(DirectServeJsonResource):
 
         store_queries = []
         for server_name, key_ids in query.items():
-            if (
-                self.federation_domain_whitelist is not None
-                and server_name not in self.federation_domain_whitelist
-            ):
-                logger.debug("Federation denied with %s", server_name)
-                continue
-
             if not key_ids:
                 key_ids = (None,)
             for key_id in key_ids:
@@ -149,25 +142,32 @@ class RemoteKey(DirectServeJsonResource):
 
         cached = await self.store.get_server_keys_json(store_queries)
 
-        json_results = set()
+        json_results: Set[bytes] = set()
 
         time_now_ms = self.clock.time_msec()
 
-        # Note that the value is unused.
+        # Map server_name->key_id->int. Note that the value of the init is unused.
+        # XXX: why don't we just use a set?
         cache_misses: Dict[str, Dict[str, int]] = {}
         for (server_name, key_id, _), key_results in cached.items():
             results = [(result["ts_added_ms"], result) for result in key_results]
 
-            if not results and key_id is not None:
-                cache_misses.setdefault(server_name, {})[key_id] = 0
+            if key_id is None:
+                # all keys were requested. Just return what we have without worrying
+                # about validity
+                for _, result in results:
+                    # Cast to bytes since postgresql returns a memoryview.
+                    json_results.add(bytes(result["key_json"]))
                 continue
 
-            if key_id is not None:
+            miss = False
+            if not results:
+                miss = True
+            else:
                 ts_added_ms, most_recent_result = max(results)
                 ts_valid_until_ms = most_recent_result["ts_valid_until_ms"]
                 req_key = query.get(server_name, {}).get(key_id, {})
                 req_valid_until = req_key.get("minimum_valid_until_ts")
-                miss = False
                 if req_valid_until is not None:
                     if ts_valid_until_ms < req_valid_until:
                         logger.debug(
@@ -211,19 +211,20 @@ class RemoteKey(DirectServeJsonResource):
                         ts_valid_until_ms,
                         time_now_ms,
                     )
-
-                if miss:
-                    cache_misses.setdefault(server_name, {})[key_id] = 0
                 # Cast to bytes since postgresql returns a memoryview.
                 json_results.add(bytes(most_recent_result["key_json"]))
-            else:
-                for _, result in results:
-                    # Cast to bytes since postgresql returns a memoryview.
-                    json_results.add(bytes(result["key_json"]))
+
+            if miss and query_remote_on_cache_miss:
+                # only bother attempting to fetch keys from servers on our whitelist
+                if (
+                    self.federation_domain_whitelist is None
+                    or server_name in self.federation_domain_whitelist
+                ):
+                    cache_misses.setdefault(server_name, {})[key_id] = 0
 
         # If there is a cache miss, request the missing keys, then recurse (and
         # ensure the result is sent).
-        if cache_misses and query_remote_on_cache_miss:
+        if cache_misses:
             await yieldable_gather_results(
                 lambda t: self.fetcher.get_keys(*t),
                 (
@@ -234,8 +235,8 @@ class RemoteKey(DirectServeJsonResource):
             await self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
             signed_keys = []
-            for key_json in json_results:
-                key_json = json_decoder.decode(key_json.decode("utf-8"))
+            for key_json_raw in json_results:
+                key_json = json_decoder.decode(key_json_raw.decode("utf-8"))
                 for signing_key in self.config.key.key_server_signing_keys:
                     key_json = sign_json(
                         key_json, self.config.server.server_name, signing_key

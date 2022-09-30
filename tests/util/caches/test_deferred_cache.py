@@ -31,7 +31,7 @@ class DeferredCacheTestCase(TestCase):
         cache = DeferredCache("test")
         cache.prefill("foo", 123)
 
-        self.assertEquals(self.successResultOf(cache.get("foo")), 123)
+        self.assertEqual(self.successResultOf(cache.get("foo")), 123)
 
     def test_hit_deferred(self):
         cache = DeferredCache("test")

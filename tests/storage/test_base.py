@@ -54,13 +54,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         sqlite_config = {"name": "sqlite3"}
         engine = create_engine(sqlite_config)
         fake_engine = Mock(wraps=engine)
-        fake_engine.can_native_upsert = False
         fake_engine.in_transaction.return_value = False
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
 
-        self.datastore = SQLBaseStore(db, None, hs)
+        self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
 
     @defer.inlineCallbacks
     def test_insert_1col(self):
@@ -103,7 +102,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEquals("Value", value)
+        self.assertEqual("Value", value)
         self.mock_txn.execute.assert_called_with(
             "SELECT retcol FROM tablename WHERE keycol = ?", ["TheKey"]
         )
@@ -121,7 +120,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
+        self.assertEqual({"colA": 1, "colB": 2, "colC": 3}, ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA, colB, colC FROM tablename WHERE keycol = ?", ["TheKey"]
         )
@@ -154,7 +153,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
+        self.assertEqual([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA FROM tablename WHERE keycol = ?", ["A set"]
         )

@@ -141,10 +141,6 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         hs = self.setup_test_homeserver(
             federation_transport_client=fed_transport_client,
         )
-        # Load the modules into the homeserver
-        module_api = hs.get_module_api()
-        for module, config in hs.config.modules.loaded_modules:
-            module(config=config, api=module_api)
 
         load_legacy_presence_router(hs)
 
@@ -439,7 +435,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
             for edu in edus:
                 # Make sure we're only checking presence-type EDUs
-                if edu["edu_type"] != EduTypes.Presence:
+                if edu["edu_type"] != EduTypes.PRESENCE:
                     continue
 
                 # EDUs can contain multiple presence updates

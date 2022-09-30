@@ -50,7 +50,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.federation_handler = hs.get_federation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
 
     @staticmethod
@@ -119,7 +119,7 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.federation_handler = hs.get_federation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
 
     @staticmethod
@@ -188,7 +188,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.member_handler = hs.get_room_member_handler()
 
@@ -258,7 +258,7 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.member_handler = hs.get_room_member_handler()
 
@@ -325,7 +325,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.registeration_handler = hs.get_registration_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.distributor = hs.get_distributor()
 

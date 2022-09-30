@@ -1,0 +1,43 @@
+/* Copyright 2022 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- We're going to stop populating event_edges.room_id and event_edges.is_state,
+-- which means we now need to give them defaults.
+
+-- We also drop the exising unique constraint which spans all four columns. Franky
+-- it's not doing much, and there are other indexes on event_id and prev_event_id.
+-- Later on we introduce a proper unique constraint on (event_id, prev_event_id).
+--
+-- We also add a foreign key constraint (which will be enforced for new rows), but
+-- don't yet validate it for existing rows (since that's slow, and we haven't yet
+-- checked that all the rows are valid)
+
+ALTER TABLE event_edges
+   ALTER room_id DROP NOT NULL,
+   ALTER is_state SET DEFAULT FALSE,
+   DROP CONSTRAINT IF EXISTS event_edges_event_id_prev_event_id_room_id_is_state_key,
+   ADD CONSTRAINT event_edges_event_id_fkey FOREIGN KEY (event_id) REFERENCES events(event_id) NOT VALID;
+
+-- In the background, we drop any rows with is_state=True. These may have been
+-- added a long time ago, but they are no longer used.
+--
+-- We also drop rows that do not correspond to entries in `events`, and finally
+-- validate the foreign key.
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+  (7101, 'event_edges_drop_invalid_rows', '{}');
+
+-- We'll then create a new unique index on (event_id, prev_event_id).
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
+  (7101, 'event_edges_replace_index', '{}', 'event_edges_drop_invalid_rows');

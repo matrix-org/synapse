@@ -13,13 +13,37 @@
 # limitations under the License.
 
 import synapse.api.errors
+from synapse.api.constants import EduTypes
 
 from tests.unittest import HomeserverTestCase
 
 
 class DeviceStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+
+    def add_device_change(self, user_id, device_ids, host):
+        """Add a device list change for the given device to
+        `device_lists_outbound_pokes` table.
+        """
+
+        for device_id in device_ids:
+            stream_id = self.get_success(
+                self.store.add_device_change_to_streams(
+                    user_id, [device_id], ["!some:room"]
+                )
+            )
+
+            self.get_success(
+                self.store.add_device_list_outbound_pokes(
+                    user_id=user_id,
+                    device_id=device_id,
+                    room_id="!some:room",
+                    stream_id=stream_id,
+                    hosts=[host],
+                    context={},
+                )
+            )
 
     def test_store_new_device(self):
         self.get_success(
@@ -95,9 +119,7 @@ class DeviceStoreTestCase(HomeserverTestCase):
         device_ids = ["device_id1", "device_id2"]
 
         # Add two device updates with sequential `stream_id`s
-        self.get_success(
-            self.store.add_device_change_to_streams("user_id", device_ids, ["somehost"])
-        )
+        self.add_device_change("@user_id:test", device_ids, "somehost")
 
         # Get all device updates ever meant for this remote
         now_stream_id, device_updates = self.get_success(
@@ -121,9 +143,7 @@ class DeviceStoreTestCase(HomeserverTestCase):
             "device_id4",
             "device_id5",
         ]
-        self.get_success(
-            self.store.add_device_change_to_streams("user_id", device_ids, ["somehost"])
-        )
+        self.add_device_change("@user_id:test", device_ids, "somehost")
 
         # Get device updates meant for this remote
         next_stream_id, device_updates = self.get_success(
@@ -143,9 +163,7 @@ class DeviceStoreTestCase(HomeserverTestCase):
 
         # Add some more device updates to ensure it still resumes properly
         device_ids = ["device_id6", "device_id7"]
-        self.get_success(
-            self.store.add_device_change_to_streams("user_id", device_ids, ["somehost"])
-        )
+        self.add_device_change("@user_id:test", device_ids, "somehost")
 
         # Get the next batch of device updates
         next_stream_id, device_updates = self.get_success(
@@ -218,11 +236,7 @@ class DeviceStoreTestCase(HomeserverTestCase):
             "fakeSelfSigning",
         ]
 
-        self.get_success(
-            self.store.add_device_change_to_streams(
-                "@user_id:test", device_ids, ["somehost"]
-            )
-        )
+        self.add_device_change("@user_id:test", device_ids, "somehost")
 
         # Get device updates meant for this remote
         next_stream_id, device_updates = self.get_success(
@@ -253,10 +267,12 @@ class DeviceStoreTestCase(HomeserverTestCase):
         # (This is a temporary arrangement for backwards compatibility!)
         self.assertEqual(len(device_updates), 2, device_updates)
         self.assertEqual(
-            device_updates[0][0], "m.signing_key_update", device_updates[0]
+            device_updates[0][0], EduTypes.SIGNING_KEY_UPDATE, device_updates[0]
         )
         self.assertEqual(
-            device_updates[1][0], "org.matrix.signing_key_update", device_updates[1]
+            device_updates[1][0],
+            EduTypes.UNSTABLE_SIGNING_KEY_UPDATE,
+            device_updates[1],
         )
 
         # Check there are no more device updates left.

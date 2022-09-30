@@ -1,1 +1,0 @@
-The docker image no longer automatically creates a temporary volume at `/data`. This is not expected to affect normal usage.

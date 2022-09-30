@@ -66,7 +66,7 @@ class EmailPusher(Pusher):
         super().__init__(hs, pusher_config)
         self.mailer = mailer
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.email = pusher_config.pushkey
         self.timed_call: Optional[IDelayedCall] = None
         self.throttle_params: Dict[str, ThrottleParams] = {}

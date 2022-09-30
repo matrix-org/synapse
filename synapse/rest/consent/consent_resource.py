@@ -78,7 +78,7 @@ class ConsentResource(DirectServeHtmlResource):
         super().__init__()
 
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.registration_handler = hs.get_registration_handler()
 
         # this is required by the request_handler wrapper

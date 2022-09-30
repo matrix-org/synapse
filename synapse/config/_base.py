@@ -16,14 +16,20 @@
 
 import argparse
 import errno
+import logging
 import os
+import re
 from collections import OrderedDict
+from enum import Enum, auto
 from hashlib import sha256
 from textwrap import dedent
 from typing import (
     Any,
+    ClassVar,
+    Collection,
     Dict,
     Iterable,
+    Iterator,
     List,
     MutableMapping,
     Optional,
@@ -40,6 +46,8 @@ import yaml
 
 from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
 
+logger = logging.getLogger(__name__)
+
 
 class ConfigError(Exception):
     """Represents a problem parsing the configuration
@@ -55,19 +63,51 @@ class ConfigError(Exception):
         self.path = path
 
 
+def format_config_error(e: ConfigError) -> Iterator[str]:
+    """
+    Formats a config error neatly
+
+    The idea is to format the immediate error, plus the "causes" of those errors,
+    hopefully in a way that makes sense to the user. For example:
+
+        Error in configuration at 'oidc_config.user_mapping_provider.config.display_name_template':
+          Failed to parse config for module 'JinjaOidcMappingProvider':
+            invalid jinja template:
+              unexpected end of template, expected 'end of print statement'.
+
+    Args:
+        e: the error to be formatted
+
+    Returns: An iterator which yields string fragments to be formatted
+    """
+    yield "Error in configuration"
+
+    if e.path:
+        yield " at '%s'" % (".".join(e.path),)
+
+    yield ":\n  %s" % (e.msg,)
+
+    parent_e = e.__cause__
+    indent = 1
+    while parent_e:
+        indent += 1
+        yield ":\n%s%s" % ("  " * indent, str(parent_e))
+        parent_e = parent_e.__cause__
+
+
 # We split these messages out to allow packages to override with package
 # specific instructions.
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS = """\
-Please opt in or out of reporting anonymized homeserver usage statistics, by
-setting the `report_stats` key in your config file to either True or False.
+Please opt in or out of reporting homeserver usage statistics, by setting
+the `report_stats` key in your config file to either True or False.
 """
 
 MISSING_REPORT_STATS_SPIEL = """\
 We would really appreciate it if you could help our project out by reporting
-anonymized usage statistics from your homeserver. Only very basic aggregate
-data (e.g. number of users) will be reported, but it helps us to track the
-growth of the Matrix community, and helps us to make Matrix a success, as well
-as to convince other networks that they should peer with us.
+homeserver usage statistics from your homeserver. Your homeserver's server name,
+along with very basic aggregate data (e.g. number of users) will be reported. But
+it helps us to track the growth of the Matrix community, and helps us to make Matrix
+a success, as well as to convince other networks that they should peer with us.
 
 Thank you.
 """
@@ -85,7 +125,10 @@ CONFIG_FILE_HEADER = """\
 # should have the same indentation.
 #
 # [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
-
+#
+# For more information on how to configure Synapse, including a complete accounting of
+# each option, go to docs/usage/configuration/config_documentation.md or
+# https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html
 """
 
 
@@ -119,7 +162,7 @@ class Config:
             defined in subclasses.
     """
 
-    section: str
+    section: ClassVar[str]
 
     def __init__(self, root_config: "RootConfig" = None):
         self.root = root_config
@@ -309,9 +352,12 @@ class RootConfig:
     class, lower-cased and with "Config" removed.
     """
 
-    config_classes = []
+    config_classes: List[Type[Config]] = []
 
-    def __init__(self):
+    def __init__(self, config_files: Collection[str] = ()):
+        # Capture absolute paths here, so we can reload config after we daemonize.
+        self.config_files = [os.path.abspath(path) for path in config_files]
+
         for config_class in self.config_classes:
             if config_class.section is None:
                 raise ValueError("%r requires a section name" % (config_class,))
@@ -383,7 +429,7 @@ class RootConfig:
         Build a default configuration file
 
         This is used when the user explicitly asks us to generate a config file
-        (eg with --generate_config).
+        (eg with --generate-config).
 
         Args:
             config_dir_path: The path where the config files are kept. Used to
@@ -429,7 +475,7 @@ class RootConfig:
             The yaml config file
         """
 
-        return CONFIG_FILE_HEADER + "\n\n".join(
+        conf = CONFIG_FILE_HEADER + "\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "generate_config_section",
@@ -444,6 +490,8 @@ class RootConfig:
                 tls_private_key_path=tls_private_key_path,
             ).values()
         )
+        conf = re.sub("\n{2,}", "\n", conf)
+        return conf
 
     @classmethod
     def load_config(
@@ -512,12 +560,10 @@ class RootConfig:
             object from parser.parse_args(..)`
         """
 
-        obj = cls()
-
         config_args = parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
-
+        obj = cls(config_files)
         if not config_files:
             parser.error("Must supply a config file.")
 
@@ -558,25 +604,51 @@ class RootConfig:
             " may specify directories containing *.yaml files.",
         )
 
-        generate_group = parser.add_argument_group("Config generation")
-        generate_group.add_argument(
-            "--generate-config",
-            action="store_true",
-            help="Generate a config file, then exit.",
+        # we nest the mutually-exclusive group inside another group so that the help
+        # text shows them in their own group.
+        generate_mode_group = parser.add_argument_group(
+            "Config generation mode",
         )
-        generate_group.add_argument(
+        generate_mode_exclusive = generate_mode_group.add_mutually_exclusive_group()
+        generate_mode_exclusive.add_argument(
+            # hidden option to make the type and default work
+            "--generate-mode",
+            help=argparse.SUPPRESS,
+            type=_ConfigGenerateMode,
+            default=_ConfigGenerateMode.GENERATE_MISSING_AND_RUN,
+        )
+        generate_mode_exclusive.add_argument(
+            "--generate-config",
+            help="Generate a config file, then exit.",
+            action="store_const",
+            const=_ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT,
+            dest="generate_mode",
+        )
+        generate_mode_exclusive.add_argument(
             "--generate-missing-configs",
             "--generate-keys",
-            action="store_true",
             help="Generate any missing additional config files, then exit.",
+            action="store_const",
+            const=_ConfigGenerateMode.GENERATE_MISSING_AND_EXIT,
+            dest="generate_mode",
         )
+        generate_mode_exclusive.add_argument(
+            "--generate-missing-and-run",
+            help="Generate any missing additional config files, then run. This is the "
+            "default behaviour.",
+            action="store_const",
+            const=_ConfigGenerateMode.GENERATE_MISSING_AND_RUN,
+            dest="generate_mode",
+        )
+
+        generate_group = parser.add_argument_group("Details for --generate-config")
         generate_group.add_argument(
             "-H", "--server-name", help="The server name to generate a config file for."
         )
         generate_group.add_argument(
             "--report-stats",
             action="store",
-            help="Whether the generated config reports anonymized usage statistics.",
+            help="Whether the generated config reports homeserver usage statistics.",
             choices=["yes", "no"],
         )
         generate_group.add_argument(
@@ -625,11 +697,12 @@ class RootConfig:
         config_dir_path = os.path.abspath(config_dir_path)
         data_dir_path = os.getcwd()
 
-        generate_missing_configs = config_args.generate_missing_configs
+        obj = cls(config_files)
 
-        obj = cls()
-
-        if config_args.generate_config:
+        if (
+            config_args.generate_mode
+            == _ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT
+        ):
             if config_args.report_stats is None:
                 parser.error(
                     "Please specify either --report-stats=yes or --report-stats=no\n\n"
@@ -687,11 +760,14 @@ class RootConfig:
                     )
                     % (config_path,)
                 )
-                generate_missing_configs = True
 
         config_dict = read_config_files(config_files)
-        if generate_missing_configs:
-            obj.generate_missing_files(config_dict, config_dir_path)
+        obj.generate_missing_files(config_dict, config_dir_path)
+
+        if config_args.generate_mode in (
+            _ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT,
+            _ConfigGenerateMode.GENERATE_MISSING_AND_EXIT,
+        ):
             return None
 
         obj.parse_config_dict(
@@ -702,10 +778,7 @@ class RootConfig:
         return obj
 
     def parse_config_dict(
-        self,
-        config_dict: Dict[str, Any],
-        config_dir_path: Optional[str] = None,
-        data_dir_path: Optional[str] = None,
+        self, config_dict: Dict[str, Any], config_dir_path: str, data_dir_path: str
     ) -> None:
         """Read the information from the config dict into this Config object.
 
@@ -729,6 +802,34 @@ class RootConfig:
         self, config_dict: Dict[str, Any], config_dir_path: str
     ) -> None:
         self.invoke_all("generate_files", config_dict, config_dir_path)
+
+    def reload_config_section(self, section_name: str) -> Config:
+        """Reconstruct the given config section, leaving all others unchanged.
+
+        This works in three steps:
+
+        1. Create a new instance of the relevant `Config` subclass.
+        2. Call `read_config` on that instance to parse the new config.
+        3. Replace the existing config instance with the new one.
+
+        :raises ValueError: if the given `section` does not exist.
+        :raises ConfigError: for any other problems reloading config.
+
+        :returns: the previous config object, which no longer has a reference to this
+            RootConfig.
+        """
+        existing_config: Optional[Config] = getattr(self, section_name, None)
+        if existing_config is None:
+            raise ValueError(f"Unknown config section '{section_name}'")
+        logger.info("Reloading config section '%s'", section_name)
+
+        new_config_data = read_config_files(self.config_files)
+        new_config = type(existing_config)(self)
+        new_config.read_config(new_config_data)
+        setattr(self, section_name, new_config)
+
+        existing_config.root = None
+        return existing_config
 
 
 def read_config_files(config_files: Iterable[str]) -> Dict[str, Any]:
@@ -893,6 +994,12 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
             return file_stream.read()
     except OSError as e:
         raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+
+
+class _ConfigGenerateMode(Enum):
+    GENERATE_MISSING_AND_RUN = auto()
+    GENERATE_MISSING_AND_EXIT = auto()
+    GENERATE_EVERYTHING_AND_EXIT = auto()
 
 
 __all__ = [

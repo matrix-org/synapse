@@ -60,6 +60,9 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         {
             "max_stream_id": 32443,
         }
+
+    Responds with a 409 when a `PartialStateConflictError` is raised due to an event
+    context that needs to be recomputed due to the un-partial stating of a room.
     """
 
     NAME = "fed_send_events"
@@ -68,8 +71,8 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
-        self.storage = hs.get_storage()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
         self.federation_event_handler = hs.get_federation_event_handler()
 
@@ -133,7 +136,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 event.internal_metadata.outlier = event_payload["outlier"]
 
                 context = EventContext.deserialize(
-                    self.storage, event_payload["context"]
+                    self._storage_controllers, event_payload["context"]
                 )
 
                 event_and_contexts.append((event, context))
@@ -167,7 +170,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
@@ -214,7 +217,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
@@ -260,7 +263,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @staticmethod
     async def _serialize_payload(room_id: str) -> JsonDict:  # type: ignore[override]
@@ -297,7 +300,7 @@ class ReplicationStoreRoomOnOutlierMembershipRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @staticmethod
     async def _serialize_payload(room_id: str, room_version: RoomVersion) -> JsonDict:  # type: ignore[override]

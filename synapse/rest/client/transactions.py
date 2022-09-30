@@ -15,7 +15,9 @@
 """This module contains logic for storing HTTP PUT transactions. This is used
 to ensure idempotency when performing PUTs using the REST API."""
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Tuple
+
+from typing_extensions import ParamSpec
 
 from twisted.python.failure import Failure
 from twisted.web.server import Request
@@ -30,6 +32,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
+
+
+P = ParamSpec("P")
 
 
 class HttpTransactionCache:
@@ -65,9 +70,9 @@ class HttpTransactionCache:
     def fetch_or_execute_request(
         self,
         request: Request,
-        fn: Callable[..., Awaitable[Tuple[int, JsonDict]]],
-        *args: Any,
-        **kwargs: Any,
+        fn: Callable[P, Awaitable[Tuple[int, JsonDict]]],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> Awaitable[Tuple[int, JsonDict]]:
         """A helper function for fetch_or_execute which extracts
         a transaction key from the given request.
@@ -82,9 +87,9 @@ class HttpTransactionCache:
     def fetch_or_execute(
         self,
         txn_key: str,
-        fn: Callable[..., Awaitable[Tuple[int, JsonDict]]],
-        *args: Any,
-        **kwargs: Any,
+        fn: Callable[P, Awaitable[Tuple[int, JsonDict]]],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> Awaitable[Tuple[int, JsonDict]]:
         """Fetches the response for this transaction, or executes the given function
         to produce a response for this transaction.
