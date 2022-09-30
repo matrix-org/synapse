@@ -1,7 +1,7 @@
 version: 2
 updates:
-  - # "pip" is the correct setting for poetry, per https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-    package-ecosystem  package-ecosystem: "pip"
+  - # "pip" is the correct setting for poetry, per https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#package-ecosystem
+    package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
