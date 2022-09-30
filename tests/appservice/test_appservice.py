@@ -236,7 +236,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
     def test_member_list_match(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         # Note that @irc_fo:here is the AS user.
-        self.store.get_local_users_in_room = simple_async_mock(
+        self.store.get_users_in_room = simple_async_mock(
             ["@alice:here", "@irc_fo:here", "@bob:here"]
         )
         self.store.get_aliases_for_room = simple_async_mock([])
