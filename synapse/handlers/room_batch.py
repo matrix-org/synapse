@@ -239,7 +239,7 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         inherited_depth: int,
-        initial_state_event_ids: List[str],
+        state_chain_event_id_to_connect_to: str,
         app_service_requester: Requester,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
@@ -255,10 +255,7 @@ class RoomBatchHandler:
             room_id: Room where you want the events persisted in.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            initial_state_event_ids:
-                This is used to set explicit state for the insertion event at
-                the start of the historical batch since it's floating with no
-                prev_events to derive state from automatically.
+            state_chain_event_id_to_connect_to: TODO: HERE
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -271,10 +268,8 @@ class RoomBatchHandler:
         # We expect the last event in a historical batch to be an batch event
         assert events_to_create[-1]["type"] == EventTypes.MSC2716_BATCH
 
-        # Make the historical event chain float off on its own by specifying no
-        # prev_events for the first event in the chain which causes the HS to
-        # ask for the state at the start of the batch later.
-        prev_event_ids: List[str] = []
+        # Connect the historical event chain to the state chain
+        prev_event_ids: List[str] = [state_chain_event_id_to_connect_to]
 
         event_ids = []
         events_to_persist = []
@@ -302,16 +297,7 @@ class RoomBatchHandler:
                     ev["sender"], app_service_requester.app_service
                 ),
                 event_dict,
-                # Only the first event (which is the insertion event) in the
-                # chain should be floating. The rest should hang off each other
-                # in a chain.
-                allow_no_prev_events=index == 0,
                 prev_event_ids=event_dict.get("prev_events"),
-                # Since the first event (which is the insertion event) in the
-                # chain is floating with no `prev_events`, it can't derive state
-                # from anywhere automatically. So we need to set some state
-                # explicitly.
-                state_event_ids=initial_state_event_ids if index == 0 else None,
                 historical=True,
                 depth=inherited_depth,
             )
@@ -360,7 +346,7 @@ class RoomBatchHandler:
         room_id: str,
         batch_id_to_connect_to: str,
         inherited_depth: int,
-        initial_state_event_ids: List[str],
+        state_chain_event_id_to_connect_to: str,
         app_service_requester: Requester,
     ) -> Tuple[List[str], str]:
         """
@@ -375,13 +361,7 @@ class RoomBatchHandler:
                 want this batch to connect to.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            initial_state_event_ids:
-                This is used to set explicit state for the insertion event at
-                the start of the historical batch since it's floating with no
-                prev_events to derive state from automatically. This should
-                probably be the state from the `prev_event` defined by
-                `/batch_send?prev_event_id=$abc` plus the outcome of
-                `persist_state_events_at_start`
+            state_chain_event_id_to_connect_to: TODO: HERE
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -427,7 +407,7 @@ class RoomBatchHandler:
             events_to_create=events_to_create,
             room_id=room_id,
             inherited_depth=inherited_depth,
-            initial_state_event_ids=initial_state_event_ids,
+            state_chain_event_id_to_connect_to=state_chain_event_id_to_connect_to,
             app_service_requester=app_service_requester,
         )
 

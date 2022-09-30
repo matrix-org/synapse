@@ -145,17 +145,16 @@ class RoomBatchSendEventRestServlet(RestServlet):
         )
 
         state_event_ids_at_start = []
-        # Create and persist all of the state events that float off on their own
-        # before the batch. These will most likely be all of the invite/member
-        # state events used to auth the upcoming historical messages.
+        # Create and persist all of the state events in a chain before the
+        # batch. These will most likely be all of the invite/member state events
+        # used to auth the upcoming historical messages.
         if body["state_events_at_start"]:
-            state_event_ids_at_start = (
-                await self.room_batch_handler.persist_state_events_at_start(
-                    state_events_at_start=body["state_events_at_start"],
-                    room_id=room_id,
-                    initial_prev_event_ids=prev_event_ids_from_query,
-                    app_service_requester=requester,
-                )
+            state_event_ids_at_start = await self.room_batch_handler.persist_state_events_at_start(
+                state_events_at_start=body["state_events_at_start"],
+                room_id=room_id,
+                # Connect the state chain to prev_event we're inserting next to
+                initial_prev_event_ids=prev_event_ids_from_query,
+                app_service_requester=requester,
             )
             # Update our ongoing auth event ID list with all of the new state we
             # just created
@@ -222,7 +221,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,
             inherited_depth=inherited_depth,
-            initial_state_event_ids=state_event_ids,
+            # Connect the historical batch to the state chain
+            state_chain_event_id_to_connect_to=state_event_ids_at_start[-1],
             app_service_requester=requester,
         )
 
