@@ -209,7 +209,11 @@ class PersistEventsStore:
 
         async with stream_ordering_manager as stream_orderings:
             for (event, _), stream in zip(events_and_contexts, stream_orderings):
-                event.internal_metadata.stream_ordering = stream
+                # If someone has already decided the stream_ordering for the
+                # event before, then just use that. This is done during backfill
+                # to help ordering of MSC2716 historical messages.
+                if event.internal_metadata.stream_ordering is None:
+                    event.internal_metadata.stream_ordering = stream
 
             await self.db_pool.runInteraction(
                 "persist_events",
