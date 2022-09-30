@@ -88,9 +88,10 @@ def make_wrapper(factory: Callable[P, R]) -> Callable[P, R]:
 
     @functools.wraps(factory)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if "strict" not in kwargs:
+        # type-ignore: should be redundant once we can use https://github.com/python/mypy/pull/12668
+        if "strict" not in kwargs:  # type: ignore[attr-defined]
             raise MissingStrictInConstrainedTypeException(factory.__name__)
-        if not kwargs["strict"]:
+        if not kwargs["strict"]:  # type: ignore[index]
             raise MissingStrictInConstrainedTypeException(factory.__name__)
         return factory(*args, **kwargs)
 

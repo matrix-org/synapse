@@ -586,7 +586,7 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = current_context()
-        record.request = self._default_request
+        record.request = self._default_request  # type: ignore
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for
@@ -594,21 +594,21 @@ class LoggingContextFilter(logging.Filter):
         if context is not None:
             # Logging is interested in the request ID. Note that for backwards
             # compatibility this is stored as the "request" on the record.
-            record.request = str(context)
+            record.request = str(context)  # type: ignore
 
             # Add some data from the HTTP request.
             request = context.request
             if request is None:
                 return True
 
-            record.ip_address = request.ip_address
-            record.site_tag = request.site_tag
-            record.requester = request.requester
-            record.authenticated_entity = request.authenticated_entity
-            record.method = request.method
-            record.url = request.url
-            record.protocol = request.protocol
-            record.user_agent = request.user_agent
+            record.ip_address = request.ip_address  # type: ignore
+            record.site_tag = request.site_tag  # type: ignore
+            record.requester = request.requester  # type: ignore
+            record.authenticated_entity = request.authenticated_entity  # type: ignore
+            record.method = request.method  # type: ignore
+            record.url = request.url  # type: ignore
+            record.protocol = request.protocol  # type: ignore
+            record.user_agent = request.user_agent  # type: ignore
 
         return True
 
