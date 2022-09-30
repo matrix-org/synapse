@@ -23,7 +23,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from unittest.mock import Mock, call, patch
 from urllib import parse as urlparse
 
-from authlib.common.urls import url_encode
 from parameterized import param, parameterized
 from typing_extensions import Literal
 
@@ -1306,7 +1305,7 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             path=f"/_matrix/client/r0/rooms/{self.room}/send/m.room.message/{None}?"
-            + url_encode(url_params),
+            + urlparse.urlencode(url_params),
             content={"membership": "invite"},
             access_token=self.appservice.token,
         )
