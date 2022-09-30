@@ -167,12 +167,12 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         Returns:
             List of user IDs that the appservice is interested in.
         """
-        # We can use `get_local_users_in_room(...)` here because an application
-        # service can only act on behalf of users of the server it's on.
-        local_users_in_room = await self.get_local_users_in_room(
+        # We need to get all users (local and remote) as an application service can be
+        # interested in anyone.
+        users_in_room = await self.get_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
-        return list(filter(app_service.is_interested_in_user, local_users_in_room))
+        return list(filter(app_service.is_interested_in_user, users_in_room))
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
