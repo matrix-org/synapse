@@ -187,13 +187,12 @@ class SendEmailHandler:
         multipart_msg["To"] = email_address
         multipart_msg["Date"] = email.utils.formatdate()
         multipart_msg["Message-ID"] = email.utils.make_msgid()
-        # A Microsoft Exchange user can configure an automatic reply (e.g. "I'm out of
-        # office until the 1st of January") to be sent to all incoming emails for a
-        # duration. But Exchange will NOT generate an automatic reply if the incoming
-        # message includes the following obscure, non-standard(?) and barely documented
-        # header with an appropriate value. The header does NOT mark the email as being
-        # auto-generated; it's more of a "don't reply to me" marker.
-        #
+        # Discourage automatic responses to Synapse's emails.
+        # Per RFC 3834, automatic responses should not be sent if the "Auto-Submitted"
+        # header is present with any value other than "no". See
+        #     https://www.rfc-editor.org/rfc/rfc3834.html#section-5.1
+        multipart_msg["Auto-Submitted"] = "auto-generated"
+        # We also include a barely-documented Microsoft-Exchange specific header.
         # The best reference I could find was
         #    https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmail/ced68690-498a-4567-9d14-5c01f974d8b1
         # which seems to suggest it can take the value "All" to mean "suppress all
