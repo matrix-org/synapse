@@ -393,6 +393,14 @@ class LoggingTransaction:
     def executemany(self, sql: str, *args: Any) -> None:
         self._do_execute(self.txn.executemany, sql, *args)
 
+    def executescript(self, sql: str) -> None:
+        if isinstance(self.database_engine, Sqlite3Engine):
+            self._do_execute(self.txn.executescript, sql)  # type: ignore[attr-defined]
+        else:
+            raise NotImplementedError(
+                f"executescript only exists for sqlite driver, not {type(self.database_engine)}"
+            )
+
     def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())
@@ -1133,17 +1141,57 @@ class DatabasePool:
         desc: str = "simple_upsert",
         lock: bool = True,
     ) -> bool:
-        """
+        """Insert a row with values + insertion_values; on conflict, update with values.
 
-        `lock` should generally be set to True (the default), but can be set
-        to False if either of the following are true:
-            1. there is a UNIQUE INDEX on the key columns. In this case a conflict
-            will cause an IntegrityError in which case this function will retry
-            the update.
-            2. we somehow know that we are the only thread which will be updating
-            this table.
-        As an additional note, this parameter only matters for old SQLite versions
-        because we will use native upserts otherwise.
+        All of our supported databases accept the nonstandard "upsert" statement in
+        their dialect of SQL. We call this a "native upsert". The syntax looks roughly
+        like:
+
+            INSERT INTO table VALUES (values + insertion_values)
+            ON CONFLICT (keyvalues)
+            DO UPDATE SET (values); -- overwrite `values` columns only
+
+        If (values) is empty, the resulting query is slighlty simpler:
+
+            INSERT INTO table VALUES (insertion_values)
+            ON CONFLICT (keyvalues)
+            DO NOTHING;             -- do not overwrite any columns
+
+        This function is a helper to build such queries.
+
+        In order for upserts to make sense, the database must be able to determine when
+        an upsert CONFLICTs with an existing row. Postgres and SQLite ensure this by
+        requiring that a unique index exist on the column names used to detect a
+        conflict (i.e. `keyvalues.keys()`).
+
+        If there is no such index, we can "emulate" an upsert with a SELECT followed
+        by either an INSERT or an UPDATE. This is unsafe: we cannot make the same
+        atomicity guarantees that a native upsert can and are very vulnerable to races
+        and crashes. Therefore if we wish to upsert without an appropriate unique index,
+        we must either:
+
+        1. Acquire a table-level lock before the emulated upsert (`lock=True`), or
+        2. VERY CAREFULLY ensure that we are the only thread and worker which will be
+           writing to this table, in which case we can proceed without a lock
+           (`lock=False`).
+
+        Generally speaking, you should use `lock=True`. If the table in question has a
+        unique index[*], this class will use a native upsert (which is atomic and so can
+        ignore the `lock` argument). Otherwise this class will use an emulated upsert,
+        in which case we want the safer option unless we been VERY CAREFUL.
+
+        [*]: Some tables have unique indices added to them in the background. Those
+             tables `T` are keys in the dictionary UNIQUE_INDEX_BACKGROUND_UPDATES,
+             where `T` maps to the background update that adds a unique index to `T`.
+             This dictionary is maintained by hand.
+
+             At runtime, we constantly check to see if each of these background updates
+             has run. If so, we deem the coresponding table safe to upsert into, because
+             we can now use a native insert to do so. If not, we deem the table unsafe
+             to upsert into and require an emulated upsert.
+
+             Tables that do not appear in this dictionary are assumed to have an
+             appropriate unique index and therefore be safe to upsert into.
 
         Args:
             table: The table to upsert into
