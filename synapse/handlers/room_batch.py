@@ -153,6 +153,7 @@ class RoomBatchHandler:
         self,
         state_events_at_start: List[JsonDict],
         room_id: str,
+        initial_prev_event_ids: List[str],
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
@@ -164,10 +165,8 @@ class RoomBatchHandler:
         Args:
             state_events_at_start:
             room_id: Room where you want the events persisted in.
-            initial_state_event_ids:
-                The base set of state for the historical batch which the floating
-                state chain will derive from. This should probably be the state
-                from the `prev_event` defined by `/batch_send?prev_event_id=$abc`.
+            initial_prev_event_ids: TODO: HERE
+                This should probably be the prev_events defined by `/batch_send?prev_event_id=$abc`.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -176,12 +175,10 @@ class RoomBatchHandler:
         assert app_service_requester.app_service
 
         state_event_ids_at_start = []
-        state_event_ids = initial_state_event_ids.copy()
 
-        # Make the state events float off on their own by specifying no
-        # prev_events for the first one in the chain so we don't have a bunch of
-        # `@mxid joined the room` noise between each batch.
-        prev_event_ids_for_state_chain: List[str] = []
+        # Connect the state chain to the prev_events we're insertin next to
+        # so that they are valid events and don't get rejected.
+        prev_event_ids_for_state_chain: List[str] = [initial_prev_event_ids]
 
         for index, state_event in enumerate(state_events_at_start):
             assert_params_in_dict(
@@ -220,16 +217,6 @@ class RoomBatchHandler:
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # The first event in the state chain is floating with no
-                    # `prev_events` which means it can't derive state from
-                    # anywhere automatically. So we need to set some state
-                    # explicitly.
-                    #
-                    # Make sure to use a copy of this list because we modify it
-                    # later in the loop here. Otherwise it will be the same
-                    # reference and also update in the event when we append
-                    # later.
-                    state_event_ids=state_event_ids.copy(),
                 )
             else:
                 (
@@ -245,20 +232,10 @@ class RoomBatchHandler:
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # The first event in the state chain is floating with no
-                    # `prev_events` which means it can't derive state from
-                    # anywhere automatically. So we need to set some state
-                    # explicitly.
-                    #
-                    # Make sure to use a copy of this list because we modify it
-                    # later in the loop here. Otherwise it will be the same
-                    # reference and also update in the event when we append later.
-                    state_event_ids=state_event_ids.copy(),
                 )
                 event_id = event.event_id
 
             state_event_ids_at_start.append(event_id)
-            state_event_ids.append(event_id)
             # Connect all the state in a floating chain
             prev_event_ids_for_state_chain = [event_id]
 
