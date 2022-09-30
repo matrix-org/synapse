@@ -23,7 +23,6 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
 )
@@ -558,7 +557,7 @@ class StateStorageController:
 
     async def get_current_hosts_in_room_or_partial_state_approximation(
         self, room_id: str
-    ) -> Sequence[str]:
+    ) -> Collection[str]:
         """Get approximation of current hosts in room based on current state.
 
         For rooms with full state, this is equivalent to `get_current_hosts_in_room`,
@@ -578,14 +577,9 @@ class StateStorageController:
         )
 
         hosts_from_state = await self.stores.main.get_current_hosts_in_room(room_id)
-        hosts_from_state_set = set(hosts_from_state)
 
-        # First take the list of hosts based on the current state.
-        # For rooms with partial state, this will be missing most hosts.
-        hosts = list(hosts_from_state)
-        # Then add in the list of hosts in the room at the time we joined.
-        # This will be an empty list for rooms with full state.
-        hosts.extend(host for host in hosts_at_join if host not in hosts_from_state_set)
+        hosts = set(hosts_at_join)
+        hosts.update(hosts_from_state)
 
         return hosts
 
