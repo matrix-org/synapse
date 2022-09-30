@@ -22,7 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 import synapse.storage
-from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.constants import EduTypes
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeyCounts,
@@ -36,7 +36,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.test_utils import event_injection, make_awaitable, simple_async_mock
+from tests.test_utils import make_awaitable, simple_async_mock
 from tests.unittest import override_config
 from tests.utils import MockClock
 
@@ -386,8 +386,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         receipts.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
-        self.hs = hs
+    def prepare(self, reactor, clock, hs):
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track any outgoing ephemeral events
         self.send_mock = simple_async_mock()
@@ -412,138 +411,6 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.exclusive_as_user_token = self.login(
             "exclusive_as_user", "password", self.exclusive_as_user_device_id
         )
-
-    def _notify_interested_services(self):
-        # This is normally set in `notify_interested_services` but we need to call the
-        # internal async version so the reactor gets pushed to completion.
-        self.hs.get_application_service_handler().current_max += 1
-        self.get_success(
-            self.hs.get_application_service_handler()._notify_interested_services(
-                RoomStreamToken(
-                    None, self.hs.get_application_service_handler().current_max
-                )
-            )
-        )
-
-    def test_match_local_room_members(self):
-        # Register an application service that's interested in local and remote user
-        interested_appservice = self._register_application_service(
-            namespaces={
-                ApplicationService.NS_USERS: [
-                    {
-                        "regex": "@local_as_user:test",
-                        "exclusive": True,
-                    },
-                ],
-            },
-        )
-
-        alice = self.register_user("alice", "pass")
-        alice_access_token = self.login("alice", "pass")
-        room_id = self.helper.create_room_as(room_creator=alice, tok=alice_access_token)
-
-        # Join the interesting user to the room
-        self.get_success(
-            event_injection.inject_member_event(
-                self.hs, room_id, "@local_as_user:test", "join"
-            )
-        )
-        # Kick the appservice into checking this membership event to get it out of the
-        # way
-        self._notify_interested_services()
-        # We don't care about the interesting user join event (this test is making sure
-        # the next thing works)
-        self.send_mock.reset_mock()
-
-        # Send a message from an uninteresting user
-        self.helper.send_event(
-            room_id,
-            type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "message from uninteresting user",
-            },
-            tok=alice_access_token,
-        )
-        # Kick the appservice into checking this new event
-        self._notify_interested_services()
-
-        self.send_mock.assert_called_once()
-        (
-            service,
-            events,
-            _ephemeral,
-            _to_device_messages,
-            _otks,
-            _fbks,
-            _device_list_summary,
-        ) = self.send_mock.call_args[0]
-
-        # Even though the message came from an uninsteresting user, it should still
-        # notify us because the interesting user is joined to the room.
-        self.assertEqual(service, interested_appservice)
-        self.assertEqual(events[0]["type"], "m.room.message")
-        self.assertEqual(events[0]["sender"], alice)
-
-    def test_match_remote_room_members(self):
-        # Register an application service that's interested in a remote user
-        interested_appservice = self._register_application_service(
-            namespaces={
-                ApplicationService.NS_USERS: [
-                    {
-                        "regex": "@interesting_user:remote",
-                        "exclusive": True,
-                    },
-                ],
-            },
-        )
-
-        alice = self.register_user("alice", "pass")
-        alice_access_token = self.login("alice", "pass")
-        room_id = self.helper.create_room_as(room_creator=alice, tok=alice_access_token)
-
-        # Join the interesting user to the room
-        self.get_success(
-            event_injection.inject_member_event(
-                self.hs, room_id, "@interesting_user:remote", "join"
-            )
-        )
-        # Kick the appservice into checking this membership event to get it out of the
-        # way
-        self._notify_interested_services()
-        # We don't care about the interesting user join event (this test is making sure
-        # the next thing works)
-        self.send_mock.reset_mock()
-
-        # Send a message from an uninteresting user
-        self.helper.send_event(
-            room_id,
-            type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "message from uninteresting user",
-            },
-            tok=alice_access_token,
-        )
-        # Kick the appservice into checking this new event
-        self._notify_interested_services()
-
-        self.send_mock.assert_called_once()
-        (
-            service,
-            events,
-            _ephemeral,
-            _to_device_messages,
-            _otks,
-            _fbks,
-            _device_list_summary,
-        ) = self.send_mock.call_args[0]
-
-        # Even though the message came from an uninsteresting user, it should still
-        # notify us because the interesting user is joined to the room.
-        self.assertEqual(service, interested_appservice)
-        self.assertEqual(events[0]["type"], "m.room.message")
-        self.assertEqual(events[0]["sender"], alice)
 
     def test_sending_read_receipt_batches_to_application_services(self):
         """Tests that a large batch of read receipts are sent correctly to

@@ -172,14 +172,23 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        # We need to get all users (local and remote) as an application service can be
-        # interested in anyone.
-        member_list = await store.get_users_in_room(
+        # We can use `get_local_users_in_room(...)` here because an application
+        # service can only act on behalf of users of the server it's on.
+        #
+        # In the future, we can consider re-using
+        # `store.get_app_service_users_in_room` which is very similar to this
+        # function but has a slightly worse performance than this because we
+        # have an early escape-hatch if we find a single user that the
+        # appservice is interested in. The juice would be worth the squeeze if
+        # `store.get_app_service_users_in_room` was used in more places besides
+        # an experimental MSC. But for now we can avoid doing more work and
+        # barely using it later.
+        local_user_ids = await store.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
 
         # check joined member events
-        for user_id in member_list:
+        for user_id in local_user_ids:
             if self.is_interested_in_user(user_id):
                 return True
         return False
@@ -191,9 +200,9 @@ class ApplicationService:
         """
         Returns whether the application is interested in a given user ID.
 
-        The appservice is considered to be interested in a user if either: the user ID
-        is in the appservice's user namespace, or if the user is the appservice's
-        configured sender_localpart. The user can be local or remote.
+        The appservice is considered to be interested in a user if either: the
+        user ID is in the appservice's user namespace, or if the user is the
+        appservice's configured sender_localpart.
 
         Args:
             user_id: The ID of the user to check.
