@@ -11,6 +11,8 @@ jobs:
     if: github.actor == 'dependabot[bot]' || github.actor == 'dmrobertson'  # DMR TEST
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Write, commit and push changelog
         run: |
           echo "${{ github.pull_request.title }}" > "changelog.d/${{ github.pull_request.number }}".docker
