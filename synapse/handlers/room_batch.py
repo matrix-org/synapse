@@ -154,7 +154,6 @@ class RoomBatchHandler:
         state_events_at_start: List[JsonDict],
         room_id: str,
         initial_prev_event_ids: List[str],
-        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
         """Takes all `state_events_at_start` event dictionaries and creates/persists
@@ -178,7 +177,7 @@ class RoomBatchHandler:
 
         # Connect the state chain to the prev_events we're insertin next to
         # so that they are valid events and don't get rejected.
-        prev_event_ids_for_state_chain: List[str] = [initial_prev_event_ids]
+        prev_event_ids_for_state_chain: List[str] = initial_prev_event_ids
 
         for index, state_event in enumerate(state_events_at_start):
             assert_params_in_dict(
@@ -213,9 +212,6 @@ class RoomBatchHandler:
                     action=membership,
                     content=event_dict["content"],
                     historical=True,
-                    # Only the first event in the state chain should be floating.
-                    # The rest should hang off each other in a chain.
-                    allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
                 )
             else:
@@ -228,9 +224,6 @@ class RoomBatchHandler:
                     ),
                     event_dict,
                     historical=True,
-                    # Only the first event in the state chain should be floating.
-                    # The rest should hang off each other in a chain.
-                    allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
                 )
                 event_id = event.event_id
