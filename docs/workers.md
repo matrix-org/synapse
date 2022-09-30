@@ -327,7 +327,8 @@ effects of bursts of events from that bridge on events sent by normal users.
 Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
 
-To enable this, the worker must have a HTTP replication listener configured,
+To enable this, the worker must have a
+[HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
 can handle multiple streams, but unless otherwise documented, each stream can only
 have a single writer.
