@@ -3,12 +3,11 @@ on:
   pull_request:
     types:
       - opened
-      - synchronize  # dmr test
 
 jobs:
   add-changelog:
     runs-on: 'ubuntu-latest'
-    if: github.actor == 'dependabot[bot]'
+    if: github.actor == 'dependabot[bot]' || github.actor == 'dmrobertson'
     steps:
       - uses: actions/checkout@v3
         with:
