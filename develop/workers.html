@@ -245,7 +245,8 @@ public internet; replication traffic is:</p>
 <li>The HTTP replication endpoint that it should talk to on the main synapse process
 (<code>worker_replication_host</code> and <code>worker_replication_http_port</code>)</li>
 <li>If handling HTTP requests, a <code>worker_listeners</code> option with an <code>http</code>
-listener, in the same way as the <code>listeners</code> option in the shared config.</li>
+listener, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code></a>
+option in the shared config.</li>
 <li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>).</li>
 </ul>
@@ -400,8 +401,9 @@ using):</p>
 For multiple workers not handling the SSO endpoints properly, see
 <a href="https://github.com/matrix-org/synapse/issues/7530">#7530</a> and
 <a href="https://github.com/matrix-org/synapse/issues/9427">#9427</a>.</p>
-<p>Note that a HTTP listener with <code>client</code> and <code>federation</code> resources must be
-configured in the <code>worker_listeners</code> option in the worker config.</p>
+<p>Note that a <a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a>
+with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the <code>worker_listeners</code>
+option in the worker config.</p>
 <h4 id="load-balancing"><a class="header" href="#load-balancing">Load balancing</a></h4>
 <p>It is possible to run multiple instances of this worker app, with incoming requests
 being load-balanced between them by the reverse-proxy. However, different endpoints
@@ -431,7 +433,8 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 <h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
 <p>Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.</p>
-<p>To enable this, the worker must have a HTTP replication listener configured,
+<p>To enable this, the worker must have a
+<a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
 have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
 can handle multiple streams, but unless otherwise documented, each stream can only
 have a single writer.</p>
@@ -514,7 +517,7 @@ the stream writer for the <code>presence</code> stream:</p>
 <p>There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
-stats is enabled).</p>
+stats is enabled). This worker doesn't handle any REST endpoints itself.</p>
 <p>To enable this, the worker must have a <code>worker_name</code> and can be configured to run
 background tasks. For example, to move background tasks to a dedicated worker,
 the shared configuration would include:</p>
@@ -548,8 +551,9 @@ it to the chosen user directory worker.</p>
 <p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
 worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
-<p>You can designate one generic worker to send output traffic to Application Services.</p>
-<p>Specify its name in the shared configuration as follows:</p>
+<p>You can designate one generic worker to send output traffic to Application Services.
+Doesn't handle any REST endpoints itself, but you should specify its name in the
+shared configuration as follows:</p>
 <pre><code class="language-yaml">notify_appservices_from_worker: worker_name
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
@@ -601,14 +605,23 @@ For example:</p>
 file to stop the main synapse running background jobs related to managing the
 media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.</p>
-<p>In the <code>media_repository</code> worker configuration file, configure the http listener to
+<p>In the <code>media_repository</code> worker configuration file, configure the
+<a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a> to
 expose the <code>media</code> resource. For example:</p>
-<pre><code class="language-yaml">worker_listeners:
- - type: http
-   port: 8085
-   resources:
-     - names:
-       - media
+<pre><code class="language-yaml">worker_app: synapse.app.media_repository
+worker_name: media_worker
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 8085
+    resources:
+      - names: [media]
+
+worker_log_config: /etc/matrix-synapse/media-worker-log.yaml
 </code></pre>
 <p>Note that if running multiple media repositories they must be on the same server
 and you must configure a single instance to run the background tasks, e.g.:</p>
