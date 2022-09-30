@@ -1,14 +1,42 @@
 name: Write changelog for dependabot PR
 on:
-  pull_request:
+  # /!\ pull_request_target is a security concern as it grants a read-write GITHUB_TOKEN
+  # within this workflow. We mitigate the risk by:
+  #  - ensuring this workflow does nothing when NOT triggered by dependabot
+  #  - downscoping permissions to the bare minimum.
+  # See https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions
+  # and in particular the section "Responding to events" for advice. (That page
+  # recommends an untrusted/trusted workflow pair, but that is overkill for this
+  # workflow.)
+  pull_request_target:
     types:
       - opened
-      - reopened
+
+permissions:
+  # The list of permission scopes is defined here:
+  # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
+  # and here:
+  # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+  # The best reference I could find for their meanings is:
+  # https://docs.github.com/en/rest/overview/permissions-required-for-github-apps
+  actions: none
+  checks: none
+  contents: write
+  deployments: none
+  id-token: none
+  issues: none
+  discussions: none
+  packages: none
+  pages: none
+  pull-requests: none
+  repository-projects: none
+  security-events: none
+  statuses: none
 
 jobs:
   add-changelog:
     runs-on: 'ubuntu-latest'
-    if: github.actor == 'dependabot[bot]' || github.actor == 'dmrobertson'
+    if: ${{ github.actor == 'dependabot[bot]' }}
     steps:
       - uses: actions/checkout@v3
         with:
