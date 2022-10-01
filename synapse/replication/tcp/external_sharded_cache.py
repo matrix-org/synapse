@@ -16,16 +16,16 @@ import binascii
 import logging
 import pickle
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Union
 
 import jump
 from prometheus_client import Counter, Histogram
-from txredisapi import ConnectionError, RedisError
+from txredisapi import ConnectionError, ConnectionHandler, RedisError
 
 from twisted.internet import defer
 
 from synapse.logging import opentracing
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.replication.tcp.redis import lazyConnection
 from synapse.util import unwrapFirstError
 
@@ -62,32 +62,24 @@ response_timer = Histogram(
 logger = logging.getLogger(__name__)
 
 
-# Max number of times to retry Redis commands on connection errors
-_MAX_CONNECTION_ATTEMPTS = 5
+_REDIS_CONNECTION_ATTEMPTS = 5
+_REDIS_TIMEOUT = 5
 
-
-async def _redis_with_retry(
-    handler: Callable,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    attempt = 0
-    while True:
-        try:
-            return await handler(*args, **kwargs)
-        except ConnectionError:
-            if attempt >= _MAX_CONNECTION_ATTEMPTS:
-                raise
-            attempt += 1
+# Object to return when we fail to talk to Redis, rather than an exception because
+# we shouldn't fail if we can't use the cache.
+_SENTINEL = object()
 
 
 class ExternalShardedCache:
-    """A cache backed by an external Redis. Does nothing if no Redis is
-    configured.
+    """
+    A sharded cache backed by an external Redis instances. Does nothing if no
+    Redis shards are configured. Methods do not raise exceptions and sends
+    warning logs in case Redis shards are unavailable.
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._redis_shards = []
+        self._redis_shards: List[ConnectionHandler] = []
+        self._reactor = hs.get_reactor()
 
         if hs.config.redis.redis_enabled and hs.config.redis.cache_shard_hosts:
             for shard in hs.config.redis.cache_shard_hosts:
@@ -105,6 +97,34 @@ class ExternalShardedCache:
                     ),
                 )
 
+    async def _redis_with_retry(
+        self,
+        shard: ConnectionHandler,
+        method: Callable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        # Have to access the private factory method here because the txredisapi.ConnectionHandler
+        # provides no way to access the underlying pool.
+        if not shard._factory.pool:
+            logger.warning("Redis shard is not connected: %r", shard)
+            return _SENTINEL
+
+        attempt = 0
+        try:
+            while True:
+                try:
+                    return await method(*args, **kwargs).addTimeout(
+                        _REDIS_TIMEOUT, self._reactor
+                    )
+                except ConnectionError:
+                    if attempt >= _REDIS_CONNECTION_ATTEMPTS:
+                        raise
+                    attempt += 1
+        except (ConnectionError, RedisError, defer.TimeoutError) as e:
+            logger.warning("Failed to talk to Redis %r: %r", shard, e)
+        return _SENTINEL
+
     def _get_redis_key(self, cache_name: str, key: str) -> str:
         return "sharded_cache_v1:%s:%s" % (cache_name, key)
 
@@ -120,6 +140,14 @@ class ExternalShardedCache:
         just no-op, but the function is useful to avoid doing unnecessary work.
         """
         return bool(self._redis_shards)
+
+    def _mset_shard(
+        self,
+        shard_id: int,
+        values: Dict[str, Any],
+    ) -> Coroutine:
+        shard = self._redis_shards[shard_id]
+        return self._redis_with_retry(shard, shard.mset, values)
 
     async def mset(
         self,
@@ -148,9 +176,7 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("set").time():
                 deferreds = [
-                    defer.ensureDeferred(
-                        _redis_with_retry(self._redis_shards[shard_id].mset, values)
-                    )
+                    defer.ensureDeferred(self._mset_shard(shard_id, values))
                     for shard_id, values in shard_id_to_encoded_values.items()
                 ]
                 try:
@@ -167,10 +193,12 @@ class ExternalShardedCache:
         self, shard_id: int, key_mapping: Dict[str, str]
     ) -> Dict[str, Any]:
         shard = self._redis_shards[shard_id]
-        try:
-            results = await shard.mget(list(key_mapping.values()))
-        except RedisError as e:
-            logger.error("Failed to get from Redis %r: %r", shard, e)
+        results = await self._redis_with_retry(
+            shard,
+            shard.mget,
+            list(key_mapping.values()),
+        )
+        if results is _SENTINEL:
             return {}
         original_keys = list(key_mapping.keys())
         mapped_results: Dict[str, Any] = {}
@@ -204,9 +232,7 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("get").time():
                 deferreds = [
-                    defer.ensureDeferred(
-                        _redis_with_retry(self._mget_shard, shard_id, keys)
-                    )
+                    defer.ensureDeferred(self._mget_shard(shard_id, keys))
                     for shard_id, keys in shard_id_to_key_mapping.items()
                 ]
                 results: Union[
@@ -236,9 +262,28 @@ class ExternalShardedCache:
     async def contains(self, cache_name: str, key: str) -> bool:
         redis_key = self._get_redis_key(cache_name, key)
         shard_id = self._get_redis_shard_id(redis_key)
-        return await self._redis_shards[shard_id].exists(redis_key)
+        shard = self._redis_shards[shard_id]
+        return (await self._redis_with_retry(shard, shard.exists, redis_key)) is True
 
     async def delete(self, cache_name: str, key: str) -> None:
         redis_key = self._get_redis_key(cache_name, key)
         shard_id = self._get_redis_shard_id(redis_key)
-        await _redis_with_retry(self._redis_shards[shard_id].delete, redis_key)
+        shard = self._redis_shards[shard_id]
+        result = await self._redis_with_retry(shard, shard.delete, redis_key)
+
+        if result is _SENTINEL:
+            logger.error(
+                "Failed to delete Redis key %s on shard %r, backgrounding...",
+                key,
+                shard,
+            )
+
+            async def background_delete() -> None:
+                await shard.delete(redis_key)
+                logger.warning(
+                    "Successfully background deleted Redis key %s on shard %r",
+                    key,
+                    shard,
+                )
+
+            run_in_background(background_delete)
