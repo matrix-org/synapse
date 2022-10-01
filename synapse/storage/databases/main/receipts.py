@@ -779,6 +779,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         async with self._receipts_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
             event_ts = await self.db_pool.runInteraction_advanced(
                 "insert_linearized_receipt",
+                False,
+                IsolationLevel.READ_COMMITTED,
                 self._insert_linearized_receipt_txn,
                 room_id,
                 receipt_type,
@@ -787,10 +789,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 thread_id,
                 data,
                 stream_id=stream_id,
-                # Read committed is actually beneficial here because we check for a receipt with
-                # greater stream order, and checking the very latest data at select time is better
-                # than the data at transaction start time.
-                isolation_level=IsolationLevel.READ_COMMITTED,
             )
 
         # If the receipt was older than the currently persisted one, nothing to do.

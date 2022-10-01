@@ -820,8 +820,9 @@ class _MultiWriterCtxManager:
         if self.id_gen._writers:
             await self.id_gen._db.runInteraction_advanced(
                 "MultiWriterIdGenerator._update_table",
-                self.id_gen._update_stream_positions_table_txn,
                 db_autocommit=True,
+                isolation_level=None,
+                func=self.id_gen._update_stream_positions_table_txn,
             )
 
         return False

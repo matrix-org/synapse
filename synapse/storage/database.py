@@ -806,21 +806,16 @@ class DatabasePool:
         **kwargs: Any,
     ) -> R:
         return await self.runInteraction_advanced(
-            desc,
-            func,
-            *args,
-            db_autocommit=False,
-            isolation_level=None,
-            **kwargs,
+            desc, False, None, func, *args, **kwargs
         )
 
     async def runInteraction_advanced(
         self,
         desc: str,
+        db_autocommit: bool,
+        isolation_level: Optional[int],
         func: Callable[..., R],
         *args: Any,
-        db_autocommit: bool = False,
-        isolation_level: Optional[int] = None,
         **kwargs: Any,
     ) -> R:
         """Starts a transaction on the database and runs a given function

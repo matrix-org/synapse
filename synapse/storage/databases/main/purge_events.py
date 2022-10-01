@@ -327,9 +327,10 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         state_groups_to_delete = await self.db_pool.runInteraction_advanced(
             "purge_room",
-            self._purge_room_txn,
-            room_id=room_id,
+            False,
             isolation_level=IsolationLevel.READ_COMMITTED,
+            func=self._purge_room_txn,
+            room_id=room_id,
         )
 
         state_groups_to_delete.extend(

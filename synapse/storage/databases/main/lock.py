@@ -164,10 +164,9 @@ class LockStore(SQLBaseStore):
 
         did_lock = await self.db_pool.runInteraction_advanced(
             "try_acquire_lock",
-            _try_acquire_lock_txn,
-            # We can autocommit here as we're executing a single query, this
-            # will avoid serialization errors.
             db_autocommit=True,
+            isolation_level=None,
+            func=_try_acquire_lock_txn,
         )
         if not did_lock:
             return None

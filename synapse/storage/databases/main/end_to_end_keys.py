@@ -1084,11 +1084,12 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
             claim_row = await self.db_pool.runInteraction_advanced(
                 "claim_e2e_one_time_keys",
+                db_autocommit,
+                None,
                 _claim_e2e_one_time_key,
                 user_id,
                 device_id,
                 algorithm,
-                db_autocommit=db_autocommit,
             )
             if claim_row:
                 device_results = results.setdefault(user_id, {}).setdefault(

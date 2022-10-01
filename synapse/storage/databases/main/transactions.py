@@ -223,12 +223,13 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction_advanced(
             "set_destination_retry_timings",
+            True,
+            None,
             self._set_destination_retry_timings_native,
             destination,
             failure_ts,
             retry_last_ts,
             retry_interval,
-            db_autocommit=True,  # Safe as it's a single upsert
         )
 
     def _set_destination_retry_timings_native(
