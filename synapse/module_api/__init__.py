@@ -831,9 +831,8 @@ class ModuleApi:
         Returns:
             Deferred[object]: result of func
         """
-        # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
-            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
         )
 
     def register_cached_function(self, cached_func: CachedFunction) -> None:

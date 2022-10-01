@@ -325,7 +325,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # We then run the same purge a second time without this isolation level to
         # purge any of those rows which were added during the first.
 
-        state_groups_to_delete = await self.db_pool.runInteraction(
+        state_groups_to_delete = await self.db_pool.runInteraction_advanced(
             "purge_room",
             self._purge_room_txn,
             room_id=room_id,

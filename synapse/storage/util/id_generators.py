@@ -818,7 +818,7 @@ class _MultiWriterCtxManager:
         # for. If we don't do this then we'll often hit serialization errors due
         # to the fact we default to REPEATABLE READ isolation levels.
         if self.id_gen._writers:
-            await self.id_gen._db.runInteraction(
+            await self.id_gen._db.runInteraction_advanced(
                 "MultiWriterIdGenerator._update_table",
                 self.id_gen._update_stream_positions_table_txn,
                 db_autocommit=True,

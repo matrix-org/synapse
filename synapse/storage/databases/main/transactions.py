@@ -221,7 +221,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             retry_interval: how long until next retry in ms
         """
 
-        await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction_advanced(
             "set_destination_retry_timings",
             self._set_destination_retry_timings_native,
             destination,

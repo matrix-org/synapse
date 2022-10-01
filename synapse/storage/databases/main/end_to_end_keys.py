@@ -1082,7 +1082,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
                 db_autocommit = False
 
-            claim_row = await self.db_pool.runInteraction(
+            claim_row = await self.db_pool.runInteraction_advanced(
                 "claim_e2e_one_time_keys",
                 _claim_e2e_one_time_key,
                 user_id,

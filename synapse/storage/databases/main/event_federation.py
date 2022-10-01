@@ -1689,7 +1689,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
                 return row[0]
 
-            return await self.db_pool.runInteraction(
+            return await self.db_pool.runInteraction_advanced(
                 "remove_received_event_from_staging",
                 _remove_received_event_from_staging_txn,
                 db_autocommit=True,

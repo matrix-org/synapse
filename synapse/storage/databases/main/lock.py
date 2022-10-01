@@ -162,7 +162,7 @@ class LockStore(SQLBaseStore):
             # We only acquired the lock if we inserted or updated the table.
             return bool(txn.rowcount)
 
-        did_lock = await self.db_pool.runInteraction(
+        did_lock = await self.db_pool.runInteraction_advanced(
             "try_acquire_lock",
             _try_acquire_lock_txn,
             # We can autocommit here as we're executing a single query, this

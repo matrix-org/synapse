@@ -777,7 +777,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             )
 
         async with self._receipts_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
-            event_ts = await self.db_pool.runInteraction(
+            event_ts = await self.db_pool.runInteraction_advanced(
                 "insert_linearized_receipt",
                 self._insert_linearized_receipt_txn,
                 room_id,
