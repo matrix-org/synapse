@@ -754,18 +754,28 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def test_get_backfill_points_in_room(self):
         """
-        Test to make sure we get some backfill points
+        Test to make sure only backfill points that are older and come before
+        the `current_depth` are returned.
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
 
+        # Try at "B"
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id)
+            self.store.get_backfill_points_in_room(room_id, depth_map["B"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
-            backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
+        self.assertEqual(backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"])
+
+        # Try at "A"
+        backfill_points = self.get_success(
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
+        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
+        # Event "2" has a depth of 2 but is not included here because we only
+        # know the approximate depth of 5 from our event "3".
+        self.assertListEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
     def test_get_backfill_points_in_room_excludes_events_we_have_attempted(
         self,
@@ -776,6 +786,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
@@ -795,12 +806,13 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # No time has passed since we attempted to backfill ^
 
+        # Try at "B"
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id)
+            self.store.get_backfill_points_in_room(room_id, depth_map["B"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Only the backfill points that we didn't record earlier exist here.
-        self.assertListEqual(backfill_event_ids, ["b6", "2", "b1"])
+        self.assertEqual(backfill_event_ids, ["b6", "2", "b1"])
 
     def test_get_backfill_points_in_room_attempted_event_retry_after_backoff_duration(
         self,
@@ -812,6 +824,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_backfill_tests()
         room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
@@ -839,26 +852,65 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # visible regardless.
         self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
 
-        # Make sure that "b1" is not in the list because we've
+        # Try at "A" and make sure that "b1" is not in the list because we've
         # already attempted many times
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id)
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2"])
+        self.assertEqual(backfill_event_ids, ["b3", "b2"])
 
         # Now advance time by 20 hours (above 2^4 because we made 4 attemps) and
         # see if we can now backfill it
         self.reactor.advance(datetime.timedelta(hours=20).total_seconds())
 
-        # Try again after we advanced enough time and we should see "b3" again
+        # Try at "A" again after we advanced enough time and we should see "b3" again
         backfill_points = self.get_success(
-            self.store.get_backfill_points_in_room(room_id)
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
-            backfill_event_ids, ["b6", "b5", "b4", "2", "b3", "b2", "b1"]
+        self.assertEqual(backfill_event_ids, ["b3", "b2", "b1"])
+
+    def test_get_backfill_points_in_room_works_after_many_failed_pull_attempts_that_could_naively_overflow(
+        self,
+    ) -> None:
+        """
+        A test that reproduces #13929 (Postgres only).
+
+        Test to make sure we can still get backfill points after many failed pull
+        attempts that cause us to backoff to the limit. Even if the backoff formula
+        would tell us to wait for more seconds than can be expressed in a 32 bit
+        signed int.
+        """
+        setup_info = self._setup_room_for_backfill_tests()
+        room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
+
+        # Pretend that we have tried and failed 10 times to backfill event b1.
+        for _ in range(10):
+            self.get_success(
+                self.store.record_event_failed_pull_attempt(room_id, "b1", "fake cause")
+            )
+
+        # If the backoff periods grow without limit:
+        # After the first failed attempt, we would have backed off for 1 << 1 = 2 hours.
+        # After the second failed attempt we would have backed off for 1 << 2 = 4 hours,
+        # so after the 10th failed attempt we should backoff for 1 << 10 == 1024 hours.
+        # Wait 1100 hours just so we have a nice round number.
+        self.reactor.advance(datetime.timedelta(hours=1100).total_seconds())
+
+        # 1024 hours in milliseconds is 1024 * 3600000, which exceeds the largest 32 bit
+        # signed integer. The bug we're reproducing is that this overflow causes an
+        # error in postgres preventing us from fetching a set of backwards extremities
+        # to retry fetching.
+        backfill_points = self.get_success(
+            self.store.get_backfill_points_in_room(room_id, depth_map["A"], limit=100)
         )
+
+        # We should aim to fetch all backoff points: b1's latest backoff period has
+        # expired, and we haven't tried the rest.
+        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
+        self.assertEqual(backfill_event_ids, ["b3", "b2", "b1"])
 
     def _setup_room_for_insertion_backfill_tests(self) -> _BackfillSetupInfo:
         """
@@ -938,18 +990,32 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def test_get_insertion_event_backward_extremities_in_room(self):
         """
-        Test to make sure insertion event backward extremities are returned.
+        Test to make sure only insertion event backward extremities that are
+        older and come before the `current_depth` are returned.
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
 
+        # Try at "insertion_eventB"
         backfill_points = self.get_success(
-            self.store.get_insertion_event_backward_extremities_in_room(room_id)
+            self.store.get_insertion_event_backward_extremities_in_room(
+                room_id, depth_map["insertion_eventB"], limit=100
+            )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
-            backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
+        self.assertEqual(backfill_event_ids, ["insertion_eventB", "insertion_eventA"])
+
+        # Try at "insertion_eventA"
+        backfill_points = self.get_success(
+            self.store.get_insertion_event_backward_extremities_in_room(
+                room_id, depth_map["insertion_eventA"], limit=100
+            )
         )
+        backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
+        # Event "2" has a depth of 2 but is not included here because we only
+        # know the approximate depth of 5 from our event "3".
+        self.assertListEqual(backfill_event_ids, ["insertion_eventA"])
 
     def test_get_insertion_event_backward_extremities_in_room_excludes_events_we_have_attempted(
         self,
@@ -961,6 +1027,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_insertion_event_backward_extremities_in_room` exclude them
@@ -973,12 +1040,15 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # No time has passed since we attempted to backfill ^
 
+        # Try at "insertion_eventB"
         backfill_points = self.get_success(
-            self.store.get_insertion_event_backward_extremities_in_room(room_id)
+            self.store.get_insertion_event_backward_extremities_in_room(
+                room_id, depth_map["insertion_eventB"], limit=100
+            )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         # Only the backfill points that we didn't record earlier exist here.
-        self.assertListEqual(backfill_event_ids, ["insertion_eventB"])
+        self.assertEqual(backfill_event_ids, ["insertion_eventB"])
 
     def test_get_insertion_event_backward_extremities_in_room_attempted_event_retry_after_backoff_duration(
         self,
@@ -991,6 +1061,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         setup_info = self._setup_room_for_insertion_backfill_tests()
         room_id = setup_info.room_id
+        depth_map = setup_info.depth_map
 
         # Record some attempts to backfill these events which will make
         # `get_backfill_points_in_room` exclude them because we
@@ -1027,13 +1098,15 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # because we haven't waited long enough for this many attempts.
         self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
 
-        # Make sure that "insertion_eventA" is not in the list because we've
-        # already attempted many times
+        # Try at "insertion_eventA" and make sure that "insertion_eventA" is not
+        # in the list because we've already attempted many times
         backfill_points = self.get_success(
-            self.store.get_insertion_event_backward_extremities_in_room(room_id)
+            self.store.get_insertion_event_backward_extremities_in_room(
+                room_id, depth_map["insertion_eventA"], limit=100
+            )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(backfill_event_ids, ["insertion_eventB"])
+        self.assertEqual(backfill_event_ids, [])
 
         # Now advance time by 20 hours (above 2^4 because we made 4 attemps) and
         # see if we can now backfill it
@@ -1042,12 +1115,12 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Try at "insertion_eventA" again after we advanced enough time and we
         # should see "insertion_eventA" again
         backfill_points = self.get_success(
-            self.store.get_insertion_event_backward_extremities_in_room(room_id)
+            self.store.get_insertion_event_backward_extremities_in_room(
+                room_id, depth_map["insertion_eventA"], limit=100
+            )
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
-        self.assertListEqual(
-            backfill_event_ids, ["insertion_eventB", "insertion_eventA"]
-        )
+        self.assertEqual(backfill_event_ids, ["insertion_eventA"])
 
 
 @attr.s

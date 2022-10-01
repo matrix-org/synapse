@@ -162,6 +162,10 @@ async def filter_event_for_clients_with_state(
     if event.internal_metadata.is_soft_failed():
         return []
 
+    # Fast path if we don't have any user IDs to check.
+    if not user_ids:
+        return ()
+
     # Make a set for all user IDs that haven't been filtered out by a check.
     allowed_user_ids = set(user_ids)
 

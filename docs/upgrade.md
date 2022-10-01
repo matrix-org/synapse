@@ -15,9 +15,8 @@ this document.
     The website <https://endoflife.date> also offers convenient
     summaries.
 
--   If Synapse was installed using [prebuilt
-    packages](setup/installation.md#prebuilt-packages), you will need to follow the
-    normal process for upgrading those packages.
+-   If Synapse was installed using [prebuilt packages](setup/installation.md#prebuilt-packages),
+    you will need to follow the normal process for upgrading those packages.
 
 -   If Synapse was installed using pip then upgrade to the latest
     version by running:
@@ -89,12 +88,48 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.69.0
+
+## Changes to the receipts replication streams
+
+Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.
+
 # Upgrading to v1.68.0
 
-As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
-version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
-now require a recent Rust compiler.
+Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
 
+## SQLite version requirement
+
+Synapse now requires a SQLite version of 3.27.0 or higher if SQLite is configured as
+Synapse's database.
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- a PostgreSQL database
+
+are not affected.
+
+## Rust requirement when building from source.
+
+Building from a source checkout of Synapse now requires a recent Rust compiler
+(currently Rust 1.58.1, but see also the
+[Platform Dependency Policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html)).
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- PyPI wheels via `pip install matrix-synapse` (on supported platforms and architectures)
+
+will not be affected.
 
 # Upgrading to v1.67.0
 
@@ -128,12 +163,12 @@ The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
 
 ## SQLite version requirement in the next release
 
-From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
 higher. Synapse v1.67.0 will be the last major release supporting SQLite
 versions 3.22 to 3.26.
 
 Those using Docker images or Debian packages from Matrix.org will not be
-affected. If you have installed from source, you should check the version of 
+affected. If you have installed from source, you should check the version of
 SQLite used by Python with:
 
 ```shell
