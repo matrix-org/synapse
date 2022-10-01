@@ -803,6 +803,22 @@ class DatabasePool:
         desc: str,
         func: Callable[..., R],
         *args: Any,
+        **kwargs: Any,
+    ) -> R:
+        return await self.runInteraction_advanced(
+            desc,
+            func,
+            *args,
+            db_autocommit=False,
+            isolation_level=None,
+            **kwargs,
+        )
+
+    async def runInteraction_advanced(
+        self,
+        desc: str,
+        func: Callable[..., R],
+        *args: Any,
         db_autocommit: bool = False,
         isolation_level: Optional[int] = None,
         **kwargs: Any,
