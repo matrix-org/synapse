@@ -1501,13 +1501,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             event_id: The event that failed to be fetched or processed
             cause: The error message or reason that we failed to pull the event
         """
-        await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction_advanced(
             "record_event_failed_pull_attempt",
+            True,  # Safe to autocommit as it's a single upsert
+            None,
             self._record_event_failed_pull_attempt_upsert_txn,
             room_id,
             event_id,
             cause,
-            db_autocommit=True,  # Safe as it's a single upsert
         )
 
     def _record_event_failed_pull_attempt_upsert_txn(

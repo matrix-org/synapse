@@ -1213,15 +1213,16 @@ class DatabasePool:
                 # We can autocommit if it is safe to upsert
                 autocommit = table not in self._unsafe_to_upsert_tables
 
-                return await self.runInteraction(
+                return await self.runInteraction_advanced(
                     desc,
+                    autocommit,
+                    None,
                     self.simple_upsert_txn,
                     table,
                     keyvalues,
                     values,
                     insertion_values,
                     lock=lock,
-                    db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:
                 attempts += 1
@@ -1436,8 +1437,10 @@ class DatabasePool:
         # We can autocommit if it safe to upsert
         autocommit = table not in self._unsafe_to_upsert_tables
 
-        await self.runInteraction(
+        await self.runInteraction_advanced(
             desc,
+            autocommit,
+            None,
             self.simple_upsert_many_txn,
             table,
             key_names,
@@ -1445,7 +1448,6 @@ class DatabasePool:
             value_names,
             value_values,
             lock=lock,
-            db_autocommit=autocommit,
         )
 
     def simple_upsert_many_txn(
@@ -1622,14 +1624,15 @@ class DatabasePool:
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
-        return await self.runInteraction(
+        return await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_select_one_txn,
             table,
             keyvalues,
             retcols,
             allow_none,
-            db_autocommit=True,
         )
 
     @overload
@@ -1673,14 +1676,15 @@ class DatabasePool:
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
-        return await self.runInteraction(
+        return await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_select_one_onecol_txn,
             table,
             keyvalues,
             retcol,
             allow_none=allow_none,
-            db_autocommit=True,
         )
 
     @overload
@@ -1764,13 +1768,14 @@ class DatabasePool:
         Returns:
             Results in a list
         """
-        return await self.runInteraction(
+        return await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_select_onecol_txn,
             table,
             keyvalues,
             retcol,
-            db_autocommit=True,
         )
 
     async def simple_select_list(
@@ -1794,13 +1799,14 @@ class DatabasePool:
         Returns:
             A list of dictionaries.
         """
-        return await self.runInteraction(
+        return await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_select_list_txn,
             table,
             keyvalues,
             retcols,
-            db_autocommit=True,
         )
 
     @classmethod
@@ -1864,15 +1870,16 @@ class DatabasePool:
         results: List[Dict[str, Any]] = []
 
         for chunk in batch_iter(iterable, batch_size):
-            rows = await self.runInteraction(
+            rows = await self.runInteraction_advanced(
                 desc,
+                True,
+                None,
                 self.simple_select_many_txn,
                 table,
                 column,
                 chunk,
                 keyvalues,
                 retcols,
-                db_autocommit=True,
             )
 
             results.extend(rows)
@@ -2050,13 +2057,14 @@ class DatabasePool:
             updatevalues: dict giving column names and values to update
             desc: description of the transaction, for logging and metrics
         """
-        await self.runInteraction(
+        await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_update_one_txn,
             table,
             keyvalues,
             updatevalues,
-            db_autocommit=True,
         )
 
     @classmethod
@@ -2115,12 +2123,13 @@ class DatabasePool:
             keyvalues: dict of column names and values to select the row with
             desc: description of the transaction, for logging and metrics
         """
-        await self.runInteraction(
+        await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_delete_one_txn,
             table,
             keyvalues,
-            db_autocommit=True,
         )
 
     @staticmethod
@@ -2160,8 +2169,8 @@ class DatabasePool:
         Returns:
             The number of deleted rows.
         """
-        return await self.runInteraction(
-            desc, self.simple_delete_txn, table, keyvalues, db_autocommit=True
+        return await self.runInteraction_advanced(
+            desc, True, None, self.simple_delete_txn, table, keyvalues
         )
 
     @staticmethod
@@ -2210,14 +2219,15 @@ class DatabasePool:
         Returns:
             Number rows deleted
         """
-        return await self.runInteraction(
+        return await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_delete_many_txn,
             table,
             column,
             iterable,
             keyvalues,
-            db_autocommit=True,
         )
 
     @staticmethod
@@ -2403,14 +2413,15 @@ class DatabasePool:
             A list of dictionaries or None.
         """
 
-        return await self.runInteraction(
+        return await self.runInteraction_advanced(
             desc,
+            True,
+            None,
             self.simple_search_list_txn,
             table,
             term,
             col,
             retcols,
-            db_autocommit=True,
         )
 
     @classmethod
