@@ -295,15 +295,19 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             include_deleted_devices = False
 
         if include_deleted_devices:
-            deleted_devices = set(query_list)
+            deleted_devices = {
+                (user_id, device_id)
+                for user_id, device_id in query_list
+                if device_id is not None
+            }
 
-        for (user_id, device_id) in query_list:
+        for (queried_user_id, queried_device_id) in query_list:
             query_clause = "user_id = ?"
-            query_params.append(user_id)
+            query_params.append(queried_user_id)
 
-            if device_id is not None:
+            if queried_device_id is not None:
                 query_clause += " AND device_id = ?"
-                query_params.append(device_id)
+                query_params.append(queried_device_id)
 
             query_clauses.append(query_clause)
 
@@ -322,10 +326,16 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         txn.execute(sql, query_params)
 
         result: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]] = {}
-        for (user_id, device_id, display_name, key_json) in txn:
+        fetched_user_id: str
+        fetched_device_id: str
+        display_name: Optional[str]
+        key_json: Optional[str]
+        for (fetched_user_id, fetched_device_id, display_name, key_json) in txn:
             if include_deleted_devices:
-                deleted_devices.remove((user_id, device_id))
-            result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
+                deleted_devices.remove((fetched_user_id, fetched_device_id))
+            result.setdefault(fetched_user_id, {})[
+                fetched_device_id
+            ] = DeviceKeyLookupResult(
                 display_name, db_to_json(key_json) if key_json else None
             )
 
