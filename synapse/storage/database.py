@@ -801,9 +801,9 @@ class DatabasePool:
     async def runInteraction(
         self,
         desc: str,
-        func: Callable[..., R],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[Concatenate[LoggingTransaction, P], R],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> R:
         return await self.runInteraction_advanced(
             desc, False, None, func, *args, **kwargs
