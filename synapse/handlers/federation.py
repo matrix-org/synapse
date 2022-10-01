@@ -412,7 +412,9 @@ class FederationHandler:
         # First we try hosts that are already in the room.
         # TODO: HEURISTIC ALERT.
         likely_domains = (
-            await self._storage_controllers.state.get_current_hosts_in_room(room_id)
+            await self._storage_controllers.state.get_current_hosts_in_room_ordered(
+                room_id
+            )
         )
 
         async def try_backfill(domains: Collection[str]) -> bool:

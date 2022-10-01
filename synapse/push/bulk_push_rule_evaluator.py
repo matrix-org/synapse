@@ -303,18 +303,8 @@ class BulkPushRuleEvaluator:
             event.room_id, users
         )
 
-        # This is a check for the case where user joins a room without being
-        # allowed to see history, and then the server receives a delayed event
-        # from before the user joined, which they should not be pushed for
-        uids_with_visibility = await filter_event_for_clients_with_state(
-            self.store, users, event, context
-        )
-
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
-                continue
-
-            if uid not in uids_with_visibility:
                 continue
 
             display_name = None
@@ -341,6 +331,26 @@ class BulkPushRuleEvaluator:
             if "notify" in actions:
                 # Push rules say we should notify the user of this event
                 actions_by_user[uid] = actions
+
+        # If there aren't any actions then we can skip the rest of the
+        # processing.
+        if not actions_by_user:
+            return
+
+        # This is a check for the case where user joins a room without being
+        # allowed to see history, and then the server receives a delayed event
+        # from before the user joined, which they should not be pushed for
+        #
+        # We do this *after* calculating the push actions as a) its unlikely
+        # that we'll filter anyone out and b) for large rooms its likely that
+        # most users will have push disabled and so the set of users to check is
+        # much smaller.
+        uids_with_visibility = await filter_event_for_clients_with_state(
+            self.store, actions_by_user.keys(), event, context
+        )
+
+        for user_id in set(actions_by_user).difference(uids_with_visibility):
+            actions_by_user.pop(user_id, None)
 
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
