@@ -547,6 +547,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             return state_group
 
         if prev_group is not None:
+            # This assertion is for mypy's benefit and is checked above.
+            assert delta_ids is not None
+
             state_group = await self.db_pool.runInteraction(
                 "store_state_group.insert_delta_group",
                 insert_delta_group_txn,

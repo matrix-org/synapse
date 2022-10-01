@@ -1684,7 +1684,11 @@ class DatabasePool:
             table,
             keyvalues,
             retcol,
-            allow_none=allow_none,
+            # Type ignore suppresses a mypy bug:
+            #     Argument "allow_none" to "runInteraction_advanced" of "DatabasePool"
+            #     has incompatible type "bool"; expected "Literal[False]"  [arg-type]
+            # I think mypy is confused by the overloads of simple_select_one_onecol_txn.
+            allow_none=allow_none,  # type:ignore[arg-type]
         )
 
     @overload
