@@ -814,9 +814,9 @@ class DatabasePool:
         desc: str,
         db_autocommit: bool,
         isolation_level: Optional[int],
-        func: Callable[..., R],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[Concatenate[LoggingTransaction, P], R],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> R:
         """Starts a transaction on the database and runs a given function
 
