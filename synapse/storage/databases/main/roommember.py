@@ -420,14 +420,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self,
         txn: LoggingTransaction,
         user_id: str,
-        membership_list: List[str],
+        membership_list: Collection[str],
     ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
         matches one in the membership list.
 
         Args:
             user_id: The user ID.
-            membership_list: A list of synapse.api.constants.Membership
+            membership_list: A collection of synapse.api.constants.Membership
                     values which the user must be in.
 
         Returns:

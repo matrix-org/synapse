@@ -22,6 +22,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Sequence,
     Tuple,
     cast,
 )
@@ -650,7 +651,9 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
         # account.
         pushers = list(await self.get_pushers_by_user_id(user_id))
 
-        def delete_pushers_txn(txn: LoggingTransaction, stream_ids: List[int]) -> None:
+        def delete_pushers_txn(
+            txn: LoggingTransaction, stream_ids: Sequence[int]
+        ) -> None:
             self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                 txn, self.get_if_user_has_pusher, (user_id,)
             )

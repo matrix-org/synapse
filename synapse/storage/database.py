@@ -1740,7 +1740,7 @@ class DatabasePool:
     def simple_select_onecol_txn(
         txn: LoggingTransaction,
         table: str,
-        keyvalues: Dict[str, Any],
+        keyvalues: Optional[Dict[str, Any]],
         retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
@@ -1971,7 +1971,7 @@ class DatabasePool:
         key_names: Collection[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[Any]],
+        value_values: Collection[Iterable[Any]],
         desc: str,
     ) -> None:
         """

@@ -380,8 +380,8 @@ class PushRuleStore(PushRulesWorkerStore):
         priority_class: int,
         conditions_json: str,
         actions_json: str,
-        before: str,
-        after: str,
+        before: Optional[str],
+        after: Optional[str],
     ) -> None:
         # Lock the table since otherwise we'll have annoying races between the
         # SELECT here and the UPSERT below.
