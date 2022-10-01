@@ -908,11 +908,6 @@ class FederationEventHandler:
                 logger.warning("Pulled event %s failed history check.", event_id)
             else:
                 raise
-        except (FederationError, RuntimeError, InvalidResponseError) as exc:
-            await self._store.record_event_failed_pull_attempt(
-                event.room_id, event_id, str(exc)
-            )
-            raise exc
 
     @trace
     async def _compute_event_context_with_maybe_missing_prevs(
