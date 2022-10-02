@@ -34,6 +34,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -927,7 +928,7 @@ class DatabasePool:
 
         start_time = monotonic_time()
 
-        def inner_func(conn: adbapi.Connection, *args, **kwargs):
+        def inner_func(conn: adbapi.Connection, *args: P.args, **kwargs: P.kwargs) -> R:
             # We shouldn't be in a transaction. If we are then something
             # somewhere hasn't committed after doing work. (This is likely only
             # possible during startup, as `run*` will ensure changes are
@@ -1020,7 +1021,7 @@ class DatabasePool:
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
         *args: Any,
-    ) -> R:
+    ) -> Union[R, List[Tuple[Any, ...]]]:
         """Runs a single query for a result set.
 
         Args:
@@ -1033,7 +1034,7 @@ class DatabasePool:
             The result of decoder(results)
         """
 
-        def interaction(txn):
+        def interaction(txn: LoggingTransaction) -> Union[R, List[Tuple[Any, ...]]]:
             txn.execute(query, args)
             if decoder:
                 return decoder(txn)
