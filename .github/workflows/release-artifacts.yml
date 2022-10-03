@@ -11,6 +11,7 @@ on:
 
     # we do the full build on tags.
     tags: ["v*"]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
