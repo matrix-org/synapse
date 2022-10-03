@@ -3,6 +3,7 @@ on:
   pull_request:
     types:
       - opened
+      - reopened
 
 permissions:
   # Needed to be able to push the commit. See 
@@ -11,7 +12,7 @@ permissions:
   contents: write
   # The pull_requests "synchronize" event doesn't seem to fire with just `contents: write`, so
   # CI doesn't run with the new changelog. Maybe `pull_requests: write` will fix this?
-  pull_requests: write
+  pull-requests: write
 
 jobs:
   add-changelog:
