@@ -358,8 +358,9 @@ class FederationSender(AbstractFederationSender):
                     last_token, self._last_poked_id, limit=100
                 )
 
+                event_ids = event_to_received_ts.keys()
                 event_entries = await self.store.get_unredacted_events_from_cache_or_db(
-                    event_to_received_ts.keys()
+                    event_ids
                 )
 
                 logger.debug(
@@ -512,9 +513,11 @@ class FederationSender(AbstractFederationSender):
 
                 events_by_room: Dict[str, List[EventBase]] = {}
 
-                for event_cache in event_entries.values():
-                    event = event_cache.event
-                    events_by_room.setdefault(event.room_id, []).append(event)
+                for event_id in event_ids:
+                    event_cache = event_entries.get(event_id)
+                    if event_cache:
+                        event = event_cache.event
+                        events_by_room.setdefault(event.room_id, []).append(event)
 
                 await make_deferred_yieldable(
                     defer.gatherResults(

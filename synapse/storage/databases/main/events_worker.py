@@ -595,9 +595,10 @@ class EventsWorkerStore(SQLBaseStore):
         event_ids: Iterable[str],
         allow_rejected: bool = False,
     ) -> Dict[str, EventCacheEntry]:
-        """Fetch a bunch of events from the cache or the database. Please note that the
-        events pulled by this function will not have any redactions applied, and no guarantee
-        is made about the ordering of the events returned.
+        """Fetch a bunch of events from the cache or the database.
+
+        Note that the events pulled by this function will not have any redactions
+        applied, and no guarantee is made about the ordering of the events returned.
 
         If events are pulled from the database, they will be cached for future lookups.
 
