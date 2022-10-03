@@ -182,7 +182,12 @@ RUN \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /usr/local
+COPY --from=builder /install/bin /usr/local/bin
+# Copy the python site-packages into /install instead of /usr/local/lib as some environments use different paths
+# e.g pyston using /usr/lib, so we instead specify a PYTHONPATH environment variable to make everyone happy.
+COPY --from=builder /install/lib/*/site-packages /install
+ENV PYTHONPATH="/install"
+
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 
