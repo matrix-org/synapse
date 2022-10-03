@@ -263,7 +263,9 @@ The labels are used to group graphs in grafana.</p>
 <p>Synapse 1.2 updates the Prometheus metrics to match the naming
 convention of the upstream <code>prometheus_client</code>. The old names are
 considered deprecated and will be removed in a future version of
-Synapse.</p>
+Synapse.
+<strong>The old names will be disabled by default in Synapse v1.71.0 and removed
+altogether in Synapse v1.73.0.</strong></p>
 <table><thead><tr><th>New Name</th><th>Old Name</th></tr></thead><tbody>
 <tr><td>python_gc_objects_collected_total</td><td>python_gc_objects_collected</td></tr>
 <tr><td>python_gc_objects_uncollectable_total</td><td>python_gc_objects_uncollectable</td></tr>
@@ -273,6 +275,13 @@ Synapse.</p>
 <tr><td>synapse_federation_client_events_processed_total</td><td>synapse_federation_client_events_processed</td></tr>
 <tr><td>synapse_event_processing_loop_count_total</td><td>synapse_event_processing_loop_count</td></tr>
 <tr><td>synapse_event_processing_loop_room_count_total</td><td>synapse_event_processing_loop_room_count</td></tr>
+<tr><td>synapse_util_caches_cache_hits</td><td>synapse_util_caches_cache:hits</td></tr>
+<tr><td>synapse_util_caches_cache_size</td><td>synapse_util_caches_cache:size</td></tr>
+<tr><td>synapse_util_caches_cache_evicted_size</td><td>synapse_util_caches_cache:evicted_size</td></tr>
+<tr><td>synapse_util_caches_cache</td><td>synapse_util_caches_cache:total</td></tr>
+<tr><td>synapse_util_caches_response_cache_size</td><td>synapse_util_caches_response_cache:size</td></tr>
+<tr><td>synapse_util_caches_response_cache_hits</td><td>synapse_util_caches_response_cache:hits</td></tr>
+<tr><td>synapse_util_caches_response_cache_evicted_size</td><td>synapse_util_caches_response_cache:evicted_size</td></tr>
 <tr><td>synapse_util_metrics_block_count_total</td><td>synapse_util_metrics_block_count</td></tr>
 <tr><td>synapse_util_metrics_block_time_seconds_total</td><td>synapse_util_metrics_block_time_seconds</td></tr>
 <tr><td>synapse_util_metrics_block_ru_utime_seconds_total</td><td>synapse_util_metrics_block_ru_utime_seconds</td></tr>
@@ -372,7 +381,7 @@ they are replacing.</p>
 <h2 id="standard-metric-names"><a class="header" href="#standard-metric-names">Standard Metric Names</a></h2>
 <p>As of synapse version 0.18.2, the format of the process-wide metrics has
 been changed to fit prometheus standard naming conventions. Additionally
-the units have been changed to seconds, from miliseconds.</p>
+the units have been changed to seconds, from milliseconds.</p>
 <table><thead><tr><th>New name</th><th>Old name</th></tr></thead><tbody>
 <tr><td>process_cpu_user_seconds_total</td><td>process_resource_utime / 1000</td></tr>
 <tr><td>process_cpu_system_seconds_total</td><td>process_resource_stime / 1000</td></tr>

@@ -239,6 +239,25 @@ change: v1.68 and workers cannot process receipts replicated by v1.69 workers, a
 vice versa.</p>
 <p>Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
 replication will resume as normal.</p>
+<h2 id="deprecation-of-legacy-prometheus-metric-names"><a class="header" href="#deprecation-of-legacy-prometheus-metric-names">Deprecation of legacy Prometheus metric names</a></h2>
+<p>In current versions of Synapse, some Prometheus metrics are emitted under two different names,
+with one of the names being older but non-compliant with OpenMetrics and Prometheus conventions
+and one of the names being newer but compliant.</p>
+<p>Synapse v1.71.0 will turn the old metric names off <em>by default</em>.
+For administrators that still rely on them and have not had chance to update their
+uses of the metrics, it's possible to specify <code>enable_legacy_metrics: true</code> in
+the configuration to re-enable them temporarily.</p>
+<p>Synapse v1.73.0 will <strong>remove legacy metric names altogether</strong> and it will no longer
+be possible to re-enable them.</p>
+<p>The Grafana dashboard, Prometheus recording rules and Prometheus Consoles included
+in the <code>contrib</code> directory in the Synapse repository have been updated to no longer
+rely on the legacy names. These can be used on a current version of Synapse
+because current versions of Synapse emit both old and new names.</p>
+<p>You may need to update your alerting rules or any other rules that depend on
+the names of Prometheus metrics.
+If you want to test your changes before legacy names are disabled by default,
+you may specify <code>enable_legacy_metrics: false</code> in your homeserver configuration.</p>
+<p>A list of affected metrics is available on the <a href="https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12">Metrics How-to page</a>.</p>
 <h1 id="upgrading-to-v1680"><a class="header" href="#upgrading-to-v1680">Upgrading to v1.68.0</a></h1>
 <p>Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.</p>
 <h2 id="sqlite-version-requirement"><a class="header" href="#sqlite-version-requirement">SQLite version requirement</a></h2>
