@@ -39,8 +39,8 @@ jobs:
       # https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
       - name: Trigger CI
         run: |
-          gh workflow run "tests.yml" --ref "${{ github.event.pull_request.head.ref }}"
-          gh workflow run "release-artifacts.yml" --ref "${{ github.event.pull_request.head.ref }}"
+          gh workflow run "tests.yml" --ref "$GITHUB_REF"
+          gh workflow run "release-artifacts.yml" --ref "$GITHUB_REF"
         shell: bash
 
   # THIS WORKFLOW HAS VARIOUS WRITE PERMISSIONS---do not add other jobs here unless they
