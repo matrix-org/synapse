@@ -207,6 +207,7 @@ class HttpListenerConfig:
     additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
     request_id_header: Optional[str] = None
+    experimental_cors_msc3886: bool = False
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -935,6 +936,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
             request_id_header=listener.get("request_id_header"),
+            experimental_cors_msc3886=listener.get("experimental_cors_msc3886", False),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)

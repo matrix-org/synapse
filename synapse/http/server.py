@@ -15,6 +15,7 @@
 
 import abc
 import html
+from http.client import FOUND
 import logging
 import types
 import urllib
@@ -870,10 +871,20 @@ def set_cors_headers(request: Request) -> None:
     request.setHeader(
         b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
-    request.setHeader(
-        b"Access-Control-Allow-Headers",
-        b"X-Requested-With, Content-Type, Authorization, Date",
-    )
+    if getattr(request, "experimental_cors_msc3886", False):
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"ETag,Location,X-Max-Bytes",
+        )
+    else:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date",
+        )
 
 
 def set_corp_headers(request: Request) -> None:
@@ -942,10 +953,15 @@ def set_clickjacking_protection_headers(request: Request) -> None:
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def respond_with_redirect(request: Request, url: bytes) -> None:
-    """Write a 302 response to the request, if it is still alive."""
+def respond_with_redirect(request: Request, url: bytes, statusCode = FOUND, cors = False) -> None:
+    """Write a 302 (or other specified status code) response to the request, if it is still alive."""
     logger.debug("Redirect to %s", url.decode("utf-8"))
-    request.redirect(url)
+
+    if cors:
+        set_cors_headers(request)
+
+    request.setResponseCode(statusCode)
+    request.setHeader(b"location", url)
     finish_request(request)
 
 
