@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, cast
 from xml.etree import ElementTree as ET
 
 import attr
@@ -130,7 +130,9 @@ class CasHandler:
         except PartialDownloadError as pde:
             # Twisted raises this error if the connection is closed,
             # even if that's being used old-http style to signal end-of-data
-            body = pde.response
+            # Cast safety: Error.response is Optional[bytes]. but a PartialDownloadError
+            # always has a non-None response.
+            body = cast(bytes, pde.response)
         except HttpResponseException as e:
             description = (
                 'Authorization server responded with a "{status}" error '
