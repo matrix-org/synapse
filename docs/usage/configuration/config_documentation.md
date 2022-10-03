@@ -2977,7 +2977,7 @@ Options for each entry include:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See [OpenID Mapping Providers](../../../synapse/latest/sso_mapping_providers.html#openid-mapping-providers)
+        See [OpenID Mapping Providers](../../sso_mapping_providers.md#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
