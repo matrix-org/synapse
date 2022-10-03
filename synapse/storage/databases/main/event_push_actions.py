@@ -1359,7 +1359,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # never take more than an hour to persist an event.
         delete_before_ts = self._clock.time_msec() - 60 * 60 * 1000
 
-        if self._started_ts > self._clock.time_msec() - delete_before_ts:
+        if self._started_ts > delete_before_ts:
             # We need to wait for at least an hour before we started deleting,
             # so that we know it's safe to delete rows with NULL `inserted_ts`.
             return
