@@ -16,3 +16,7 @@
 -- Add a column so that we know when a push action was inserted, to make it
 -- easier to clear out old ones.
 ALTER TABLE event_push_actions_staging ADD COLUMN inserted_ts BIGINT;
+
+-- We now add a default for *new* rows. We don't do this above as we don't want
+-- to have to update every remove with the new default.
+ALTER TABLE event_push_actions_staging ALTER COLUMN inserted_ts SET DEFAULT extract(epoch from now()) * 1000;

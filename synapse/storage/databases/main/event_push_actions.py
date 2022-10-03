@@ -205,6 +205,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
     ):
         super().__init__(database, db_conn, hs)
 
+        # Track when the process started.
+        self._started_ts = self._clock.time_msec()
+
         # These get correctly set by _find_stream_orderings_for_times_txn
         self.stream_ordering_month_ago: Optional[int] = None
         self.stream_ordering_day_ago: Optional[int] = None
@@ -1356,14 +1359,23 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # never take more than an hour to persist an event.
         delete_before_ts = self._clock.time_msec() - 60 * 60 * 1000
 
+        if self._started_ts > self._clock.time_msec() - delete_before_ts:
+            # We need to wait for at least an hour before we started deleting,
+            # so that we know it's safe to delete rows with NULL `inserted_ts`.
+            return
+
         # We don't have an index on `inserted_ts`, instead we assume that the
         # number of "live" rows in `event_push_actions_staging` is small enough
-        # that an infrequent periodic scan won't cause a problem
+        # that an infrequent periodic scan won't cause a problem.
+        #
+        # Note: we also delete any columns with NULL `inserted_ts`, this is safe
+        # as we added a default value to new rows and so they must be at least
+        # an hour old.
         limit = 1000
         sql = """
             DELETE FROM event_push_actions_staging WHERE event_id IN (
                 SELECT event_id FROM event_push_actions_staging WHERE
-                inserted_ts < ?
+                inserted_ts < ? OR inserted_ts IS NULL
                 LIMIT ?
             )
         """
