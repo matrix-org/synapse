@@ -45,8 +45,8 @@ jobs:
         # develop; use github.event.pull_request.head.ref above to commit to the PR
         # branch.
         run: |
-          gh workflow run "tests.yml" --ref "$GITHUB_REF"
-          gh workflow run "release-artifacts.yml" --ref "$GITHUB_REF"
+          gh workflow run "tests.yml" --ref "${{ github.event.pull_request.head.ref }}"
+          gh workflow run "release-artifacts.yml" --ref "${{ github.event.pull_request.head.ref }}"
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
