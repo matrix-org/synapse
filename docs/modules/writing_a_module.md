@@ -83,3 +83,52 @@ the callback name as the argument name and the function as its value. A
 
 Callbacks for each category can be found on their respective page of the
 [Synapse documentation website](https://matrix-org.github.io/synapse).
+
+## Caching
+
+Modules can leverage Synapse's caching tools to manage their own cached functions. This
+canbe helpful for modules that need to repeatedly request the same data from the database
+or a remote service.
+
+Functions that need to be wrapped with a cache need to be decorated with a `@cached()`
+decorator (which can be imported from `synapse.module_api`) and registered with the
+[`ModuleApi.register_cached_function`](https://github.com/matrix-org/synapse/blob/1cc2ca81badb9c5161d219dfc9a273a338adedd2/synapse/module_api/__init__.py#L839-L850)
+API when initialising the module. If the module needs to invalidate an entry in a cache,
+it needs to use the [`ModuleApi.invalidate_cache`](https://github.com/matrix-org/synapse/blob/1cc2ca81badb9c5161d219dfc9a273a338adedd2/synapse/module_api/__init__.py#L855-L872)
+API, with the function to invalidate the cache of and the key(s) of the entry to
+invalidate.
+
+Below is an example of a simple module using a cached function:
+
+```python
+from typing import Any
+from synapse.module_api import cached, ModuleApi
+
+class MyModule:
+    def __init__(self, config: Any, api: ModuleApi):
+        self.api = api
+        
+        # Register the cached function so Synapse knows how to correctly invalidate
+        # entries for it.
+        self.api.register_cached_function(self.get_user_from_id)
+
+    @cached()
+    async def get_user_from_id(self, user_id: str) -> str:
+        """A function with a cache."""
+        return await self.get_user(user_id)
+
+    async def do_something_with_users(self) -> None:
+        """Calls the cached function and then invalidates an entry in its cache."""
+        
+        user_id = "@alice:example.com"
+        
+        # Get the user. Since get_user_from_id is wrapped with a cache, the return value
+        # for this user_id will be cached.
+        user = await self.get_user_from_id(user_id)
+        
+        # Do something with user...
+        
+        # Let's say something has changed with our user, and the entry we have for them in
+        # the cache is out of date, so we want to invalidate it.
+        await self.api.invalidate_cache(self.get_user_from_id, (user_id,))
+```
