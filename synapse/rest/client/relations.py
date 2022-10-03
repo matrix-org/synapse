@@ -83,7 +83,7 @@ class RelationPaginationServlet(RestServlet):
             to_token = await StreamToken.from_string(self.store, to_token_str)
 
         # The unstable version of this API returns an extra field for client
-        # compatibility, see
+        # compatibility, see https://github.com/matrix-org/synapse/issues/12930.
         assert request.path is not None
         include_original_event = request.path.startswith(b"/_matrix/client/unstable/")
 
@@ -97,8 +97,6 @@ class RelationPaginationServlet(RestServlet):
             direction=direction,
             from_token=from_token,
             to_token=to_token,
-            # The unstable version of this API returns an extra field for client
-            # compatibility, see
             include_original_event=include_original_event,
         )
 
