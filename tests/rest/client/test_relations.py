@@ -654,6 +654,14 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
         # We also expect to get the original event (the id of which is self.parent_id)
+        # when requesting the unstable endpoint.
+        self.assertNotIn("original_event", channel.json_body)
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
         self.assertEqual(
             channel.json_body["original_event"]["event_id"], self.parent_id
         )
@@ -753,11 +761,6 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
                 "type": "m.reaction",
             },
             channel.json_body["chunk"][0],
-        )
-
-        # We also expect to get the original event (the id of which is self.parent_id)
-        self.assertEqual(
-            channel.json_body["original_event"]["event_id"], self.parent_id
         )
 
         # Make sure next_batch has something in it that looks like it could be a
