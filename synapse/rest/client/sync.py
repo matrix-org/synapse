@@ -175,6 +175,11 @@ class SyncRestServlet(RestServlet):
         if since is not None:
             since_token = await StreamToken.from_string(self.store, since)
 
+        debug_token = parse_string(request, "synapse_debug_current_token")
+        debug_current_token = None
+        if debug_token is not None:
+            debug_current_token = await StreamToken.from_string(self.store, debug_token)
+
         # send any outstanding server notices to the user.
         await self._server_notices_sender.on_user_syncing(user.to_string())
 
@@ -192,6 +197,7 @@ class SyncRestServlet(RestServlet):
                 since_token=since_token,
                 timeout=timeout,
                 full_state=full_state,
+                debug_current_token=debug_current_token,
             )
 
         # the client may have disconnected by now; don't bother to serialize the
