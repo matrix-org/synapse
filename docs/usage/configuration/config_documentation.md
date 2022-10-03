@@ -2457,7 +2457,9 @@ enable_legacy_metrics: false
 
 See https://github.com/matrix-org/synapse/issues/11106 for context.
 
-*Since v1.67.0.* **Deprecated: will be removed in v1.73.0.**
+*Since v1.67.0.*
+
+**Will be removed in v1.73.0.**
 ---
 ### `sentry`
 
