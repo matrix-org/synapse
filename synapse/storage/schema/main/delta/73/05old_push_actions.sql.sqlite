@@ -21,4 +21,4 @@ DELETE FROM event_push_actions_staging;
 
 -- Add a column so that we know when a push action was inserted, to make it
 -- easier to clear out old ones.
-ALTER TABLE event_push_actions_staging ADD COLUMN inserted_ts BIGINT NOT NULL;
+ALTER TABLE event_push_actions_staging ADD COLUMN inserted_ts BIGINT;
