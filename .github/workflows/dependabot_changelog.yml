@@ -4,6 +4,12 @@ on:
     types:
       - opened
 
+permissions:
+  # Needed to be able to push the commit. See 
+  #     https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions#enable-auto-merge-on-a-pull-request
+  # for a similar example
+  contents: write
+
 jobs:
   add-changelog:
     runs-on: 'ubuntu-latest'
