@@ -10,6 +10,9 @@ permissions:
   #     https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions#enable-auto-merge-on-a-pull-request
   # for a similar example
   contents: write
+  # We need `actions-write` in order to create a `workflow_dispatch` event. See
+  # https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event
+  actions: write
 
 jobs:
   add-changelog:
