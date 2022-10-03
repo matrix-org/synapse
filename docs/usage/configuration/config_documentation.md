@@ -179,7 +179,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-   See [Delegation of incoming federation traffic](https://matrix-org.github.io/synapse/latest/delegate.html) for more
+   See [Delegation of incoming federation traffic](../../delegate.md) for more
 information.
 
 Example configuration:
@@ -2977,7 +2977,7 @@ Options for each entry include:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See [OpenID Mapping Providers](https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers)
+        See [OpenID Mapping Providers](../../../synapse/latest/sso_mapping_providers.html#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
@@ -3422,8 +3422,8 @@ This option has the following sub-options:
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
     These indexes are built the first time Synapse starts; admins can
-    manually trigger a rebuild via API following the instructions at
-         [https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run](https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run),
+    manually trigger a rebuild via the API following the instructions
+    [for running background updates](../administration/admin_api/background_updates.md#run),
     set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
