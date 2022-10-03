@@ -138,7 +138,7 @@ jobs:
       # Only build a single wheel in CI.
       - name: "Env: build aarch64 wheels"
         run: |
-          echo "CIBW_ARCHS_LINUX=aarch64 >> $GITHUB_ENV
+          echo "CIBW_ARCHS_LINUX=aarch64" >> $GITHUB_ENV
         if: matrix.emulate_aarch64
 
       - name: Build wheels
