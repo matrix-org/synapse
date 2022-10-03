@@ -135,6 +135,8 @@ Synapse 1.2 updates the Prometheus metrics to match the naming
 convention of the upstream `prometheus_client`. The old names are
 considered deprecated and will be removed in a future version of
 Synapse.
+**The old names will be disabled by default in Synapse v1.71.0 and removed
+altogether in Synapse v1.73.0.**
 
 | New Name                                                                     | Old Name                                                               |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -146,6 +148,13 @@ Synapse.
 | synapse_federation_client_events_processed_total                             | synapse_federation_client_events_processed                             |
 | synapse_event_processing_loop_count_total                                    | synapse_event_processing_loop_count                                    |
 | synapse_event_processing_loop_room_count_total                               | synapse_event_processing_loop_room_count                               |
+| synapse_util_caches_cache_hits                                               | synapse_util_caches_cache:hits                                         |
+| synapse_util_caches_cache_size                                               | synapse_util_caches_cache:size                                         |
+| synapse_util_caches_cache_evicted_size                                       | synapse_util_caches_cache:evicted_size                                 |
+| synapse_util_caches_cache                                                    | synapse_util_caches_cache:total                                        |
+| synapse_util_caches_response_cache_size                                      | synapse_util_caches_response_cache:size                                |
+| synapse_util_caches_response_cache_hits                                      | synapse_util_caches_response_cache:hits                                |
+| synapse_util_caches_response_cache_evicted_size                              | synapse_util_caches_response_cache:evicted_size                        |
 | synapse_util_metrics_block_count_total                                       | synapse_util_metrics_block_count                                       |
 | synapse_util_metrics_block_time_seconds_total                                | synapse_util_metrics_block_time_seconds                                |
 | synapse_util_metrics_block_ru_utime_seconds_total                            | synapse_util_metrics_block_ru_utime_seconds                            |
@@ -261,7 +270,7 @@ Standard Metric Names
 
 As of synapse version 0.18.2, the format of the process-wide metrics has
 been changed to fit prometheus standard naming conventions. Additionally
-the units have been changed to seconds, from miliseconds.
+the units have been changed to seconds, from milliseconds.
 
 | New name                                 | Old name                          |
 | ---------------------------------------- | --------------------------------- |
