@@ -126,7 +126,7 @@ class MyModule:
         # for this user_id will be cached.
         user = await self.get_user_from_id(user_id)
         
-        # Do something with user...
+        # Do something with `user`...
         
         # Let's say something has changed with our user, and the entry we have for them in
         # the cache is out of date, so we want to invalidate it.
