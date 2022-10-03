@@ -1265,11 +1265,19 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
             "as_user_potato", self.appservice.token
         )
 
-        self.room = self.helper.create_room_as(
-            room_creator=self.appservice_user,
-            tok=self.appservice.token,
-            appservice_user_id=self.appservice_user,
+        # Create a room as the appservice user.
+        args = {
+            "access_token": self.appservice.token,
+            "user_id": self.appservice_user,
+        }
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/r0/createRoom?{urlparse.urlencode(args)}",
+            content={"visibility": "public"},
         )
+
+        assert channel.code == 200
+        self.room = channel.json_body["room_id"]
 
         self.main_store = self.hs.get_datastores().main
 

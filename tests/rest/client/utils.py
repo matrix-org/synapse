@@ -70,7 +70,6 @@ class RestHelper:
         expect_code: Literal[200] = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
-        appservice_user_id: Optional[str] = ...,
     ) -> str:
         ...
 
@@ -84,7 +83,6 @@ class RestHelper:
         expect_code: int = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
-        appservice_user_id: Optional[str] = ...,
     ) -> Optional[str]:
         ...
 
@@ -97,7 +95,6 @@ class RestHelper:
         expect_code: int = HTTPStatus.OK,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-        appservice_user_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Create a room.
@@ -119,10 +116,6 @@ class RestHelper:
                 Note that if is_public is set, the "visibility" key will be overridden.
                 If room_version is set, the "room_version" key will be overridden.
             custom_headers: HTTP headers to include in the request.
-            appservice_user_id: The `user_id` URL parameter to pass.
-                This allows driving an application service user
-                using an application service access token in `tok`.
-
 
         Returns:
             The ID of the newly created room, or None if the request failed.
@@ -135,13 +128,8 @@ class RestHelper:
             content["visibility"] = "public" if is_public else "private"
         if room_version:
             content["room_version"] = room_version
-        args = {}
         if tok:
-            args["access_token"] = tok
-        if appservice_user_id:
-            args["user_id"] = appservice_user_id
-        if args:
-            path = path + "?" + urlencode(args)
+            path = path + "?access_token=%s" % tok
 
         channel = make_request(
             self.hs.get_reactor(),
