@@ -130,9 +130,10 @@ class CasHandler:
         except PartialDownloadError as pde:
             # Twisted raises this error if the connection is closed,
             # even if that's being used old-http style to signal end-of-data
-            # Cast safety: Error.response is Optional[bytes]. but a PartialDownloadError
-            # always has a non-None response.
-            body = cast(bytes, pde.response)
+            # Assertion is for mypy's benefit. Error.response is Optional[bytes],
+            # but a PartialDownloadError should always have a non-None response.
+            assert pde.response is not None
+            body = pde.response
         except HttpResponseException as e:
             description = (
                 'Authorization server responded with a "{status}" error '
