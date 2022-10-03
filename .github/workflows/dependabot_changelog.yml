@@ -9,6 +9,9 @@ permissions:
   #     https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions#enable-auto-merge-on-a-pull-request
   # for a similar example
   contents: write
+  # The pull_requests "synchronize" event doesn't seem to fire with just `contents: write`, so
+  # CI doesn't run with the new changelog. Maybe `pull_requests: write` will fix this?
+  pull_requests: write
 
 jobs:
   add-changelog:
@@ -27,3 +30,5 @@ jobs:
           git commit -m "Changelog"
           git push
         shell: bash
+  # THIS WORKFLOW HAS VARIOUS WRITE PERMISSIONS---do not add other jobs here unless they
+  # are sufficiently locked down to dependabot only as above.
