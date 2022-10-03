@@ -38,6 +38,9 @@ jobs:
       # See
       # https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
       - name: Trigger CI
+        # Note: we use $GITHUB_REF here to run PR against the merge of this change with
+        # develop; use github.event.pull_request.head.ref above to commit to the PR
+        # branch.
         run: |
           gh workflow run "tests.yml" --ref "$GITHUB_REF"
           gh workflow run "release-artifacts.yml" --ref "$GITHUB_REF"
