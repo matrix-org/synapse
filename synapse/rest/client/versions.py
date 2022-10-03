@@ -112,7 +112,8 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
                     "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
                     # Adds support for simple HTTP rendezvous as per MSC3886
-                    "org.matrix.msc3886": not self.config.experimental.msc3886_endpoint is None,
+                    "org.matrix.msc3886": not self.config.experimental.msc3886_endpoint
+                    is None,
                 },
             },
         )

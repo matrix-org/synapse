@@ -15,11 +15,11 @@
 
 import abc
 import html
-from http.client import FOUND
 import logging
 import types
 import urllib
 from http import HTTPStatus
+from http.client import FOUND
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
@@ -953,7 +953,9 @@ def set_clickjacking_protection_headers(request: Request) -> None:
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def respond_with_redirect(request: Request, url: bytes, statusCode = FOUND, cors = False) -> None:
+def respond_with_redirect(
+    request: Request, url: bytes, statusCode=FOUND, cors=False
+) -> None:
     """Write a 302 (or other specified status code) response to the request, if it is still alive."""
     logger.debug("Redirect to %s", url.decode("utf-8"))
 

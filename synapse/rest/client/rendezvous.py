@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from http.client import TEMPORARY_REDIRECT
 import logging
+from http.client import TEMPORARY_REDIRECT
 from typing import TYPE_CHECKING
 
 from synapse.http.server import HttpServer, respond_with_redirect
@@ -53,7 +53,9 @@ class RendezvousServlet(RestServlet):
         self.endpoint = hs.config.experimental.msc3886_endpoint.encode("utf-8")
 
     async def on_POST(self, request: SynapseRequest) -> None:
-        respond_with_redirect(request, self.endpoint, statusCode=TEMPORARY_REDIRECT, cors=True)
+        respond_with_redirect(
+            request, self.endpoint, statusCode=TEMPORARY_REDIRECT, cors=True
+        )
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

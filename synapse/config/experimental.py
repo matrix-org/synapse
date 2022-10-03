@@ -127,4 +127,6 @@ class ExperimentalConfig(Config):
         )
 
         # MSC3886: Simple client rendezvous capability
-        self.msc3886_endpoint: Optional[str] = experimental.get("msc3886_endpoint", None)
+        self.msc3886_endpoint: Optional[str] = experimental.get(
+            "msc3886_endpoint", None
+        )
