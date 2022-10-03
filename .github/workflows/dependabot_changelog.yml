@@ -3,16 +3,13 @@ on:
   pull_request:
     types:
       - opened
-      - reopened
+      - reopened  # For debugging!
 
 permissions:
   # Needed to be able to push the commit. See 
   #     https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions#enable-auto-merge-on-a-pull-request
   # for a similar example
   contents: write
-  # The pull_requests "synchronize" event doesn't seem to fire with just `contents: write`, so
-  # CI doesn't run with the new changelog. Maybe `pull_requests: write` will fix this?
-  pull-requests: write
 
 jobs:
   add-changelog:
@@ -31,5 +28,20 @@ jobs:
           git commit -m "Changelog"
           git push
         shell: bash
+      # We have to explicitly start CI.
+      #
+      # By default, workflows can't trigger other workflows when they're just using the
+      # default `GITHUB_TOKEN` access token. (This is intended to stop you from writing
+      # recursive workflow loops by accident, because that'll get very expensive very
+      # quickly.) Instead, you have to manually call out to another workflow, or else
+      # make your changes (i.e. the `git push` above) using a personal access token.
+      # See
+      # https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow
+      - name: Trigger CI
+        run: |
+          gh workflow run "tests.yml" --ref "${{ github.event.pull_request.head.ref }}"
+          gh workflow run "release-artifacts.yml" --ref "${{ github.event.pull_request.head.ref }}"
+        shell: bash
+
   # THIS WORKFLOW HAS VARIOUS WRITE PERMISSIONS---do not add other jobs here unless they
   # are sufficiently locked down to dependabot only as above.
