@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all workflow run artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
       - name: Build a tarball for the debs
         run: tar -cvJf debs.tar.xz debs
       - name: Attach to release
