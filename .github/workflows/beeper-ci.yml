@@ -116,6 +116,12 @@ jobs:
             -f docker/Dockerfile \
             .
 
+          # Ensure the image works properly
+          docker run \
+            --entrypoint '' \
+            ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }} \
+            python -m synapse.app.homeserver --help
+
           echo "Pushed image: synapse:$tag-${{ github.sha }}"
           if [ "${{ github.ref_name }}" = "beeper" ]; then
             echo "Pushed image: synapse:latest"
@@ -149,5 +155,11 @@ jobs:
             --tag ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }}-pyston \
             -f docker/Dockerfile \
             .
+
+          # Ensure the image works properly
+          docker run \
+            --entrypoint '' \
+            ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }}-pyston \
+            python -m synapse.app.homeserver --help
 
           echo "Pushed image: synapse:$tag-${{ github.sha }}-pyston"
