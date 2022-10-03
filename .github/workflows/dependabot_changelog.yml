@@ -14,7 +14,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Write, commit and push changelog
         run: |
-          echo "${{ github.event.pull_request.title }}." > "changelog.d/${{ github.event.pull_request.number }}".docker
+          echo "${{ github.event.pull_request.title }}." > "changelog.d/${{ github.event.pull_request.number }}".misc
           git add changelog.d
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
