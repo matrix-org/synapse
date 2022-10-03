@@ -1,1 +1,1 @@
-Fixes check_avatar_size_and_mime_type() to successfully update avatars on homeservers running on non-default ports which were mistakenly treated as remote homeserver while validating the avatar's size and mime type. Contributed by @ashfame.
+Fix a bug which prevented setting an avatar on homeservers which have an explicit port in their `server_name`. Contributed by @ashfame.
