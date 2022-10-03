@@ -45,6 +45,8 @@ jobs:
           gh workflow run "tests.yml" --ref "$GITHUB_REF"
           gh workflow run "release-artifacts.yml" --ref "$GITHUB_REF"
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # THIS WORKFLOW HAS VARIOUS WRITE PERMISSIONS---do not add other jobs here unless they
   # are sufficiently locked down to dependabot only as above.
