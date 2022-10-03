@@ -1394,7 +1394,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 return
 
             # We sleep to ensure that we don't overwhelm the DB.
-            self._clock.sleep(1.0)
+            await self._clock.sleep(1.0)
 
 
 class EventPushActionsStore(EventPushActionsWorkerStore):
