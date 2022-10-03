@@ -290,8 +290,7 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.after_callbacks is not None
-        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
-        self.after_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
+        self.after_callbacks.append((callback, args, kwargs))
 
     def async_call_after(
         self, callback: Callable[P, Awaitable], *args: P.args, **kwargs: P.kwargs
@@ -312,8 +311,7 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.async_after_callbacks is not None
-        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
-        self.async_after_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
+        self.async_after_callbacks.append((callback, args, kwargs))
 
     def call_on_exception(
         self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
@@ -331,8 +329,7 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.exception_callbacks is not None
-        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
-        self.exception_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
+        self.exception_callbacks.append((callback, args, kwargs))
 
     def fetchone(self) -> Optional[Tuple]:
         return self.txn.fetchone()
@@ -421,10 +418,7 @@ class LoggingTransaction:
         sql = self.database_engine.convert_param_style(sql)
         if args:
             try:
-                # The type-ignore should be redundant once mypy releases a version with
-                # https://github.com/python/mypy/pull/12668. (`args` might be empty,
-                # (but we'll catch the index error if so.)
-                sql_logger.debug("[SQL values] {%s} %r", self.name, args[0])  # type: ignore[index]
+                sql_logger.debug("[SQL values] {%s} %r", self.name, args[0])
             except Exception:
                 # Don't let logging failures stop SQL from working
                 pass
@@ -655,9 +649,7 @@ class DatabasePool:
         # For now, we just log an error, and hope that it works on the first attempt.
         # TODO: raise an exception.
 
-        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be iterable; see
-        # https://github.com/python/mypy/pull/12668
-        for i, arg in enumerate(args):  # type: ignore[arg-type, var-annotated]
+        for i, arg in enumerate(args):
             if inspect.isgenerator(arg):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -665,9 +657,7 @@ class DatabasePool:
                     i,
                     func,
                 )
-        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be a mapping; see
-        # https://github.com/python/mypy/pull/12668
-        for name, val in kwargs.items():  # type: ignore[attr-defined]
+        for name, val in kwargs.items():
             if inspect.isgenerator(val):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -2469,6 +2459,66 @@ def make_in_list_sql_clause(
         return "%s = ANY(?)" % (column,), [list(iterable)]
     else:
         return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
+
+
+# These overloads ensure that `columns` and `iterable` values have the same length.
+# Suppress "Single overload definition, multiple required" complaint.
+@overload  # type: ignore[misc]
+def make_tuple_in_list_sql_clause(
+    database_engine: BaseDatabaseEngine,
+    columns: Tuple[str, str],
+    iterable: Collection[Tuple[Any, Any]],
+) -> Tuple[str, list]:
+    ...
+
+
+def make_tuple_in_list_sql_clause(
+    database_engine: BaseDatabaseEngine,
+    columns: Tuple[str, ...],
+    iterable: Collection[Tuple[Any, ...]],
+) -> Tuple[str, list]:
+    """Returns an SQL clause that checks the given tuple of columns is in the iterable.
+
+    Args:
+        database_engine
+        columns: Names of the columns in the tuple.
+        iterable: The tuples to check the columns against.
+
+    Returns:
+        A tuple of SQL query and the args
+    """
+    if len(columns) == 0:
+        # Should be unreachable due to mypy, as long as the overloads are set up right.
+        if () in iterable:
+            return "TRUE", []
+        else:
+            return "FALSE", []
+
+    if len(columns) == 1:
+        # Use `= ANY(?)` on postgres.
+        return make_in_list_sql_clause(
+            database_engine, next(iter(columns)), [values[0] for values in iterable]
+        )
+
+    # There are multiple columns. Avoid using an `= ANY(?)` clause on postgres, as
+    # indices are not used when there are multiple columns. Instead, use an `IN`
+    # expression.
+    #
+    # `IN ((?, ...), ...)` with tuples is supported by postgres only, whereas
+    # `IN (VALUES (?, ...), ...)` is supported by both sqlite and postgres.
+    # Thus, the latter is chosen.
+
+    if len(iterable) == 0:
+        # A 0-length `VALUES` list is not allowed in sqlite or postgres.
+        # Also note that a 0-length `IN (...)` clause (not using `VALUES`) is not
+        # allowed in postgres.
+        return "FALSE", []
+
+    tuple_sql = "(%s)" % (",".join("?" for _ in columns),)
+    return "(%s) IN (VALUES %s)" % (
+        ",".join(column for column in columns),
+        ",".join(tuple_sql for _ in iterable),
+    ), [value for values in iterable for value in values]
 
 
 KV = TypeVar("KV")

@@ -1134,6 +1134,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
+    @cached(iterable=True)
     async def get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
         """Gets the list of servers in a partial state room at the time we joined it.
 
@@ -1216,6 +1217,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_partial_state_servers_at_join, (room_id,)
+        )
 
         # We now delete anything from `device_lists_remote_pending` with a
         # stream ID less than the minimum
@@ -1862,6 +1866,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             values=((room_id, s) for s in servers),
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_partial_state_servers_at_join, (room_id,)
+        )
 
     async def write_partial_state_rooms_join_event_id(
         self,
