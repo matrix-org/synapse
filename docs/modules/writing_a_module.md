@@ -122,13 +122,13 @@ class MyModule:
         
         user_id = "@alice:example.com"
         
-        # Get the user. Since get_user_from_id is wrapped with a cache, the return value
-        # for this user_id will be cached.
+        # Get the user. Since get_user_from_id is wrapped with a cache, the return
+        # value for this user_id will be cached.
         user = await self.get_user_from_id(user_id)
         
         # Do something with `user`...
         
-        # Let's say something has changed with our user, and the entry we have for them in
-        # the cache is out of date, so we want to invalidate it.
+        # Let's say something has changed with our user, and the entry we have for
+        # them in the cache is out of date, so we want to invalidate it.
         await self.api.invalidate_cache(self.get_user_from_id, (user_id,))
 ```
