@@ -484,7 +484,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             _device_list_summary,
         ) = self.send_mock.call_args[0]
 
-        # Even though the message came from an uninsteresting user, it should still
+        # Even though the message came from an uninteresting user, it should still
         # notify us because the interesting user is joined to the room.
         self.assertEqual(service, interested_appservice)
         self.assertEqual(events[0]["type"], "m.room.message")
