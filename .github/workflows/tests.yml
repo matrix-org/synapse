@@ -60,7 +60,7 @@ jobs:
         run: scripts-dev/check_line_terminators.sh
 
   lint-newsfile:
-    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
+    if: ${{ (github.base_ref == 'develop'  || contains(github.base_ref, 'release-')) && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
