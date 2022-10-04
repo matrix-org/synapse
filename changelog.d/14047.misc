@@ -1,0 +1,1 @@
+Add debug parameter to sync API to override the current token. Contributed by Nick @ Beeper (@fizzadar).
