@@ -267,7 +267,7 @@ all = [
 
 [tool.poetry.dev-dependencies]
 ## We pin black so that our tests don't start failing on new releases.
-isort = "==5.7.0"
+isort = "==5.10.1"
 black = "==22.3.0"
 flake8-comprehensions = "*"
 flake8-bugbear = "==21.3.2"
