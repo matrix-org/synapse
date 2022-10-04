@@ -588,6 +588,106 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _rotate()
         _assert_counts(0, 0, 0, 0)
 
+    def test_recursive_thread(self) -> None:
+        """
+        Events related to events in a thread should still be considered part of
+        that thread.
+        """
+
+        # Create a user to receive notifications and send receipts.
+        user_id = self.register_user("user1235", "pass")
+        token = self.login("user1235", "pass")
+
+        # And another users to send events.
+        other_id = self.register_user("other", "pass")
+        other_token = self.login("other", "pass")
+
+        # Create a room and put both users in it.
+        room_id = self.helper.create_room_as(user_id, tok=token)
+        self.helper.join(room_id, other_id, tok=other_token)
+
+        # Update the user's push rules to care about reaction events.
+        self.get_success(
+            self.store.add_push_rule(
+                user_id,
+                "related_events",
+                priority_class=5,
+                conditions=[
+                    {"kind": "event_match", "key": "type", "pattern": "m.reaction"}
+                ],
+                actions=["notify"],
+            )
+        )
+
+        def _create_event(type: str, content: JsonDict) -> str:
+            result = self.helper.send_event(
+                room_id, type=type, content=content, tok=other_token
+            )
+            return result["event_id"]
+
+        def _assert_counts(noitf_count: int, thread_notif_count: int) -> None:
+            counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-unread-counts",
+                    self.store._get_unread_counts_by_receipt_txn,
+                    room_id,
+                    user_id,
+                )
+            )
+            self.assertEqual(
+                counts.main_timeline,
+                NotifCounts(
+                    notify_count=noitf_count, unread_count=0, highlight_count=0
+                ),
+            )
+            if thread_notif_count:
+                self.assertEqual(
+                    counts.threads,
+                    {
+                        thread_id: NotifCounts(
+                            notify_count=thread_notif_count,
+                            unread_count=0,
+                            highlight_count=0,
+                        ),
+                    },
+                )
+            else:
+                self.assertEqual(counts.threads, {})
+
+        # Create a root event.
+        thread_id = _create_event(
+            "m.room.message", {"msgtype": "m.text", "body": "msg"}
+        )
+        _assert_counts(1, 0)
+
+        # Reply, creating a thread.
+        reply_id = _create_event(
+            "m.room.message",
+            {
+                "msgtype": "m.text",
+                "body": "msg",
+                "m.relates_to": {
+                    "rel_type": "m.thread",
+                    "event_id": thread_id,
+                },
+            },
+        )
+        _assert_counts(1, 1)
+
+        # Create an event related to a thread event, this should still appear in
+        # the thread.
+        _create_event(
+            type="m.reaction",
+            content={
+                "m.relates_to": {
+                    "rel_type": "m.annotation",
+                    "event_id": reply_id,
+                    "key": "A",
+                }
+            },
+        )
+        _assert_counts(1, 2)
+
     def test_find_first_stream_ordering_after_ts(self) -> None:
         def add_event(so: int, ts: int) -> None:
             self.get_success(
