@@ -1,1 +1,1 @@
-Fix a bug which prevented setting an avatar on homeservers which have an explicit port in their `server_name`. Contributed by @ashfame.
+Fix a bug which prevented setting an avatar on homeservers which have an explicit port in their `server_name` and had avatar's size or image type restrictions configured. Contributed by @ashfame.
