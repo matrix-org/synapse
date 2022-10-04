@@ -327,6 +327,41 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(res)
 
+    @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
+    def test_avatar_fetching_metadata_right_source(self) -> None:
+        """Tests that local and remote file are rightly fetched for metadata
+        when checking for avatar size and mime type"""
+        remote_server = "test:8080"
+        store = self.hs.get_datastores().main
+
+        self.get_success(store.store_local_media(
+            media_id="local",
+            media_type="image/png",
+            media_length=50,
+            time_now_ms=self.clock.time_msec(),
+            upload_name=None,
+            user_id=UserID.from_string("@whatever:test"),
+        ))
+        self.get_success(store.store_cached_remote_media(
+            media_id="remote",
+            media_type="image/png",
+            media_length=50,
+            origin=remote_server,
+            time_now_ms=self.clock.time_msec(),
+            upload_name=None,
+            filesystem_id="remote"
+        ))
+
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/local")
+        )
+        self.assertTrue(res)
+
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://" + remote_server + "/remote")
+        )
+        self.assertTrue(res)
+
     def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
         """Stores metadata about files in the database.
 
