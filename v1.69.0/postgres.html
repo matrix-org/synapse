@@ -1,0 +1,397 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Using Postgres - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html" class="active">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/postgres.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="using-postgres"><a class="header" href="#using-postgres">Using Postgres</a></h1>
+<p>Synapse supports PostgreSQL versions 10 or later.</p>
+<h2 id="install-postgres-client-libraries"><a class="header" href="#install-postgres-client-libraries">Install postgres client libraries</a></h2>
+<p>Synapse will require the python postgres client library in order to
+connect to a postgres database.</p>
+<ul>
+<li>
+<p>If you are using the <a href="setup/installation.html#matrixorg-packages">matrix.org debian/ubuntu
+packages</a>, the necessary python
+library will already be installed, but you will need to ensure the
+low-level postgres library is installed, which you can do with
+<code>apt install libpq5</code>.</p>
+</li>
+<li>
+<p>For other pre-built packages, please consult the documentation from
+the relevant package.</p>
+</li>
+<li>
+<p>If you installed synapse <a href="setup/installation.html#installing-from-source">in a
+virtualenv</a>, you can install
+the library with:</p>
+<pre><code>~/synapse/env/bin/pip install &quot;matrix-synapse[postgres]&quot;
+</code></pre>
+<p>(substituting the path to your virtualenv for <code>~/synapse/env</code>, if
+you used a different path). You will require the postgres
+development files. These are in the <code>libpq-dev</code> package on
+Debian-derived distributions.</p>
+</li>
+</ul>
+<h2 id="set-up-database"><a class="header" href="#set-up-database">Set up database</a></h2>
+<p>Assuming your PostgreSQL database user is called <code>postgres</code>, first authenticate as the database user with:</p>
+<pre><code class="language-sh">su - postgres
+# Or, if your system uses sudo to get administrative rights
+sudo -u postgres bash
+</code></pre>
+<p>Then, create a postgres user and a database with:</p>
+<pre><code class="language-sh"># this will prompt for a password for the new user
+createuser --pwprompt synapse_user
+
+createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse_user synapse
+</code></pre>
+<p>The above will create a user called <code>synapse_user</code>, and a database called
+<code>synapse</code>.</p>
+<p>Note that the PostgreSQL database <em>must</em> have the correct encoding set
+(as shown above), otherwise it will not be able to store UTF8 strings.</p>
+<p>You may need to enable password authentication so <code>synapse_user</code> can
+connect to the database. See
+<a href="https://www.postgresql.org/docs/current/auth-pg-hba-conf.html">https://www.postgresql.org/docs/current/auth-pg-hba-conf.html</a>.</p>
+<h2 id="synapse-config"><a class="header" href="#synapse-config">Synapse config</a></h2>
+<p>When you are ready to start using PostgreSQL, edit the <code>database</code>
+section in your config file to match the following lines:</p>
+<pre><code class="language-yaml">database:
+  name: psycopg2
+  args:
+    user: &lt;user&gt;
+    password: &lt;pass&gt;
+    database: &lt;db&gt;
+    host: &lt;host&gt;
+    cp_min: 5
+    cp_max: 10
+</code></pre>
+<p>All key, values in <code>args</code> are passed to the <code>psycopg2.connect(..)</code>
+function, except keys beginning with <code>cp_</code>, which are consumed by the
+twisted adbapi connection pool. See the <a href="https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS">libpq
+documentation</a>
+for a list of options which can be passed.</p>
+<p>You should consider tuning the <code>args.keepalives_*</code> options if there is any danger of
+the connection between your homeserver and database dropping, otherwise Synapse
+may block for an extended period while it waits for a response from the
+database server. Example values might be:</p>
+<pre><code class="language-yaml">database:
+  args:
+    # ... as above
+
+    # seconds of inactivity after which TCP should send a keepalive message to the server
+    keepalives_idle: 10
+
+    # the number of seconds after which a TCP keepalive message that is not
+    # acknowledged by the server should be retransmitted
+    keepalives_interval: 10
+
+    # the number of TCP keepalives that can be lost before the client's connection
+    # to the server is considered dead
+    keepalives_count: 3
+</code></pre>
+<h2 id="tuning-postgres"><a class="header" href="#tuning-postgres">Tuning Postgres</a></h2>
+<p>The default settings should be fine for most deployments. For larger
+scale deployments tuning some of the settings is recommended, details of
+which can be found at
+<a href="https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server">https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server</a>.</p>
+<p>In particular, we've found tuning the following values helpful for
+performance:</p>
+<ul>
+<li><code>shared_buffers</code></li>
+<li><code>effective_cache_size</code></li>
+<li><code>work_mem</code></li>
+<li><code>maintenance_work_mem</code></li>
+<li><code>autovacuum_work_mem</code></li>
+</ul>
+<p>Note that the appropriate values for those fields depend on the amount
+of free memory the database host has available.</p>
+<p>Additionally, admins of large deployments might want to consider using huge pages
+to help manage memory, especially when using large values of <code>shared_buffers</code>. You
+can read more about that <a href="https://www.postgresql.org/docs/10/kernel-resources.html#LINUX-HUGE-PAGES">here</a>.</p>
+<h2 id="porting-from-sqlite"><a class="header" href="#porting-from-sqlite">Porting from SQLite</a></h2>
+<h3 id="overview"><a class="header" href="#overview">Overview</a></h3>
+<p>The script <code>synapse_port_db</code> allows porting an existing synapse server
+backed by SQLite to using PostgreSQL. This is done in as a two phase
+process:</p>
+<ol>
+<li>Copy the existing SQLite database to a separate location and run
+the port script against that offline database.</li>
+<li>Shut down the server. Rerun the port script to port any data that
+has come in since taking the first snapshot. Restart server against
+the PostgreSQL database.</li>
+</ol>
+<p>The port script is designed to be run repeatedly against newer snapshots
+of the SQLite database file. This makes it safe to repeat step 1 if
+there was a delay between taking the previous snapshot and being ready
+to do step 2.</p>
+<p>It is safe to at any time kill the port script and restart it.</p>
+<p>However, under no circumstances should the SQLite database be <code>VACUUM</code>ed between
+multiple runs of the script. Doing so can lead to an inconsistent copy of your database
+into Postgres.
+To avoid accidental error, the script will check that SQLite's <code>auto_vacuum</code> mechanism
+is disabled, but the script is not able to protect against a manual <code>VACUUM</code> operation
+performed either by the administrator or by any automated task that the administrator
+may have configured.</p>
+<p>Note that the database may take up significantly more (25% - 100% more)
+space on disk after porting to Postgres.</p>
+<h3 id="using-the-port-script"><a class="header" href="#using-the-port-script">Using the port script</a></h3>
+<p>Firstly, shut down the currently running synapse server and copy its
+database file (typically <code>homeserver.db</code>) to another location. Once the
+copy is complete, restart synapse. For instance:</p>
+<pre><code class="language-sh">synctl stop
+cp homeserver.db homeserver.db.snapshot
+synctl start
+</code></pre>
+<p>Copy the old config file into a new config file:</p>
+<pre><code class="language-sh">cp homeserver.yaml homeserver-postgres.yaml
+</code></pre>
+<p>Edit the database section as described in the section <em>Synapse config</em>
+above and with the SQLite snapshot located at <code>homeserver.db.snapshot</code>
+simply run:</p>
+<pre><code class="language-sh">synapse_port_db --sqlite-database homeserver.db.snapshot \
+    --postgres-config homeserver-postgres.yaml
+</code></pre>
+<p>The flag <code>--curses</code> displays a coloured curses progress UI.</p>
+<p>If the script took a long time to complete, or time has otherwise passed
+since the original snapshot was taken, repeat the previous steps with a
+newer snapshot.</p>
+<p>To complete the conversion shut down the synapse server and run the port
+script one last time, e.g. if the SQLite database is at <code>homeserver.db</code>
+run:</p>
+<pre><code class="language-sh">synapse_port_db --sqlite-database homeserver.db \
+    --postgres-config homeserver-postgres.yaml
+</code></pre>
+<p>Once that has completed, change the synapse config to point at the
+PostgreSQL database configuration file <code>homeserver-postgres.yaml</code>:</p>
+<pre><code class="language-sh">synctl stop
+mv homeserver.yaml homeserver-old-sqlite.yaml
+mv homeserver-postgres.yaml homeserver.yaml
+synctl start
+</code></pre>
+<p>Synapse should now be running against PostgreSQL.</p>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="alternative-auth-methods"><a class="header" href="#alternative-auth-methods">Alternative auth methods</a></h3>
+<p>If you get an error along the lines of <code>FATAL:  Ident authentication failed for user &quot;synapse_user&quot;</code>, you may need to use an authentication method other than
+<code>ident</code>:</p>
+<ul>
+<li>
+<p>If the <code>synapse_user</code> user has a password, add the password to the <code>database:</code>
+section of <code>homeserver.yaml</code>. Then add the following to <code>pg_hba.conf</code>:</p>
+<pre><code>host    synapse     synapse_user    ::1/128     md5  # or `scram-sha-256` instead of `md5` if you use that
+</code></pre>
+</li>
+<li>
+<p>If the <code>synapse_user</code> user does not have a password, then a password doesn't
+have to be added to <code>homeserver.yaml</code>. But the following does need to be added
+to <code>pg_hba.conf</code>:</p>
+<pre><code>host    synapse     synapse_user    ::1/128     trust
+</code></pre>
+</li>
+</ul>
+<p>Note that line order matters in <code>pg_hba.conf</code>, so make sure that if you do add a
+new line, it is inserted before:</p>
+<pre><code>host    all         all             ::1/128     ident
+</code></pre>
+<h3 id="fixing-incorrect-collate-or-ctype"><a class="header" href="#fixing-incorrect-collate-or-ctype">Fixing incorrect <code>COLLATE</code> or <code>CTYPE</code></a></h3>
+<p>Synapse will refuse to set up a new database if it has the wrong values of
+<code>COLLATE</code> and <code>CTYPE</code> set. Synapse will also refuse to start an existing database with incorrect values
+of <code>COLLATE</code> and <code>CTYPE</code> unless the config flag <code>allow_unsafe_locale</code>, found in the 
+<code>database</code> section of the config, is set to true. Using different locales can cause issues if the locale library is updated from
+underneath the database, or if a different version of the locale is used on any
+replicas.</p>
+<p>If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
+the correct locale parameter (as shown above). It is also possible to change the
+parameters on a live database and run a <code>REINDEX</code> on the entire database,
+however extreme care must be taken to avoid database corruption.</p>
+<p>Note that the above may fail with an error about duplicate rows if corruption
+has already occurred, and such duplicate rows will need to be manually removed.</p>
+<h3 id="fixing-inconsistent-sequences-error"><a class="header" href="#fixing-inconsistent-sequences-error">Fixing inconsistent sequences error</a></h3>
+<p>Synapse uses Postgres sequences to generate IDs for various tables. A sequence
+and associated table can get out of sync if, for example, Synapse has been
+downgraded and then upgraded again.</p>
+<p>To fix the issue shut down Synapse (including any and all workers) and run the
+SQL command included in the error message. Once done Synapse should start
+successfully.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="setup/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="reverse_proxy.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="setup/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="reverse_proxy.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Database Schemas - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html" class="active">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/development/database_schema.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="synapse-database-schema-files"><a class="header" href="#synapse-database-schema-files">Synapse database schema files</a></h1>
+<p>Synapse's database schema is stored in the <code>synapse.storage.schema</code> module.</p>
+<h2 id="logical-databases"><a class="header" href="#logical-databases">Logical databases</a></h2>
+<p>Synapse supports splitting its datastore across multiple physical databases (which can
+be useful for large installations), and the schema files are therefore split according
+to the logical database they apply to.</p>
+<p>At the time of writing, the following &quot;logical&quot; databases are supported:</p>
+<ul>
+<li><code>state</code> - used to store Matrix room state (more specifically, <code>state_groups</code>,
+their relationships and contents).</li>
+<li><code>main</code> - stores everything else.</li>
+</ul>
+<p>Additionally, the <code>common</code> directory contains schema files for tables which must be
+present on <em>all</em> physical databases.</p>
+<h2 id="synapse-schema-versions"><a class="header" href="#synapse-schema-versions">Synapse schema versions</a></h2>
+<p>Synapse manages its database schema via &quot;schema versions&quot;. These are mainly used to
+help avoid confusion if the Synapse codebase is rolled back after the database is
+updated. They work as follows:</p>
+<ul>
+<li>
+<p>The Synapse codebase defines a constant <code>synapse.storage.schema.SCHEMA_VERSION</code>
+which represents the expectations made about the database by that version. For
+example, as of Synapse v1.36, this is <code>59</code>.</p>
+</li>
+<li>
+<p>The database stores a &quot;compatibility version&quot; in
+<code>schema_compat_version.compat_version</code> which defines the <code>SCHEMA_VERSION</code> of the
+oldest version of Synapse which will work with the database. On startup, if
+<code>compat_version</code> is found to be newer than <code>SCHEMA_VERSION</code>, Synapse will refuse to
+start.</p>
+<p>Synapse automatically updates this field from
+<code>synapse.storage.schema.SCHEMA_COMPAT_VERSION</code>.</p>
+</li>
+<li>
+<p>Whenever a backwards-incompatible change is made to the database format (normally
+via a <code>delta</code> file), <code>synapse.storage.schema.SCHEMA_COMPAT_VERSION</code> is also updated
+so that administrators can not accidentally roll back to a too-old version of Synapse.</p>
+</li>
+</ul>
+<p>Generally, the goal is to maintain compatibility with at least one or two previous
+releases of Synapse, so any substantial change tends to require multiple releases and a
+bit of forward-planning to get right.</p>
+<p>As a worked example: we want to remove the <code>room_stats_historical</code> table. Here is how it
+might pan out.</p>
+<ol>
+<li>
+<p>Replace any code that <em>reads</em> from <code>room_stats_historical</code> with alternative
+implementations, but keep writing to it in case of rollback to an earlier version.
+Also, increase <code>synapse.storage.schema.SCHEMA_VERSION</code>.  In this
+instance, there is no existing code which reads from <code>room_stats_historical</code>, so
+our starting point is:</p>
+<p>v1.36.0: <code>SCHEMA_VERSION=59</code>, <code>SCHEMA_COMPAT_VERSION=59</code></p>
+</li>
+<li>
+<p>Next (say in Synapse v1.37.0): remove the code that <em>writes</em> to
+<code>room_stats_historical</code>, but don’t yet remove the table in case of rollback to
+v1.36.0. Again, we increase <code>synapse.storage.schema.SCHEMA_VERSION</code>, but
+because we have not broken compatibility with v1.36, we do not yet update
+<code>SCHEMA_COMPAT_VERSION</code>. We now have:</p>
+<p>v1.37.0: <code>SCHEMA_VERSION=60</code>, <code>SCHEMA_COMPAT_VERSION=59</code>.</p>
+</li>
+<li>
+<p>Later (say in Synapse v1.38.0): we can remove the table altogether. This will
+break compatibility with v1.36.0, so we must update <code>SCHEMA_COMPAT_VERSION</code> accordingly.
+There is no need to update <code>synapse.storage.schema.SCHEMA_VERSION</code>, since there is no
+change to the Synapse codebase here. So we end up with:</p>
+<p>v1.38.0: <code>SCHEMA_VERSION=60</code>, <code>SCHEMA_COMPAT_VERSION=60</code>.</p>
+</li>
+</ol>
+<p>If in doubt about whether to update <code>SCHEMA_VERSION</code> or not, it is generally best to
+lean towards doing so.</p>
+<h2 id="full-schema-dumps"><a class="header" href="#full-schema-dumps">Full schema dumps</a></h2>
+<p>In the <code>full_schemas</code> directories, only the most recently-numbered snapshot is used
+(<code>54</code> at the time of writing). Older snapshots (eg, <code>16</code>) are present for historical
+reference only.</p>
+<h3 id="building-full-schema-dumps"><a class="header" href="#building-full-schema-dumps">Building full schema dumps</a></h3>
+<p>If you want to recreate these schemas, they need to be made from a database that
+has had all background updates run.</p>
+<p>To do so, use <code>scripts-dev/make_full_schema.sh</code>. This will produce new
+<code>full.sql.postgres</code> and <code>full.sql.sqlite</code> files.</p>
+<p>Ensure postgres is installed, then run:</p>
+<pre><code class="language-sh">./scripts-dev/make_full_schema.sh -p postgres_username -o output_dir/
+</code></pre>
+<p>NB at the time of writing, this script predates the split into separate <code>state</code>/<code>main</code>
+databases so will require updates to handle that correctly.</p>
+<h2 id="delta-files"><a class="header" href="#delta-files">Delta files</a></h2>
+<p>Delta files define the steps required to upgrade the database from an earlier version.
+They can be written as either a file containing a series of SQL statements, or a Python
+module.</p>
+<p>Synapse remembers which delta files it has applied to a database (they are stored in the
+<code>applied_schema_deltas</code> table) and will not re-apply them (even if a given file is
+subsequently updated).</p>
+<p>Delta files should be placed in a directory named <code>synapse/storage/schema/&lt;database&gt;/delta/&lt;version&gt;/</code>.
+They are applied in alphanumeric order, so  by convention the first two characters
+of the filename should be an integer such as <code>01</code>, to put the file in the right order.</p>
+<h3 id="sql-delta-files"><a class="header" href="#sql-delta-files">SQL delta files</a></h3>
+<p>These should be named <code>*.sql</code>, or —  for changes which should only be applied for a
+given database engine — <code>*.sql.posgres</code> or <code>*.sql.sqlite</code>. For example, a delta which
+adds a new column to the <code>foo</code> table might be called <code>01add_bar_to_foo.sql</code>.</p>
+<p>Note that our SQL parser is a bit simple - it understands comments (<code>--</code> and <code>/*...*/</code>),
+but complex statements which require a <code>;</code> in the middle of them (such as <code>CREATE TRIGGER</code>) are beyond it and you'll have to use a Python delta file.</p>
+<h3 id="python-delta-files"><a class="header" href="#python-delta-files">Python delta files</a></h3>
+<p>For more flexibility, a delta file can take the form of a python module. These should
+be named <code>*.py</code>. Note that database-engine-specific modules are not supported here –
+instead you can write <code>if isinstance(database_engine, PostgresEngine)</code> or similar.</p>
+<p>A Python delta module should define either or both of the following functions:</p>
+<pre><code class="language-python">import synapse.config.homeserver
+import synapse.storage.engines
+import synapse.storage.types
+
+
+def run_create(
+    cur: synapse.storage.types.Cursor,
+    database_engine: synapse.storage.engines.BaseDatabaseEngine,
+) -&gt; None:
+    &quot;&quot;&quot;Called whenever an existing or new database is to be upgraded&quot;&quot;&quot;
+    ...
+
+def run_upgrade(
+    cur: synapse.storage.types.Cursor,
+    database_engine: synapse.storage.engines.BaseDatabaseEngine,
+    config: synapse.config.homeserver.HomeServerConfig,
+) -&gt; None:
+    &quot;&quot;&quot;Called whenever an existing database is to be upgraded.&quot;&quot;&quot;
+    ...
+</code></pre>
+<h2 id="boolean-columns"><a class="header" href="#boolean-columns">Boolean columns</a></h2>
+<p>Boolean columns require special treatment, since SQLite treats booleans the
+same as integers.</p>
+<p>There are three separate aspects to this:</p>
+<ul>
+<li>
+<p>Any new boolean column must be added to the <code>BOOLEAN_COLUMNS</code> list in
+<code>synapse/_scripts/synapse_port_db.py</code>. This tells the port script to cast
+the integer value from SQLite to a boolean before writing the value to the
+postgres database.</p>
+</li>
+<li>
+<p>Before SQLite 3.23, <code>TRUE</code> and <code>FALSE</code> were not recognised as constants by
+SQLite, and the <code>IS [NOT] TRUE</code>/<code>IS [NOT] FALSE</code> operators were not
+supported. This makes it necessary to avoid using <code>TRUE</code> and <code>FALSE</code>
+constants in SQL commands.</p>
+<p>For example, to insert a <code>TRUE</code> value into the database, write:</p>
+<pre><code class="language-python">txn.execute(&quot;INSERT INTO tbl(col) VALUES (?)&quot;, (True, ))
+</code></pre>
+</li>
+<li>
+<p>Default values for new boolean columns present a particular
+difficulty. Generally it is best to create separate schema files for
+Postgres and SQLite. For example:</p>
+<pre><code class="language-sql"># in 00delta.sql.postgres:
+ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT FALSE;
+</code></pre>
+<pre><code class="language-sql"># in 00delta.sql.sqlite:
+ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT 0;
+</code></pre>
+<p>Note that there is a particularly insidious failure mode here: the Postgres
+flavour will be accepted by SQLite 3.22, but will give a column whose
+default value is the <strong>string</strong> <code>&quot;FALSE&quot;</code> - which, when cast back to a boolean
+in Python, evaluates to <code>True</code>.</p>
+</li>
+</ul>
+<h2 id="event_id-global-uniqueness"><a class="header" href="#event_id-global-uniqueness"><code>event_id</code> global uniqueness</a></h2>
+<p><code>event_id</code>'s can be considered globally unique although there has been a lot of
+debate on this topic in places like
+<a href="https://github.com/matrix-org/matrix-spec-proposals/issues/2779">MSC2779</a> and
+<a href="https://github.com/matrix-org/matrix-spec-proposals/pull/2848">MSC2848</a> which
+has no resolution yet (as of 2022-09-01). There are several places in Synapse
+and even in the Matrix APIs like <a href="https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid"><code>GET /_matrix/federation/v1/event/{eventId}</code></a>
+where we assume that event IDs are globally unique.</p>
+<p>When scoping <code>event_id</code> in a database schema, it is often nice to accompany it
+with <code>room_id</code> (<code>PRIMARY KEY (room_id, event_id)</code> and a <code>FOREIGN KEY(room_id) REFERENCES rooms(room_id)</code>) which makes flexible lookups easy. For example it
+makes it very easy to find and clean up everything in a room when it needs to be
+purged (no need to use sub-<code>select</code> query or join from the <code>events</code> table).</p>
+<p>A note on collisions: In room versions <code>1</code> and <code>2</code> it's possible to end up with
+two events with the same <code>event_id</code> (in the same or different rooms). After room
+version <code>3</code>, that can only happen with a hash collision, which we basically hope
+will never happen (SHA256 has a massive big key space).</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../opentracing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../development/experimental_features.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../opentracing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../development/experimental_features.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

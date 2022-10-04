@@ -1,0 +1,26 @@
+[Unit]
+Description=Synapse %i
+AssertPathExists=/etc/matrix-synapse/workers/%i.yaml
+
+# This service should be restarted when the synapse target is restarted.
+PartOf=matrix-synapse.target
+ReloadPropagatedFrom=matrix-synapse.target
+
+# if this is started at the same time as the main, let the main process start
+# first, to initialise the database schema.
+After=matrix-synapse.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=matrix-synapse
+WorkingDirectory=/var/lib/matrix-synapse
+EnvironmentFile=-/etc/default/matrix-synapse
+ExecStart=/opt/venvs/matrix-synapse/bin/python -m synapse.app.generic_worker --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/ --config-path=/etc/matrix-synapse/workers/%i.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=3
+SyslogIdentifier=matrix-synapse-%i
+
+[Install]
+WantedBy=matrix-synapse.target

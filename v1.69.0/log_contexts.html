@@ -1,0 +1,485 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Log Contexts - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html" class="active">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/log_contexts.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="log-contexts"><a class="header" href="#log-contexts">Log Contexts</a></h1>
+<p>To help track the processing of individual requests, synapse uses a
+'<code>log context</code>' to track which request it is handling at any given
+moment. This is done via a thread-local variable; a <code>logging.Filter</code> is
+then used to fish the information back out of the thread-local variable
+and add it to each log record.</p>
+<p>Logcontexts are also used for CPU and database accounting, so that we
+can track which requests were responsible for high CPU use or database
+activity.</p>
+<p>The <code>synapse.logging.context</code> module provides facilities for managing
+the current log context (as well as providing the <code>LoggingContextFilter</code>
+class).</p>
+<p>Asynchronous functions make the whole thing complicated, so this document describes
+how it all works, and how to write code which follows the rules.</p>
+<p>In this document, &quot;awaitable&quot; refers to any object which can be <code>await</code>ed. In the context of
+Synapse, that normally means either a coroutine or a Twisted 
+<a href="https://twistedmatrix.com/documents/current/api/twisted.internet.defer.Deferred.html"><code>Deferred</code></a>.</p>
+<h2 id="logcontexts-without-asynchronous-code"><a class="header" href="#logcontexts-without-asynchronous-code">Logcontexts without asynchronous code</a></h2>
+<p>In the absence of any asynchronous voodoo, things are simple enough. As with
+any code of this nature, the rule is that our function should leave
+things as it found them:</p>
+<pre><code class="language-python">from synapse.logging import context         # omitted from future snippets
+
+def handle_request(request_id):
+    request_context = context.LoggingContext()
+
+    calling_context = context.set_current_context(request_context)
+    try:
+        request_context.request = request_id
+        do_request_handling()
+        logger.debug(&quot;finished&quot;)
+    finally:
+        context.set_current_context(calling_context)
+
+def do_request_handling():
+    logger.debug(&quot;phew&quot;)  # this will be logged against request_id
+</code></pre>
+<p>LoggingContext implements the context management methods, so the above
+can be written much more succinctly as:</p>
+<pre><code class="language-python">def handle_request(request_id):
+    with context.LoggingContext() as request_context:
+        request_context.request = request_id
+        do_request_handling()
+        logger.debug(&quot;finished&quot;)
+
+def do_request_handling():
+    logger.debug(&quot;phew&quot;)
+</code></pre>
+<h2 id="using-logcontexts-with-awaitables"><a class="header" href="#using-logcontexts-with-awaitables">Using logcontexts with awaitables</a></h2>
+<p>Awaitables break the linear flow of code so that there is no longer a single entry point
+where we should set the logcontext and a single exit point where we should remove it.</p>
+<p>Consider the example above, where <code>do_request_handling</code> needs to do some
+blocking operation, and returns an awaitable:</p>
+<pre><code class="language-python">async def handle_request(request_id):
+    with context.LoggingContext() as request_context:
+        request_context.request = request_id
+        await do_request_handling()
+        logger.debug(&quot;finished&quot;)
+</code></pre>
+<p>In the above flow:</p>
+<ul>
+<li>The logcontext is set</li>
+<li><code>do_request_handling</code> is called, and returns an awaitable</li>
+<li><code>handle_request</code> awaits the awaitable</li>
+<li>Execution of <code>handle_request</code> is suspended</li>
+</ul>
+<p>So we have stopped processing the request (and will probably go on to
+start processing the next), without clearing the logcontext.</p>
+<p>To circumvent this problem, synapse code assumes that, wherever you have
+an awaitable, you will want to <code>await</code> it. To that end, whereever
+functions return awaitables, we adopt the following conventions:</p>
+<p><strong>Rules for functions returning awaitables:</strong></p>
+<blockquote>
+<ul>
+<li>If the awaitable is already complete, the function returns with the
+same logcontext it started with.</li>
+<li>If the awaitable is incomplete, the function clears the logcontext
+before returning; when the awaitable completes, it restores the
+logcontext before running any callbacks.</li>
+</ul>
+</blockquote>
+<p>That sounds complicated, but actually it means a lot of code (including
+the example above) &quot;just works&quot;. There are two cases:</p>
+<ul>
+<li>
+<p>If <code>do_request_handling</code> returns a completed awaitable, then the
+logcontext will still be in place. In this case, execution will
+continue immediately after the <code>await</code>; the &quot;finished&quot; line will
+be logged against the right context, and the <code>with</code> block restores
+the original context before we return to the caller.</p>
+</li>
+<li>
+<p>If the returned awaitable is incomplete, <code>do_request_handling</code> clears
+the logcontext before returning. The logcontext is therefore clear
+when <code>handle_request</code> <code>await</code>s the awaitable.</p>
+<p>Once <code>do_request_handling</code>'s awaitable completes, it will reinstate
+the logcontext, before running the second half of <code>handle_request</code>,
+so again the &quot;finished&quot; line will be logged against the right context,
+and the <code>with</code> block restores the original context.</p>
+</li>
+</ul>
+<p>As an aside, it's worth noting that <code>handle_request</code> follows our rules</p>
+<ul>
+<li>though that only matters if the caller has its own logcontext which it
+cares about.</li>
+</ul>
+<p>The following sections describe pitfalls and helpful patterns when
+implementing these rules.</p>
+<h2 id="always-await-your-awaitables"><a class="header" href="#always-await-your-awaitables">Always await your awaitables</a></h2>
+<p>Whenever you get an awaitable back from a function, you should <code>await</code> on
+it as soon as possible. Do not pass go; do not do any logging; do not
+call any other functions.</p>
+<pre><code class="language-python">async def fun():
+    logger.debug(&quot;starting&quot;)
+    await do_some_stuff()       # just like this
+
+    coro = more_stuff()
+    result = await coro         # also fine, of course
+
+    return result
+</code></pre>
+<p>Provided this pattern is followed all the way back up to the callchain
+to where the logcontext was set, this will make things work out ok:
+provided <code>do_some_stuff</code> and <code>more_stuff</code> follow the rules above, then
+so will <code>fun</code>.</p>
+<p>It's all too easy to forget to <code>await</code>: for instance if we forgot that
+<code>do_some_stuff</code> returned an awaitable, we might plough on regardless. This
+leads to a mess; it will probably work itself out eventually, but not
+before a load of stuff has been logged against the wrong context.
+(Normally, other things will break, more obviously, if you forget to
+<code>await</code>, so this tends not to be a major problem in practice.)</p>
+<p>Of course sometimes you need to do something a bit fancier with your
+awaitable - not all code follows the linear A-then-B-then-C pattern.
+Notes on implementing more complex patterns are in later sections.</p>
+<h2 id="where-you-create-a-new-awaitable-make-it-follow-the-rules"><a class="header" href="#where-you-create-a-new-awaitable-make-it-follow-the-rules">Where you create a new awaitable, make it follow the rules</a></h2>
+<p>Most of the time, an awaitable comes from another synapse function.
+Sometimes, though, we need to make up a new awaitable, or we get an awaitable
+back from external code. We need to make it follow our rules.</p>
+<p>The easy way to do it is by using <code>context.make_deferred_yieldable</code>. Suppose we want to implement
+<code>sleep</code>, which returns a deferred which will run its callbacks after a
+given number of seconds. That might look like:</p>
+<pre><code class="language-python"># not a logcontext-rules-compliant function
+def get_sleep_deferred(seconds):
+    d = defer.Deferred()
+    reactor.callLater(seconds, d.callback, None)
+    return d
+</code></pre>
+<p>That doesn't follow the rules, but we can fix it by calling it through
+<code>context.make_deferred_yieldable</code>:</p>
+<pre><code class="language-python">async def sleep(seconds):
+    return await context.make_deferred_yieldable(get_sleep_deferred(seconds))
+</code></pre>
+<h2 id="fire-and-forget"><a class="header" href="#fire-and-forget">Fire-and-forget</a></h2>
+<p>Sometimes you want to fire off a chain of execution, but not wait for
+its result. That might look a bit like this:</p>
+<pre><code class="language-python">async def do_request_handling():
+    await foreground_operation()
+
+    # *don't* do this
+    background_operation()
+
+    logger.debug(&quot;Request handling complete&quot;)
+
+async def background_operation():
+    await first_background_step()
+    logger.debug(&quot;Completed first step&quot;)
+    await second_background_step()
+    logger.debug(&quot;Completed second step&quot;)
+</code></pre>
+<p>The above code does a couple of steps in the background after
+<code>do_request_handling</code> has finished. The log lines are still logged
+against the <code>request_context</code> logcontext, which may or may not be
+desirable. There are two big problems with the above, however. The first
+problem is that, if <code>background_operation</code> returns an incomplete
+awaitable, it will expect its caller to <code>await</code> immediately, so will have
+cleared the logcontext. In this example, that means that 'Request
+handling complete' will be logged without any context.</p>
+<p>The second problem, which is potentially even worse, is that when the
+awaitable returned by <code>background_operation</code> completes, it will restore
+the original logcontext. There is nothing waiting on that awaitable, so
+the logcontext will leak into the reactor and possibly get attached to
+some arbitrary future operation.</p>
+<p>There are two potential solutions to this.</p>
+<p>One option is to surround the call to <code>background_operation</code> with a
+<code>PreserveLoggingContext</code> call. That will reset the logcontext before
+starting <code>background_operation</code> (so the context restored when the
+deferred completes will be the empty logcontext), and will restore the
+current logcontext before continuing the foreground process:</p>
+<pre><code class="language-python">async def do_request_handling():
+    await foreground_operation()
+
+    # start background_operation off in the empty logcontext, to
+    # avoid leaking the current context into the reactor.
+    with PreserveLoggingContext():
+        background_operation()
+
+    # this will now be logged against the request context
+    logger.debug(&quot;Request handling complete&quot;)
+</code></pre>
+<p>Obviously that option means that the operations done in
+<code>background_operation</code> would be not be logged against a logcontext
+(though that might be fixed by setting a different logcontext via a
+<code>with LoggingContext(...)</code> in <code>background_operation</code>).</p>
+<p>The second option is to use <code>context.run_in_background</code>, which wraps a
+function so that it doesn't reset the logcontext even when it returns
+an incomplete awaitable, and adds a callback to the returned awaitable to
+reset the logcontext. In other words, it turns a function that follows
+the Synapse rules about logcontexts and awaitables into one which behaves
+more like an external function --- the opposite operation to that
+described in the previous section. It can be used like this:</p>
+<pre><code class="language-python">async def do_request_handling():
+    await foreground_operation()
+
+    context.run_in_background(background_operation)
+
+    # this will now be logged against the request context
+    logger.debug(&quot;Request handling complete&quot;)
+</code></pre>
+<h2 id="passing-synapse-deferreds-into-third-party-functions"><a class="header" href="#passing-synapse-deferreds-into-third-party-functions">Passing synapse deferreds into third-party functions</a></h2>
+<p>A typical example of this is where we want to collect together two or
+more awaitables via <code>defer.gatherResults</code>:</p>
+<pre><code class="language-python">a1 = operation1()
+a2 = operation2()
+a3 = defer.gatherResults([a1, a2])
+</code></pre>
+<p>This is really a variation of the fire-and-forget problem above, in that
+we are firing off <code>a1</code> and <code>a2</code> without awaiting on them. The difference
+is that we now have third-party code attached to their callbacks. Anyway
+either technique given in the <a href="#fire-and-forget">Fire-and-forget</a>
+section will work.</p>
+<p>Of course, the new awaitable returned by <code>gather</code> needs to be
+wrapped in order to make it follow the logcontext rules before we can
+yield it, as described in <a href="#where-you-create-a-new-awaitable-make-it-follow-the-rules">Where you create a new awaitable, make it
+follow the
+rules</a>.</p>
+<p>So, option one: reset the logcontext before starting the operations to
+be gathered:</p>
+<pre><code class="language-python">async def do_request_handling():
+    with PreserveLoggingContext():
+        a1 = operation1()
+        a2 = operation2()
+        result = await defer.gatherResults([a1, a2])
+</code></pre>
+<p>In this case particularly, though, option two, of using
+<code>context.run_in_background</code> almost certainly makes more sense, so that
+<code>operation1</code> and <code>operation2</code> are both logged against the original
+logcontext. This looks like:</p>
+<pre><code class="language-python">async def do_request_handling():
+    a1 = context.run_in_background(operation1)
+    a2 = context.run_in_background(operation2)
+
+    result = await make_deferred_yieldable(defer.gatherResults([a1, a2]))
+</code></pre>
+<h2 id="a-note-on-garbage-collection-of-awaitable-chains"><a class="header" href="#a-note-on-garbage-collection-of-awaitable-chains">A note on garbage-collection of awaitable chains</a></h2>
+<p>It turns out that our logcontext rules do not play nicely with awaitable
+chains which get orphaned and garbage-collected.</p>
+<p>Imagine we have some code that looks like this:</p>
+<pre><code class="language-python">listener_queue = []
+
+def on_something_interesting():
+    for d in listener_queue:
+        d.callback(&quot;foo&quot;)
+
+async def await_something_interesting():
+    new_awaitable = defer.Deferred()
+    listener_queue.append(new_awaitable)
+
+    with PreserveLoggingContext():
+        await new_awaitable
+</code></pre>
+<p>Obviously, the idea here is that we have a bunch of things which are
+waiting for an event. (It's just an example of the problem here, but a
+relatively common one.)</p>
+<p>Now let's imagine two further things happen. First of all, whatever was
+waiting for the interesting thing goes away. (Perhaps the request times
+out, or something <em>even more</em> interesting happens.)</p>
+<p>Secondly, let's suppose that we decide that the interesting thing is
+never going to happen, and we reset the listener queue:</p>
+<pre><code class="language-python">def reset_listener_queue():
+    listener_queue.clear()
+</code></pre>
+<p>So, both ends of the awaitable chain have now dropped their references,
+and the awaitable chain is now orphaned, and will be garbage-collected at
+some point. Note that <code>await_something_interesting</code> is a coroutine, 
+which Python implements as a generator function.  When Python
+garbage-collects generator functions, it gives them a chance to 
+clean up by making the <code>await</code> (or <code>yield</code>) raise a <code>GeneratorExit</code>
+exception. In our case, that means that the <code>__exit__</code> handler of
+<code>PreserveLoggingContext</code> will carefully restore the request context, but
+there is now nothing waiting for its return, so the request context is
+never cleared.</p>
+<p>To reiterate, this problem only arises when <em>both</em> ends of a awaitable
+chain are dropped. Dropping the the reference to an awaitable you're
+supposed to be awaiting is bad practice, so this doesn't
+actually happen too much. Unfortunately, when it does happen, it will
+lead to leaked logcontexts which are incredibly hard to track down.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="development/synapse_architecture/cancellation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="replication.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="development/synapse_architecture/cancellation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="replication.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

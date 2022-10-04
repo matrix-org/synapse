@@ -1,0 +1,310 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Auth Chain Difference Algorithm - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html" class="active">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/auth_chain_difference_algorithm.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="auth-chain-difference-algorithm"><a class="header" href="#auth-chain-difference-algorithm">Auth Chain Difference Algorithm</a></h1>
+<p>The auth chain difference algorithm is used by V2 state resolution, where a
+naive implementation can be a significant source of CPU and DB usage.</p>
+<h3 id="definitions"><a class="header" href="#definitions">Definitions</a></h3>
+<p>A <em>state set</em> is a set of state events; e.g. the input of a state resolution
+algorithm is a collection of state sets.</p>
+<p>The <em>auth chain</em> of a set of events are all the events' auth events and <em>their</em>
+auth events, recursively (i.e. the events reachable by walking the graph induced
+by an event's auth events links).</p>
+<p>The <em>auth chain difference</em> of a collection of state sets is the union minus the
+intersection of the sets of auth chains corresponding to the state sets, i.e an
+event is in the auth chain difference if it is reachable by walking the auth
+event graph from at least one of the state sets but not from <em>all</em> of the state
+sets.</p>
+<h2 id="breadth-first-walk-algorithm"><a class="header" href="#breadth-first-walk-algorithm">Breadth First Walk Algorithm</a></h2>
+<p>A way of calculating the auth chain difference without calculating the full auth
+chains for each state set is to do a parallel breadth first walk (ordered by
+depth) of each state set's auth chain. By tracking which events are reachable
+from each state set we can finish early if every pending event is reachable from
+every state set.</p>
+<p>This can work well for state sets that have a small auth chain difference, but
+can be very inefficient for larger differences. However, this algorithm is still
+used if we don't have a chain cover index for the room (e.g. because we're in
+the process of indexing it).</p>
+<h2 id="chain-cover-index"><a class="header" href="#chain-cover-index">Chain Cover Index</a></h2>
+<p>Synapse computes auth chain differences by pre-computing a &quot;chain cover&quot; index
+for the auth chain in a room, allowing us to efficiently make reachability queries
+like &quot;is event <code>A</code> in the auth chain of event <code>B</code>?&quot;. We could do this with an index
+that tracks all pairs <code>(A, B)</code> such that <code>A</code> is in the auth chain of <code>B</code>. However, this
+would be prohibitively large, scaling poorly as the room accumulates more state
+events.</p>
+<p>Instead, we break down the graph into <em>chains</em>. A chain is a subset of a DAG
+with the following property: for any pair of events <code>E</code> and <code>F</code> in the chain,
+the chain contains a path <code>E -&gt; F</code> or a path <code>F -&gt; E</code>. This forces a chain to be
+linear (without forks), e.g. <code>E -&gt; F -&gt; G -&gt; ... -&gt; H</code>. Each event in the chain
+is given a <em>sequence number</em> local to that chain. The oldest event <code>E</code> in the
+chain has sequence number 1. If <code>E</code> has a child <code>F</code> in the chain, then <code>F</code> has
+sequence number 2. If <code>E</code> has a grandchild <code>G</code> in the chain, then <code>G</code> has
+sequence number 3; and so on.</p>
+<p>Synapse ensures that each persisted event belongs to exactly one chain, and
+tracks how the chains are connected to one another. This allows us to
+efficiently answer reachability queries. Doing so uses less storage than
+tracking reachability on an event-by-event basis, particularly when we have
+fewer and longer chains. See</p>
+<blockquote>
+<p>Jagadish, H. (1990). <a href="https://doi.org/10.1145/99935.99944">A compression technique to materialize transitive closure</a>.
+<em>ACM Transactions on Database Systems (TODS)</em>, 15*(4)*, 558-598.</p>
+</blockquote>
+<p>for the original idea or</p>
+<blockquote>
+<p>Y. Chen, Y. Chen, <a href="https://doi.org/10.1109/ICDE.2008.4497498">An efficient algorithm for answering graph
+reachability queries</a>,
+in: 2008 IEEE 24th International Conference on Data Engineering, April 2008,
+pp. 893–902. (PDF available via <a href="https://scholar.google.com/scholar?q=Y.%20Chen,%20Y.%20Chen,%20An%20efficient%20algorithm%20for%20answering%20graph%20reachability%20queries,%20in:%202008%20IEEE%2024th%20International%20Conference%20on%20Data%20Engineering,%20April%202008,%20pp.%20893902.">Google Scholar</a>.)</p>
+</blockquote>
+<p>for a more modern take.</p>
+<p>In practical terms, the chain cover assigns every event a
+<em>chain ID</em> and <em>sequence number</em> (e.g. <code>(5,3)</code>), and maintains a map of <em>links</em>
+between events in chains (e.g. <code>(5,3) -&gt; (2,4)</code>) such that <code>A</code> is reachable by <code>B</code>
+(i.e. <code>A</code> is in the auth chain of <code>B</code>) if and only if either:</p>
+<ol>
+<li><code>A</code> and <code>B</code> have the same chain ID and <code>A</code>'s sequence number is less than <code>B</code>'s
+sequence number; or</li>
+<li>there is a link <code>L</code> between <code>B</code>'s chain ID and <code>A</code>'s chain ID such that
+<code>L.start_seq_no</code> &lt;= <code>B.seq_no</code> and <code>A.seq_no</code> &lt;= <code>L.end_seq_no</code>.</li>
+</ol>
+<p>There are actually two potential implementations, one where we store links from
+each chain to every other reachable chain (the transitive closure of the links
+graph), and one where we remove redundant links (the transitive reduction of the
+links graph) e.g. if we have chains <code>C3 -&gt; C2 -&gt; C1</code> then the link <code>C3 -&gt; C1</code>
+would not be stored. Synapse uses the former implementation so that it doesn't
+need to recurse to test reachability between chains. This trades-off extra storage
+in order to save CPU cycles and DB queries.</p>
+<h3 id="example"><a class="header" href="#example">Example</a></h3>
+<p>An example auth graph would look like the following, where chains have been
+formed based on type/state_key and are denoted by colour and are labelled with
+<code>(chain ID, sequence number)</code>. Links are denoted by the arrows (links in grey
+are those that would be remove in the second implementation described above).</p>
+<p><img src="auth_chain_diff.dot.png" alt="Example" /></p>
+<p>Note that we don't include all links between events and their auth events, as
+most of those links would be redundant. For example, all events point to the
+create event, but each chain only needs the one link from it's base to the
+create event.</p>
+<h2 id="using-the-index"><a class="header" href="#using-the-index">Using the Index</a></h2>
+<p>This index can be used to calculate the auth chain difference of the state sets
+by looking at the chain ID and sequence numbers reachable from each state set:</p>
+<ol>
+<li>For every state set lookup the chain ID/sequence numbers of each state event</li>
+<li>Use the index to find all chains and the maximum sequence number reachable
+from each state set.</li>
+<li>The auth chain difference is then all events in each chain that have sequence
+numbers between the maximum sequence number reachable from <em>any</em> state set and
+the minimum reachable by <em>all</em> state sets (if any).</li>
+</ol>
+<p>Note that steps 2 is effectively calculating the auth chain for each state set
+(in terms of chain IDs and sequence numbers), and step 3 is calculating the
+difference between the union and intersection of the auth chains.</p>
+<h3 id="worked-example"><a class="header" href="#worked-example">Worked Example</a></h3>
+<p>For example, given the above graph, we can calculate the difference between
+state sets consisting of:</p>
+<ol>
+<li><code>S1</code>: Alice's invite <code>(4,1)</code> and Bob's second join <code>(2,2)</code>; and</li>
+<li><code>S2</code>: Alice's second join <code>(4,3)</code> and Bob's first join <code>(2,1)</code>.</li>
+</ol>
+<p>Using the index we see that the following auth chains are reachable from each
+state set:</p>
+<ol>
+<li><code>S1</code>: <code>(1,1)</code>, <code>(2,2)</code>, <code>(3,1)</code> &amp; <code>(4,1)</code></li>
+<li><code>S2</code>: <code>(1,1)</code>, <code>(2,1)</code>, <code>(3,2)</code> &amp; <code>(4,3)</code></li>
+</ol>
+<p>And so, for each the ranges that are in the auth chain difference:</p>
+<ol>
+<li>Chain 1: None, (since everything can reach the create event).</li>
+<li>Chain 2: The range <code>(1, 2]</code> (i.e. just <code>2</code>), as <code>1</code> is reachable by all state
+sets and the maximum reachable is <code>2</code> (corresponding to Bob's second join).</li>
+<li>Chain 3: Similarly the range <code>(1, 2]</code> (corresponding to the second power
+level).</li>
+<li>Chain 4: The range <code>(1, 3]</code> (corresponding to both of Alice's joins).</li>
+</ol>
+<p>So the final result is: Bob's second join <code>(2,2)</code>, the second power level
+<code>(3,2)</code> and both of Alice's joins <code>(4,2)</code> &amp; <code>(4,3)</code>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="development/room-dag-concepts.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="media_repository.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="development/room-dag-concepts.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="media_repository.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>
