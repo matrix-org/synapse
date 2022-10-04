@@ -557,25 +557,26 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             }
         )
 
+        # Keep track of the count and make sure we don't make any of these requests
         event_endpoint_requested_count = 0
         room_state_ids_endpoint_requested_count = 0
         room_state_endpoint_requested_count = 0
 
         async def get_event(
             destination: str, event_id: str, timeout: Optional[int] = None
-        ) -> JsonDict:
+        ) -> None:
             nonlocal event_endpoint_requested_count
             event_endpoint_requested_count += 1
 
         async def get_room_state_ids(
             destination: str, room_id: str, event_id: str
-        ) -> JsonDict:
+        ) -> None:
             nonlocal room_state_ids_endpoint_requested_count
             room_state_ids_endpoint_requested_count += 1
 
         async def get_room_state(
             room_version: RoomVersion, destination: str, room_id: str, event_id: str
-        ) -> StateRequestResponse:
+        ) -> None:
             nonlocal room_state_endpoint_requested_count
             room_state_endpoint_requested_count += 1
 
@@ -604,19 +605,28 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         if event_endpoint_requested_count > 0:
             self.fail(
                 "We don't expect an outbound request to /event in the happy path but if "
-                + "the logic is sneaking around what we expect, make sure to fail the test "
+                "the logic is sneaking around what we expect, make sure to fail the test. "
+                "We don't expect it because the signature failure should cause us to backoff "
+                "and not asking about pulled_event_without_signatures="
+                f"{pulled_event_without_signatures.event_id} again"
             )
 
         if room_state_ids_endpoint_requested_count > 0:
             self.fail(
                 "We don't expect an outbound request to /state_ids in the happy path but if "
-                + "the logic is sneaking around what we expect, make sure to fail the test "
+                "the logic is sneaking around what we expect, make sure to fail the test. "
+                "We don't expect it because the signature failure should cause us to backoff "
+                "and not asking about pulled_event_without_signatures="
+                f"{pulled_event_without_signatures.event_id} again"
             )
 
         if room_state_endpoint_requested_count > 0:
             self.fail(
                 "We don't expect an outbound request to /state in the happy path but if "
-                + "the logic is sneaking around what we expect, make sure to fail the test "
+                "the logic is sneaking around what we expect, make sure to fail the test. "
+                "We don't expect it because the signature failure should cause us to backoff "
+                "and not asking about pulled_event_without_signatures="
+                f"{pulled_event_without_signatures.event_id} again"
             )
 
         # Make sure we only recorded a single failure which corresponds to the signature
