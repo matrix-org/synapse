@@ -334,23 +334,27 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         remote_server = "test:8080"
         store = self.hs.get_datastores().main
 
-        self.get_success(store.store_local_media(
-            media_id="local",
-            media_type="image/png",
-            media_length=50,
-            time_now_ms=self.clock.time_msec(),
-            upload_name=None,
-            user_id=UserID.from_string("@whatever:test"),
-        ))
-        self.get_success(store.store_cached_remote_media(
-            media_id="remote",
-            media_type="image/png",
-            media_length=50,
-            origin=remote_server,
-            time_now_ms=self.clock.time_msec(),
-            upload_name=None,
-            filesystem_id="remote"
-        ))
+        self.get_success(
+            store.store_local_media(
+                media_id="local",
+                media_type="image/png",
+                media_length=50,
+                time_now_ms=self.clock.time_msec(),
+                upload_name=None,
+                user_id=UserID.from_string("@whatever:test"),
+            )
+        )
+        self.get_success(
+            store.store_cached_remote_media(
+                media_id="remote",
+                media_type="image/png",
+                media_length=50,
+                origin=remote_server,
+                time_now_ms=self.clock.time_msec(),
+                upload_name=None,
+                filesystem_id="remote",
+            )
+        )
 
         res = self.get_success(
             self.handler.check_avatar_size_and_mime_type("mxc://test/local")
@@ -358,7 +362,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertTrue(res)
 
         res = self.get_success(
-            self.handler.check_avatar_size_and_mime_type("mxc://" + remote_server + "/remote")
+            self.handler.check_avatar_size_and_mime_type(
+                "mxc://" + remote_server + "/remote"
+            )
         )
         self.assertTrue(res)
 
