@@ -210,18 +210,27 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
     ) -> Tuple[Union[str, None], List[str]]:
         if not room_types:
             return None, []
-        else:
-            # We use None when we want get rooms without a type
-            is_null_clause = ""
-            if None in room_types:
-                is_null_clause = "OR room_type IS NULL"
-                room_types = [value for value in room_types if value is not None]
 
+        # Since None is used to represent a room without a type, care needs to
+        # be taken into account when constructing the where clause.
+        clauses = []
+        args = []
+
+        room_types_set = set(room_types)
+
+        # We use None to represent a room without a type.
+        if None in room_types_set:
+            clauses.append("room_type IS NULL")
+            room_types_set.remove(None)
+
+        # If there are other room types, generate the proper clause.
+        if room_types:
             list_clause, args = make_in_list_sql_clause(
-                self.database_engine, "room_type", room_types
+                self.database_engine, "room_type", room_types_set
             )
+            clauses.append(list_clause)
 
-            return f"({list_clause} {is_null_clause})", args
+        return f"({' OR '.join(clauses)})", args
 
     async def count_public_rooms(
         self,
