@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import MAIN_TIMELINE
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
@@ -133,13 +135,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
             self.assertEqual(
-                counts,
+                counts.main_timeline,
                 NotifCounts(
                     notify_count=noitf_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
             )
+            self.assertEqual(counts.threads, {})
 
         def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
@@ -186,6 +189,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(0, 0)
 
         _create_event()
+        _assert_counts(1, 0)
         _rotate()
         _assert_counts(1, 0)
 
@@ -235,6 +239,354 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(0, 0)
         _rotate()
         _assert_counts(0, 0)
+
+    def test_count_aggregation_threads(self) -> None:
+        """
+        This is essentially the same test as test_count_aggregation, but adds
+        events to the main timeline and to a thread.
+        """
+
+        user_id, token, _, other_token, room_id = self._create_users_and_room()
+        thread_id: str
+
+        last_event_id: str
+
+        def _assert_counts(
+            noitf_count: int,
+            highlight_count: int,
+            thread_notif_count: int,
+            thread_highlight_count: int,
+        ) -> None:
+            counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-unread-counts",
+                    self.store._get_unread_counts_by_receipt_txn,
+                    room_id,
+                    user_id,
+                )
+            )
+            self.assertEqual(
+                counts.main_timeline,
+                NotifCounts(
+                    notify_count=noitf_count,
+                    unread_count=0,
+                    highlight_count=highlight_count,
+                ),
+            )
+            if thread_notif_count or thread_highlight_count:
+                self.assertEqual(
+                    counts.threads,
+                    {
+                        thread_id: NotifCounts(
+                            notify_count=thread_notif_count,
+                            unread_count=0,
+                            highlight_count=thread_highlight_count,
+                        ),
+                    },
+                )
+            else:
+                self.assertEqual(counts.threads, {})
+
+        def _create_event(
+            highlight: bool = False, thread_id: Optional[str] = None
+        ) -> str:
+            content: JsonDict = {
+                "msgtype": "m.text",
+                "body": user_id if highlight else "msg",
+            }
+            if thread_id:
+                content["m.relates_to"] = {
+                    "rel_type": "m.thread",
+                    "event_id": thread_id,
+                }
+
+            result = self.helper.send_event(
+                room_id,
+                type="m.room.message",
+                content=content,
+                tok=other_token,
+            )
+            nonlocal last_event_id
+            last_event_id = result["event_id"]
+            return last_event_id
+
+        def _rotate() -> None:
+            self.get_success(self.store._rotate_notifs())
+
+        def _mark_read(event_id: str, thread_id: str = MAIN_TIMELINE) -> None:
+            self.get_success(
+                self.store.insert_receipt(
+                    room_id,
+                    "m.read",
+                    user_id=user_id,
+                    event_ids=[event_id],
+                    thread_id=thread_id,
+                    data={},
+                )
+            )
+
+        _assert_counts(0, 0, 0, 0)
+        thread_id = _create_event()
+        _assert_counts(1, 0, 0, 0)
+        _rotate()
+        _assert_counts(1, 0, 0, 0)
+
+        _create_event(thread_id=thread_id)
+        _assert_counts(1, 0, 1, 0)
+        _rotate()
+        _assert_counts(1, 0, 1, 0)
+
+        _create_event()
+        _assert_counts(2, 0, 1, 0)
+        _rotate()
+        _assert_counts(2, 0, 1, 0)
+
+        event_id = _create_event(thread_id=thread_id)
+        _assert_counts(2, 0, 2, 0)
+        _rotate()
+        _assert_counts(2, 0, 2, 0)
+
+        _create_event()
+        _create_event(thread_id=thread_id)
+        _mark_read(event_id)
+        _assert_counts(1, 0, 3, 0)
+        _mark_read(event_id, thread_id)
+        _assert_counts(1, 0, 1, 0)
+
+        _mark_read(last_event_id)
+        _mark_read(last_event_id, thread_id)
+        _assert_counts(0, 0, 0, 0)
+
+        _create_event()
+        _create_event(thread_id=thread_id)
+        _assert_counts(1, 0, 1, 0)
+        _rotate()
+        _assert_counts(1, 0, 1, 0)
+
+        # Delete old event push actions, this should not affect the (summarised) count.
+        self.get_success(self.store._remove_old_push_actions_that_have_rotated())
+        _assert_counts(1, 0, 1, 0)
+
+        _mark_read(last_event_id)
+        _mark_read(last_event_id, thread_id)
+        _assert_counts(0, 0, 0, 0)
+
+        _create_event(True)
+        _assert_counts(1, 1, 0, 0)
+        _rotate()
+        _assert_counts(1, 1, 0, 0)
+
+        event_id = _create_event(True, thread_id)
+        _assert_counts(1, 1, 1, 1)
+        _rotate()
+        _assert_counts(1, 1, 1, 1)
+
+        # Check that adding another notification and rotating after highlight
+        # works.
+        _create_event()
+        _rotate()
+        _assert_counts(2, 1, 1, 1)
+
+        _create_event(thread_id=thread_id)
+        _rotate()
+        _assert_counts(2, 1, 2, 1)
+
+        # Check that sending read receipts at different points results in the
+        # right counts.
+        _mark_read(event_id)
+        _assert_counts(1, 0, 2, 1)
+        _mark_read(event_id, thread_id)
+        _assert_counts(1, 0, 1, 0)
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 1, 0)
+        _mark_read(last_event_id, thread_id)
+        _assert_counts(0, 0, 0, 0)
+
+        _create_event(True)
+        _create_event(True, thread_id)
+        _assert_counts(1, 1, 1, 1)
+        _mark_read(last_event_id)
+        _mark_read(last_event_id, thread_id)
+        _assert_counts(0, 0, 0, 0)
+        _rotate()
+        _assert_counts(0, 0, 0, 0)
+
+    def test_count_aggregation_mixed(self) -> None:
+        """
+        This is essentially the same test as test_count_aggregation_threads, but
+        sends both unthreaded and threaded receipts.
+        """
+
+        # Create a user to receive notifications and send receipts.
+        user_id = self.register_user("user1235", "pass")
+        token = self.login("user1235", "pass")
+
+        # And another users to send events.
+        other_id = self.register_user("other", "pass")
+        other_token = self.login("other", "pass")
+
+        # Create a room and put both users in it.
+        room_id = self.helper.create_room_as(user_id, tok=token)
+        self.helper.join(room_id, other_id, tok=other_token)
+        thread_id: str
+
+        last_event_id: str
+
+        def _assert_counts(
+            noitf_count: int,
+            highlight_count: int,
+            thread_notif_count: int,
+            thread_highlight_count: int,
+        ) -> None:
+            counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-unread-counts",
+                    self.store._get_unread_counts_by_receipt_txn,
+                    room_id,
+                    user_id,
+                )
+            )
+            self.assertEqual(
+                counts.main_timeline,
+                NotifCounts(
+                    notify_count=noitf_count,
+                    unread_count=0,
+                    highlight_count=highlight_count,
+                ),
+            )
+            if thread_notif_count or thread_highlight_count:
+                self.assertEqual(
+                    counts.threads,
+                    {
+                        thread_id: NotifCounts(
+                            notify_count=thread_notif_count,
+                            unread_count=0,
+                            highlight_count=thread_highlight_count,
+                        ),
+                    },
+                )
+            else:
+                self.assertEqual(counts.threads, {})
+
+        def _create_event(
+            highlight: bool = False, thread_id: Optional[str] = None
+        ) -> str:
+            content: JsonDict = {
+                "msgtype": "m.text",
+                "body": user_id if highlight else "msg",
+            }
+            if thread_id:
+                content["m.relates_to"] = {
+                    "rel_type": "m.thread",
+                    "event_id": thread_id,
+                }
+
+            result = self.helper.send_event(
+                room_id,
+                type="m.room.message",
+                content=content,
+                tok=other_token,
+            )
+            nonlocal last_event_id
+            last_event_id = result["event_id"]
+            return last_event_id
+
+        def _rotate() -> None:
+            self.get_success(self.store._rotate_notifs())
+
+        def _mark_read(event_id: str, thread_id: Optional[str] = None) -> None:
+            self.get_success(
+                self.store.insert_receipt(
+                    room_id,
+                    "m.read",
+                    user_id=user_id,
+                    event_ids=[event_id],
+                    thread_id=thread_id,
+                    data={},
+                )
+            )
+
+        _assert_counts(0, 0, 0, 0)
+        thread_id = _create_event()
+        _assert_counts(1, 0, 0, 0)
+        _rotate()
+        _assert_counts(1, 0, 0, 0)
+
+        _create_event(thread_id=thread_id)
+        _assert_counts(1, 0, 1, 0)
+        _rotate()
+        _assert_counts(1, 0, 1, 0)
+
+        _create_event()
+        _assert_counts(2, 0, 1, 0)
+        _rotate()
+        _assert_counts(2, 0, 1, 0)
+
+        event_id = _create_event(thread_id=thread_id)
+        _assert_counts(2, 0, 2, 0)
+        _rotate()
+        _assert_counts(2, 0, 2, 0)
+
+        _create_event()
+        _create_event(thread_id=thread_id)
+        _mark_read(event_id)
+        _assert_counts(1, 0, 1, 0)
+
+        _mark_read(last_event_id, MAIN_TIMELINE)
+        _mark_read(last_event_id, thread_id)
+        _assert_counts(0, 0, 0, 0)
+
+        _create_event()
+        _create_event(thread_id=thread_id)
+        _assert_counts(1, 0, 1, 0)
+        _rotate()
+        _assert_counts(1, 0, 1, 0)
+
+        # Delete old event push actions, this should not affect the (summarised) count.
+        self.get_success(self.store._remove_old_push_actions_that_have_rotated())
+        _assert_counts(1, 0, 1, 0)
+
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 0, 0)
+
+        _create_event(True)
+        _assert_counts(1, 1, 0, 0)
+        _rotate()
+        _assert_counts(1, 1, 0, 0)
+
+        event_id = _create_event(True, thread_id)
+        _assert_counts(1, 1, 1, 1)
+        _rotate()
+        _assert_counts(1, 1, 1, 1)
+
+        # Check that adding another notification and rotating after highlight
+        # works.
+        _create_event()
+        _rotate()
+        _assert_counts(2, 1, 1, 1)
+
+        _create_event(thread_id=thread_id)
+        _rotate()
+        _assert_counts(2, 1, 2, 1)
+
+        # Check that sending read receipts at different points results in the
+        # right counts.
+        _mark_read(event_id)
+        _assert_counts(1, 0, 1, 0)
+        _mark_read(event_id, MAIN_TIMELINE)
+        _assert_counts(1, 0, 1, 0)
+        _mark_read(last_event_id, MAIN_TIMELINE)
+        _assert_counts(0, 0, 1, 0)
+        _mark_read(last_event_id, thread_id)
+        _assert_counts(0, 0, 0, 0)
+
+        _create_event(True)
+        _create_event(True, thread_id)
+        _assert_counts(1, 1, 1, 1)
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 0, 0)
+        _rotate()
+        _assert_counts(0, 0, 0, 0)
 
     def test_find_first_stream_ordering_after_ts(self) -> None:
         def add_event(so: int, ts: int) -> None:
