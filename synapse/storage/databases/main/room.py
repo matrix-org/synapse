@@ -250,14 +250,6 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         def _count_public_rooms_txn(txn: LoggingTransaction) -> int:
             query_args = []
 
-            room_type_clause, args = self._construct_room_type_where_clause(
-                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
-                if search_filter
-                else None
-            )
-            room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
-            query_args += args
-
             if network_tuple:
                 if network_tuple.appservice_id:
                     published_sql = """
@@ -276,6 +268,14 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     SELECT room_id FROM rooms WHERE is_public
                     UNION SELECT room_id from appservice_room_list
             """
+
+            room_type_clause, args = self._construct_room_type_where_clause(
+                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
+                if search_filter
+                else None
+            )
+            room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
+            query_args += args
 
             sql = f"""
                 SELECT
