@@ -179,7 +179,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-   See [Delegation of incoming federation traffic](../../delegate.md) for more
+See [Delegation of incoming federation traffic](../../delegate.md) for more
 information.
 
 Example configuration:
