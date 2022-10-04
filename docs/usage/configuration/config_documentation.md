@@ -3418,9 +3418,11 @@ This option has the following sub-options:
    the user directory. If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
+
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
+    
     These indexes are built the first time Synapse starts; admins can
     manually trigger a rebuild via the API following the instructions
     [for running background updates](../administration/admin_api/background_updates.md#run),
