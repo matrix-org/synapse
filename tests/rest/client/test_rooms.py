@@ -2217,7 +2217,7 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         room_types: Optional[List[Union[str, None]]],
         instance_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
-        body = {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}}
+        body: JsonDict = {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}}
         if instance_id:
             body["third_party_instance_id"] = "test|test"
 

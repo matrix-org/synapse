@@ -207,14 +207,14 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     def _construct_room_type_where_clause(
         self, room_types: Union[List[Union[str, None]], None]
-    ) -> Tuple[Union[str, None], List[str]]:
+    ) -> Tuple[Union[str, None], list]:
         if not room_types:
             return None, []
 
         # Since None is used to represent a room without a type, care needs to
         # be taken into account when constructing the where clause.
         clauses = []
-        args = []
+        args: list = []
 
         room_types_set = set(room_types)
 
