@@ -22,7 +22,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
     cast,
@@ -1535,7 +1534,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     async def filter_event_ids_with_pull_attempt_backoff(
         self,
         room_id: str,
-        event_ids: Sequence[str],
+        event_ids: Collection[str],
     ) -> List[str]:
         """
         Filter down the events to ones that we've failed to pull before recently. Uses
