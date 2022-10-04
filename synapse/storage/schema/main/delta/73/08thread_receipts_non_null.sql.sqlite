@@ -69,8 +69,8 @@ CREATE INDEX receipts_linearized_user ON receipts_linearized( user_id );
 
 -- Re-run background updates from 72/08thread_receipts.sql.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7303, 'receipts_linearized_unique_index', '{}')
+  (7308, 'receipts_linearized_unique_index', '{}')
   ON CONFLICT (update_name) DO NOTHING;
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7303, 'receipts_graph_unique_index', '{}')
+  (7308, 'receipts_graph_unique_index', '{}')
   ON CONFLICT (update_name) DO NOTHING;
