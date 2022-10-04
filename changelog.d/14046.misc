@@ -1,0 +1,1 @@
+Fix CI config for building wheels on OSX. Regressed in #13983.
