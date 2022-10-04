@@ -309,7 +309,7 @@ class GenericWorkerServer(HomeServer):
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
                     room.register_servlets(self, resource, is_worker=True)
-                    relations.register_servlets(hs, client_resource)
+                    relations.register_servlets(self, resource)
                     room.register_deprecated_servlets(self, resource)
                     initial_sync.register_servlets(self, resource)
                     room_batch.register_servlets(self, resource)
