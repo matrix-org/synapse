@@ -14,7 +14,6 @@
 # limitations under the License.
 import email.utils
 import logging
-import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -790,7 +789,8 @@ class ModuleApi:
 
         Added in Synapse v1.9.0.
 
-        This is deprecated in favor of create_login_token.
+        This was deprecated in Synapse v1.69.0 in favor of create_login_token, and will
+        be removed in Synapse 1.71.0.
 
         Args:
             user_id: gives the ID of the user that the token is for
@@ -801,10 +801,10 @@ class ModuleApi:
                to get this token, if any. This is encoded in the token so that
                /login can report stats on number of successful logins by IdP.
         """
-        warnings.warn(
-            "ModuleApi.generate_short_term_login_token() is deprecated "
-            "in favor of ModuleApi.create_login_token().",
-            DeprecationWarning,
+        logger.warn(
+            "A module configured on this server uses ModuleApi.generate_short_term_login_token(), "
+            "which is deprecated in favor of ModuleApi.create_login_token(), and will be removed in "
+            "Synapse 1.71.0",
         )
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
             user_id,
