@@ -27,6 +27,8 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.events import _EventInternalMetadata
+from synapse.rest import admin
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict
@@ -43,6 +45,12 @@ class _BackfillSetupInfo:
 
 
 class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
@@ -1121,6 +1129,63 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertEqual(backfill_event_ids, ["insertion_eventA"])
+
+    def test_filter_event_ids_with_pull_attempt_backoff(
+        self,
+    ):
+        """
+        Test to make sure only event IDs we should backoff from are returned.
+        """
+
+        # Create the room
+        user_id = self.register_user("alice", "test")
+        tok = self.login("alice", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(
+                room_id, "$failed_event_id", "fake cause"
+            )
+        )
+
+        event_ids_to_backoff = self.get_success(
+            self.store.filter_event_ids_with_pull_attempt_backoff(
+                room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
+            )
+        )
+
+        self.assertEqual(event_ids_to_backoff, ["$failed_event_id"])
+
+    def test_filter_event_ids_with_pull_attempt_backoff_retry_after_backoff_duration(
+        self,
+    ):
+        """
+        Test to make sure only event IDs are returned after the backoff duration has
+        elapsed.
+        """
+
+        # Create the room
+        user_id = self.register_user("alice", "test")
+        tok = self.login("alice", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(
+                room_id, "$failed_event_id", "fake cause"
+            )
+        )
+
+        # Now advance time by 2 hours so we wait long enough for the single failed
+        # attempt (2^1 hours).
+        self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
+
+        event_ids_to_backoff = self.get_success(
+            self.store.filter_event_ids_with_pull_attempt_backoff(
+                room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
+            )
+        )
+
+        self.assertEqual(event_ids_to_backoff, [])
 
 
 @attr.s

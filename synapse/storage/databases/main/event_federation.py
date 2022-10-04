@@ -1532,78 +1532,75 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
 
     @trace
-    async def filter_events_with_pull_attempt_backoff(
+    async def filter_event_ids_with_pull_attempt_backoff(
         self,
         room_id: str,
         event_ids: Sequence[str],
     ) -> List[str]:
         """
-        Filter out events that we've failed to pull before
-        recently. Uses exponential backoff.
+        Filter down the events to ones that we've failed to pull before recently. Uses
+        exponential backoff.
 
         Args:
             room_id: The room that the events belong to
             event_ids: A list of events to filter down
 
         Returns:
-            List of event_ids that can be attempted to be pulled
+            List of event_ids that should not be attempted to be pulled
         """
-        return await self.db_pool.runInteraction(
-            "filter_events_with_pull_attempt_backoff",
-            self._filter_events_with_pull_attempt_backoff_txn,
-            room_id,
-            event_ids,
-        )
 
-    def _filter_events_with_pull_attempt_backoff_txn(
-        self,
-        txn: LoggingTransaction,
-        room_id: str,
-        event_ids: Sequence[str],
-    ) -> None:
-        where_event_ids_match_clause, values = make_in_list_sql_clause(
-            txn.database_engine, "event_id", event_ids
-        )
+        def _filter_event_ids_with_pull_attempt_backoff_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            where_event_ids_match_clause, values = make_in_list_sql_clause(
+                txn.database_engine, "event_id", event_ids
+            )
 
-        sql = """
-            SELECT event_id FROM event_failed_pull_attempts as failed_backfill_attempt_info
-            WHERE
-                failed_backfill_attempt_info.room_id = ?
-                %s /* where_event_ids_match_clause */
-                /**
-                * Exponential back-off (up to the upper bound) so we don't try to
-                * pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
-                *
-                * We use `1 << n` as a power of 2 equivalent for compatibility
-                * with older SQLites. The left shift equivalent only works with
-                * powers of 2 because left shift is a binary operation (base-2).
-                * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
-                */
-                AND (
-                    failed_backfill_attempt_info.event_id IS NULL
-                    OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
-                        (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "least"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "min"
+            else:
+                raise RuntimeError("Unknown database engine")
+
+            sql = f"""
+                SELECT event_id FROM event_failed_pull_attempts
+                WHERE
+                    room_id = ?
+                    AND {where_event_ids_match_clause}
+                    /**
+                    * Exponential back-off (up to the upper bound) so we don't try to
+                    * pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+                    *
+                    * We use `1 << n` as a power of 2 equivalent for compatibility
+                    * with older SQLites. The left shift equivalent only works with
+                    * powers of 2 because left shift is a binary operation (base-2).
+                    * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
+                    */
+                    AND ? /* current_time */ < last_attempt_ts + (
+                        (1 << {least_function}(num_attempts, ? /* max doubling steps */))
                         * ? /* step */
                     )
-                )
-        """
+            """
 
-        if isinstance(self.database_engine, PostgresEngine):
-            least_function = "least"
-        elif isinstance(self.database_engine, Sqlite3Engine):
-            least_function = "min"
-        else:
-            raise RuntimeError("Unknown database engine")
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    *values,
+                    self._clock.time_msec(),
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
+                ),
+            )
 
-        txn.execute(
-            sql % (where_event_ids_match_clause, least_function),
-            (
-                room_id,
-                *values,
-                self._clock.time_msec(),
-                BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
-                BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
-            ),
+            event_ids_to_ignore_result = cast(List[Tuple[str]], txn.fetchall())
+
+            return [event_id for event_id, in event_ids_to_ignore_result]
+
+        return await self.db_pool.runInteraction(
+            "filter_event_ids_with_pull_attempt_backoff_txn",
+            _filter_event_ids_with_pull_attempt_backoff_txn,
         )
 
     async def get_missing_events(

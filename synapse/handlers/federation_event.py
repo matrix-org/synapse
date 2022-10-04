@@ -956,7 +956,7 @@ class FederationEventHandler:
         missing_prevs = prevs - seen
 
         # Filter out events we've tried to pull recently
-        prevs_to_ignore = await self.store.filter_events_with_pull_attempt_backoff(
+        prevs_to_ignore = await self.store.filter_event_ids_with_pull_attempt_backoff(
             room_id, missing_prevs
         )
         missing_prevs = missing_prevs - prevs_to_ignore
