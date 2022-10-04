@@ -1471,7 +1471,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         num_devices = await self.db_pool.simple_select_one_onecol(
             table="devices",
-            keyvalues={"user_id": user_id, "hidden": "false"},
+            keyvalues={"user_id": user_id, "hidden": False},
             retcol="COALESCE(COUNT(*), 0)",
             desc="count_devices",
         )
