@@ -2174,7 +2174,7 @@ class PersistEventsStore:
             (
                 (event.event_id,)
                 for event, _ in all_events_and_contexts
-                if not event.internal_metadata.is_outlier()
+                if event.internal_metadata.is_notifiable()
             ),
         )
 

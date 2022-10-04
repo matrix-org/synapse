@@ -1540,7 +1540,9 @@ class TimestampLookupHandler:
             )
 
             likely_domains = (
-                await self._storage_controllers.state.get_current_hosts_in_room(room_id)
+                await self._storage_controllers.state.get_current_hosts_in_room_ordered(
+                    room_id
+                )
             )
 
             # Loop through each homeserver candidate until we get a succesful response
