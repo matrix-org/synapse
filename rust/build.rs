@@ -22,7 +22,7 @@ fn main() -> Result<(), std::io::Error> {
 
         for entry in entries {
             if entry.is_dir() {
-                dirs.push(entry)
+                dirs.push(entry);
             } else {
                 paths.push(entry.to_str().expect("valid rust paths").to_string());
             }

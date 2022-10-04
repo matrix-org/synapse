@@ -246,6 +246,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
     ):
         super().__init__(database, db_conn, hs)
 
+        # Track when the process started.
+        self._started_ts = self._clock.time_msec()
+
         # These get correctly set by _find_stream_orderings_for_times_txn
         self.stream_ordering_month_ago: Optional[int] = None
         self.stream_ordering_day_ago: Optional[int] = None
@@ -263,6 +266,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         if hs.config.worker.run_background_tasks:
             self._rotate_notif_loop = self._clock.looping_call(
                 self._rotate_notifs, 30 * 1000
+            )
+
+            self._clear_old_staging_loop = self._clock.looping_call(
+                self._clear_old_push_actions_staging, 30 * 60 * 1000
             )
 
         self.db_pool.updates.register_background_index_update(
@@ -978,7 +985,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # can be used to insert into the `event_push_actions_staging` table.
         def _gen_entry(
             user_id: str, actions: Collection[Union[Mapping, str]]
-        ) -> Tuple[str, str, str, int, int, int, str]:
+        ) -> Tuple[str, str, str, int, int, int, str, int]:
             is_highlight = 1 if _action_has_highlight(actions) else 0
             notif = 1 if "notify" in actions else 0
             return (
@@ -989,6 +996,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 is_highlight,  # highlight column
                 int(count_as_unread),  # unread column
                 thread_id,  # thread_id column
+                self._clock.time_msec(),  # inserted_ts column
             )
 
         await self.db_pool.simple_insert_many(
@@ -1001,6 +1009,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 "highlight",
                 "unread",
                 "thread_id",
+                "inserted_ts",
             ),
             values=[
                 _gen_entry(user_id, actions)
@@ -1570,6 +1579,53 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             )
             if done:
                 break
+
+    @wrap_as_background_process("_clear_old_push_actions_staging")
+    async def _clear_old_push_actions_staging(self) -> None:
+        """Clear out any old event push actions from the staging table for
+        events that we failed to persist.
+        """
+
+        # We delete anything more than an hour old, on the assumption that we'll
+        # never take more than an hour to persist an event.
+        delete_before_ts = self._clock.time_msec() - 60 * 60 * 1000
+
+        if self._started_ts > delete_before_ts:
+            # We need to wait for at least an hour before we started deleting,
+            # so that we know it's safe to delete rows with NULL `inserted_ts`.
+            return
+
+        # We don't have an index on `inserted_ts`, instead we assume that the
+        # number of "live" rows in `event_push_actions_staging` is small enough
+        # that an infrequent periodic scan won't cause a problem.
+        #
+        # Note: we also delete any columns with NULL `inserted_ts`, this is safe
+        # as we added a default value to new rows and so they must be at least
+        # an hour old.
+        limit = 1000
+        sql = """
+            DELETE FROM event_push_actions_staging WHERE event_id IN (
+                SELECT event_id FROM event_push_actions_staging WHERE
+                inserted_ts < ? OR inserted_ts IS NULL
+                LIMIT ?
+            )
+        """
+
+        def _clear_old_push_actions_staging_txn(txn: LoggingTransaction) -> bool:
+            txn.execute(sql, (delete_before_ts, limit))
+            return txn.rowcount >= limit
+
+        while True:
+            # Returns true if we have more stuff to delete from the table.
+            deleted = await self.db_pool.runInteraction(
+                "_clear_old_push_actions_staging", _clear_old_push_actions_staging_txn
+            )
+
+            if not deleted:
+                return
+
+            # We sleep to ensure that we don't overwhelm the DB.
+            await self._clock.sleep(1.0)
 
 
 class EventPushActionsStore(EventPushActionsWorkerStore):
