@@ -358,7 +358,10 @@ class SyncHandler:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
             result: SyncResult = await self.current_sync_for_user(
-                sync_config, since_token, full_state=full_state
+                sync_config,
+                since_token,
+                full_state=full_state,
+                debug_current_token=debug_current_token,
             )
         else:
             # Otherwise, we wait for something to happen and report it to the user.
