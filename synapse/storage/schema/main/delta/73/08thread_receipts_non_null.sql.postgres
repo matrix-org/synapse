@@ -13,7 +13,11 @@
  * limitations under the License.
  */
 
--- The columns can now be made non-nullable.
-ALTER TABLE event_push_actions_staging ALTER COLUMN thread_id SET NOT NULL;
-ALTER TABLE event_push_actions ALTER COLUMN thread_id SET NOT NULL;
-ALTER TABLE event_push_summary ALTER COLUMN thread_id SET NOT NULL;
+-- Drop constraint on (room_id, receipt_type, user_id).
+
+-- Rebuild the unique constraint with the thread_id.
+ALTER TABLE receipts_linearized
+    DROP CONSTRAINT receipts_linearized_uniqueness;
+
+ALTER TABLE receipts_graph
+    DROP CONSTRAINT receipts_graph_uniqueness;
