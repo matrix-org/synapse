@@ -95,10 +95,10 @@ class DeleteDevicesRestServlet(RestServlet):
             body = parse_and_validate_json_object_from_request(request, self.PostBody)
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
-                # DELETE
+                # TODO: Can/should we remove this fallback now?
                 # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
-                body = {}
+                body = self.PostBody.parse_obj({})
             else:
                 raise e
 
@@ -162,13 +162,14 @@ class DeviceRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
 
         try:
-            body = parse_json_object_from_request(request)
+            body = parse_and_validate_json_object_from_request(request, self.DeleteBody)
 
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
+                # TODO: can/should we remove this fallback now?
                 # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
-                body = {}
+                body = self.DeleteBody.parse_obj({})
             else:
                 raise
 
