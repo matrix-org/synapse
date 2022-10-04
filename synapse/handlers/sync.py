@@ -1493,16 +1493,14 @@ class SyncHandler:
                 since_token.device_list_key
             )
             if changed_users is not None:
-                result = await self.store.get_rooms_for_users_with_stream_ordering(
-                    changed_users
-                )
+                result = await self.store.get_rooms_for_users(changed_users)
 
                 for changed_user_id, entries in result.items():
                     # Check if the changed user shares any rooms with the user,
                     # or if the changed user is the syncing user (as we always
                     # want to include device list updates of their own devices).
                     if user_id == changed_user_id or any(
-                        e.room_id in joined_rooms for e in entries
+                        rid in joined_rooms for rid in entries
                     ):
                         users_that_have_changed.add(changed_user_id)
             else:
@@ -1536,13 +1534,9 @@ class SyncHandler:
                 newly_left_users.update(left_users)
 
             # Remove any users that we still share a room with.
-            left_users_rooms = (
-                await self.store.get_rooms_for_users_with_stream_ordering(
-                    newly_left_users
-                )
-            )
+            left_users_rooms = await self.store.get_rooms_for_users(newly_left_users)
             for user_id, entries in left_users_rooms.items():
-                if any(e.room_id in joined_rooms for e in entries):
+                if any(rid in joined_rooms for rid in entries):
                     newly_left_users.discard(user_id)
 
             return DeviceListUpdates(
