@@ -29,7 +29,6 @@ from synapse.api.constants import EduTypes
 from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
-from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.types import (
     JsonDict,
     UserID,
@@ -59,12 +58,8 @@ class E2eKeysHandler:
 
         federation_registry = hs.get_federation_registry()
 
-        self._is_master = hs.config.worker.worker_app is None
-        if not self._is_master:
-            self._user_device_resync_client = (
-                ReplicationUserDevicesResyncRestServlet.make_client(hs)
-            )
-        else:
+        is_master = hs.config.worker.worker_app is None
+        if is_master:
             # Only register this edu handler on master as it requires writing
             # device updates to the db
             federation_registry.register_edu_handler(
@@ -318,14 +313,13 @@ class E2eKeysHandler:
             # probably be tracking their device lists. However, we haven't
             # done an initial sync on the device list so we do it now.
             try:
-                if self._is_master:
-                    resync_results = await self.device_handler.device_list_updater.user_device_resync(
+                resync_results = (
+                    await self.device_handler.device_list_updater.user_device_resync(
                         user_id
                     )
-                else:
-                    resync_results = await self._user_device_resync_client(
-                        user_id=user_id
-                    )
+                )
+                if resync_results is None:
+                    raise ValueError("Device resync failed")
 
                 # Add the device keys to the results.
                 user_devices = resync_results["devices"]
