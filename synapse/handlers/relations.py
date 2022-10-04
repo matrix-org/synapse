@@ -78,6 +78,7 @@ class RelationsHandler:
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
+        include_original_event: bool = False,
     ) -> JsonDict:
         """Get related events of a event, ordered by topological ordering.
 
@@ -94,6 +95,7 @@ class RelationsHandler:
                 oldest first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
+            include_original_event: Whether to include the parent event.
 
         Returns:
             The pagination chunk.
@@ -138,25 +140,24 @@ class RelationsHandler:
             is_peeking=(member_event_id is None),
         )
 
-        now = self._clock.time_msec()
-        # Do not bundle aggregations when retrieving the original event because
-        # we want the content before relations are applied to it.
-        original_event = self._event_serializer.serialize_event(
-            event, now, bundle_aggregations=None
-        )
         # The relations returned for the requested event do include their
         # bundled aggregations.
         aggregations = await self.get_bundled_aggregations(
             events, requester.user.to_string()
         )
-        serialized_events = self._event_serializer.serialize_events(
-            events, now, bundle_aggregations=aggregations
-        )
 
-        return_value = {
-            "chunk": serialized_events,
-            "original_event": original_event,
+        now = self._clock.time_msec()
+        return_value: JsonDict = {
+            "chunk": self._event_serializer.serialize_events(
+                events, now, bundle_aggregations=aggregations
+            ),
         }
+        if include_original_event:
+            # Do not bundle aggregations when retrieving the original event because
+            # we want the content before relations are applied to it.
+            return_value["original_event"] = self._event_serializer.serialize_event(
+                event, now, bundle_aggregations=None
+            )
 
         if next_token:
             return_value["next_batch"] = await next_token.to_string(self._main_store)

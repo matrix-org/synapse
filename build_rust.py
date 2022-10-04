@@ -15,6 +15,9 @@ def build(setup_kwargs: Dict[str, Any]) -> None:
         path=cargo_toml_path,
         binding=Binding.PyO3,
         py_limited_api=True,
+        # We force always building in release mode, as we can't tell the
+        # difference between using `poetry` in development vs production.
+        debug=False,
     )
     setup_kwargs.setdefault("rust_extensions", []).append(extension)
     setup_kwargs["zip_safe"] = False

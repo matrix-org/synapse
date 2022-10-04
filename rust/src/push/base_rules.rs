@@ -173,7 +173,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3786.rule.room.server_acl"),
+        rule_id: Cow::Borrowed("global/override/.m.rule.room.server_acl"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
