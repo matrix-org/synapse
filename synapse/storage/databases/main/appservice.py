@@ -167,8 +167,9 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         Returns:
             List of user IDs that the appservice controls.
         """
-        # We can use `get_local_users_in_room(...)` here because an application
-        # service can only act on behalf of users of the server it's on.
+        # We can use `get_local_users_in_room(...)` here because an application service
+        # can only be interested in local users of the server it's on (ignore any remote
+        # users that might match the user namespace regex).
         local_users_in_room = await self.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )

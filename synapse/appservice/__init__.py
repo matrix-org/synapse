@@ -172,8 +172,9 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        # We can use `get_local_users_in_room(...)` here because an application
-        # service can only act on behalf of users of the server it's on.
+        # We can use `get_local_users_in_room(...)` here because an application service
+        # can only be interested in local users of the server it's on (ignore any remote
+        # users that might match the user namespace regex).
         #
         # In the future, we can consider re-using
         # `store.get_app_service_users_in_room` which is very similar to this
