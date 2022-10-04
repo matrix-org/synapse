@@ -29,7 +29,7 @@ jobs:
         run: docker buildx inspect
           
       - name: Log in to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -48,7 +48,7 @@ jobs:
             type=pep440,pattern={{raw}}
 
       - name: Build and push all platforms
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           push: true
           labels: "gitsha1=${{ github.sha }}"
