@@ -1311,7 +1311,15 @@ class SyncHandler:
         # this is due to some of the underlying streams not supporting the ability
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
-        now_token = debug_current_token or self.event_sources.get_current_token()
+        now_token = self.event_sources.get_current_token()
+
+        if debug_current_token:
+            logger.info(
+                "Overriding sync current token for debugging to: %r",
+                debug_current_token,
+            )
+            now_token = debug_current_token
+
         log_kv({"now_token": now_token})
 
         logger.debug(
