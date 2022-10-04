@@ -1136,7 +1136,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         """
         Test to make sure only event IDs we should backoff from are returned.
         """
-
         # Create the room
         user_id = self.register_user("alice", "test")
         tok = self.login("alice", "test")
@@ -1160,10 +1159,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self,
     ):
         """
-        Test to make sure event IDs are returned after the backoff duration has
-        elapsed.
+        Test to make sure event IDs are returned after the backoff duration has elapsed.
         """
-
         # Create the room
         user_id = self.register_user("alice", "test")
         tok = self.login("alice", "test")
