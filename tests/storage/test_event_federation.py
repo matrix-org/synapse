@@ -1160,7 +1160,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self,
     ):
         """
-        Test to make sure only event IDs are returned after the backoff duration has
+        Test to make sure event IDs are returned after the backoff duration has
         elapsed.
         """
 
