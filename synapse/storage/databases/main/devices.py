@@ -1466,6 +1466,40 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         return rows
 
+    async def get_stale_devices(self, user_id: str) -> Collection[str]:
+        """Get set of devices that we could delete for this user."""
+
+        num_devices = await self.db_pool.simple_select_one_onecol(
+            table="devices",
+            keyvalues={"user_id": user_id, "hidden": "false"},
+            retcol="COALESCE(COUNT(*), 0)",
+            desc="count_devices",
+        )
+
+        if num_devices > 10:
+            return ()
+
+        max_last_seen = self._clock.time_msec() - 14 * 24 * 60 * 60 * 1000
+
+        sql = """
+            SELECT DISTINCT device_id FROM devices
+            LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
+            WHERE
+                user_id = ?
+                AND not hidden
+                AND last_seen < ?
+                AND key_json IS NULL
+        """
+
+        def get_stale_devices_txn(txn: LoggingTransaction) -> Collection[str]:
+            txn.execute(sql, (user_id, max_last_seen))
+            return {device_id for device_id, in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_stale_devices",
+            get_stale_devices_txn,
+        )
+
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
     def __init__(
@@ -1517,7 +1551,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     "user_id": user_id,
                     "device_id": device_id,
                 },
-                values={},
+                values={
+                    "last_seen": self._clock.time_msec(),
+                },
                 insertion_values={
                     "display_name": initial_device_display_name,
                     "hidden": False,
