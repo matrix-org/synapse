@@ -106,6 +106,8 @@ class Codes(str, Enum):
     # Part of MSC3895.
     UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
 
+    USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
@@ -564,6 +566,20 @@ class UnredactedContentDeletedError(SynapseError):
         if self.content_keep_ms is not None:
             extra = {"fi.mau.msc2815.content_keep_ms": self.content_keep_ms}
         return cs_error(self.msg, self.errcode, **extra)
+
+
+class NotApprovedError(SynapseError):
+    def __init__(
+        self,
+        msg: str,
+        approval_notice_medium: str,
+    ):
+        super().__init__(
+            code=403,
+            msg=msg,
+            errcode=Codes.USER_AWAITING_APPROVAL,
+            additional_fields={"approval_notice_medium": approval_notice_medium},
+        )
 
 
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":

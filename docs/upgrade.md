@@ -88,6 +88,46 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.69.0
+
+## Changes to the receipts replication streams
+
+Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.
+
+
+## Deprecation of legacy Prometheus metric names
+
+In current versions of Synapse, some Prometheus metrics are emitted under two different names,
+with one of the names being older but non-compliant with OpenMetrics and Prometheus conventions
+and one of the names being newer but compliant.
+
+Synapse v1.71.0 will turn the old metric names off *by default*.
+For administrators that still rely on them and have not had chance to update their
+uses of the metrics, it's possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and it will no longer
+be possible to re-enable them.
+
+The Grafana dashboard, Prometheus recording rules and Prometheus Consoles included
+in the `contrib` directory in the Synapse repository have been updated to no longer
+rely on the legacy names. These can be used on a current version of Synapse
+because current versions of Synapse emit both old and new names.
+
+You may need to update your alerting rules or any other rules that depend on
+the names of Prometheus metrics.
+If you want to test your changes before legacy names are disabled by default,
+you may specify `enable_legacy_metrics: false` in your homeserver configuration.
+
+A list of affected metrics is available on the [Metrics How-to page](https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12).
+
+
 # Upgrading to v1.68.0
 
 Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.

@@ -1,0 +1,1 @@
+Revert catch-all exceptions being recorded as event pull attempt failures (only handle what we know about).
