@@ -62,7 +62,11 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.device_list_updater = hs.get_device_handler().device_list_updater
+        from synapse.handlers.device import DeviceHandler
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.device_list_updater = handler.device_list_updater
+
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
 

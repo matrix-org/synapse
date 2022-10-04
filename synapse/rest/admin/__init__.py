@@ -253,9 +253,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
-    DeviceRestServlet(hs).register(http_server)
-    DevicesRestServlet(hs).register(http_server)
-    DeleteDevicesRestServlet(hs).register(http_server)
     UserMediaStatisticsRestServlet(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
@@ -280,6 +277,9 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
 
     # Some servlets only get registered for the main process.
     if hs.config.worker.worker_app is None:
+        DeviceRestServlet(hs).register(http_server)
+        DevicesRestServlet(hs).register(http_server)
+        DeleteDevicesRestServlet(hs).register(http_server)
         SendServerNoticeServlet(hs).register(http_server)
         BackgroundUpdateEnabledRestServlet(hs).register(http_server)
         BackgroundUpdateRestServlet(hs).register(http_server)

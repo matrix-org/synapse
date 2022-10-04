@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 from synapse.api.errors import InvalidAPICallError, SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -69,7 +70,9 @@ class KeyUploadServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
-        self.device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.device_handler = handler
 
     async def on_POST(
         self, request: SynapseRequest, device_id: Optional[str]
