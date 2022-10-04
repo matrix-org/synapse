@@ -1361,13 +1361,7 @@ class SyncHandler:
                 # User joined a room - we have to then check the room state to ensure we
                 # respect any bans if there's a race between the join and ban events.
                 if event.membership == Membership.JOIN:
-                    assert event.internal_metadata.stream_ordering
-                    extrems = await self.store.get_forward_extremities_for_room_at_stream_ordering(
-                        room_id, event.internal_metadata.stream_ordering
-                    )
-                    user_ids_in_room = await self.state.get_current_user_ids_in_room(
-                        room_id, extrems
-                    )
+                    user_ids_in_room = await self.store.get_users_in_room(room_id)
                     if user_id in user_ids_in_room:
                         mutable_joined_room_ids.add(room_id)
                 # The user left the room, or left and was re-invited but not joined yet
