@@ -43,32 +43,6 @@ class MetricsConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_metrics = config.get("enable_metrics", False)
 
-        """
-        ### `enable_legacy_metrics` (experimental)
-
-        **Experimental: this option may be removed or have its behaviour
-        changed at any time, with no notice.**
-
-        Set to `true` to publish both legacy and non-legacy Prometheus metric names,
-        or to `false` to only publish non-legacy Prometheus metric names.
-        Defaults to `true`. Has no effect if `enable_metrics` is `false`.
-
-        Legacy metric names include:
-        - metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
-        - counters that don't end with the `_total` suffix, such as `synapse_federation_client_sent_edus`, therefore not adhering to the OpenMetrics standard.
-
-        These legacy metric names are unconventional and not compliant with OpenMetrics standards.
-        They are included for backwards compatibility.
-
-        Example configuration:
-        ```yaml
-        enable_legacy_metrics: false
-        ```
-
-        See https://github.com/matrix-org/synapse/issues/11106 for context.
-
-        *Since v1.67.0.*
-        """
         self.enable_legacy_metrics = config.get("enable_legacy_metrics", True)
 
         self.report_stats = config.get("report_stats", None)
