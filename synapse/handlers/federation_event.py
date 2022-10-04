@@ -906,6 +906,11 @@ class FederationEventHandler:
 
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
+            elif e.code == 429:
+                logger.warning(
+                    "Not attempting to pull event %s that we already tried to pull recently (backing off).",
+                    event_id,
+                )
             else:
                 raise
 
@@ -965,7 +970,7 @@ class FederationEventHandler:
             raise FederationError(
                 "ERROR",
                 429,
-                "Not attempting to pull event that we already tried recently (backing off).",
+                "Not attempting to pull event that we already tried to pull recently (backing off).",
                 affected=prevs_to_ignore[0],
             )
 
