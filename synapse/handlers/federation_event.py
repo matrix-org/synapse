@@ -911,15 +911,16 @@ class FederationEventHandler:
                 raise
         except FederationPullAttemptBackoffError as exc:
             # Log a warning about why we failed to process the event (the error message
-            # is pretty good)
+            # for `FederationPullAttemptBackoffError` is pretty good)
             logger.warning(str(exc))
-            # We do not record a failed pull attempt when we backoff fetching a
-            # missing `prev_event` because not being able to fetch the `prev_events` for
-            # a given event, doesn't mean we won't be able to fetch the given event as a
-            # `prev_event` for another downstream event.
+            # We do not record a failed pull attempt when we backoff fetching a missing
+            # `prev_event` because not being able to fetch the `prev_events` just means
+            # we won't be able to de-outlier the pulled event. But we can still use an
+            # `outlier` in the state/auth chain for another event. So we shouldn't stop
+            # a downstream event from trying to pull it.
             #
-            # This avoids a cascade of backoff for all events in the DAG downstream
-            # from one backoff attempt.
+            # This avoids a cascade of backoff for all events in the DAG downstream from
+            # one event backoff upstream.
 
     @trace
     async def _compute_event_context_with_maybe_missing_prevs(
