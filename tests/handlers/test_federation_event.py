@@ -651,6 +651,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                 keyvalues={"event_id": pulled_event.event_id},
                 retcol="num_attempts",
             ),
+            # StoreError: 404: No row found
             StoreError,
         )
 
