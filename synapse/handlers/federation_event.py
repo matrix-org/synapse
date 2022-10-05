@@ -900,19 +900,28 @@ class FederationEventHandler:
                     backfilled=backfilled,
                 )
         except FederationError as e:
-            await self._store.record_event_failed_pull_attempt(
-                event.room_id, event_id, str(e)
-            )
-
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
+                await self._store.record_event_failed_pull_attempt(
+                    event.room_id, event_id, str(e)
+                )
             elif e.code == 429:
                 logger.warning(
                     "Not attempting to pull event=%s because of affected=%s that we already tried to pull recently (backing off).",
                     event_id,
                     e.affected,
                 )
+                # We do not record a failed pull attempt when we backoff fetching a
+                # missing `prev_event` because not being able to fetch the `prev_events` for
+                # a given event, doesn't mean we won't be able to fetch the given event as a
+                # `prev_event` for another downstream event.
+                #
+                # This avoids a cascade of backoff for all events in the DAG downstream
+                # from one backoff attempt.
             else:
+                await self._store.record_event_failed_pull_attempt(
+                    event.room_id, event_id, str(e)
+                )
                 raise
 
     @trace
