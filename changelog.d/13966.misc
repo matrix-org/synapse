@@ -1,1 +1,0 @@
-Refactor language in user directory `_track_user_joined_room` code to make it more clear that we use both local and remote users.

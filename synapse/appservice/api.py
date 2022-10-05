@@ -120,7 +120,11 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self.get_json(
+                uri,
+                {"access_token": service.hs_token},
+                headers={"Authorization": f"Bearer {service.hs_token}"},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -140,7 +144,11 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self.get_json(
+                uri,
+                {"access_token": service.hs_token},
+                headers={"Authorization": f"Bearer {service.hs_token}"},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -181,7 +189,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 **fields,
                 b"access_token": service.hs_token,
             }
-            response = await self.get_json(uri, args=args)
+            response = await self.get_json(
+                uri, args=args, headers={"Authorization": f"Bearer {service.hs_token}"}
+            )
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
@@ -217,7 +227,11 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri, {"access_token": service.hs_token})
+                info = await self.get_json(
+                    uri,
+                    {"access_token": service.hs_token},
+                    headers={"Authorization": f"Bearer {service.hs_token}"},
+                )
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -313,6 +327,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 uri=uri,
                 json_body=body,
                 args={"access_token": service.hs_token},
+                headers={"Authorization": f"Bearer {service.hs_token}"},
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
