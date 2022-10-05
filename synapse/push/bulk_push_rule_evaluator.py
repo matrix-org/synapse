@@ -349,6 +349,7 @@ class BulkPushRuleEvaluator:
             thread_id,
         )
 
+
 MemberMap = Dict[str, Optional[EventIdMembership]]
 Rule = Dict[str, dict]
 RulesByUser = Dict[str, List[Rule]]
