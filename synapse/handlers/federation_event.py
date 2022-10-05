@@ -908,8 +908,9 @@ class FederationEventHandler:
                 logger.warning("Pulled event %s failed history check.", event_id)
             elif e.code == 429:
                 logger.warning(
-                    "Not attempting to pull event %s that we already tried to pull recently (backing off).",
+                    "Not attempting to pull event=%s because of affected=%s that we already tried to pull recently (backing off).",
                     event_id,
+                    e.affected,
                 )
             else:
                 raise
@@ -966,11 +967,16 @@ class FederationEventHandler:
         prevs_to_ignore = await self._store.filter_event_ids_with_pull_attempt_backoff(
             room_id, missing_prevs
         )
+        logger.info(
+            "_compute_event_context_with_maybe_missing_prevs(event=%s) prevs_to_ignore=%s",
+            event.event_id,
+            prevs_to_ignore,
+        )
         if len(prevs_to_ignore) > 0:
             raise FederationError(
                 "ERROR",
                 429,
-                "Not attempting to pull event that we already tried to pull recently (backing off).",
+                f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
                 affected=prevs_to_ignore[0],
             )
 

@@ -182,6 +182,11 @@ class PersistEventsStore:
                 a room that has been un-partial stated.
         """
 
+        logger.info(
+            "_persist_events_and_state_updates events=%s",
+            [x[0].event_id for x in events_and_contexts],
+        )
+
         # We want to calculate the stream orderings as late as possible, as
         # we only notify after all events with a lesser stream ordering have
         # been persisted. I.e. if we spend 10s inside the with block then
