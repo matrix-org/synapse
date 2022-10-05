@@ -771,6 +771,10 @@ class ModuleApi:
             auth_provider_session_id: The session ID got during login from the SSO IdP,
                 if any.
         """
+        # The deprecated `generate_short_term_login_token` method defaulted to an empty
+        # string for the `auth_provider_id` because of how the underlying macaroon was
+        # generated. This will change to a proper NULL-able field when the tokens get
+        # moved to the database.
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
             user_id,
             auth_provider_id or "",
