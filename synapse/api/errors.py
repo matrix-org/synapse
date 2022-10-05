@@ -274,6 +274,31 @@ class FederationDeniedError(SynapseError):
         )
 
 
+class FederationPullAttemptBackoffError(SynapseError):
+    """
+    Raised to indicate that we are are deliberately not attempting to pull the given
+    event over federation because we've already done so recently and are backing off.
+
+    Attributes:
+        event_id: The event_id which we are refusing to pull
+        message: A custom error message that gives more context
+    """
+
+    def __init__(self, event_id: str, message: Optional[str]):
+        self.event_id = event_id
+
+        if message:
+            error_message = message
+        else:
+            error_message = f"Not attempting to pull event={self.event_id} because we already tried to pull it recently (backing off)."
+
+        super().__init__(
+            code=403,
+            msg=error_message,
+            errcode=Codes.FORBIDDEN,
+        )
+
+
 class InteractiveAuthIncompleteError(Exception):
     """An error raised when UI auth is not yet complete
 
