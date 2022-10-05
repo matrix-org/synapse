@@ -189,7 +189,7 @@ class DeviceRestServlet(RestServlet):
         return 200, {}
 
     class PutBody(RequestBodyModel):
-        deviceId: Optional[StrictStr]
+        display_name: Optional[StrictStr]
 
     async def on_PUT(
         self, request: SynapseRequest, device_id: str
