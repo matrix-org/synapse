@@ -44,6 +44,7 @@ class ServerNameTestCase(unittest.TestCase):
             "newline.com\n",
             ".empty-label.com",
             "1234:5678:80",  # too many colons
+            ":80",
         ]
         for i in test_data:
             try:
