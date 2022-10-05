@@ -2,6 +2,12 @@
 # configure_workers_and_start.py uses and amends to this file depending on the workers
 # that have been selected.
 
+error_log /dev/stderr info;
+
+http {
+  access_log /dev/stdout;
+}
+
 {{ upstream_directives }}
 
 server {
