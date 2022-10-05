@@ -1,1 +1,1 @@
-Making parse_server_name more consistent.
+Make `parse_server_name` consistent in handling invalid server names.
