@@ -1486,7 +1486,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
             WHERE
                 user_id = ?
-                AND not hidden
+                AND NOT hidden
                 AND last_seen < ?
                 AND key_json IS NULL
         """
