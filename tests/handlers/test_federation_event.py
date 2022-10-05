@@ -14,7 +14,7 @@
 from typing import Optional
 from unittest import mock
 
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, StoreError
 from synapse.api.room_versions import RoomVersion
 from synapse.event_auth import (
     check_state_dependent_auth_rules,
@@ -641,16 +641,18 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertEqual(backfill_num_attempts_for_event_without_signatures, 1)
 
-        # And we recorded a failure for the event that has the missing prev_event
-        # since we weren't able to go and fetch it.
-        backfill_num_attempts = self.get_success(
+        # And make sure we didn't record a failure for the event that has the missing
+        # prev_event because we don't want to cause a cascade of failures. Just because
+        # we can't pull a `prev_event` for this `pulled_event`, doesn't mean we won't be
+        # able to fetch `pulled_event` as a `prev_event` for another event downstream.
+        self.get_failure(
             main_store.db_pool.simple_select_one_onecol(
                 table="event_failed_pull_attempts",
                 keyvalues={"event_id": pulled_event.event_id},
                 retcol="num_attempts",
-            )
+            ),
+            StoreError,
         )
-        self.assertEqual(backfill_num_attempts, 1)
 
     def test_process_pulled_event_with_rejected_missing_state(self) -> None:
         """Ensure that we correctly handle pulled events with missing state containing a
