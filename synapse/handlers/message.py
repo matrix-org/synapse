@@ -1880,6 +1880,7 @@ class EventCreationHandler:
             events_and_context, backfilled=backfilled
         )
 
+        events_and_pos = []
         for event in persisted_events:
             if self._ephemeral_events_enabled:
                 # If there's an expiry timestamp on the event, schedule its expiry.
@@ -1888,24 +1889,22 @@ class EventCreationHandler:
             stream_ordering = event.internal_metadata.stream_ordering
             assert stream_ordering is not None
             pos = PersistedEventPosition(self._instance_name, stream_ordering)
-
-            async def _notify() -> None:
-                try:
-                    await self.notifier.on_new_room_event(
-                        event, pos, max_stream_token, extra_users=extra_users
-                    )
-                except Exception:
-                    logger.exception(
-                        "Error notifying about new room event %s",
-                        event.event_id,
-                    )
-
-            run_in_background(_notify)
+            events_and_pos.append((event, pos))
 
             if event.type == EventTypes.Message:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
                 run_in_background(self._bump_active_time, requester.user)
+
+        async def _notify() -> None:
+            try:
+                await self.notifier.on_new_room_events(
+                    events_and_pos, max_stream_token, extra_users=extra_users
+                )
+            except Exception:
+                logger.exception("Error notifying about new room events")
+
+        run_in_background(_notify)
 
         return persisted_events[-1]
 

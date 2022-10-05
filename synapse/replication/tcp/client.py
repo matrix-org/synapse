@@ -210,15 +210,16 @@ class ReplicationDataHandler:
 
                 max_token = self.store.get_room_max_token()
                 event_pos = PersistedEventPosition(instance_name, token)
-                await self.notifier.on_new_room_event_args(
-                    event_pos=event_pos,
-                    max_room_stream_token=max_token,
-                    extra_users=extra_users,
-                    room_id=row.data.room_id,
-                    event_id=row.data.event_id,
-                    event_type=row.data.type,
-                    state_key=row.data.state_key,
-                    membership=row.data.membership,
+                event_entry = self.notifier.create_pending_room_event_entry(
+                    event_pos,
+                    extra_users,
+                    row.data.room_id,
+                    row.data.type,
+                    row.data.state_key,
+                    row.data.membership,
+                )
+                await self.notifier.notify_new_room_events(
+                    [(event_entry, row.data.event_id)], max_token
                 )
 
                 # If this event is a join, make a note of it so we have an accurate
