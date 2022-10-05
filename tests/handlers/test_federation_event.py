@@ -642,9 +642,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(backfill_num_attempts_for_event_without_signatures, 1)
 
         # And make sure we didn't record a failure for the event that has the missing
-        # prev_event because we don't want to cause a cascade of failures. Just because
-        # we can't pull a `prev_event` for this `pulled_event`, doesn't mean we won't be
-        # able to fetch `pulled_event` as a `prev_event` for another event downstream.
+        # prev_event because we don't want to cause a cascade of failures. Not being
+        # able to fetch the `prev_events` just means we won't be able to de-outlier the
+        # pulled event. But we can still use an `outlier` in the state/auth chain for
+        # another event. So we shouldn't stop a downstream event from trying to pull it.
         self.get_failure(
             main_store.db_pool.simple_select_one_onecol(
                 table="event_failed_pull_attempts",
