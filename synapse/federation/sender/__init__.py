@@ -536,7 +536,7 @@ class FederationSender(AbstractFederationSender):
 
                 if event_entries:
                     now = self.clock.time_msec()
-                    last_id = event_ids[-1]
+                    last_id = next(reversed(event_ids))
                     ts = event_to_received_ts[last_id]
                     assert ts is not None
 
