@@ -332,6 +332,11 @@ class BulkPushRuleEvaluator:
                     if actions and "notify" in actions:
                         # Push rules say we should notify the user of this event
                         actions_by_user[uid] = actions
+                        logger.info(
+                            "Staging notify action to userID=%s for eventID=%s",
+                            uid,
+                            event.event_id,
+                        )
                     break
 
         # Mark in the DB staging area the push actions for users who should be
@@ -343,14 +348,6 @@ class BulkPushRuleEvaluator:
             count_as_unread_by_user,
             thread_id,
         )
-
-        logger.info(
-            "Staged %d push actions to %d users for event %s",
-            sum(len(actions) for actions in actions_by_user.values()),
-            len(actions_by_user),
-            event.event_id,
-        )
-
 
 MemberMap = Dict[str, Optional[EventIdMembership]]
 Rule = Dict[str, dict]
