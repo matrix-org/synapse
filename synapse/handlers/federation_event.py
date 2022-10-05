@@ -976,11 +976,6 @@ class FederationEventHandler:
         prevs_to_ignore = await self._store.filter_event_ids_with_pull_attempt_backoff(
             room_id, missing_prevs
         )
-        logger.info(
-            "_compute_event_context_with_maybe_missing_prevs(event=%s) prevs_to_ignore=%s",
-            event.event_id,
-            prevs_to_ignore,
-        )
         if len(prevs_to_ignore) > 0:
             raise FederationError(
                 "ERROR",

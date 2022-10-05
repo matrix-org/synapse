@@ -1501,7 +1501,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             event_id: The event that failed to be fetched or processed
             cause: The error message or reason that we failed to pull the event
         """
-        logger.info(
+        logger.debug(
             "record_event_failed_pull_attempt room_id=%s, event_id=%s, cause=%s",
             room_id,
             event_id,

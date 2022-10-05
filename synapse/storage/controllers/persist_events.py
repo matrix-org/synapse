@@ -392,7 +392,6 @@ class EventsPersistenceStorageController:
             partitioned.setdefault(event.room_id, []).append((event, ctx))
             event_ids.append(event.event_id)
 
-        logger.info("persist_events event_ids=%s", event_ids)
         set_tag(
             SynapseTags.FUNC_ARG_PREFIX + "event_ids",
             str(event_ids),
@@ -443,7 +442,6 @@ class EventsPersistenceStorageController:
     async def persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
     ) -> Tuple[EventBase, PersistedEventPosition, RoomStreamToken]:
-        logger.info("persist_event event=%s", event.event_id)
         """
         Returns:
             The event, stream ordering of `event`, and the stream ordering of the

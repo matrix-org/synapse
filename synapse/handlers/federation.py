@@ -1005,25 +1005,12 @@ class FederationHandler:
 
         await self._bulk_push_rule_evaluator.action_for_event_by_user(event, context)
         try:
-            logger.info(
-                "on_invite_request persist_events_and_notify=%s sender=%s",
-                event.event_id,
-                event.sender,
-            )
-            logger.info(
-                "on_invite_request debug_event=%s",
-                event.get_pdu_json(),
-            )
-            # await self._federation_event_handler.backfill_event_id(
-            #     origin, event.room_id, event.event_id
-            # )
             await self._federation_event_handler.persist_events_and_notify(
                 event.room_id, [(event, context)]
             )
-        except Exception as exc:
-            logger.info("on_invite_request persist exception=%s", str(exc))
+        except Exception:
             await self.store.remove_push_actions_from_staging(event.event_id)
-            raise exc
+            raise
 
         return event
 

@@ -1719,11 +1719,6 @@ class EventCreationHandler:
                         # way? If we have been invited by a remote server, we need
                         # to get them to sign the event.
 
-                        logger.info(
-                            "asdf send_invite event=%s outlier=%s",
-                            event.event_id,
-                            event.internal_metadata.outlier,
-                        )
                         returned_invite = await federation_handler.send_invite(
                             invitee.domain, event
                         )
@@ -1731,10 +1726,6 @@ class EventCreationHandler:
 
                         # TODO: Make sure the signatures actually are correct.
                         event.signatures.update(returned_invite.signatures)
-
-                        logger.info(
-                            "asdf send_invite debug event=%s", event.get_pdu_json()
-                        )
 
                 if event.content["membership"] == Membership.KNOCK:
                     event.unsigned[

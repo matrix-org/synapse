@@ -57,48 +57,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             delete_local_events,
         )
 
-    def asdf_get_debug_events_in_room_ordered_by_depth_txn(
-        self, txn: LoggingTransaction, room_id: str
-    ) -> Any:
-        """
-        Output all events in the room in a nice table as a string to log
-
-        Based on https://github.com/matrix-org/matrix-react-sdk/pull/8354
-        """
-        sql = (
-            "SELECT depth, stream_ordering, type, state_key, outlier, event_id FROM events"
-            " WHERE events.room_id = ?"
-            " ORDER BY depth DESC, stream_ordering DESC;"
-        )
-        txn.execute(
-            sql,
-            (room_id,),
-        )
-
-        headerColumnLengthMap = {
-            "depth": 4,
-            "stream_ordering": 12,
-            "type": 30,
-            "state_key": 40,
-            "outlier": 4,
-            # event_ids are 44 long but we don't need the extra 5 padding
-            # because it's the last item and we're just cheating by building
-            # this into the value instead of the format code.
-            "event_id": 39,
-        }
-
-        output = ""
-        row_format = "".join(
-            [
-                "{:<" + str(columnLength + 5) + "}"
-                for columnLength in headerColumnLengthMap.values()
-            ]
-        )
-        output += row_format.format(*headerColumnLengthMap.keys()) + "\n"
-        for row in txn:
-            output += row_format.format(*[str(x) for x in row]) + "\n"
-        return output
-
     def _purge_history_txn(
         self,
         txn: LoggingTransaction,
@@ -175,11 +133,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             should_delete_params += ("%:" + self.hs.hostname, "%:" + self.hs.hostname)
 
         should_delete_params += (room_id, token.topological)
-
-        logger.info(
-            "before purge asdf_get_debug_events_in_room_ordered_by_depth\n%s",
-            self.asdf_get_debug_events_in_room_ordered_by_depth_txn(txn, room_id),
-        )
 
         # Note that we insert events that are outliers and aren't going to be
         # deleted, as nothing will happen to them.
@@ -259,19 +212,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         txn.execute(
             "DELETE FROM event_to_state_groups "
             "WHERE event_id IN (SELECT event_id from events_to_purge)"
-        )
-
-        txn.execute(
-            """
-            SELECT event_id FROM events_to_purge
-            """
-        )
-        events_to_purge_results = txn.fetchall()
-        # events_to_purge = [x[0] for x in events_to_purge_results]
-        logger.info(
-            "qwer delete_local_events=%s events_to_purge=%s",
-            delete_local_events,
-            events_to_purge_results,
         )
 
         # Delete all remote non-state events
@@ -367,11 +307,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 self.invalidate_get_event_cache_after_txn(txn, event_id)
 
         logger.info("[purge] done")
-
-        logger.info(
-            "after purge asdf_get_debug_events_in_room_ordered_by_depth\n%s",
-            self.asdf_get_debug_events_in_room_ordered_by_depth_txn(txn, room_id),
-        )
 
         return referenced_state_groups
 
