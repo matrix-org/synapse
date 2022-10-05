@@ -28,7 +28,14 @@ from typing import (
 
 from typing_extensions import TypedDict
 
-from synapse.api.errors import Codes, InvalidClientTokenError, LoginError, SynapseError
+from synapse.api.constants import ApprovalNoticeMedium
+from synapse.api.errors import (
+    Codes,
+    InvalidClientTokenError,
+    LoginError,
+    NotApprovedError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
@@ -55,11 +62,11 @@ logger = logging.getLogger(__name__)
 
 class LoginResponse(TypedDict, total=False):
     user_id: str
-    access_token: str
+    access_token: Optional[str]
     home_server: str
     expires_in_ms: Optional[int]
     refresh_token: Optional[str]
-    device_id: str
+    device_id: Optional[str]
     well_known: Optional[Dict[str, Any]]
 
 
@@ -90,6 +97,12 @@ class LoginRestServlet(RestServlet):
         self.oidc_enabled = hs.config.oidc.oidc_enabled
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
+        )
+
+        # Whether we need to check if the user has been approved or not.
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
         self.auth = hs.get_auth()
@@ -219,6 +232,14 @@ class LoginRestServlet(RestServlet):
                 )
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(result["user_id"])
+            if not approved:
+                raise NotApprovedError(
+                    msg="This account is pending approval by a server administrator.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
+                )
 
         well_known_data = self._well_known_builder.get_well_known()
         if well_known_data:
@@ -355,6 +376,16 @@ class LoginRestServlet(RestServlet):
                 "device_id cannot be longer than 512 characters.",
                 errcode=Codes.INVALID_PARAM,
             )
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(user_id)
+            if not approved:
+                # If the user isn't approved (and needs to be) we won't allow them to
+                # actually log in, so we don't want to create a device/access token.
+                return LoginResponse(
+                    user_id=user_id,
+                    home_server=self.hs.hostname,
+                )
 
         initial_display_name = login_submission.get("initial_device_display_name")
         (

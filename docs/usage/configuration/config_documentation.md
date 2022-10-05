@@ -179,7 +179,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-See https://matrix-org.github.io/synapse/latest/delegate.html for more
+See [Delegation of incoming federation traffic](../../delegate.md) for more
 information.
 
 Example configuration:
@@ -2229,6 +2229,9 @@ homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.
 
+As Spaces are just rooms under the hood, Space aliases may also be
+used.
+
 Example configuration:
 ```yaml
 auto_join_rooms:
@@ -2240,7 +2243,7 @@ auto_join_rooms:
 
 Where `auto_join_rooms` are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.
+homeserver registers. This option will not create Spaces.
 
 By default the auto-created rooms are publicly joinable from any federated
 server. Use the `autocreate_auto_join_rooms_federated` and
@@ -2258,7 +2261,7 @@ autocreate_auto_join_rooms: false
 ---
 ### `autocreate_auto_join_rooms_federated`
 
-Whether the rooms listen in `auto_join_rooms` that are auto-created are available
+Whether the rooms listed in `auto_join_rooms` that are auto-created are available
 via federation. Only has an effect if `autocreate_auto_join_rooms` is true.
 
 Note that whether a room is federated cannot be modified after
@@ -2432,6 +2435,31 @@ Example configuration:
 ```yaml
 enable_metrics: true
 ```
+---
+### `enable_legacy_metrics`
+
+Set to `true` to publish both legacy and non-legacy Prometheus metric names,
+or to `false` to only publish non-legacy Prometheus metric names.
+Defaults to `true`. Has no effect if `enable_metrics` is `false`.
+**In Synapse v1.71.0, this will default to `false` before being removed in Synapse v1.73.0.**
+
+Legacy metric names include:
+- metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
+- counters that don't end with the `_total` suffix, such as `synapse_federation_client_sent_edus`, therefore not adhering to the OpenMetrics standard.
+
+These legacy metric names are unconventional and not compliant with OpenMetrics standards.
+They are included for backwards compatibility.
+
+Example configuration:
+```yaml
+enable_legacy_metrics: false
+```
+
+See https://github.com/matrix-org/synapse/issues/11106 for context.
+
+*Since v1.67.0.*
+
+**Will be removed in v1.73.0.**
 ---
 ### `sentry`
 
@@ -2949,7 +2977,7 @@ Options for each entry include:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
+        See [OpenID Mapping Providers](../../sso_mapping_providers.md#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
@@ -3390,13 +3418,15 @@ This option has the following sub-options:
    the user directory. If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
+
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
+    
     These indexes are built the first time Synapse starts; admins can
-    manually trigger a rebuild via API following the instructions at
-         https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
-    Set to true to return search results containing all known users, even if that
+    manually trigger a rebuild via the API following the instructions
+    [for running background updates](../administration/admin_api/background_updates.md#run),
+    set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the

@@ -8,6 +8,7 @@
 !README.rst
 !pyproject.toml
 !poetry.lock
+!Cargo.lock
 !build_rust.py
 
 rust/target

@@ -1,1 +1,0 @@
-Fix a long-standing spec compliance bug where Synapse would accept a trailing slash on the end of `/get_missing_events` federation requests.
