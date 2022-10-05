@@ -1476,7 +1476,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             desc="count_devices",
         )
 
-        if num_devices > 10:
+        if num_devices < 10:
             return ()
 
         max_last_seen = self._clock.time_msec() - 14 * 24 * 60 * 60 * 1000
