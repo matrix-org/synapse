@@ -514,6 +514,8 @@ class FederationSender(AbstractFederationSender):
                 events_by_room: Dict[str, List[EventBase]] = {}
 
                 for event_id in event_ids:
+                    # `event_entries` is unsorted, so we have to iterate over `event_ids`
+                    # to ensure the events are in the right order
                     event_cache = event_entries.get(event_id)
                     if event_cache:
                         event = event_cache.event
@@ -534,7 +536,7 @@ class FederationSender(AbstractFederationSender):
 
                 if event_entries:
                     now = self.clock.time_msec()
-                    last_id = list(event_entries.keys())[-1]
+                    last_id = event_ids[-1]
                     ts = event_to_received_ts[last_id]
                     assert ts is not None
 
