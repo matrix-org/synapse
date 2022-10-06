@@ -315,10 +315,6 @@ def _check_client_allowed_to_see_event(
             return None
 
     if event.event_id in always_include_ids:
-        logger.debug(
-            "_check_client_allowed_to_see_event(event=%s): Returning event because it's included in the `always_include_ids`",
-            event.event_id,
-        )
         return event
 
     # we need to handle outliers separately, since we don't have the room state.
@@ -356,10 +352,6 @@ def _check_client_allowed_to_see_event(
         and _check_history_visibility(event, visibility, is_peeking)
         == _CheckVisibility.ALLOWED
     ):
-        logger.debug(
-            "_check_client_allowed_to_see_event(event=%s): Returning event because not `sender_erased` and `_check_history_visibility` returned `_CheckVisibility.ALLOWED`",
-            event.event_id,
-        )
         return event
 
     membership_result = _check_membership(user_id, event, visibility, state, is_peeking)
