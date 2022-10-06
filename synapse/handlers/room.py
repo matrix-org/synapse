@@ -1157,6 +1157,7 @@ class RoomCreationHandler:
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
+        events_to_send = []
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
@@ -1165,7 +1166,7 @@ class RoomCreationHandler:
                 EventTypes.PowerLevels, pl_content, False
             )
             current_state_group = power_context._state_group
-            await send(power_event, power_context, creator)
+            events_to_send.append((power_event, power_context))
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1214,9 +1215,8 @@ class RoomCreationHandler:
                 False,
             )
             current_state_group = pl_context._state_group
-            await send(pl_event, pl_context, creator)
+            events_to_send.append((pl_event, pl_context))
 
-        events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             room_alias_event, room_alias_context = await create_event(
                 EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True
