@@ -30,6 +30,7 @@ from typing import (
 import attr
 
 from synapse.api.constants import RelationTypes
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -47,6 +48,26 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThreadsNextBatch:
+    topological_ordering: int
+    stream_ordering: int
+
+    def __str__(self) -> str:
+        return f"{self.topological_ordering}_{self.stream_ordering}"
+
+    @classmethod
+    def from_string(cls, string: str) -> "ThreadsNextBatch":
+        """
+        Creates a ThreadsNextBatch from its textual representation.
+        """
+        try:
+            keys = (int(s) for s in string.split("_"))
+            return cls(*keys)
+        except Exception:
+            raise SynapseError(400, "Invalid threads token")
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -916,83 +937,60 @@ class RelationsWorkerStore(SQLBaseStore):
         self,
         room_id: str,
         limit: int = 5,
-        from_token: Optional[StreamToken] = None,
-        to_token: Optional[StreamToken] = None,
-    ) -> Tuple[List[str], Optional[StreamToken]]:
+        from_token: Optional[ThreadsNextBatch] = None,
+    ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
         """Get a list of thread IDs, ordered by topological ordering of their
         latest reply.
 
         Args:
             room_id: The room the event belongs to.
             limit: Only fetch the most recent `limit` threads.
-            from_token: Fetch rows from the given token, or from the start if None.
-            to_token: Fetch rows up to the given token, or up to the end if None.
+            from_token: Fetch rows from a previous next_batch, or from the start if None.
 
         Returns:
             A tuple of:
                 A list of thread root event IDs.
 
-                The next stream token, if one exists.
+                The next_batch, if one exists.
         """
-        pagination_clause = generate_pagination_where_clause(
-            direction="b",
-            column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_token.room_key.as_historical_tuple()
-            if from_token
-            else None,
-            to_token=to_token.room_key.as_historical_tuple() if to_token else None,
-            engine=self.database_engine,
-        )
-
-        if pagination_clause:
-            pagination_clause = "AND " + pagination_clause
+        # Generate the pagination clause, if necessary.
+        #
+        # Find any threads where the latest reply is equal / before the last
+        # thread's topo ordering and earlier in stream ordering.
+        pagination_clause = ""
+        pagination_args: tuple = ()
+        if from_token:
+            pagination_clause = "AND topological_ordering <= ? AND stream_ordering < ?"
+            pagination_args = (
+                from_token.topological_ordering,
+                from_token.stream_ordering,
+            )
 
         sql = f"""
-            SELECT relates_to_id, MAX(topological_ordering), MAX(stream_ordering)
-            FROM event_relations
-            INNER JOIN events USING (event_id)
+            SELECT thread_id, topological_ordering, stream_ordering
+            FROM threads
             WHERE
-                room_id = ? AND
-                relation_type = '{RelationTypes.THREAD}'
+                room_id = ?
                 {pagination_clause}
-            GROUP BY relates_to_id
-            ORDER BY MAX(topological_ordering) DESC, MAX(stream_ordering) DESC
+            ORDER BY topological_ordering DESC, stream_ordering DESC
             LIMIT ?
         """
 
         def _get_threads_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[str], Optional[StreamToken]]:
-            txn.execute(sql, [room_id, limit + 1])
+        ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
+            txn.execute(sql, (room_id, *pagination_args, limit + 1))
 
-            last_topo_id = None
-            last_stream_id = None
-            thread_ids = []
-            for thread_id, topo_id, stream_id in txn:
-                thread_ids.append(thread_id)
-                last_topo_id = topo_id
-                last_stream_id = stream_id
+            rows = cast(List[Tuple[str, int, int]], txn.fetchall())
+            thread_ids = [r[0] for r in rows]
 
-            # If there are more events, generate the next pagination key.
+            # If there are more events, generate the next pagination key from the
+            # last thread which will be returned.
             next_token = None
-            if len(thread_ids) > limit and last_topo_id and last_stream_id:
-                next_key = RoomStreamToken(last_topo_id, last_stream_id)
-                if from_token:
-                    next_token = from_token.copy_and_replace(
-                        StreamKeyType.ROOM, next_key
-                    )
-                else:
-                    next_token = StreamToken(
-                        room_key=next_key,
-                        presence_key=0,
-                        typing_key=0,
-                        receipt_key=0,
-                        account_data_key=0,
-                        push_rules_key=0,
-                        to_device_key=0,
-                        device_list_key=0,
-                        groups_key=0,
-                    )
+            if len(thread_ids) > limit:
+                last_topo_id = rows[-2][1]
+                last_stream_id = rows[-2][2]
+                next_token = ThreadsNextBatch(last_topo_id, last_stream_id)
 
             return thread_ids[:limit], next_token
 

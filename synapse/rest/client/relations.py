@@ -21,6 +21,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
+from synapse.storage.databases.main.relations import ThreadsNextBatch
 from synapse.types import JsonDict, StreamToken
 
 if TYPE_CHECKING:
@@ -125,7 +126,6 @@ class ThreadsServlet(RestServlet):
 
         limit = parse_integer(request, "limit", default=5)
         from_token_str = parse_string(request, "from")
-        to_token_str = parse_string(request, "to")
         include = parse_string(
             request,
             "include",
@@ -136,10 +136,7 @@ class ThreadsServlet(RestServlet):
         # Return the relations
         from_token = None
         if from_token_str:
-            from_token = await StreamToken.from_string(self.store, from_token_str)
-        to_token = None
-        if to_token_str:
-            to_token = await StreamToken.from_string(self.store, to_token_str)
+            from_token = ThreadsNextBatch.from_string(from_token_str)
 
         result = await self._relations_handler.get_threads(
             requester=requester,
@@ -147,7 +144,6 @@ class ThreadsServlet(RestServlet):
             include=ThreadsListInclude(include),
             limit=limit,
             from_token=from_token,
-            to_token=to_token,
         )
 
         return 200, result

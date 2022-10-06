@@ -21,7 +21,7 @@ from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
 from synapse.logging.opentracing import trace
-from synapse.storage.databases.main.relations import _RelatedEvent
+from synapse.storage.databases.main.relations import ThreadsNextBatch, _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
 
@@ -498,8 +498,7 @@ class RelationsHandler:
         room_id: str,
         include: ThreadsListInclude,
         limit: int = 5,
-        from_token: Optional[StreamToken] = None,
-        to_token: Optional[StreamToken] = None,
+        from_token: Optional[ThreadsNextBatch] = None,
     ) -> JsonDict:
         """Get related events of a event, ordered by topological ordering.
 
@@ -510,7 +509,6 @@ class RelationsHandler:
                 be returned.
             limit: Only fetch the most recent `limit` events.
             from_token: Fetch rows from the given token, or from the start if None.
-            to_token: Fetch rows up to the given token, or up to the end if None.
 
         Returns:
             The pagination chunk.
@@ -526,8 +524,8 @@ class RelationsHandler:
         # Note that ignored users are not passed into get_relations_for_event
         # below. Ignored users are handled in filter_events_for_client (and by
         # not passing them in here we should get a better cache hit rate).
-        thread_roots, next_token = await self._main_store.get_threads(
-            room_id=room_id, limit=limit, from_token=from_token, to_token=to_token
+        thread_roots, next_batch = await self._main_store.get_threads(
+            room_id=room_id, limit=limit, from_token=from_token
         )
 
         events = await self._main_store.get_events_as_list(thread_roots)
@@ -554,21 +552,18 @@ class RelationsHandler:
             is_peeking=(member_event_id is None),
         )
 
-        now = self._clock.time_msec()
-
         aggregations = await self.get_bundled_aggregations(
             events, requester.user.to_string()
         )
+
+        now = self._clock.time_msec()
         serialized_events = self._event_serializer.serialize_events(
             events, now, bundle_aggregations=aggregations
         )
 
         return_value: JsonDict = {"chunk": serialized_events}
 
-        if next_token:
-            return_value["next_batch"] = await next_token.to_string(self._main_store)
-
-        if from_token:
-            return_value["prev_batch"] = await from_token.to_string(self._main_store)
+        if next_batch:
+            return_value["next_batch"] = str(next_batch)
 
         return return_value
