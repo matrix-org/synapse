@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class RendezvousServlet(RestServlet):
     """
     Get a token that can be used with `m.login.token` to log in a second device.
+    This implementation is a stub that redirects to another configured endpoint.
 
     Request:
 
@@ -40,7 +41,7 @@ class RendezvousServlet(RestServlet):
 
     Response:
 
-    HTTP/1.1 302
+    HTTP/1.1 307
     Location: <configured endpoint>
     """
 
