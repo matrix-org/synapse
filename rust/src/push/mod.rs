@@ -430,25 +430,13 @@ impl FilteredPushRules {
     /// Iterates over all the rules and their enabled state, including base
     /// rules, in the order they should be executed in.
     fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {
-        self.push_rules
-            .iter()
-            .filter(|rule| {
-                // Ignore disabled experimental push rules
-                if !self.msc3772_enabled
-                    && rule.rule_id == "global/underride/.org.matrix.msc3772.thread_reply"
-                {
-                    return false;
-                }
-
-                true
-            })
-            .map(|r| {
-                let enabled = *self
-                    .enabled_map
-                    .get(&*r.rule_id)
-                    .unwrap_or(&r.default_enabled);
-                (r, enabled)
-            })
+        self.push_rules.iter().map(|r| {
+            let enabled = *self
+                .enabled_map
+                .get(&*r.rule_id)
+                .unwrap_or(&r.default_enabled);
+            (r, enabled)
+        })
     }
 }
 
