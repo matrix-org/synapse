@@ -38,9 +38,8 @@ class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
         # values. (Presumably this validation was not always present.)
         event_creation_handler = self.hs.get_event_creation_handler()
         requester = create_requester(alice)
-        with (
-            patch("synapse.events.validator.validate_canonicaljson"),
-            patch("synapse.events.validator.jsonschema.validate"),
+        with patch("synapse.events.validator.validate_canonicaljson"), patch(
+            "synapse.events.validator.jsonschema.validate"
         ):
             self.helper.send_state(
                 room_id,
