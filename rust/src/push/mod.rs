@@ -275,16 +275,6 @@ pub enum KnownCondition {
     SenderNotificationPermission {
         key: Cow<'static, str>,
     },
-    #[serde(rename = "org.matrix.msc3772.relation_match")]
-    RelationMatch {
-        rel_type: Cow<'static, str>,
-        #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-        event_type_pattern: Option<Cow<'static, str>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender: Option<Cow<'static, str>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender_type: Option<Cow<'static, str>>,
-    },
 }
 
 impl IntoPy<PyObject> for Condition {
