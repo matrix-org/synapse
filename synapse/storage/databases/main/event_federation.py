@@ -1074,14 +1074,15 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         Returns:
             The event ids of the forward extremities.
-
         """
 
         return await self.db_pool.runInteraction(
-            "get_prev_events_for_room", self._get_prev_events_for_room_txn, room_id
+            "get_prev_events_for_full_state_room",
+            self._get_prev_events_for_full_state_room_txn,
+            room_id,
         )
 
-    def _get_prev_events_for_room_txn(
+    def _get_prev_events_for_full_state_room_txn(
         self, txn: LoggingTransaction, room_id: str
     ) -> List[str]:
         # we just use the 10 newest events. Older events will become
