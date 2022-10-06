@@ -128,7 +128,7 @@ you may specify `enable_legacy_metrics: false` in your homeserver configuration.
 A list of affected metrics is available on the [Metrics How-to page](https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12).
 
 
-## Deprecation of a module API method
+## Deprecation of the `generate_short_term_login_token` module API method
 
 The following method of the module API has been deprecated, and is scheduled to
 be remove in v1.71.0:
