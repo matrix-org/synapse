@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.69.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.69.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 06 Oct 2022 10:32:46 +0100
+
 matrix-synapse-py3 (1.69.0~rc1) stable; urgency=medium
 
   * The man page for the hash_password script has been updated to reflect
