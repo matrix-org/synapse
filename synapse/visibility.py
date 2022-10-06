@@ -84,7 +84,14 @@ async def filter_events_for_client(
     """
     # Filter out events that have been soft failed so that we don't relay them
     # to clients.
+    events_before_filtering = events
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
+    if len(events_before_filtering) != len(events):
+        logger.debug(
+            "filter_events_for_client: Filtered out soft-failed events: Before=%s, After=%s",
+            [event.event_id for event in events_before_filtering],
+            [event.event_id for event in events],
+        )
 
     types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
 
@@ -301,9 +308,17 @@ def _check_client_allowed_to_see_event(
             _check_filter_send_to_client(event, clock, retention_policy, sender_ignored)
             == _CheckFilter.DENIED
         ):
+            logger.debug(
+                "_check_client_allowed_to_see_event(event=%s): Filtered out event because `_check_filter_send_to_client` returned `_CheckFilter.DENIED`",
+                event.event_id,
+            )
             return None
 
     if event.event_id in always_include_ids:
+        logger.debug(
+            "_check_client_allowed_to_see_event(event=%s): Returning event because it's included in the `always_include_ids`",
+            event.event_id,
+        )
         return event
 
     # we need to handle outliers separately, since we don't have the room state.
@@ -312,9 +327,17 @@ def _check_client_allowed_to_see_event(
         # for out-of-band membership events (eg, incoming invites, or rejections of
         # said invite) for the user themselves.
         if event.type == EventTypes.Member and event.state_key == user_id:
-            logger.debug("Returning out-of-band-membership event %s", event)
+            logger.debug(
+                "_check_client_allowed_to_see_event(event=%s): Returning out-of-band-membership event %s",
+                event.event_id,
+                event,
+            )
             return event
 
+        logger.debug(
+            "_check_client_allowed_to_see_event(event=%s): Filtered out event because it's an outlier",
+            event.event_id,
+        )
         return None
 
     if state is None:
@@ -333,15 +356,29 @@ def _check_client_allowed_to_see_event(
         and _check_history_visibility(event, visibility, is_peeking)
         == _CheckVisibility.ALLOWED
     ):
+        logger.debug(
+            "_check_client_allowed_to_see_event(event=%s): Returning event because not `sender_erased` and `_check_history_visibility` returned `_CheckVisibility.ALLOWED`",
+            event.event_id,
+        )
         return event
 
     membership_result = _check_membership(user_id, event, visibility, state, is_peeking)
     if not membership_result.allowed:
+        logger.debug(
+            "_check_client_allowed_to_see_event(event=%s): Filtered out event because the user can't see the event because of their membership, membership_result.allowed=%s membership_result.joined=%s",
+            event.event_id,
+            membership_result.allowed,
+            membership_result.joined,
+        )
         return None
 
     # If the sender has been erased and the user was not joined at the time, we
     # must only return the redacted form.
     if sender_erased and not membership_result.joined:
+        logger.debug(
+            "_check_client_allowed_to_see_event(event=%s): Returning pruned event because `sender_erased` and the user was not joined at the time",
+            event.event_id,
+        )
         event = prune_event(event)
 
     return event
