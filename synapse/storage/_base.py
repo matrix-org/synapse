@@ -94,6 +94,7 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache(
                 "get_rooms_for_user_with_stream_ordering", (user_id,)
             )
+            self._attempt_to_invalidate_cache("get_rooms_for_user", (user_id,))
 
         # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))

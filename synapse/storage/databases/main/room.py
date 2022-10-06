@@ -207,21 +207,30 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     def _construct_room_type_where_clause(
         self, room_types: Union[List[Union[str, None]], None]
-    ) -> Tuple[Union[str, None], List[str]]:
+    ) -> Tuple[Union[str, None], list]:
         if not room_types:
             return None, []
-        else:
-            # We use None when we want get rooms without a type
-            is_null_clause = ""
-            if None in room_types:
-                is_null_clause = "OR room_type IS NULL"
-                room_types = [value for value in room_types if value is not None]
 
+        # Since None is used to represent a room without a type, care needs to
+        # be taken into account when constructing the where clause.
+        clauses = []
+        args: list = []
+
+        room_types_set = set(room_types)
+
+        # We use None to represent a room without a type.
+        if None in room_types_set:
+            clauses.append("room_type IS NULL")
+            room_types_set.remove(None)
+
+        # If there are other room types, generate the proper clause.
+        if room_types:
             list_clause, args = make_in_list_sql_clause(
-                self.database_engine, "room_type", room_types
+                self.database_engine, "room_type", room_types_set
             )
+            clauses.append(list_clause)
 
-            return f"({list_clause} {is_null_clause})", args
+        return f"({' OR '.join(clauses)})", args
 
     async def count_public_rooms(
         self,
@@ -241,14 +250,6 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         def _count_public_rooms_txn(txn: LoggingTransaction) -> int:
             query_args = []
 
-            room_type_clause, args = self._construct_room_type_where_clause(
-                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
-                if search_filter
-                else None
-            )
-            room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
-            query_args += args
-
             if network_tuple:
                 if network_tuple.appservice_id:
                     published_sql = """
@@ -267,6 +268,14 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     SELECT room_id FROM rooms WHERE is_public
                     UNION SELECT room_id from appservice_room_list
             """
+
+            room_type_clause, args = self._construct_room_type_where_clause(
+                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
+                if search_filter
+                else None
+            )
+            room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
+            query_args += args
 
             sql = f"""
                 SELECT
@@ -1134,6 +1143,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
+    @cached(iterable=True)
     async def get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
         """Gets the list of servers in a partial state room at the time we joined it.
 
@@ -1216,6 +1226,29 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_partial_state_servers_at_join, (room_id,)
+        )
+
+        # We now delete anything from `device_lists_remote_pending` with a
+        # stream ID less than the minimum
+        # `partial_state_rooms.device_lists_stream_id`, as we no longer need them.
+        device_lists_stream_id = DatabasePool.simple_select_one_onecol_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={},
+            retcol="MIN(device_lists_stream_id)",
+            allow_none=True,
+        )
+        if device_lists_stream_id is None:
+            # There are no rooms being currently partially joined, so we delete everything.
+            txn.execute("DELETE FROM device_lists_remote_pending")
+        else:
+            sql = """
+                DELETE FROM device_lists_remote_pending
+                WHERE stream_id <= ?
+            """
+            txn.execute(sql, (device_lists_stream_id,))
 
     @cached()
     async def is_partial_state_room(self, room_id: str) -> bool:
@@ -1235,6 +1268,22 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
 
         return entry is not None
+
+    async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
+        self, room_id: str
+    ) -> Tuple[str, int]:
+        """Get the event ID of the initial join that started the partial
+        join, and the device list stream ID at the point we started the partial
+        join.
+        """
+
+        result = await self.db_pool.simple_select_one(
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            retcols=("join_event_id", "device_lists_stream_id"),
+            desc="get_join_event_id_for_partial_state",
+        )
+        return result["join_event_id"], result["device_lists_stream_id"]
 
 
 class _BackgroundUpdates:
@@ -1777,28 +1826,46 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         room_id: str,
         servers: Collection[str],
+        device_lists_stream_id: int,
     ) -> None:
-        """Mark the given room as containing events with partial state
+        """Mark the given room as containing events with partial state.
+
+        We also store additional data that describes _when_ we first partial-joined this
+        room, which helps us to keep other homeservers in sync when we finally fully
+        join this room.
+
+        We do not include a `join_event_id` here---we need to wait for the join event
+        to be persisted first.
 
         Args:
             room_id: the ID of the room
             servers: other servers known to be in the room
+            device_lists_stream_id: the device_lists stream ID at the time when we first
+                joined the room.
         """
         await self.db_pool.runInteraction(
             "store_partial_state_room",
             self._store_partial_state_room_txn,
             room_id,
             servers,
+            device_lists_stream_id,
         )
 
     def _store_partial_state_room_txn(
-        self, txn: LoggingTransaction, room_id: str, servers: Collection[str]
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        servers: Collection[str],
+        device_lists_stream_id: int,
     ) -> None:
         DatabasePool.simple_insert_txn(
             txn,
             table="partial_state_rooms",
             values={
                 "room_id": room_id,
+                "device_lists_stream_id": device_lists_stream_id,
+                # To be updated later once the join event is persisted.
+                "join_event_id": None,
             },
         )
         DatabasePool.simple_insert_many_txn(
@@ -1808,6 +1875,39 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             values=((room_id, s) for s in servers),
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_partial_state_servers_at_join, (room_id,)
+        )
+
+    async def write_partial_state_rooms_join_event_id(
+        self,
+        room_id: str,
+        join_event_id: str,
+    ) -> None:
+        """Record the join event which resulted from a partial join.
+
+        We do this separately to `store_partial_state_room` because we need to wait for
+        the join event to be persisted. Otherwise we violate a foreign key constraint.
+        """
+        await self.db_pool.runInteraction(
+            "write_partial_state_rooms_join_event_id",
+            self._write_partial_state_rooms_join_event_id,
+            room_id,
+            join_event_id,
+        )
+
+    def _write_partial_state_rooms_join_event_id(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        join_event_id: str,
+    ) -> None:
+        DatabasePool.simple_update_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            updatevalues={"join_event_id": join_event_id},
+        )
 
     async def maybe_store_room_on_outlier_membership(
         self, room_id: str, room_version: RoomVersion

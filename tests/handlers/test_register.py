@@ -497,7 +497,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            event_creation_handler.handle_new_client_event(requester, event, context)
+            event_creation_handler.handle_new_client_event(
+                requester, events_and_context=[(event, context)]
+            )
         )
 
         # Register a second user, which won't be be in the room (or even have an invite)

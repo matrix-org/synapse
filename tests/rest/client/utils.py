@@ -543,8 +543,12 @@ class RestHelper:
 
         return channel.json_body
 
-    def login_via_oidc(self, remote_user_id: str) -> JsonDict:
-        """Log in (as a new user) via OIDC
+    def login_via_oidc(
+        self,
+        remote_user_id: str,
+        expected_status: int = 200,
+    ) -> JsonDict:
+        """Log in via OIDC
 
         Returns the result of the final token login.
 
@@ -578,7 +582,9 @@ class RestHelper:
             "/login",
             content={"type": "m.login.token", "token": login_token},
         )
-        assert channel.code == HTTPStatus.OK
+        assert (
+            channel.code == expected_status
+        ), f"unexpected status in response: {channel.code}"
         return channel.json_body
 
     def auth_via_oidc(

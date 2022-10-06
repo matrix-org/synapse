@@ -11,7 +11,9 @@ rust-version = "1.58.1"
 
 [lib]
 name = "synapse"
-crate-type = ["cdylib"]
+# We generate a `cdylib` for Python and a standard `lib` for running
+# tests/benchmarks.
+crate-type = ["lib", "cdylib"]
 
 [package.metadata.maturin]
 # This is where we tell maturin where to place the built library.

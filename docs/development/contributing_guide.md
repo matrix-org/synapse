@@ -167,6 +167,12 @@ was broken. They are slower than the linters but will typically catch more error
 poetry run trial tests
 ```
 
+You can run unit tests in parallel by specifying `-jX` argument to `trial` where `X` is the number of parallel runners you want. To use 4 cpu cores, you would run them like:
+
+```sh
+poetry run trial -j4 tests
+```
+
 If you wish to only run *some* unit tests, you may specify
 another module instead of `tests` - or a test class or a method:
 

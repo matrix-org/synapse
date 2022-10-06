@@ -531,7 +531,9 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
         self.get_success(
-            event_handler.handle_new_client_event(self.requester, event, context)
+            event_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
         )
         state1 = set(self.get_success(context.get_current_state_ids()).values())
 
@@ -549,7 +551,9 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
         self.get_success(
-            event_handler.handle_new_client_event(self.requester, event, context)
+            event_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
         )
         state2 = set(self.get_success(context.get_current_state_ids()).values())
 
