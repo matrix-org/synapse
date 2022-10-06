@@ -148,15 +148,13 @@ class OEmbedProvider:
         if oembed_version != "1.0" and oembed_version != 1:
             return OEmbedResult({}, None, None)
 
-        # Ensure the cache age is None or an int.
-        cache_age = oembed.get("cache_age")
-        if cache_age:
-            try:
-                cache_age = int(cache_age) * 1000
-            except (TypeError, ValueError):
-                # If the cache age cannot be parsed (e.g. wrong type or invalid
-                # string), ignore it.
-                cache_age = None
+        # Attempt to parse the cache age, if possible.
+        try:
+            cache_age = int(oembed.get("cache_age")) * 1000
+        except (TypeError, ValueError):
+            # If the cache age cannot be parsed (e.g. wrong type or invalid
+            # string), ignore it.
+            cache_age = None
 
         # The oEmbed response converted to Open Graph.
         open_graph_response = {"og:url": url}
@@ -180,7 +178,7 @@ class OEmbedProvider:
             open_graph_response["og:image"] = thumbnail_url
 
         # Process each type separately.
-        oembed_type = oembed["type"]
+        oembed_type = oembed.get("type")
         if oembed_type == "rich":
             html = oembed.get("html")
             if isinstance(html, str):
