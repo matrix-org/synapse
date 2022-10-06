@@ -223,7 +223,7 @@ class OptionsResourceTests(unittest.TestCase):
         self.resource.putChild(b"res", DummyResource())
 
     def _make_request(
-        self, method: bytes, path: bytes, experimental_cors_msc3886=False
+        self, method: bytes, path: bytes, experimental_cors_msc3886: bool = False
     ) -> FakeChannel:
         """Create a request from the method/path and return a channel with the response."""
         # Create a site and query for the resource.

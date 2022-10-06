@@ -50,7 +50,8 @@ class RendezvousServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.endpoint = hs.config.experimental.msc3886_endpoint.encode("utf-8")
+        redirection_target: str = hs.config.experimental.msc3886_endpoint or ""
+        self.endpoint = redirection_target.encode("utf-8")
 
     async def on_POST(self, request: SynapseRequest) -> None:
         respond_with_redirect(
@@ -59,5 +60,5 @@ class RendezvousServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    if not hs.config.experimental.msc3886_endpoint is None:
+    if hs.config.experimental.msc3886_endpoint is not None:
         RendezvousServlet(hs).register(http_server)
