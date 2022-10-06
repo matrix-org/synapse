@@ -1062,6 +1062,59 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             return min_depth_event_id, current_min_depth
 
+    async def get_prev_events_for_creating_event_in_room(self, room_id: str) -> List[str]:
+        """
+        Gets up to 10 event IDs which are suitable for use as `prev_events`
+        when creating an event in the given room.
+
+        If a full-state room:
+            Gets up to 10 of the forward extremities of the room DAG.
+            See `get_prev_events_for_full_state_room`.
+
+        If a partial-state room:
+            Gets up to 10 of the forward extremities of the room subgraph
+            in which we pretend other homeservers haven't sent any events.
+            See `_get_prev_events_for_partial_state_room_from_join_event_txn`.
+        Gets a subset of the current forward extremities in the given room.
+
+        Limits the result to 10 extremities, so that we can avoid creating
+        events which refer to hundreds of prev_events.
+
+        Args:
+            room_id: room_id
+
+        Returns:
+            The event IDs of up to 10 event IDs which are suitable for use as
+            `prev_events`.
+        """
+
+        return await self.db_pool.runInteraction(
+            "get_prev_events_for_creating_event_in_room",
+            self._get_prev_events_for_creating_event_in_room_txn,
+            room_id,
+        )
+
+    def _get_prev_events_for_creating_event_in_room_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> List[str]:
+        # Find out if the room is partial-stated, getting the partial join event ID
+        # if it is.
+        join_event_id = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="join_event_id",
+            allow_none=True,
+        )
+
+        if join_event_id is None:
+            # This is not a partial-state room.
+            return self._get_prev_events_for_full_state_room_txn(txn, room_id)
+        else:
+            return self._get_prev_events_for_partial_state_room_from_join_event_txn(
+                txn, join_event_id
+            )
+
     async def get_prev_events_for_full_state_room(self, room_id: str) -> List[str]:
         """
         Gets a subset of the current forward extremities in the given room.
