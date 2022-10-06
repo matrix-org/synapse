@@ -307,7 +307,7 @@ twine = "*"
 towncrier = ">=18.6.0rc1"
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "setuptools_rust>=1.3"]
+requires = ["poetry-core==1.2.0", "setuptools_rust==1.5.2"]
 build-backend = "poetry.core.masonry.api"
 
 
