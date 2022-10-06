@@ -1062,7 +1062,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             return min_depth_event_id, current_min_depth
 
-    async def get_prev_events_for_room(self, room_id: str) -> List[str]:
+    async def get_prev_events_for_full_state_room(self, room_id: str) -> List[str]:
         """
         Gets a subset of the current forward extremities in the given room.
 
@@ -1073,7 +1073,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id: room_id
 
         Returns:
-            The event ids of the forward extremities.
+            The event ids of up to 10 of the forward extremities,
+            suitable for using as `prev_events` in a full-state room.
         """
 
         return await self.db_pool.runInteraction(
