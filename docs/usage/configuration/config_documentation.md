@@ -2658,8 +2658,8 @@ warning on start-up. To suppress this warning, set
 If the use of a trusted key server has to be deactivated, e.g. in a private
 federation or for privacy reasons, this can be realised by setting
 an empty array (`trusted_key_servers: []`). Then Synapse will request the keys
-directly from the communication partner. If Synapse does not get keys directly
-from the communication partner, the events of the other server will be rejected.
+directly from the server that owns the keys. If Synapse does not get keys directly
+from the server, the events of this server will be rejected.
 
 Options for each entry in the list include:
 * `server_name`: the name of the server. Required.
