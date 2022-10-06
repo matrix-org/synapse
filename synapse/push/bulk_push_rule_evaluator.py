@@ -165,7 +165,10 @@ class BulkPushRuleEvaluator:
         return rules_by_user
 
     async def _get_power_levels_and_sender_level(
-        self, event: EventBase, context: EventContext
+        self,
+        event: EventBase,
+        context: EventContext,
+        event_id_to_event: Mapping[str, EventBase],
     ) -> Tuple[dict, Optional[int]]:
         # There are no power levels and sender levels possible to get from outlier
         if event.internal_metadata.is_outlier():
@@ -177,15 +180,26 @@ class BulkPushRuleEvaluator:
         )
         pl_event_id = prev_state_ids.get(POWER_KEY)
 
+        # fastpath: if there's a power level event, that's all we need, and
+        # not having a power level event is an extreme edge case
         if pl_event_id:
-            # fastpath: if there's a power level event, that's all we need, and
-            # not having a power level event is an extreme edge case
-            auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
+            # check that the power level event is not in the batch before checking the DB
+            pl_event = event_id_to_event.get(pl_event_id)
+            if pl_event:
+                auth_events = {POWER_KEY: pl_event}
+            else:
+                auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
         else:
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=False
             )
             auth_events_dict = await self.store.get_events(auth_events_ids)
+            # check to see that there aren't any needed auth events in the batch as it
+            # hasn't been persisted yet
+            for auth_event_id in auth_events_ids:
+                auth_event = event_id_to_event.get(auth_event_id)
+                if auth_event:
+                    auth_events_dict[auth_event_id] = auth_event
             auth_events = {(e.type, e.state_key): e for e in auth_events_dict.values()}
 
         sender_level = get_user_power_level(event.sender, auth_events)
