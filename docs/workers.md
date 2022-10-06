@@ -123,13 +123,15 @@ public internet; replication traffic is:
 ### Worker configuration
 
 In the config file for each worker, you must specify:
- * The type of worker (`worker_app`). The currently available worker applications are listed below.
- * A unique name for the worker (`worker_name`).
+ * The type of worker ([`worker_app`](usage/configuration/config_documentation.md#worker_app)).
+   The currently available worker applications are listed below.
+ * A unique name for the worker ([`worker_name`](usage/configuration/config_documentation.md#worker_name)).
  * The HTTP replication endpoint that it should talk to on the main synapse process
-   (`worker_replication_host` and `worker_replication_http_port`)
- * If handling HTTP requests, a `worker_listeners` option with an `http`
-   listener, in the same way as the [`listeners`](usage/configuration/config_documentation.md#listeners)
-   option in the shared config.
+   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
+   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port))
+ * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners)
+   option with an `http` listener, in the same way as the
+   [`listeners`](usage/configuration/config_documentation.md#listeners) option in the shared config.
  * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`).
 
