@@ -157,7 +157,7 @@ class OEmbedProvider:
             cache_age = None
 
         # The oEmbed response converted to Open Graph.
-        open_graph_response = {"og:url": url}
+        open_graph_response: JsonDict = {"og:url": url}
 
         title = oembed.get("title")
         if title and isinstance(title, str):
