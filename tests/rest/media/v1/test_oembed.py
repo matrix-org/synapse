@@ -25,8 +25,16 @@ from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
+try:
+    import lxml
+except ImportError:
+    lxml = None
+
 
 class OEmbedTests(HomeserverTestCase):
+    if not lxml:
+        skip = "url preview feature requires lxml"
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.oembed = OEmbedProvider(hs)
 
