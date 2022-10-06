@@ -219,7 +219,7 @@ oidc = ["authlib"]
 # `systemd.journal.JournalHandler`, as is documented in
 # `contrib/systemd/log_config.yaml`.
 systemd = ["systemd-python"]
-url_preview = ["lxml"]
+url-preview = ["lxml"]
 sentry = ["sentry-sdk"]
 opentracing = ["jaeger-client", "opentracing"]
 jwt = ["authlib"]
@@ -250,7 +250,7 @@ all = [
     "pysaml2",
     # oidc and jwt
     "authlib",
-    # url_preview
+    # url-preview
     "lxml",
     # sentry
     "sentry-sdk",
