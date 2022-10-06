@@ -16,8 +16,8 @@ Internal Changes
 ----------------
 
 - Ensure Synapse v1.69 works with upcoming database changes in v1.70. ([\#14045](https://github.com/matrix-org/synapse/issues/14045))
-- Fix a bug introduced in Synapse 1.68.0 where messages could not be sent in rooms with non-integer `notifications` power level. ([\#14073](https://github.com/matrix-org/synapse/issues/14073))
-- Pin build-system requirements. ([\#14080](https://github.com/matrix-org/synapse/issues/14080))
+- Fix a bug introduced in Synapse v1.68.0 where messages could not be sent in rooms with non-integer `notifications` power level. ([\#14073](https://github.com/matrix-org/synapse/issues/14073))
+- Temporarily pin build-system requirements to workaround an incompatibility with poetry-core 1.3.0. This will be reverted before the v1.69.0 release proper, see [\#14079](https://github.com/matrix-org/synapse/issues/14079). ([\#14080](https://github.com/matrix-org/synapse/issues/14080))
 
 
 Synapse 1.69.0rc1 (2022-10-04)
