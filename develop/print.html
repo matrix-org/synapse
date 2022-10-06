@@ -1651,6 +1651,30 @@ the names of Prometheus metrics.
 If you want to test your changes before legacy names are disabled by default,
 you may specify <code>enable_legacy_metrics: false</code> in your homeserver configuration.</p>
 <p>A list of affected metrics is available on the <a href="https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12">Metrics How-to page</a>.</p>
+<h2 id="deprecation-of-the-generate_short_term_login_token-module-api-method"><a class="header" href="#deprecation-of-the-generate_short_term_login_token-module-api-method">Deprecation of the <code>generate_short_term_login_token</code> module API method</a></h2>
+<p>The following method of the module API has been deprecated, and is scheduled to
+be remove in v1.71.0:</p>
+<pre><code class="language-python">def generate_short_term_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: str = &quot;&quot;,
+    auth_provider_session_id: Optional[str] = None,
+) -&gt; str:
+    ...
+</code></pre>
+<p>It has been replaced by an asynchronous equivalent:</p>
+<pre><code class="language-python">async def create_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: Optional[str] = None,
+    auth_provider_session_id: Optional[str] = None,
+) -&gt; str:
+    ...
+</code></pre>
+<p>Synapse will log a warning when a module uses the deprecated method, to help
+administrators find modules using it.</p>
 <h1 id="upgrading-to-v1680"><a class="header" href="#upgrading-to-v1680">Upgrading to v1.68.0</a></h1>
 <p>Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.</p>
 <h2 id="sqlite-version-requirement"><a class="header" href="#sqlite-version-requirement">SQLite version requirement</a></h2>
