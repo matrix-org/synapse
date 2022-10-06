@@ -1099,6 +1099,70 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return [row[0] for row in txn]
 
+    def _get_prev_events_for_partial_state_room_from_join_event_txn(
+        self, txn: LoggingTransaction, join_event_id: str
+    ) -> List[str]:
+        """
+        Given the ID of a join event, which is the origin of a partial join,
+        gets a subset of the current events suitable for being used as `prev_events`
+        in the corresponding partial-state room.
+        The returned events are always created by the local homeserver.
+
+        These are forward extremities of the subgraph of the room graph,
+        starting at the partial join event and transitively including any other
+        successor events as long as they were created locally on this homeserver.
+        (i.e. No events created on remote homeservers are included in this subgraph.)
+
+        Limits the result to 10 extremities, so that we can avoid creating
+        events which refer to hundreds of prev_events.
+
+        Args:
+            join_event_id: ID of the join event from which our partial join
+                originates
+
+        Preconditions:
+            1. `join_event_id` is a valid event ID of a real join event,
+               created by the local homeserver.
+            2. The room corresponding to `join_event_id` is partial-stated.
+
+        Postconditions:
+            1. For each of the returned event IDs, all events in the `prev_event`
+               chain up to `join_event_id` were persisted locally.
+            2. At least one event ID is returned.
+
+        Returns:
+            List of event IDs suitable for use as `prev_events`
+        """
+
+        # We just use 10 events at max.
+        # Parallel events from our own homeserver are unlikely anyway.
+        sql = """
+            WITH RECURSIVE
+              local_subgraph_event_edges(prev, succ) AS (
+                /* Base case */
+                SELECT ?, event_id FROM event_edges JOIN events USING (event_id) WHERE prev_event_id=? AND sender LIKE ?
+                UNION
+                /* Step case: recurse into successor events, as long as those events are sent by us */
+                SELECT t.succ AS prev, e.succ AS succ FROM local_subgraph_event_edges t
+                  LEFT JOIN (SELECT prev_event_id AS prev, event_id AS succ FROM event_edges JOIN events USING (event_id)
+                WHERE events.sender LIKE ?) e ON t.succ = e.prev
+                  WHERE t.succ IS NOT NULL
+              )
+            /* Only choose events with no locally-sent successor event */
+            SELECT t.prev AS new_prev_event FROM local_subgraph_event_edges t WHERE succ IS NULL
+            LIMIT 10
+        """
+
+        hs_pattern = f"%:{self.hs.hostname}"
+        txn.execute(sql, (join_event_id, join_event_id, hs_pattern, hs_pattern))
+        rows = [row[0] for row in txn]
+        if not rows:
+            # If no rows are returned, there are no successors so the join event
+            # is the forward extremity of the locally-sent subgraph
+            return [join_event_id]
+
+        return rows
+
     async def get_rooms_with_many_extremities(
         self, min_count: int, limit: int, room_id_filter: Iterable[str]
     ) -> List[str]:
