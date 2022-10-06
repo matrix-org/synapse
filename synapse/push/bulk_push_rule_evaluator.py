@@ -289,11 +289,18 @@ class BulkPushRuleEvaluator:
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
 
+        # It's possible that old room versions have non-integer power levels (floats or
+        # strings). Workaround this by explicitly converting to int.
+        notification_levels = power_levels.get("notifications", {})
+        if not event.room_version.msc3667_int_only_power_levels:
+            for user_id, level in notification_levels.items():
+                notification_levels[user_id] = int(level)
+
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels.get("notifications", {}),
+            notification_levels,
             relations,
             self._relations_match_enabled,
         )
