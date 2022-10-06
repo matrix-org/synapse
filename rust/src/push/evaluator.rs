@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
@@ -46,13 +46,6 @@ pub struct PushRuleEvaluator {
     /// The `notifications` section of the current power levels in the room.
     notification_power_levels: BTreeMap<String, i64>,
 
-    /// The relations related to the event as a mapping from relation type to
-    /// set of sender/event type 2-tuples.
-    relations: BTreeMap<String, BTreeSet<(String, String)>>,
-
-    /// Is running "relation" conditions enabled?
-    relation_match_enabled: bool,
-
     /// The power level of the sender of the event, or None if event is an
     /// outlier.
     sender_power_level: Option<i64>,
@@ -67,8 +60,6 @@ impl PushRuleEvaluator {
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
-        relations: BTreeMap<String, BTreeSet<(String, String)>>,
-        relation_match_enabled: bool,
     ) -> Result<Self, Error> {
         let body = flattened_keys
             .get("content.body")
@@ -80,8 +71,6 @@ impl PushRuleEvaluator {
             body,
             room_member_count,
             notification_power_levels,
-            relations,
-            relation_match_enabled,
             sender_power_level,
         })
     }
@@ -278,15 +267,8 @@ impl PushRuleEvaluator {
 fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
-    let evaluator = PushRuleEvaluator::py_new(
-        flattened_keys,
-        10,
-        Some(0),
-        BTreeMap::new(),
-        BTreeMap::new(),
-        true,
-    )
-    .unwrap();
+    let evaluator =
+        PushRuleEvaluator::py_new(flattened_keys, 10, Some(0), BTreeMap::new()).unwrap();
 
     let result = evaluator.run(&FilteredPushRules::default(), None, Some("bob"));
     assert_eq!(result.len(), 3);

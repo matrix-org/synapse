@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, Optional, Union
 
 import frozendict
 
@@ -38,12 +38,7 @@ from tests.test_utils.event_injection import create_event, inject_member_event
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
-    def _get_evaluator(
-        self,
-        content: JsonDict,
-        relations: Optional[Dict[str, Set[Tuple[str, str]]]] = None,
-        relations_match_enabled: bool = False,
-    ) -> PushRuleEvaluator:
+    def _get_evaluator(self, content: JsonDict) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -63,8 +58,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             room_member_count,
             sender_power_level,
             power_levels.get("notifications", {}),
-            relations or {},
-            relations_match_enabled,
         )
 
     def test_display_name(self) -> None:

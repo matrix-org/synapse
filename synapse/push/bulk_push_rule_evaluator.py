@@ -276,16 +276,11 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
+        # Find the event's thread ID.
         relation = relation_from_event(event)
-        # If the event does not have a relation, then cannot have any mutual
-        # relations or thread ID.
-        relations = {}
+        # If the event does not have a relation, then it cannot have a thread ID.
         thread_id = MAIN_TIMELINE
         if relation:
-            relations = await self._get_mutual_relations(
-                relation.parent_id,
-                itertools.chain(*(r.rules() for r in rules_by_user.values())),
-            )
             # Recursively attempt to find the thread this event relates to.
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
@@ -306,8 +301,6 @@ class BulkPushRuleEvaluator:
             room_member_count,
             sender_power_level,
             notification_levels,
-            relations,
-            self._relations_match_enabled,
         )
 
         users = rules_by_user.keys()
