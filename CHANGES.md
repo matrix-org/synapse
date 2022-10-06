@@ -1,4 +1,4 @@
-Synapse 1.69.0rc3 (2022-10-06)
+Synapse 1.69.0rc2 (2022-10-06)
 ==============================
 
 Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
