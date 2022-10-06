@@ -1,4 +1,4 @@
-Synapse 1.69.0rc2 (2022-10-06)
+Synapse 1.69.0rc3 (2022-10-06)
 ==============================
 
 Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
@@ -6,10 +6,18 @@ Server administrators should update their dashboards and alerting rules to avoid
 See the [upgrade notes](https://matrix-org.github.io/synapse/v1.69/upgrade.html#upgrading-to-v1690) for more details.
 
 
+Deprecations and Removals
+-------------------------
+
+- Deprecate the `generate_short_term_login_token` method in favor of an async `create_login_token` method in the Module API. ([\#13842](https://github.com/matrix-org/synapse/issues/13842))
+
+
 Internal Changes
 ----------------
 
 - Ensure Synapse v1.69 works with upcoming database changes in v1.70. ([\#14045](https://github.com/matrix-org/synapse/issues/14045))
+- Fix a bug introduced in Synapse 1.68.0 where messages could not be sent in rooms with non-integer `notifications` power level. ([\#14073](https://github.com/matrix-org/synapse/issues/14073))
+- Pin build-system requirements. ([\#14080](https://github.com/matrix-org/synapse/issues/14080))
 
 
 Synapse 1.69.0rc1 (2022-10-04)

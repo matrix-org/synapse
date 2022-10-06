@@ -1,1 +1,0 @@
-Deprecate the `generate_short_term_login_token` method in favor of an async `create_login_token` method in the Module API.
