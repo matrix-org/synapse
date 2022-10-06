@@ -97,6 +97,11 @@ class SendJoinParserTestCase(TestCase):
         self.assertEqual(parsed_response.servers_in_room, ["hs1", "hs2"])
 
     def test_errors_closing_coroutines(self) -> None:
+        """Check we close all coroutines, even if closing the first raises an Exception.
+
+        We also check that an Exception of some kind is raised, but we don't make any
+        assertions about its attributes or type.
+        """
         parser = SendJoinParser(RoomVersions.V1, False)
         response = {"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}
         serialisation = json.dumps(response).encode()
