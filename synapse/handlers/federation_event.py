@@ -2118,7 +2118,7 @@ class FederationEventHandler:
                 )
             else:
                 await self._bulk_push_rule_evaluator.action_for_event_by_user(
-                    event, context
+                    [(event, context)]
                 )
 
         try:
