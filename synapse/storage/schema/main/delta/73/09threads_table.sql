@@ -23,3 +23,6 @@ CREATE TABLE threads (
     stream_ordering BIGINT NOT NULL,
     CONSTRAINT threads_uniqueness UNIQUE (room_id, thread_id)
 );
+
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+  (7309, 'threads_backfill', '{}');
