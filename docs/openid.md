@@ -423,7 +423,7 @@ Synapse config:
     user_mapping_provider:
       config:
         display_name_template: "{{ user.name }}"
-        email_template: "{{ '{{ user.email }}' }}"
+        email_template: "{{ user.email }}"
 ```
 
 Relevant documents:

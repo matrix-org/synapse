@@ -304,6 +304,30 @@ class BulkPushRuleEvaluator:
                 event, context, event_id_to_event
             )
 
+            # Recursively attempt to find the thread this event relates to.
+            if relation.rel_type == RelationTypes.THREAD:
+                thread_id = relation.parent_id
+            else:
+                # Since the event has not yet been persisted we check whether
+                # the parent is part of a thread.
+                thread_id = await self.store.get_thread_id(relation.parent_id) or "main"
+
+        # It's possible that old room versions have non-integer power levels (floats or
+        # strings). Workaround this by explicitly converting to int.
+        notification_levels = power_levels.get("notifications", {})
+        if not event.room_version.msc3667_int_only_power_levels:
+            for user_id, level in notification_levels.items():
+                notification_levels[user_id] = int(level)
+
+        evaluator = PushRuleEvaluator(
+            _flatten_dict(event),
+            room_member_count,
+            sender_power_level,
+            notification_levels,
+            relations,
+            self._relations_match_enabled,
+        )
+
             relation = relation_from_event(event)
             # If the event does not have a relation, then cannot have any mutual
             # relations or thread ID.
