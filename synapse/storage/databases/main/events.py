@@ -35,7 +35,7 @@ import attr
 from prometheus_client import Counter
 
 import synapse.metrics
-from synapse.api.constants import EventContentFields, EventTypes
+from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, relation_from_event
@@ -1865,6 +1865,34 @@ class PersistEventsStore:
                 "aggregation_key": relation.aggregation_key,
             },
         )
+
+        if relation.rel_type == RelationTypes.THREAD:
+            # Upsert into the threads table, but only overwrite the value if the
+            # new event is of a later topological order OR if the topological
+            # ordering is equal, but the stream ordering is later.
+            sql = """
+            INSERT INTO threads (room_id, thread_id, latest_event_id, topological_ordering, stream_ordering)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (room_id, thread_id)
+            DO UPDATE SET
+                latest_event_id = excluded.latest_event_id,
+                topological_ordering = excluded.topological_ordering,
+                stream_ordering = excluded.stream_ordering
+            WHERE
+                threads.topological_ordering <= excluded.topological_ordering AND
+                threads.stream_ordering < excluded.stream_ordering
+            """
+
+            txn.execute(
+                sql,
+                (
+                    event.room_id,
+                    relation.parent_id,
+                    event.event_id,
+                    event.depth,
+                    event.internal_metadata.stream_ordering,
+                ),
+            )
 
     def _handle_insertion_event(
         self, txn: LoggingTransaction, event: EventBase
