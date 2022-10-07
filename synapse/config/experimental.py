@@ -95,8 +95,6 @@ class ExperimentalConfig(Config):
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
 
-        # MSC3771: Thread read receipts
-        self.msc3771_enabled: bool = experimental.get("msc3771_enabled", False)
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
 
