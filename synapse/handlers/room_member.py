@@ -799,7 +799,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 origin_server_ts=origin_server_ts,
             )
 
-        latest_event_ids = await self.store.get_prev_events_for_room(room_id)
+        latest_event_ids = await self.store.get_prev_events_for_creating_event_in_room(
+            room_id
+        )
 
         state_before_join = await self.state_handler.compute_state_after_events(
             room_id, latest_event_ids
