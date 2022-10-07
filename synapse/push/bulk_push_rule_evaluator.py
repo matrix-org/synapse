@@ -114,9 +114,6 @@ class BulkPushRuleEvaluator:
             resizable=False,
         )
 
-        # Whether to support MSC3772 is supported.
-        self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
-
     async def _get_rules_for_event(
         self,
         event: EventBase,
