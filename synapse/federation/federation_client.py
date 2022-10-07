@@ -366,7 +366,7 @@ class FederationClient(FederationBase):
     @tag_args
     async def get_pdu(
         self,
-        destinations: Iterable[str],
+        destinations: Collection[str],
         event_id: str,
         room_version: RoomVersion,
         timeout: Optional[int] = None,
@@ -389,7 +389,7 @@ class FederationClient(FederationBase):
         """
 
         logger.debug(
-            "get_pdu: event_id=%s from destinations=%s", event_id, destinations
+            f"get_pdu(event_id={event_id}): from destinations=%s", destinations
         )
 
         # TODO: Rate limit the number of times we try and get the same event.
@@ -415,11 +415,7 @@ class FederationClient(FederationBase):
                 last_attempt = pdu_attempts.get(destination, 0)
                 if last_attempt + PDU_RETRY_TIME_MS > now:
                     logger.debug(
-                        "get_pdu: skipping destination=%s because we tried it recently last_attempt=%s and we only check every %s (now=%s)",
-                        destination,
-                        last_attempt,
-                        PDU_RETRY_TIME_MS,
-                        now,
+                        f"get_pdu(event_id={event_id}): skipping destination={destination} because we tried it recently last_attempt={last_attempt} and we only check every {PDU_RETRY_TIME_MS} (now={now})",
                     )
                     continue
 
@@ -442,25 +438,24 @@ class FederationClient(FederationBase):
                         # loop and stop asking other destinations.
                         break
 
-                except SynapseError as e:
+                except NotRetryingDestination as e:
+                    logger.info(f"get_pdu(event_id={event_id}): {e}")
+                    continue
+                except FederationDeniedError:
                     logger.info(
-                        "Failed to get PDU %s from %s because %s",
-                        event_id,
-                        destination,
-                        e,
+                        f"get_pdu(event_id={event_id}): Not attempting to fetch PDU from {destination} because the homeserver is not on our federation whitelist"
                     )
                     continue
-                except (NotRetryingDestination, FederationDeniedError) as e:
-                    logger.info(str(e))
+                except SynapseError as e:
+                    logger.info(
+                        f"get_pdu(event_id={event_id}): Failed to get PDU from {destination} because {e}",
+                    )
                     continue
                 except Exception as e:
                     pdu_attempts[destination] = now
 
                     logger.info(
-                        "Failed to get PDU %s from %s because %s",
-                        event_id,
-                        destination,
-                        e,
+                        f"get_pdu(event_id={event_id}): Failed to get PDU from {destination} because {e}",
                     )
                     continue
 
@@ -834,13 +829,17 @@ class FederationClient(FederationBase):
             except (
                 RequestSendFailed,
                 InvalidResponseError,
-                # This is the federation client retry backoff error.
-                NotRetryingDestination,
-                # Homeserver is not on our whitelist.
-                FederationDeniedError,
             ) as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
                 # Skip to the next homeserver in the list to try.
+                continue
+            except NotRetryingDestination as e:
+                logger.info(f"{description}: {e}")
+                continue
+            except FederationDeniedError:
+                logger.info(
+                    f"{description}: Not attempting to {description} from {destination} because the homeserver is not on our federation whitelist"
+                )
                 continue
             except UnsupportedRoomVersionError:
                 raise

@@ -441,6 +441,14 @@ class FederationHandler:
                     # appropriate stuff.
                     # TODO: We can probably do something more intelligent here.
                     return True
+                except NotRetryingDestination as e:
+                    logger.info(f"_maybe_backfill_inner: {e}")
+                    continue
+                except FederationDeniedError:
+                    logger.info(
+                        f"_maybe_backfill_inner: Not attempting to backfill from {dom} because the homeserver is not on our federation whitelist"
+                    )
+                    continue
                 except (SynapseError, InvalidResponseError) as e:
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
@@ -476,14 +484,8 @@ class FederationHandler:
 
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
-                except NotRetryingDestination as e:
-                    logger.info(str(e))
-                    continue
                 except RequestSendFailed as e:
                     logger.info("Failed to get backfill from %s because %s", dom, e)
-                    continue
-                except FederationDeniedError as e:
-                    logger.info(e)
                     continue
                 except Exception as e:
                     logger.exception("Failed to backfill from %s because %s", dom, e)
