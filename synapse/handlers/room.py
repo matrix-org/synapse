@@ -1458,8 +1458,6 @@ class RoomContextHandler:
 
 class TimestampLookupHandler:
     def __init__(self, hs: "HomeServer"):
-        # TODO: Remove
-        self.hs = hs
         self.server_name = hs.hostname
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
@@ -1493,13 +1491,6 @@ class TimestampLookupHandler:
         Raises:
             SynapseError if unable to find any event locally in the given direction
         """
-        # TODO: Remove: this is just here to consistently reproduce the MSC3030
-        # Complement test flake
-        from twisted.internet import task as twisted_task
-
-        d = twisted_task.deferLater(self.hs.get_reactor(), 3.5)
-        await d
-
         logger.debug(
             f"get_event_for_timestamp(room_id={room_id}, timestamp={timestamp}, direction={direction}) Finding closest event..."
         )
