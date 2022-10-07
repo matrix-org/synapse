@@ -391,21 +391,15 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
-    msc3772_enabled: bool,
 }
 
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    pub fn py_new(
-        push_rules: PushRules,
-        enabled_map: BTreeMap<String, bool>,
-        msc3772_enabled: bool,
-    ) -> Self {
+    pub fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3772_enabled,
         }
     }
 
