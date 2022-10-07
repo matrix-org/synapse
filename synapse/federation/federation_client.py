@@ -80,6 +80,18 @@ PDU_RETRY_TIME_MS = 1 * 60 * 1000
 T = TypeVar("T")
 
 
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class PulledPduInfo:
+    """
+    A result object that stores the PDU and info about it like which homeserver we
+    pulled it from (`pull_origin`)
+    """
+
+    pdu: EventBase
+    # Which homeserver we pulled the PDU from
+    pull_origin: str
+
+
 class InvalidResponseError(RuntimeError):
     """Helper for _try_destination_list: indicates that the server returned a response
     we couldn't parse
@@ -114,7 +126,9 @@ class FederationClient(FederationBase):
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
 
-        self._get_pdu_cache: ExpiringCache[str, EventBase] = ExpiringCache(
+        # Cache mapping `event_id` to a tuple of the event itself and the `pull_origin`
+        # (which server we pulled the event from)
+        self._get_pdu_cache: ExpiringCache[str, Tuple[EventBase, str]] = ExpiringCache(
             cache_name="get_pdu_cache",
             clock=self._clock,
             max_len=1000,
@@ -356,7 +370,7 @@ class FederationClient(FederationBase):
         event_id: str,
         room_version: RoomVersion,
         timeout: Optional[int] = None,
-    ) -> Optional[EventBase]:
+    ) -> Optional[PulledPduInfo]:
         """Requests the PDU with given origin and ID from the remote home
         servers.
 
@@ -371,7 +385,7 @@ class FederationClient(FederationBase):
                 moving to the next destination. None indicates no timeout.
 
         Returns:
-            The requested PDU, or None if we were unable to find it.
+            The requested PDU wrapped in `PulledPduInfo`, or None if we were unable to find it.
         """
 
         logger.debug(
@@ -384,13 +398,18 @@ class FederationClient(FederationBase):
         # it gets persisted to the database), so we cache the results of the lookup.
         # Note that this is separate to the regular get_event cache which caches
         # events once they have been persisted.
-        event = self._get_pdu_cache.get(event_id)
+        get_pdu_cache_entry = self._get_pdu_cache.get(event_id)
 
+        event = None
+        pull_origin = None
+        if get_pdu_cache_entry:
+            event, pull_origin = get_pdu_cache_entry
         # If we don't see the event in the cache, go try to fetch it from the
         # provided remote federated destinations
-        if not event:
+        elif not get_pdu_cache_entry:
             pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
+            # TODO: We can probably refactor this to use `_try_destination_list`
             for destination in destinations:
                 now = self._clock.time_msec()
                 last_attempt = pdu_attempts.get(destination, 0)
@@ -411,12 +430,13 @@ class FederationClient(FederationBase):
                         room_version=room_version,
                         timeout=timeout,
                     )
+                    pull_origin = destination
 
                     pdu_attempts[destination] = now
 
                     if event:
                         # Prime the cache
-                        self._get_pdu_cache[event.event_id] = event
+                        self._get_pdu_cache[event.event_id] = (event, pull_origin)
 
                         # Now that we have an event, we can break out of this
                         # loop and stop asking other destinations.
@@ -430,10 +450,7 @@ class FederationClient(FederationBase):
                         e,
                     )
                     continue
-                except NotRetryingDestination as e:
-                    logger.info(str(e))
-                    continue
-                except FederationDeniedError as e:
+                except (NotRetryingDestination, FederationDeniedError) as e:
                     logger.info(str(e))
                     continue
                 except Exception as e:
@@ -447,7 +464,7 @@ class FederationClient(FederationBase):
                     )
                     continue
 
-        if not event:
+        if not event or not pull_origin:
             return None
 
         # `event` now refers to an object stored in `get_pdu_cache`. Our
@@ -459,7 +476,7 @@ class FederationClient(FederationBase):
             event.room_version,
         )
 
-        return event_copy
+        return PulledPduInfo(event_copy, pull_origin)
 
     @trace
     @tag_args
@@ -699,12 +716,14 @@ class FederationClient(FederationBase):
         pdu_origin = get_domain_from_id(pdu.sender)
         if not res and pdu_origin != origin:
             try:
-                res = await self.get_pdu(
+                pulled_pdu_info = await self.get_pdu(
                     destinations=[pdu_origin],
                     event_id=pdu.event_id,
                     room_version=room_version,
                     timeout=10000,
                 )
+                if pulled_pdu_info is not None:
+                    res = pulled_pdu_info.pdu
             except SynapseError:
                 pass
 
@@ -806,6 +825,7 @@ class FederationClient(FederationBase):
             )
 
         for destination in destinations:
+            # We don't want to ask our own server for information we don't have
             if destination == self.server_name:
                 continue
 
@@ -814,9 +834,14 @@ class FederationClient(FederationBase):
             except (
                 RequestSendFailed,
                 InvalidResponseError,
+                # This is the federation client retry backoff error.
                 NotRetryingDestination,
+                # Homeserver is not on our whitelist.
+                FederationDeniedError,
             ) as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
+                # Skip to the next homeserver in the list to try.
+                continue
             except UnsupportedRoomVersionError:
                 raise
             except HttpResponseException as e:

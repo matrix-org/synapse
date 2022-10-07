@@ -146,14 +146,14 @@ class FederationClientTest(FederatingHomeserverTestCase):
 
     def test_get_pdu_returns_nothing_when_event_does_not_exist(self):
         """No event should be returned when the event does not exist"""
-        remote_pdu = self.get_success(
+        pulled_pdu_info = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet.another.server"],
                 "event_should_not_exist",
                 RoomVersions.V9,
             )
         )
-        self.assertEqual(remote_pdu, None)
+        self.assertEqual(pulled_pdu_info, None)
 
     def test_get_pdu(self):
         """Test to make sure an event is returned by `get_pdu()`"""
@@ -173,13 +173,15 @@ class FederationClientTest(FederatingHomeserverTestCase):
         remote_pdu.internal_metadata.outlier = True
 
         # Get the event again. This time it should read it from cache.
-        remote_pdu2 = self.get_success(
+        pulled_pdu_info2 = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet.another.server"],
                 remote_pdu.event_id,
                 RoomVersions.V9,
             )
         )
+        self.assertIsNotNone(pulled_pdu_info2)
+        remote_pdu2 = pulled_pdu_info2.pdu
 
         # Sanity check that we are working against the same event
         self.assertEqual(remote_pdu.event_id, remote_pdu2.event_id)
@@ -219,13 +221,15 @@ class FederationClientTest(FederatingHomeserverTestCase):
             )
         )
 
-        remote_pdu = self.get_success(
+        pulled_pdu_info = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet.another.server"],
                 "event_id",
                 RoomVersions.V9,
             )
         )
+        self.assertIsNotNone(pulled_pdu_info)
+        remote_pdu = pulled_pdu_info.pdu
 
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
