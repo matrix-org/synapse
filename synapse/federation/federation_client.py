@@ -1634,6 +1634,54 @@ class FederationClient(FederationBase):
         return result
 
     async def timestamp_to_event(
+        self, *, destinations: List[str], room_id: str, timestamp: int, direction: str
+    ) -> Optional["TimestampToEventResponse"]:
+        """
+        Calls each remote federating server from `destinations` asking for their closest
+        event to the given timestamp in the given direction until we get a response.
+        Also validates the response to always return the expected keys or raises an
+        error.
+
+        Args:
+            destinations: The domains of homeservers to try fetching from
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            A parsed TimestampToEventResponse including the closest event_id
+            and origin_server_ts
+
+        Raises:
+            SynapseError if the chosen remote server returns a 300/400 code, or
+            no servers were reachable.
+        """
+
+        async def _timestamp_to_event_from_destination(
+            destination: str,
+        ) -> Optional["TimestampToEventResponse"]:
+            return await self._timestamp_to_event_from_destination(
+                destination, room_id, timestamp, direction
+            )
+
+        # Loop through each homeserver candidate until we get a succesful response
+        return await self._try_destination_list(
+            "timestamp_to_event",
+            destinations,
+            # TODO: The requested timestamp may lie in a part of the
+            #   event graph that the remote server *also* didn't have,
+            #   in which case they will have returned another event
+            #   which may be nowhere near the requested timestamp. In
+            #   the future, we may need to reconcile that gap and ask
+            #   other homeservers, and/or extend `/timestamp_to_event`
+            #   to return events on *both* sides of the timestamp to
+            #   help reconcile the gap faster.
+            _timestamp_to_event_from_destination,
+        )
+
+    async def _timestamp_to_event_from_destination(
         self, destination: str, room_id: str, timestamp: int, direction: str
     ) -> "TimestampToEventResponse":
         """
