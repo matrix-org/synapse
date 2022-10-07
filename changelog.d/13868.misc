@@ -1,1 +1,0 @@
-Fix unstable MSC3882 endpoint being incorrectly available on stable API versions.

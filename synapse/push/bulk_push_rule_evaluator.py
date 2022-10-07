@@ -31,7 +31,7 @@ from typing import (
 
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -280,20 +280,32 @@ class BulkPushRuleEvaluator:
         # If the event does not have a relation, then cannot have any mutual
         # relations or thread ID.
         relations = {}
-        thread_id = "main"
+        thread_id = MAIN_TIMELINE
         if relation:
             relations = await self._get_mutual_relations(
                 relation.parent_id,
                 itertools.chain(*(r.rules() for r in rules_by_user.values())),
             )
+            # Recursively attempt to find the thread this event relates to.
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
+            else:
+                # Since the event has not yet been persisted we check whether
+                # the parent is part of a thread.
+                thread_id = await self.store.get_thread_id(relation.parent_id) or "main"
+
+        # It's possible that old room versions have non-integer power levels (floats or
+        # strings). Workaround this by explicitly converting to int.
+        notification_levels = power_levels.get("notifications", {})
+        if not event.room_version.msc3667_int_only_power_levels:
+            for user_id, level in notification_levels.items():
+                notification_levels[user_id] = int(level)
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels.get("notifications", {}),
+            notification_levels,
             relations,
             self._relations_match_enabled,
         )

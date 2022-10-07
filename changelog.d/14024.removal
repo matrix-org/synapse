@@ -1,1 +1,0 @@
-Announce that legacy metric names are deprecated, will be turned off by default in Synapse v1.71.0 and removed altogether in Synapse v1.73.0. See the upgrade notes for more information.
