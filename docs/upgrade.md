@@ -161,27 +161,6 @@ Synapse will log a warning when a module uses the deprecated method, to help
 administrators find modules using it.
 
 
-## Package extra `url_preview` now called `url-preview`
-
-This is compliant with [PEP 685](https://peps.python.org/pep-0685/#specification) and is necessary to use the URL preview option when Synapse is built with poetry-core 1.3.0 or greater. [#14079](https://github.com/matrix-org/synapse/issues/14079) has some more context.
-
-If you are installing Synapse from source with this extra specifically named, e.g. with
-
-```
-pip install /path/to/synapse[url_preview]
-```
-
-or
-
-```
-poetry install --extras url_preview
-```
-
-then you need to change the underscore `_` in `url_preview` to a hyphen `-` when upgrading to Synapse 1.69.0.
-No config changes are necessary.
-
-Installations using Debian packages and Docker images from Matrix.org are not affected. Installations from source that install the `all` extra are not affected.
-
 # Upgrading to v1.68.0
 
 Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
