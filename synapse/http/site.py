@@ -73,7 +73,6 @@ class SynapseRequest(Request):
         *args: Any,
         max_request_body_size: int = 1024,
         request_id_header: Optional[str] = None,
-        experimental_cors_msc3886: bool = False,
         **kw: Any,
     ):
         super().__init__(channel, *args, **kw)
@@ -83,7 +82,7 @@ class SynapseRequest(Request):
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
-        self.experimental_cors_msc3886 = experimental_cors_msc3886
+        self.experimental_cors_msc3886 = getattr(site, "experimental_cors_msc3886", False)
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
@@ -624,7 +623,7 @@ class SynapseSite(Site):
 
         request_id_header = config.http_options.request_id_header
 
-        experimental_cors_msc3886 = config.http_options.experimental_cors_msc3886
+        self.experimental_cors_msc3886 = config.http_options.experimental_cors_msc3886
 
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
@@ -633,7 +632,6 @@ class SynapseSite(Site):
                 max_request_body_size=max_request_body_size,
                 queued=queued,
                 request_id_header=request_id_header,
-                experimental_cors_msc3886=experimental_cors_msc3886,
             )
 
         self.requestFactory = request_factory  # type: ignore

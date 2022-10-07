@@ -878,7 +878,7 @@ def set_cors_headers(request: Request) -> None:
         )
         request.setHeader(
             b"Access-Control-Expose-Headers",
-            b"ETag,Location,X-Max-Bytes",
+            b"ETag, Location, X-Max-Bytes",
         )
     else:
         request.setHeader(
