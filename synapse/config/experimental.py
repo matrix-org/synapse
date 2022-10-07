@@ -100,9 +100,6 @@ class ExperimentalConfig(Config):
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
 
-        # MSC3715: dir param on /relations.
-        self.msc3715_enabled: bool = experimental.get("msc3715_enabled", False)
-
         # MSC3848: Introduce errcodes for specific event sending failures
         self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
 
