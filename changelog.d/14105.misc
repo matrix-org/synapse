@@ -1,0 +1,1 @@
+Faster joins: only choose locally-created events as `prev_events` when sending events into a partial-state room.
