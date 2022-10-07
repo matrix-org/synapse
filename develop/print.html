@@ -10228,6 +10228,16 @@ pusher instances by their worker name, e.g.:</p>
     - pusher_worker1
     - pusher_worker2
 </code></pre>
+<p>An example for a pusher instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.pusher
+worker_name: pusher_worker1
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/pusher-worker-log.yaml
+</code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
 <p><strong>Deprecated as of Synapse v1.59.</strong> <a href="workers.html#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
 <code>notify_appservices_from_worker</code> option instead.</a></p>
@@ -10246,6 +10256,16 @@ For example:</p>
 <pre><code class="language-yaml">federation_sender_instances:
     - federation_sender1
     - federation_sender2
+</code></pre>
+<p>An example for a federation sender instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.federation_sender
+worker_name: federation_sender1
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
 </code></pre>
 <h3 id="synapseappmedia_repository"><a class="header" href="#synapseappmedia_repository"><code>synapse.app.media_repository</code></a></h3>
 <p>Handles the media repository. It can handle all endpoints starting with:</p>
