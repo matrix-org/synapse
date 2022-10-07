@@ -490,6 +490,12 @@ pusher_instances:
     - pusher_worker2
 ```
 
+An example for a pusher instance:
+
+```yaml
+{{#include systemd-with-workers/workers/pusher_worker.yaml}}
+```
+
 
 ### `synapse.app.appservice`
 
@@ -518,6 +524,12 @@ For example:
 federation_sender_instances:
     - federation_sender1
     - federation_sender2
+```
+
+An example for a federation sender instance:
+
+```yaml
+{{#include systemd-with-workers/workers/federation_sender.yaml}}
 ```
 
 ### `synapse.app.media_repository`
