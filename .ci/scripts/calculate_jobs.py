@@ -102,11 +102,26 @@ sytest_tests = [
         "postgres": "multi-postgres",
         "workers": "workers",
     },
+    {
+        "sytest-tag": "focal",
+        "postgres": "multi-postgres",
+        "workers": "workers",
+        "reactor": "asyncio",
+    },
 ]
 
 if not IS_PR:
     sytest_tests.extend(
         [
+            {
+                "sytest-tag": "focal",
+                "reactor": "asyncio",
+            },
+            {
+                "sytest-tag": "focal",
+                "postgres": "postgres",
+                "reactor": "asyncio",
+            },
             {
                 "sytest-tag": "testing",
                 "postgres": "postgres",
