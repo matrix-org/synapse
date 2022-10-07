@@ -446,15 +446,15 @@ jobs:
 
           - arrangement: monolith
             database: SQLite
-            asyncio-reactor: true
+            reactor: asyncio
 
           - arrangement: monolith
             database: Postgres
-            asyncio-reactor: true
+            reactor: asyncio
 
           - arrangement: workers
             database: Postgres
-            asyncio-reactor: true
+            reactor: asyncio
 
 
     steps:
@@ -477,7 +477,7 @@ jobs:
           set -o pipefail
           POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} \
           WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} \
-          ASYNCIO_REACTOR=${{ matrix.asyncio-reactor && 1 || '' }} \
+          ASYNCIO_REACTOR=${{ (matrix.reactor == 'asyncio') && 1 || '' }} \
           COMPLEMENT_DIR=`pwd`/complement \
             synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
