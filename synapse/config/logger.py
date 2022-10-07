@@ -326,6 +326,8 @@ def setup_logging(
         logBeginner: The Twisted logBeginner to use.
 
     """
+    from twisted.internet import reactor
+
     log_config_path = (
         config.worker.worker_log_config
         if use_worker_options
@@ -348,3 +350,4 @@ def setup_logging(
     )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())
+    logging.info("Twisted reactor: %s", type(reactor).__name__)
