@@ -13,18 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
     Union,
 )
@@ -38,7 +35,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
-from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRuleEvaluator
+from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
@@ -199,51 +196,6 @@ class BulkPushRuleEvaluator:
         pl_event = auth_events.get(POWER_KEY)
 
         return pl_event.content if pl_event else {}, sender_level
-
-    async def _get_mutual_relations(
-        self, parent_id: str, rules: Iterable[Tuple[PushRule, bool]]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
-        """
-        Fetch event metadata for events which related to the same event as the given event.
-
-        If the given event has no relation information, returns an empty dictionary.
-
-        Args:
-            parent_id: The event ID which is targeted by relations.
-            rules: The push rules which will be processed for this event.
-
-        Returns:
-            A dictionary of relation type to:
-                A set of tuples of:
-                    The sender
-                    The event type
-        """
-
-        # If the experimental feature is not enabled, skip fetching relations.
-        if not self._relations_match_enabled:
-            return {}
-
-        # Pre-filter to figure out which relation types are interesting.
-        rel_types = set()
-        for rule, enabled in rules:
-            if not enabled:
-                continue
-
-            for condition in rule.conditions:
-                if condition["kind"] != "org.matrix.msc3772.relation_match":
-                    continue
-
-                # rel_type is required.
-                rel_type = condition.get("rel_type")
-                if rel_type:
-                    rel_types.add(rel_type)
-
-        # If no valid rules were found, no mutual relations.
-        if not rel_types:
-            return {}
-
-        # If any valid rules were found, fetch the mutual relations.
-        return await self.store.get_mutual_event_relations(parent_id, rel_types)
 
     @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
