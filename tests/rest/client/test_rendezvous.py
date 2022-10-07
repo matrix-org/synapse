@@ -41,5 +41,5 @@ class RendezvousServletTestCase(unittest.HomeserverTestCase):
     @override_config({"experimental_features": {"msc3886_endpoint": "/asd"}})
     def test_redirect(self) -> None:
         channel = self.make_request("POST", endpoint, {}, access_token=None)
-        self.assertEqual(channel.code, 302)
+        self.assertEqual(channel.code, 307)
         self.assertEqual(channel.headers.getRawHeaders("Location"), ["/asd"])
