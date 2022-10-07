@@ -2003,6 +2003,12 @@ class SyncHandler:
                 continue
 
             if not non_joins:
+                if has_join:
+                    logger.warning(
+                        "Have join event but room not in joined list, possible "
+                        "cache invalidation race! Joined roomID=%s",
+                        room_id,
+                    )
                 continue
             last_non_join = non_joins[-1]
 
