@@ -20,7 +20,7 @@ Due to the renaming of metrics in prometheus_client 0.4.0, this customised
 vendoring of the code will emit both the old versions that Synapse dashboards
 expect, and the newer "best practice" version of the up-to-date official client.
 """
-
+import logging
 import math
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -34,6 +34,7 @@ from prometheus_client.core import Sample
 from twisted.web.resource import Resource
 from twisted.web.server import Request
 
+logger = logging.getLogger(__name__)
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
@@ -219,11 +220,16 @@ class MetricsHandler(BaseHTTPRequestHandler):
         except Exception:
             self.send_error(500, "error generating metric output")
             raise
-        self.send_response(200)
-        self.send_header("Content-Type", CONTENT_TYPE_LATEST)
-        self.send_header("Content-Length", str(len(output)))
-        self.end_headers()
-        self.wfile.write(output)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", CONTENT_TYPE_LATEST)
+            self.send_header("Content-Length", str(len(output)))
+            self.end_headers()
+            self.wfile.write(output)
+        except BrokenPipeError as e:
+            logger.warning(
+                "BrokenPipeError when serving metrics (%s). Did Prometheus restart?", e
+            )
 
     def log_message(self, format: str, *args: Any) -> None:
         """Log nothing."""
