@@ -440,8 +440,6 @@ class RelationsWorkerStore(SQLBaseStore):
 
         edits = await self.get_events(edit_ids.values())  # type: ignore[attr-defined]
 
-        # TODO Should this assert m.new_content exists in the content for cleartext events?
-
         # Map to the original event IDs to the edit events.
         #
         # There might not be an edit event due to there being no edits or
