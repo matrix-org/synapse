@@ -44,6 +44,12 @@ if bool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", False)):
 
         from twisted.internet import asyncioreactor
 
+        if bool(os.environ.get("SYNAPSE_UVLOOP", False)):
+            import uvloop
+
+            uvloop.install()
+            print("Using uvloop")
+
         asyncioreactor.install(asyncio.get_event_loop())
     except ImportError:
         pass
