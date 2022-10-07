@@ -1062,7 +1062,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             return min_depth_event_id, current_min_depth
 
-    async def get_prev_events_for_creating_event_in_room(self, room_id: str) -> List[str]:
+    async def get_prev_events_for_creating_event_in_room(
+        self, room_id: str
+    ) -> List[str]:
         """
         Gets up to 10 event IDs which are suitable for use as `prev_events`
         when creating an event in the given room.

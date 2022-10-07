@@ -470,8 +470,14 @@ class PerDestinationQueue:
                 # servers, but the remote will correctly deduplicate them and
                 # handle it only once.
 
-                # Step 1, fetch the current extremities
-                extrems = await self._store.get_prev_events_for_room(pdu.room_id)
+                # Step 1, fetch some of the current extremities
+                # For partial state rooms, we intentionally restrict ourselves
+                # to only using our own events here, since we shouldn't divulge
+                # other servers' events to servers which we can't know,
+                # with certainty, whether they are in the room or not.
+                extrems = await self._store.get_prev_events_for_creating_event_in_room(
+                    pdu.room_id
+                )
 
                 if pdu.event_id in extrems:
                     # If the event is in the extremities, then great! We can just

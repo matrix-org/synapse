@@ -249,7 +249,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # precede the join.
         mocked_get_prev_events = patch.object(
             self.hs.get_datastores().main,
-            "get_prev_events_for_room",
+            "get_prev_events_for_creating_event_in_room",
             new_callable=MagicMock,
             return_value=make_awaitable([last_room_creation_event_id]),
         )

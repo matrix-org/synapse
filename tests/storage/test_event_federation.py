@@ -77,7 +77,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             )
 
         # this should get the last ten
-        r = self.get_success(self.store.get_prev_events_for_room(room_id))
+        r = self.get_success(self.store.get_prev_events_for_full_state_room(room_id))
         self.assertEqual(10, len(r))
         for i in range(0, 10):
             self.assertEqual("$event_%i:local" % (19 - i), r[i])

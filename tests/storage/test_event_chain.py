@@ -515,7 +515,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         # Create a fork in the DAG with different events.
         event_handler = self.hs.get_event_creation_handler()
         latest_event_ids = self.get_success(
-            self.store.get_prev_events_for_room(room_id)
+            self.store.get_prev_events_for_full_state_room(room_id)
         )
         event, context = self.get_success(
             event_handler.create_event(

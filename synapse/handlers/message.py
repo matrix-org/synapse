@@ -1121,7 +1121,11 @@ class EventCreationHandler:
                 len(prev_event_ids),
             )
         else:
-            prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
+            prev_event_ids = (
+                await self.store.get_prev_events_for_creating_event_in_room(
+                    builder.room_id
+                )
+            )
 
         # Do a quick sanity check here, rather than waiting until we've created the
         # event and then try to auth it (which fails with a somewhat confusing "No
@@ -2061,7 +2065,9 @@ class EventCreationHandler:
 
         # modules can send new state events, so we re-calculate the auth events just in
         # case.
-        prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
+        prev_event_ids = await self.store.get_prev_events_for_creating_event_in_room(
+            builder.room_id
+        )
 
         event = await builder.build(
             prev_event_ids=prev_event_ids,

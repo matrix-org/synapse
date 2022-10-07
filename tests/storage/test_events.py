@@ -81,7 +81,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
     def assert_extremities(self, expected_extremities):
         """Assert the current extremities for the room"""
         extremities = self.get_success(
-            self.store.get_prev_events_for_room(self.room_id)
+            self.store.get_prev_events_for_full_state_room(self.room_id)
         )
         self.assertCountEqual(extremities, expected_extremities)
 
