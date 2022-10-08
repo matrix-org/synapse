@@ -74,6 +74,8 @@ jobs:
         with:
           repository: beeper/complement
           path: complement
+          # TODO: upgrade this or find a better way to keep aligned with upstream
+          ref: 94fe6b9aa5560cb6a7fc4518472070287cb5d42a
       - name: Install complement dependencies
         run: |-
           sudo apt-get -qq update
