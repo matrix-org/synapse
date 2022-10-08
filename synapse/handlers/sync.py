@@ -1357,13 +1357,15 @@ class SyncHandler:
             # latest change is JOIN.
 
             for room_id, event in mem_last_change_by_room_id.items():
+                # The user left the room, or left and was re-invited but not joined yet
+                if event.membership != Membership.JOIN:
+                    mutable_joined_room_ids.discard(room_id)
+                    continue
+
                 # Joined but we already know about it? Nothing to do here, this will bypass
                 # most membership events in any gappy syncs as get_rooms_for_user will already
                 # be up to date or close to it.
-                if (
-                    event.membership == Membership.JOIN
-                    and room_id in mutable_joined_room_ids
-                ):
+                if room_id in mutable_joined_room_ids:
                     continue
 
                 logger.info(
@@ -1374,16 +1376,12 @@ class SyncHandler:
                 )
                 # User joined a room - we have to then check the room state to ensure we
                 # respect any bans if there's a race between the join and ban events.
-                if event.membership == Membership.JOIN:
-                    # NB: we invalidate the cache here to avoid a race condition between
-                    # cache invalidation-over-replication and sync requests.
-                    self.store.get_users_in_room.invalidate((room_id,))
-                    user_ids_in_room = await self.store.get_users_in_room(room_id)
-                    if user_id in user_ids_in_room:
-                        mutable_joined_room_ids.add(room_id)
-                # The user left the room, or left and was re-invited but not joined yet
-                else:
-                    mutable_joined_room_ids.discard(room_id)
+                # NB: we invalidate the cache here to avoid a race condition between
+                # cache invalidation-over-replication and sync requests.
+                self.store.get_users_in_room.invalidate((room_id,))
+                user_ids_in_room = await self.store.get_users_in_room(room_id)
+                if user_id in user_ids_in_room:
+                    mutable_joined_room_ids.add(room_id)
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
