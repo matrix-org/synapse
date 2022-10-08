@@ -1320,7 +1320,6 @@ class SyncHandler:
 
         # Note: we get the users room list *before* we get the current token, this
         # avoids checking back in history if rooms are joined after the token is fetched.
-        token_before_rooms = self.event_sources.get_current_token()
         mutable_joined_room_ids = set(await self.store.get_rooms_for_user(user_id))
 
         # NB: The now_token gets changed by some of the generate_sync_* methods,
@@ -1335,7 +1334,6 @@ class SyncHandler:
                 debug_current_token,
             )
             now_token = debug_current_token
-            token_before_rooms = debug_current_token
 
         log_kv({"now_token": now_token})
 
@@ -1343,6 +1341,10 @@ class SyncHandler:
         # during which membership events may have been persisted, so we fetch these now
         # and modify the joined room list for any changes between the get_rooms_for_user
         # call and the get_current_token call.
+
+        # NB: due to race conditions in cache invalidation-over-replication we cannot
+        # assume that the get_rooms_for_user is up to date, looking at the membership
+        # events allows us to correct for this.
         membership_change_events = []
         if since_token:
             membership_change_events = await self.store.get_membership_changes_for_user(
@@ -1358,15 +1360,17 @@ class SyncHandler:
             # latest change is JOIN.
 
             for room_id, event in mem_last_change_by_room_id.items():
-                assert event.internal_metadata.stream_ordering
+                # Joined but we already know about it? Nothing to do here, this will bypass
+                # most membership events in any gappy syncs as get_rooms_for_user will already
+                # be up to date or close to it.
                 if (
-                    event.internal_metadata.stream_ordering
-                    < token_before_rooms.room_key.stream
+                    event.membership == Membership.JOIN
+                    and room_id in mutable_joined_room_ids
                 ):
                     continue
 
                 logger.info(
-                    "User membership change between getting rooms and current token: %s %s %s",
+                    "Checking membership change between since token and current token: %s %s %s",
                     user_id,
                     event.membership,
                     room_id,
