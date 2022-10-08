@@ -3791,13 +3791,16 @@ start_pushers: false
 ---
 ### `pusher_instances`
 
-It is possible to run multiple pusher workers, in which case the
+It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher), in which case the
 work is balanced across them. Use this setting to list the pushers by [`worker_name`](#worker_name).
+
+If only one pusher worker is configured, this setting is not necessary.
 
 Example configuration:
 ```yaml
 pusher_instances:
   - pusher_worker1
+  - pusher_worker2
 ```
 ---
 ### `send_federation`
@@ -3855,8 +3858,9 @@ stream_writers:
 ---
 ### `run_background_tasks_on`
 
-The worker that is used to run background tasks (e.g. cleaning up expired
-data). If not provided this defaults to the main process.
+The [worker](../../workers.md#background-tasks) that is used to run
+background tasks (e.g. cleaning up expired data). If not provided this
+defaults to the main process.
 
 Example configuration:
 ```yaml
