@@ -1318,6 +1318,11 @@ class SyncHandler:
             # See https://github.com/matrix-org/matrix-doc/issues/1144
             raise NotImplementedError()
 
+        # If we have no since token (init sync), ensure any cached rooms for the user
+        # is first invalidated to avoid race conditions with invalidation-over-replication.
+        if not since_token:
+            self.store.get_rooms_for_user.invalidate((user_id,))
+
         # Note: we get the users room list *before* we get the current token, this
         # avoids checking back in history if rooms are joined after the token is fetched.
         mutable_joined_room_ids = set(await self.store.get_rooms_for_user(user_id))
