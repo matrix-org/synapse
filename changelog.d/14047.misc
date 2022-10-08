@@ -1,1 +1,1 @@
-Add debug parameter to sync API to override the current token. Contributed by Nick @ Beeper (@fizzadar).
+Add `?synapse_debug_current_token` query parameter to `/sync` API to override the current token. Contributed by Nick @ Beeper (@fizzadar).
