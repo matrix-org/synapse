@@ -1,0 +1,1 @@
+Make room version 10 default. Implements MSC3904. Contributed by @FSG-Cat.
