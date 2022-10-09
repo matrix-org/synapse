@@ -50,6 +50,9 @@ class StreamChangeCache:
         # map from stream id to the a set of entities which changed at that stream id.
         self._cache: SortedDict[int, Set[EntityType]] = SortedDict()
 
+        # Maximum known stream position to wait on if behind the current persisted position.
+        self.max_stream_pos = current_stream_pos
+
         # the earliest stream_pos for which we can reliably answer
         # get_all_entities_changed. In other words, one less than the earliest
         # stream_pos for which we know _cache is valid.
@@ -194,6 +197,9 @@ class StreamChangeCache:
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
             for entity in r:
                 del self._entity_to_key[entity]
+
+        if stream_pos > self.max_stream_pos:
+            self.max_stream_pos = stream_pos
 
     def _evict(self) -> None:
         while len(self._cache) > self._max_size:
