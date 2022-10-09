@@ -295,7 +295,7 @@ Known room versions are listed [here](https://spec.matrix.org/latest/rooms/#comp
 For example, for room version 1, `default_room_version` should be set
 to "1".
 
-Currently defaults to "9".
+Currently defaults to "10".
 
 Example configuration:
 ```yaml
