@@ -1609,7 +1609,7 @@ class FederationHandler:
             run_as_background_process(
                 desc="sync_partial_state_room",
                 func=self._sync_partial_state_room,
-                initial_destination=None,
+                initial_destination=resync_info.joined_via,
                 other_destinations=resync_info.servers_in_room,
                 room_id=room_id,
             )
