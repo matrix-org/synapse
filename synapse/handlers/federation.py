@@ -1617,7 +1617,7 @@ class FederationHandler:
     async def _sync_partial_state_room(
         self,
         initial_destination: Optional[str],
-        other_destinations: Collection[str],
+        other_destinations: Sequence[str],
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
@@ -1738,6 +1738,7 @@ class FederationHandler:
                             destination,
                         )
 
+
 def _prioritise_destinations_for_partial_state_resync(
     initial_destination: Optional[str], other_destinations: Collection[str]
 ) -> Sequence[str]:
@@ -1753,5 +1754,5 @@ def _prioritise_destinations_for_partial_state_resync(
             destinations.remove(initial_destination)
         destinations = [initial_destination] + destinations
     else:
-        destinations = other_destinations
+        destinations = list(other_destinations)
     return destinations
