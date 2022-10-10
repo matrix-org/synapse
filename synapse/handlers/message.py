@@ -1547,7 +1547,9 @@ class EventCreationHandler:
                     expiry_ms=60 * 60 * 1000,
                 )
 
-                self._external_cache_joined_hosts_updates[state_entry.state_group] = None
+                self._external_cache_joined_hosts_updates[
+                    state_entry.state_group
+                ] = None
 
     async def _validate_canonical_alias(
         self,
