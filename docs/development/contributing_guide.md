@@ -390,7 +390,7 @@ This file will become part of our [changelog](
 https://github.com/matrix-org/synapse/blob/master/CHANGES.md) at the next
 release, so the content of the file should be a short description of your
 change in the same style as the rest of the changelog. The file can contain Markdown
-formatting, and should end with a full stop (.) or an exclamation mark (!) for
+formatting, and must end with a full stop (.) or an exclamation mark (!) for
 consistency.
 
 Adding credits to the changelog is encouraged, we value your

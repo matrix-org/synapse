@@ -21,6 +21,7 @@ from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
 from synapse.logging.opentracing import trace
 from synapse.storage.databases.main.relations import _RelatedEvent
+from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
 
@@ -72,13 +73,10 @@ class RelationsHandler:
         requester: Requester,
         event_id: str,
         room_id: str,
+        pagin_config: PaginationConfig,
+        include_original_event: bool,
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
-        limit: int = 5,
-        direction: str = "b",
-        from_token: Optional[StreamToken] = None,
-        to_token: Optional[StreamToken] = None,
-        include_original_event: bool = False,
     ) -> JsonDict:
         """Get related events of a event, ordered by topological ordering.
 
@@ -88,14 +86,10 @@ class RelationsHandler:
             requester: The user requesting the relations.
             event_id: Fetch events that relate to this event ID.
             room_id: The room the event belongs to.
+            pagin_config: The pagination config rules to apply, if any.
+            include_original_event: Whether to include the parent event.
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
-            limit: Only fetch the most recent `limit` events.
-            direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`).
-            from_token: Fetch rows from the given token, or from the start if None.
-            to_token: Fetch rows up to the given token, or up to the end if None.
-            include_original_event: Whether to include the parent event.
 
         Returns:
             The pagination chunk.
@@ -114,6 +108,9 @@ class RelationsHandler:
         if event is None:
             raise SynapseError(404, "Unknown parent event.")
 
+        # TODO Update pagination config to not allow None limits.
+        assert pagin_config.limit is not None
+
         # Note that ignored users are not passed into get_relations_for_event
         # below. Ignored users are handled in filter_events_for_client (and by
         # not passing them in here we should get a better cache hit rate).
@@ -123,10 +120,10 @@ class RelationsHandler:
             room_id=room_id,
             relation_type=relation_type,
             event_type=event_type,
-            limit=limit,
-            direction=direction,
-            from_token=from_token,
-            to_token=to_token,
+            limit=pagin_config.limit,
+            direction=pagin_config.direction,
+            from_token=pagin_config.from_token,
+            to_token=pagin_config.to_token,
         )
 
         events = await self._main_store.get_events_as_list(
@@ -162,8 +159,10 @@ class RelationsHandler:
         if next_token:
             return_value["next_batch"] = await next_token.to_string(self._main_store)
 
-        if from_token:
-            return_value["prev_batch"] = await from_token.to_string(self._main_store)
+        if pagin_config.from_token:
+            return_value["prev_batch"] = await pagin_config.from_token.to_string(
+                self._main_store
+            )
 
         return return_value
 

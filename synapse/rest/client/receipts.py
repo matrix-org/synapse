@@ -50,7 +50,6 @@ class ReceiptRestServlet(RestServlet):
             ReceiptTypes.READ_PRIVATE,
             ReceiptTypes.FULLY_READ,
         }
-        self._msc3771_enabled = hs.config.experimental.msc3771_enabled
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
@@ -67,30 +66,29 @@ class ReceiptRestServlet(RestServlet):
 
         # Pull the thread ID, if one exists.
         thread_id = None
-        if self._msc3771_enabled:
-            if "thread_id" in body:
-                thread_id = body.get("thread_id")
-                if not thread_id or not isinstance(thread_id, str):
-                    raise SynapseError(
-                        400,
-                        "thread_id field must be a non-empty string",
-                        Codes.INVALID_PARAM,
-                    )
+        if "thread_id" in body:
+            thread_id = body.get("thread_id")
+            if not thread_id or not isinstance(thread_id, str):
+                raise SynapseError(
+                    400,
+                    "thread_id field must be a non-empty string",
+                    Codes.INVALID_PARAM,
+                )
 
-                if receipt_type == ReceiptTypes.FULLY_READ:
-                    raise SynapseError(
-                        400,
-                        f"thread_id is not compatible with {ReceiptTypes.FULLY_READ} receipts.",
-                        Codes.INVALID_PARAM,
-                    )
+            if receipt_type == ReceiptTypes.FULLY_READ:
+                raise SynapseError(
+                    400,
+                    f"thread_id is not compatible with {ReceiptTypes.FULLY_READ} receipts.",
+                    Codes.INVALID_PARAM,
+                )
 
-                # Ensure the event ID roughly correlates to the thread ID.
-                if thread_id != await self._main_store.get_thread_id(event_id):
-                    raise SynapseError(
-                        400,
-                        f"event_id {event_id} is not related to thread {thread_id}",
-                        Codes.INVALID_PARAM,
-                    )
+            # Ensure the event ID roughly correlates to the thread ID.
+            if thread_id != await self._main_store.get_thread_id(event_id):
+                raise SynapseError(
+                    400,
+                    f"event_id {event_id} is not related to thread {thread_id}",
+                    Codes.INVALID_PARAM,
+                )
 
         await self.presence_handler.bump_presence_active_time(requester.user)
 
