@@ -27,6 +27,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Tuple,
     Union,
 )
@@ -1651,15 +1652,9 @@ class FederationHandler:
 
         # Make an infinite iterator of destinations to try. Once we find a working
         # destination, we'll stick with it until it flakes.
-        destinations: Collection[str]
-        if initial_destination is not None:
-            # Move `initial_destination` to the front of the list.
-            destinations = list(other_destinations)
-            if initial_destination in destinations:
-                destinations.remove(initial_destination)
-            destinations = [initial_destination] + destinations
-        else:
-            destinations = other_destinations
+        destinations = _prioritise_destinations_for_partial_state_resync(
+            initial_destination, other_destinations
+        )
         destination_iter = itertools.cycle(destinations)
 
         # `destination` is the current remote homeserver we're pulling from.
@@ -1742,3 +1737,21 @@ class FederationHandler:
                             room_id,
                             destination,
                         )
+
+def _prioritise_destinations_for_partial_state_resync(
+    initial_destination: Optional[str], other_destinations: Collection[str]
+) -> Sequence[str]:
+    """Work out the order in which we should ask servers to resync events.
+
+    If an `initial_destination` is given, it takes top priority. Otherwise
+    all servers are treated equally.
+    """
+    if initial_destination is not None:
+        # Move `initial_destination` to the front of the list.
+        destinations = list(other_destinations)
+        if initial_destination in destinations:
+            destinations.remove(initial_destination)
+        destinations = [initial_destination] + destinations
+    else:
+        destinations = other_destinations
+    return destinations
