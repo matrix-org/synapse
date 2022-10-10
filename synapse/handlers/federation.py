@@ -631,6 +631,7 @@ class FederationHandler:
                     room_id=room_id,
                     servers=ret.servers_in_room,
                     device_lists_stream_id=self.store.get_device_stream_token(),
+                    joined_via=origin,
                 )
 
             try:
