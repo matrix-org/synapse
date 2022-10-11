@@ -599,7 +599,7 @@ class RootRedirect(resource.Resource):
 class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
-    def render_OPTIONS(self, request: Request) -> bytes:
+    def render_OPTIONS(self, request: SynapseRequest) -> bytes:
         request.setResponseCode(204)
         request.setHeader(b"Content-Length", b"0")
 
@@ -764,7 +764,7 @@ def respond_with_json(
 
 
 def respond_with_json_bytes(
-    request: Request,
+    request: SynapseRequest,
     code: int,
     json_bytes: bytes,
     send_cors: bool = False,
@@ -954,7 +954,7 @@ def set_clickjacking_protection_headers(request: Request) -> None:
 
 
 def respond_with_redirect(
-    request: Request, url: bytes, statusCode: int = FOUND, cors: bool = False
+    request: SynapseRequest, url: bytes, statusCode: int = FOUND, cors: bool = False
 ) -> None:
     """
     Write a 302 (or other specified status code) response to the request, if it is still alive.
