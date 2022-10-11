@@ -860,7 +860,7 @@ def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
     _ByteProducer(request, bytes_generator)
 
 
-def set_cors_headers(request: Request) -> None:
+def set_cors_headers(request: SynapseRequest) -> None:
     """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
@@ -871,7 +871,7 @@ def set_cors_headers(request: Request) -> None:
     request.setHeader(
         b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
-    if getattr(request, "experimental_cors_msc3886", False):
+    if request.experimental_cors_msc3886:
         request.setHeader(
             b"Access-Control-Allow-Headers",
             b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
