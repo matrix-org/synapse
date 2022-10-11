@@ -56,7 +56,9 @@ class RendezvousServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         redirection_target: Optional[str] = hs.config.experimental.msc3886_endpoint
-        assert redirection_target is not None, "Servlet is only registered if there is a redirection target"
+        assert (
+            redirection_target is not None
+        ), "Servlet is only registered if there is a redirection target"
         self.endpoint = redirection_target.encode("utf-8")
 
     async def on_POST(self, request: SynapseRequest) -> None:
