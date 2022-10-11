@@ -121,7 +121,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY synapse /synapse/synapse/
 COPY rust /synapse/rust/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst build_rust.py /synapse/
+COPY pyproject.toml README.rst build_rust.py Cargo.toml Cargo.lock /synapse/
 
 # Repeat of earlier build argument declaration, as this is a new build stage.
 ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
