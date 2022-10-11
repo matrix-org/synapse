@@ -42,10 +42,12 @@ class PaginationConfig:
         cls,
         store: "DataStore",
         request: SynapseRequest,
-        raise_invalid_params: bool = True,
         default_limit: Optional[int] = None,
+        default_dir: str = "f",
     ) -> "PaginationConfig":
-        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
+        direction = parse_string(
+            request, "dir", default=default_dir, allowed_values=["f", "b"]
+        )
 
         from_tok_str = parse_string(request, "from")
         to_tok_str = parse_string(request, "to")
