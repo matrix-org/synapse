@@ -1110,10 +1110,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 SET thread_id = ?
                 WHERE room_id = ? AND user_id = ? AND thread_id is NULL
                 """,
-                (
-                    room_id,
-                    user_id,
-                ),
+                ("main", room_id, user_id),
             )
 
             # Replace the previous summary with the new counts.
@@ -1277,6 +1274,14 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         logger.info("Rotating notifications, handling %d rows", len(summaries))
 
         # Ensure that any updated threads have an updated thread_id.
+        txn.execute_batch(
+            """
+            UPDATE event_push_summary
+            SET thread_id = ?
+            WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+            """,
+            [("main", room_id, user_id) for user_id, room_id in summaries],
+        )
         self.db_pool.simple_update_many_txn(
             txn,
             table="event_push_summary",
