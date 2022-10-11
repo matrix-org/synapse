@@ -1104,11 +1104,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             )
 
             # First ensure that the existing rows have an updated thread_id field.
-            self.db_pool.simple_update_txn(
-                txn,
-                table="event_push_summary",
-                keyvalues={"room_id": room_id, "user_id": user_id, "thread_id": None},
-                updatevalues={"thread_id": "main"},
+            txn.execute(
+                """
+                UPDATE event_push_summary
+                SET thread_id = ?
+                WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                """,
+                (
+                    room_id,
+                    user_id,
+                ),
             )
 
             # Replace the previous summary with the new counts.
