@@ -16,7 +16,6 @@ from typing import List
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.filtering import Filter
-from synapse.events import EventBase
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.types import JsonDict
@@ -115,7 +114,7 @@ class PaginationTestCase(HomeserverTestCase):
         )
         self.event_id_none = res["event_id"]
 
-    def _filter_messages(self, filter: JsonDict) -> List[EventBase]:
+    def _filter_messages(self, filter: JsonDict) -> List[str]:
         """Make a request to /messages with a filter, returns the chunk of events."""
 
         events, next_key = self.get_success(
@@ -129,41 +128,34 @@ class PaginationTestCase(HomeserverTestCase):
             )
         )
 
-        return events
+        return [ev.event_id for ev in events]
 
     def test_filter_relation_senders(self):
         # Messages which second user reacted to.
         filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
         # Messages which third user reacted to.
         filter = {"related_by_senders": [self.third_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_2)
+        self.assertEqual(chunk, [self.event_id_2])
 
         # Messages which either user reacted to.
         filter = {"related_by_senders": [self.second_user_id, self.third_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c.event_id for c in chunk], [self.event_id_1, self.event_id_2]
-        )
+        self.assertCountEqual(chunk, [self.event_id_1, self.event_id_2])
 
     def test_filter_relation_type(self):
         # Messages which have annotations.
         filter = {"related_by_rel_types": [RelationTypes.ANNOTATION]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
         # Messages which have references.
         filter = {"related_by_rel_types": [RelationTypes.REFERENCE]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_2)
+        self.assertEqual(chunk, [self.event_id_2])
 
         # Messages which have either annotations or references.
         filter = {
@@ -173,10 +165,7 @@ class PaginationTestCase(HomeserverTestCase):
             ]
         }
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c.event_id for c in chunk], [self.event_id_1, self.event_id_2]
-        )
+        self.assertCountEqual(chunk, [self.event_id_1, self.event_id_2])
 
     def test_filter_relation_senders_and_type(self):
         # Messages which second user reacted to.
@@ -185,8 +174,7 @@ class PaginationTestCase(HomeserverTestCase):
             "related_by_rel_types": [RelationTypes.ANNOTATION],
         }
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
     def test_duplicate_relation(self):
         """An event should only be returned once if there are multiple relations to it."""
@@ -205,21 +193,18 @@ class PaginationTestCase(HomeserverTestCase):
 
         filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
     def test_filter_rel_types(self) -> None:
         # Messages which are annotations.
         filter = {"org.matrix.msc3874.rel_types": [RelationTypes.ANNOTATION]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_annotation)
+        self.assertEqual(chunk, [self.event_id_annotation])
 
         # Messages which are references.
         filter = {"org.matrix.msc3874.rel_types": [RelationTypes.REFERENCE]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_reference)
+        self.assertEqual(chunk, [self.event_id_reference])
 
         # Messages which are either annotations or references.
         filter = {
@@ -229,9 +214,8 @@ class PaginationTestCase(HomeserverTestCase):
             ]
         }
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
         self.assertCountEqual(
-            [c.event_id for c in chunk],
+            chunk,
             [self.event_id_annotation, self.event_id_reference],
         )
 
@@ -239,10 +223,8 @@ class PaginationTestCase(HomeserverTestCase):
         # Messages which are not annotations.
         filter = {"org.matrix.msc3874.not_rel_types": [RelationTypes.ANNOTATION]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 4, chunk)
-        event_ids = [ev.event_id for ev in chunk]
         self.assertEqual(
-            event_ids,
+            chunk,
             [
                 self.event_id_1,
                 self.event_id_2,
@@ -254,10 +236,8 @@ class PaginationTestCase(HomeserverTestCase):
         # Messages which are not references.
         filter = {"org.matrix.msc3874.not_rel_types": [RelationTypes.REFERENCE]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 4, chunk)
-        event_ids = [ev.event_id for ev in chunk]
         self.assertEqual(
-            event_ids,
+            chunk,
             [
                 self.event_id_1,
                 self.event_id_annotation,
@@ -274,7 +254,4 @@ class PaginationTestCase(HomeserverTestCase):
             ]
         }
         chunk = self._filter_messages(filter)
-        event_ids = [ev.event_id for ev in chunk]
-        self.assertEqual(
-            event_ids, [self.event_id_1, self.event_id_2, self.event_id_none]
-        )
+        self.assertEqual(chunk, [self.event_id_1, self.event_id_2, self.event_id_none])
