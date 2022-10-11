@@ -29,8 +29,12 @@ logger = logging.getLogger(__name__)
 
 class RendezvousServlet(RestServlet):
     """
-    Get a token that can be used with `m.login.token` to log in a second device.
-    This implementation is a stub that redirects to another configured endpoint.
+    This is a placeholder implementation of [MSC3886](https://github.com/matrix-org/matrix-spec-proposals/pull/3886)
+    simple client rendezvous capability that is used by the "Sign in with QR" functionality.
+
+    This implementation only serves as a 307 redirect to a configured server rather than being a full implementation.
+
+    A module that implements the full functionality is available at: https://pypi.org/project/matrix-http-rendezvous-synapse/.
 
     Request:
 
@@ -59,6 +63,8 @@ class RendezvousServlet(RestServlet):
         respond_with_redirect(
             request, self.endpoint, statusCode=TEMPORARY_REDIRECT, cors=True
         )
+
+    # PUT, GET and DELETE are not implemented as they should be fulfilled by the redirect target.
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
