@@ -42,7 +42,7 @@ class PaginationConfig:
         cls,
         store: "DataStore",
         request: SynapseRequest,
-        default_limit: Optional[int] = None,
+        default_limit: int,
         default_dir: str = "f",
     ) -> "PaginationConfig":
         direction = parse_string(
@@ -69,12 +69,10 @@ class PaginationConfig:
             raise SynapseError(400, "'to' parameter is invalid")
 
         limit = parse_integer(request, "limit", default=default_limit)
+        if limit < 0:
+            raise SynapseError(400, "Limit must be 0 or above")
 
-        if limit:
-            if limit < 0:
-                raise SynapseError(400, "Limit must be 0 or above")
-
-            limit = min(int(limit), MAX_LIMIT)
+        limit = min(limit, MAX_LIMIT)
 
         try:
             return PaginationConfig(from_tok, to_tok, direction, limit)
