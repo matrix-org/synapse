@@ -1,0 +1,1 @@
+Fix an issue with Docker images causing the Rust dependencies to not be pinned correctly.
