@@ -1495,21 +1495,15 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
              a dict {event_id -> bool}
         """
-        # if the event cache contains the event, obviously we've seen it.
+        # TODO: We used to query the _get_event_cache here as a fast-path before
+        #  hitting the database. For if an event were in the cache, we've presumably
+        #  seen it before.
+        #
+        #  But this is currently an invalid assumption due to the _get_event_cache
+        #  not being invalidated when purging events from a room. The optimisation can
+        #  be re-added after https://github.com/matrix-org/synapse/issues/13476
 
-        cache_results = {
-            event_id
-            for event_id in event_ids
-            if await self._get_event_cache.contains((event_id,))
-        }
-        results = dict.fromkeys(cache_results, True)
-        remaining = [
-            event_id for event_id in event_ids if event_id not in cache_results
-        ]
-        if not remaining:
-            return results
-
-        def have_seen_events_txn(txn: LoggingTransaction) -> None:
+        def have_seen_events_txn(txn: LoggingTransaction) -> Dict[str, bool]:
             # we deliberately do *not* query the database for room_id, to make the
             # query an index-only lookup on `events_event_id_key`.
             #
@@ -1517,16 +1511,17 @@ class EventsWorkerStore(SQLBaseStore):
 
             sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", remaining
+                txn.database_engine, "e.event_id", event_ids
             )
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
             # ... and then we can update the results for each key
-            results.update({eid: (eid in found_events) for eid in remaining})
+            return {eid: (eid in found_events) for eid in event_ids}
 
-        await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
-        return results
+        return await self.db_pool.runInteraction(
+            "have_seen_events", have_seen_events_txn
+        )
 
     @cached(max_entries=100000, tree=True)
     async def have_seen_event(self, room_id: str, event_id: str) -> bool:
