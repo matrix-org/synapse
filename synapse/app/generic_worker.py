@@ -270,6 +270,7 @@ class GenericWorkerServer(HomeServer):
     def _listen_http(self, listener_config: ListenerConfig) -> None:
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
+        tls = listener_config.tls
 
         assert listener_config.http_options is not None
 
@@ -375,22 +376,37 @@ class GenericWorkerServer(HomeServer):
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
-        _base.listen_tcp(
-            bind_addresses,
-            port,
-            SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
-                site_tag,
-                listener_config,
-                root_resource,
-                self.version_string,
-                max_request_body_size=max_request_body_size(self.config),
-                reactor=self.get_reactor(),
-            ),
+        site = SynapseSite(
+            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+            site_tag,
+            listener_config,
+            root_resource,
+            self.version_string,
+            max_request_body_size=max_request_body_size(self.config),
             reactor=self.get_reactor(),
         )
-
-        logger.info("Synapse worker now listening on port %d", port)
+        # This has same logic as synapse/app/homeserver.py where we choose between
+        # listen_ssl and listen_tcp based on the tls configuration flag in listener
+        # config.
+        if tls:
+            # refresh_certificate should have been called before this.
+            assert self.tls_server_context_factory is not None
+            _base.listen_ssl(
+                bind_addresses,
+                port,
+                site,
+                self.tls_server_context_factory,
+                reactor=self.get_reactor(),
+            )
+            logger.info("Synapse worker now listening on port %d (TLS)", port)
+        else:
+            _base.listen_tcp(
+                bind_addresses,
+                port,
+                site,
+                reactor=self.get_reactor(),
+            )
+            logger.info("Synapse worker now listening on port %d", port)
 
     def start_listening(self) -> None:
         for listener in self.config.worker.worker_listeners:
