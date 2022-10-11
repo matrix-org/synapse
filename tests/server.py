@@ -266,7 +266,12 @@ class FakeSite:
     site_tag = "test"
     access_logger = logging.getLogger("synapse.access.http.fake")
 
-    def __init__(self, resource: IResource, reactor: IReactorTime, experimental_cors_msc3886: bool = False):
+    def __init__(
+        self,
+        resource: IResource,
+        reactor: IReactorTime,
+        experimental_cors_msc3886: bool = False,
+    ):
         """
 
         Args:
