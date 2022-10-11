@@ -108,9 +108,6 @@ class RelationsHandler:
         if event is None:
             raise SynapseError(404, "Unknown parent event.")
 
-        # TODO Update pagination config to not allow None limits.
-        assert pagin_config.limit is not None
-
         # Note that ignored users are not passed into get_relations_for_event
         # below. Ignored users are handled in filter_events_for_client (and by
         # not passing them in here we should get a better cache hit rate).

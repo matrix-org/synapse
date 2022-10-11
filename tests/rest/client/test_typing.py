@@ -59,7 +59,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             self.event_source.get_new_events(
                 user=UserID.from_string(self.user_id),
                 from_key=0,
-                limit=None,
+                limit=0,
                 room_ids=[self.room_id],
                 is_guest=False,
             )

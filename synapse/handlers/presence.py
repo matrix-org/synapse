@@ -1596,7 +1596,9 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         self,
         user: UserID,
         from_key: Optional[int],
-        limit: Optional[int] = None,
+        # Having a default limit doesn't match the EventSource API, but some
+        # callers do not provide it. It is unused in this class.
+        limit: int = 0,
         room_ids: Optional[Collection[str]] = None,
         is_guest: bool = False,
         explicit_room_id: Optional[str] = None,

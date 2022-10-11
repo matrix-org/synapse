@@ -35,7 +35,7 @@ class PaginationConfig:
     from_token: Optional[StreamToken]
     to_token: Optional[StreamToken]
     direction: str
-    limit: Optional[int]
+    limit: int
 
     @classmethod
     async def from_request(
