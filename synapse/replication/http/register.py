@@ -102,6 +102,12 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
 
         await self.registration_handler.check_registration_ratelimit(content["address"])
 
+        # Always default admin users to approved (since it means they were created by
+        # an admin).
+        approved_default = self._approval_default
+        if content["admin"]:
+            approved_default = True
+
         await self.registration_handler.register_with_store(
             user_id=user_id,
             password_hash=content["password_hash"],
@@ -113,7 +119,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type=content["user_type"],
             address=content["address"],
             shadow_banned=content["shadow_banned"],
-            approved=content.get("approved", self._approval_default),
+            approved=content.get("approved", approved_default),
         )
 
         return 200, {}
