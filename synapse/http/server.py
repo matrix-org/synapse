@@ -340,7 +340,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
             return callback_return
 
-        _unrecognised_request_handler(request)
+        return _unrecognised_request_handler(request)
 
     @abc.abstractmethod
     def _send_response(
