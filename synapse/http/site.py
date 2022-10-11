@@ -82,9 +82,7 @@ class SynapseRequest(Request):
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
-        self.experimental_cors_msc3886 = getattr(
-            site, "experimental_cors_msc3886", False
-        )
+        self.experimental_cors_msc3886 = site.experimental_cors_msc3886
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
