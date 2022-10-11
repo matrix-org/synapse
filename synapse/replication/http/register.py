@@ -49,7 +49,6 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         else:
             self._approval_default = True
 
-
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
         user_id: str,
