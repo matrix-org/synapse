@@ -956,7 +956,15 @@ def set_clickjacking_protection_headers(request: Request) -> None:
 def respond_with_redirect(
     request: Request, url: bytes, statusCode: int = FOUND, cors: bool = False
 ) -> None:
-    """Write a 302 (or other specified status code) response to the request, if it is still alive."""
+    """
+    Write a 302 (or other specified status code) response to the request, if it is still alive.
+
+    Args:
+        request: The http request to respond to.
+        url: The URL to redirect to.
+        statusCode: The HTTP status code to use for the redirect (defaults to 302).
+        cors: Whether to set CORS headers on the response.
+    """
     logger.debug("Redirect to %s", url.decode("utf-8"))
 
     if cors:
