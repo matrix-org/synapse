@@ -39,6 +39,17 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         self.store = hs.get_datastores().main
         self.registration_handler = hs.get_registration_handler()
 
+        # Default value if the worker that sent the replication request did not include
+        # an 'approved' property.
+        if (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        ):
+            self._approval_default = False
+        else:
+            self._approval_default = True
+
+
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
         user_id: str,
@@ -103,7 +114,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type=content["user_type"],
             address=content["address"],
             shadow_banned=content["shadow_banned"],
-            approved=content["approved"],
+            approved=content.get("approved", self._approval_default),
         )
 
         return 200, {}
