@@ -1,1 +1,0 @@
-Fix error in background update when rotating existing notifications. Introduced in v1.69.0rc2.

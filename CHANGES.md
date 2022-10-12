@@ -1,3 +1,20 @@
+Synapse 1.69.0rc3 (2022-10-12)
+==============================
+
+Bugfixes
+--------
+
+- Fix an issue with Docker images causing the Rust dependencies to not be pinned correctly. ([\#14129](https://github.com/matrix-org/synapse/issues/14129))
+- Fix a bug introduced in Synapse 1.69.0rc1 which would cause registration replication requests to fail if the worker sending the request is not running Synapse 1.69. ([\#14135](https://github.com/matrix-org/synapse/issues/14135))
+- Fix error in background update when rotating existing notifications. Introduced in v1.69.0rc2. ([\#14138](https://github.com/matrix-org/synapse/issues/14138))
+
+
+Internal Changes
+----------------
+
+- Rename the `url_preview` extra to `url-preview`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14085](https://github.com/matrix-org/synapse/issues/14085))
+
+
 Synapse 1.69.0rc2 (2022-10-06)
 ==============================
 
