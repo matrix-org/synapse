@@ -1,0 +1,1 @@
+The GET `/_matrix/client/v3/rooms/{roomId}/messages` and GET `/_matrix/client/v3/sync` endpoints now protect the history of rooms with history_visibility set to `shared` from room members that knock and subsequently leave/are kicked immediately. Contributed by Amman Zaman.
