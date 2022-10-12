@@ -963,18 +963,22 @@ class RelationsWorkerStore(SQLBaseStore):
         # results from the below query.
         sql = """
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type
+                SELECT event_id, relates_to_id, relation_type, 0 depth
                 FROM event_relations
                 WHERE event_id = ?
-                UNION SELECT e.event_id, e.relates_to_id, e.relation_type
+                UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
                 FROM event_relations e
                 INNER JOIN related_events r ON r.relates_to_id = e.event_id
-            ) SELECT relates_to_id FROM related_events WHERE relation_type = 'm.thread';
+                WHERE depth <= 3
+            )
+            SELECT relates_to_id FROM related_events
+            WHERE relation_type = 'm.thread'
+            ORDER BY depth DESC
+            LIMIT 1;
         """
 
         def _get_thread_id(txn: LoggingTransaction) -> str:
             txn.execute(sql, (event_id,))
-            # TODO Should we ensure there's only a single result here?
             row = txn.fetchone()
             if row:
                 return row[0]
@@ -1020,7 +1024,10 @@ class RelationsWorkerStore(SQLBaseStore):
                 FROM event_relations e
                 INNER JOIN related_events r ON r.relates_to_id = e.event_id
                 WHERE depth <= 3
-            ) SELECT relates_to_id FROM related_events ORDER BY depth DESC LIMIT 1
+            )
+            SELECT relates_to_id FROM related_events
+            ORDER BY depth DESC
+            LIMIT 1
         ), ?) AND relation_type = 'm.thread' LIMIT 1;
         """
 
