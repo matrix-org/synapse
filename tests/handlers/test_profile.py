@@ -329,8 +329,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
     def test_avatar_fetching_metadata_right_source(self) -> None:
-        """Tests that local and remote file are rightly fetched for metadata
-        when checking for avatar size and mime type"""
+        """Tests that local and remote files are correctly fetched for metadata
+        when checking for avatar size and mime type."""
+        # This test only concerns itself with correctly figuring out the host and port
+        # based on mxc url so that metadata can be fetched from the right place i.e.
+        # get_local_media() for local image & get_cached_remote_media() for remote image
         remote_server = "test:8080"
         store = self.hs.get_datastores().main
 
