@@ -1159,7 +1159,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self,
     ):
         """
-        Test to make sure event IDs are returned after the backoff duration has elapsed.
+        Test to make sure no event IDs are returned after the backoff duration has
+        elapsed.
         """
         # Create the room
         user_id = self.register_user("alice", "test")
@@ -1181,7 +1182,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
             )
         )
-
+        # Since this function only returns events we should backoff from, time has
+        # elapsed past the backoff range so there is no events to backoff from.
         self.assertEqual(event_ids_to_backoff, [])
 
 
