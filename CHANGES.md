@@ -1,10 +1,15 @@
 Synapse 1.69.0rc3 (2022-10-12)
 ==============================
 
+Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
+Server administrators should update their dashboards and alerting rules to avoid using the deprecated metric names.
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.69/upgrade.html#upgrading-to-v1690) for more details.
+
+
 Bugfixes
 --------
 
-- Fix an issue with Docker images causing the Rust dependencies to not be pinned correctly. ([\#14129](https://github.com/matrix-org/synapse/issues/14129))
+- Fix an issue with Docker images causing the Rust dependencies to not be pinned correctly. Introduced in v1.68.0 ([\#14129](https://github.com/matrix-org/synapse/issues/14129))
 - Fix a bug introduced in Synapse 1.69.0rc1 which would cause registration replication requests to fail if the worker sending the request is not running Synapse 1.69. ([\#14135](https://github.com/matrix-org/synapse/issues/14135))
 - Fix error in background update when rotating existing notifications. Introduced in v1.69.0rc2. ([\#14138](https://github.com/matrix-org/synapse/issues/14138))
 
@@ -17,11 +22,6 @@ Internal Changes
 
 Synapse 1.69.0rc2 (2022-10-06)
 ==============================
-
-Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
-Server administrators should update their dashboards and alerting rules to avoid using the deprecated metric names.
-See the [upgrade notes](https://matrix-org.github.io/synapse/v1.69/upgrade.html#upgrading-to-v1690) for more details.
-
 
 Deprecations and Removals
 -------------------------
