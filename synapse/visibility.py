@@ -87,11 +87,12 @@ async def filter_events_for_client(
     events_before_filtering = events
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
     if len(events_before_filtering) != len(events):
-        logger.debug(
-            "filter_events_for_client: Filtered out soft-failed events: Before=%s, After=%s",
-            [event.event_id for event in events_before_filtering],
-            [event.event_id for event in events],
-        )
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "filter_events_for_client: Filtered out soft-failed events: Before=%s, After=%s",
+                [event.event_id for event in events_before_filtering],
+                [event.event_id for event in events],
+            )
 
     types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
 
