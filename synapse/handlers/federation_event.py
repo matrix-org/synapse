@@ -977,7 +977,7 @@ class FederationEventHandler:
         # If we've already recently attempted to pull this missing event, don't
         # try it again so soon. Since we have to fetch all of the prev_events, we can
         # bail early here if we find any to ignore.
-        prevs_to_ignore = await self._store.filter_event_ids_with_pull_attempt_backoff(
+        prevs_to_ignore = await self._store.get_event_ids_to_not_pull_from_backoff(
             room_id, missing_prevs
         )
         if len(prevs_to_ignore) > 0:

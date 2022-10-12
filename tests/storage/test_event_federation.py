@@ -1130,7 +1130,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertEqual(backfill_event_ids, ["insertion_eventA"])
 
-    def test_filter_event_ids_with_pull_attempt_backoff(
+    def test_get_event_ids_to_not_pull_from_backoff(
         self,
     ):
         """
@@ -1148,14 +1148,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
 
         event_ids_to_backoff = self.get_success(
-            self.store.filter_event_ids_with_pull_attempt_backoff(
+            self.store.get_event_ids_to_not_pull_from_backoff(
                 room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
             )
         )
 
         self.assertEqual(event_ids_to_backoff, ["$failed_event_id"])
 
-    def test_filter_event_ids_with_pull_attempt_backoff_retry_after_backoff_duration(
+    def test_get_event_ids_to_not_pull_from_backoff_retry_after_backoff_duration(
         self,
     ):
         """
@@ -1177,7 +1177,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
 
         event_ids_to_backoff = self.get_success(
-            self.store.filter_event_ids_with_pull_attempt_backoff(
+            self.store.get_event_ids_to_not_pull_from_backoff(
                 room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
             )
         )

@@ -1537,7 +1537,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
 
     @trace
-    async def filter_event_ids_with_pull_attempt_backoff(
+    async def get_event_ids_to_not_pull_from_backoff(
         self,
         room_id: str,
         event_ids: Collection[str],
@@ -1563,7 +1563,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 "last_attempt_ts",
                 "num_attempts",
             ),
-            desc="filter_event_ids_with_pull_attempt_backoff",
+            desc="get_event_ids_to_not_pull_from_backoff",
         )
 
         current_time = self._clock.time_msec()
