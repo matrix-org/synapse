@@ -279,8 +279,6 @@ class SyncHandler:
 
         self.rooms_to_exclude = hs.config.server.rooms_to_exclude_from_sync
 
-        self._msc3773_enabled = hs.config.experimental.msc3773_enabled
-
     async def wait_for_sync_for_user(
         self,
         requester: Requester,
@@ -2424,10 +2422,7 @@ class SyncHandler:
                     unread_count = notifs.main_timeline.unread_count
 
                     # Check the sync configuration.
-                    if (
-                        self._msc3773_enabled
-                        and sync_config.filter_collection.unread_thread_notifications()
-                    ):
+                    if sync_config.filter_collection.unread_thread_notifications():
                         # And add info for each thread.
                         room_sync.unread_thread_notifications = {
                             thread_id: {
