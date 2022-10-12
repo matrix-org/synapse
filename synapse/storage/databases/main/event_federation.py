@@ -1561,31 +1561,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 txn.database_engine, "event_id", event_ids
             )
 
-            if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
-            else:
-                raise RuntimeError("Unknown database engine")
-
             sql = f"""
-                SELECT event_id FROM event_failed_pull_attempts
+                SELECT event_id, last_attempt_ts, num_attempts FROM event_failed_pull_attempts
                 WHERE
                     room_id = ?
                     AND {where_event_ids_match_clause}
-                    /**
-                    * Exponential back-off (up to the upper bound) so we don't try to
-                    * pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
-                    *
-                    * We use `1 << n` as a power of 2 equivalent for compatibility
-                    * with older SQLites. The left shift equivalent only works with
-                    * powers of 2 because left shift is a binary operation (base-2).
-                    * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
-                    */
-                    AND ? /* current_time */ < last_attempt_ts + (
-                        (1 << {least_function}(num_attempts, ? /* max doubling steps */))
-                        * ? /* step */
-                    )
             """
 
             txn.execute(
@@ -1593,15 +1573,30 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 (
                     room_id,
                     *values,
-                    self._clock.time_msec(),
-                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
-                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
                 ),
             )
 
-            event_ids_to_ignore_result = cast(List[Tuple[str]], txn.fetchall())
+            event_failed_pull_attempts = cast(
+                List[Tuple[str, int, int]], txn.fetchall()
+            )
 
-            return [event_id for event_id, in event_ids_to_ignore_result]
+            current_time = self._clock.time_msec()
+            return [
+                event_id
+                for event_id, last_attempt_ts, num_attempts in event_failed_pull_attempts
+                # Exponential back-off (up to the upper bound) so we don't try to
+                # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+                if current_time
+                < last_attempt_ts
+                + (
+                    2
+                    ** min(
+                        num_attempts,
+                        BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    )
+                )
+                * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+            ]
 
         return await self.db_pool.runInteraction(
             "filter_event_ids_with_pull_attempt_backoff_txn",
