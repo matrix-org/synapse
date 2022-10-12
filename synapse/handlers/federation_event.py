@@ -566,6 +566,9 @@ class FederationEventHandler:
             event: partial-state event to be de-partial-stated
 
         Raises:
+            FederationPullAttemptBackoffError if we are are deliberately not attempting
+                to pull the given event over federation because we've already done so
+                recently and are backing off.
             FederationError if we fail to request state from the remote server.
         """
         logger.info("Updating state for %s", event.event_id)
@@ -900,6 +903,18 @@ class FederationEventHandler:
                     context,
                     backfilled=backfilled,
                 )
+        except FederationPullAttemptBackoffError as exc:
+            # Log a warning about why we failed to process the event (the error message
+            # for `FederationPullAttemptBackoffError` is pretty good)
+            logger.warning("_process_pulled_event: " + str(exc))
+            # We do not record a failed pull attempt when we backoff fetching a missing
+            # `prev_event` because not being able to fetch the `prev_events` just means
+            # we won't be able to de-outlier the pulled event. But we can still use an
+            # `outlier` in the state/auth chain for another event. So we shouldn't stop
+            # a downstream event from trying to pull it.
+            #
+            # This avoids a cascade of backoff for all events in the DAG downstream from
+            # one event backoff upstream.
         except FederationError as e:
             await self._store.record_event_failed_pull_attempt(
                 event.room_id, event_id, str(e)
@@ -909,18 +924,6 @@ class FederationEventHandler:
                 logger.warning("Pulled event %s failed history check.", event_id)
             else:
                 raise
-        except FederationPullAttemptBackoffError as exc:
-            # Log a warning about why we failed to process the event (the error message
-            # for `FederationPullAttemptBackoffError` is pretty good)
-            logger.warning(str(exc))
-            # We do not record a failed pull attempt when we backoff fetching a missing
-            # `prev_event` because not being able to fetch the `prev_events` just means
-            # we won't be able to de-outlier the pulled event. But we can still use an
-            # `outlier` in the state/auth chain for another event. So we shouldn't stop
-            # a downstream event from trying to pull it.
-            #
-            # This avoids a cascade of backoff for all events in the DAG downstream from
-            # one event backoff upstream.
 
     @trace
     async def _compute_event_context_with_maybe_missing_prevs(
