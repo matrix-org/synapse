@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+from unittest.mock import Mock
 
 from synapse.api.room_versions import RoomVersions
 from synapse.federation.transport.client import SendJoinParser
@@ -94,3 +95,39 @@ class SendJoinParserTestCase(TestCase):
         # Retrieve and check the parsed SendJoinResponse
         parsed_response = parser.finish()
         self.assertEqual(parsed_response.servers_in_room, ["hs1", "hs2"])
+
+    def test_errors_closing_coroutines(self) -> None:
+        """Check we close all coroutines, even if closing the first raises an Exception.
+
+        We also check that an Exception of some kind is raised, but we don't make any
+        assertions about its attributes or type.
+        """
+        parser = SendJoinParser(RoomVersions.V1, False)
+        response = {"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}
+        serialisation = json.dumps(response).encode()
+
+        # Mock the coroutines managed by this parser.
+        # The first one will error when we try to close it.
+        coro_1 = Mock()
+        coro_1.close = Mock(side_effect=RuntimeError("Couldn't close coro 1"))
+
+        coro_2 = Mock()
+
+        coro_3 = Mock()
+        coro_3.close = Mock(side_effect=RuntimeError("Couldn't close coro 3"))
+
+        parser._coros = [coro_1, coro_2, coro_3]
+
+        # Send half of the data to the parser
+        parser.write(serialisation[: len(serialisation) // 2])
+
+        # Close the parser. There should be _some_ kind of exception, but it need not
+        # be that RuntimeError directly. E.g. we might want to raise a wrapper
+        # encompassing multiple errors from multiple coroutines.
+        with self.assertRaises(Exception):
+            parser.finish()
+
+        # In any case, we should have tried to close both coros.
+        coro_1.close.assert_called()
+        coro_2.close.assert_called()
+        coro_3.close.assert_called()
