@@ -126,3 +126,45 @@ print("::endgroup::")
 
 test_matrix = json.dumps(sytest_tests)
 print(f"::set-output name=sytest_test_matrix::{test_matrix}")
+
+
+# First calculate the workers used during complement jobs
+#
+# Will only be used on tests with SYNAPSE_COMPLEMENT_USE_WORKERS enabled
+# Github sees a none existent key and evaluates it to an empty string, according to
+# https://docs.github.com/en/actions/learn-github-actions/contexts
+# See the last sentence before "Determining when to use contexts"
+
+complement_test_jobs = [
+    {"arrangement": "monolith", "database": "SQLite"},
+    {"arrangement": "monolith", "database": "Postgres"},
+    {
+        "arrangement": "workers",
+        "database": "Postgres",
+        "worker_types": ", ".join(
+            worker
+            for worker in [
+                "event_persister",
+                "event_persister",
+                "background_worker",
+                "frontend_proxy",
+                "event_creator",
+                "user_dir",
+                "media_repository",
+                "federation_inbound",
+                "federation_reader",
+                "federation_sender",
+                "synchrotron",
+                "appservice",
+                "pusher",
+            ]
+        ),
+    },
+]
+
+print("::group::Calculated complement job with workers")
+print(json.dumps(complement_test_jobs, indent=4))
+print("::endgroup::")
+
+test_matrix = json.dumps(complement_test_jobs)
+print(f"::set-output name=complement_test_matrix::{test_matrix}")
