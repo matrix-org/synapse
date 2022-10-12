@@ -1553,45 +1553,36 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         Returns:
             List of event_ids that should not be attempted to be pulled
         """
-
-        def _filter_event_ids_with_pull_attempt_backoff_txn(
-            txn: LoggingTransaction,
-        ) -> List[str]:
-            event_failed_pull_attempts = self.db_pool.simple_select_many_txn(
-                txn,
-                table="event_failed_pull_attempts",
-                column="event_id",
-                iterable=event_ids,
-                keyvalues={},
-                retcols=(
-                    "event_id",
-                    "last_attempt_ts",
-                    "num_attempts",
-                ),
-            )
-
-            current_time = self._clock.time_msec()
-            return [
-                event_failed_pull_attempt["event_id"]
-                for event_failed_pull_attempt in event_failed_pull_attempts
-                # Exponential back-off (up to the upper bound) so we don't try to
-                # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
-                if current_time
-                < event_failed_pull_attempt["last_attempt_ts"]
-                + (
-                    2
-                    ** min(
-                        event_failed_pull_attempt["num_attempts"],
-                        BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
-                    )
-                )
-                * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
-            ]
-
-        return await self.db_pool.runInteraction(
-            "filter_event_ids_with_pull_attempt_backoff_txn",
-            _filter_event_ids_with_pull_attempt_backoff_txn,
+        event_failed_pull_attempts = await self.db_pool.simple_select_many_batch(
+            table="event_failed_pull_attempts",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=(
+                "event_id",
+                "last_attempt_ts",
+                "num_attempts",
+            ),
+            desc="filter_event_ids_with_pull_attempt_backoff",
         )
+
+        current_time = self._clock.time_msec()
+        return [
+            event_failed_pull_attempt["event_id"]
+            for event_failed_pull_attempt in event_failed_pull_attempts
+            # Exponential back-off (up to the upper bound) so we don't try to
+            # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+            if current_time
+            < event_failed_pull_attempt["last_attempt_ts"]
+            + (
+                2
+                ** min(
+                    event_failed_pull_attempt["num_attempts"],
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                )
+            )
+            * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+        ]
 
     async def get_missing_events(
         self,
