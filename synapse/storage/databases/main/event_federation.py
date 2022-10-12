@@ -1557,41 +1557,31 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         def _filter_event_ids_with_pull_attempt_backoff_txn(
             txn: LoggingTransaction,
         ) -> List[str]:
-            where_event_ids_match_clause, values = make_in_list_sql_clause(
-                txn.database_engine, "event_id", event_ids
-            )
-
-            sql = f"""
-                SELECT event_id, last_attempt_ts, num_attempts FROM event_failed_pull_attempts
-                WHERE
-                    room_id = ?
-                    AND {where_event_ids_match_clause}
-            """
-
-            txn.execute(
-                sql,
-                (
-                    room_id,
-                    *values,
+            event_failed_pull_attempts = self.db_pool.simple_select_many_txn(
+                txn,
+                table="event_failed_pull_attempts",
+                column="event_id",
+                iterable=event_ids,
+                keyvalues={},
+                retcols=(
+                    "event_id",
+                    "last_attempt_ts",
+                    "num_attempts",
                 ),
-            )
-
-            event_failed_pull_attempts = cast(
-                List[Tuple[str, int, int]], txn.fetchall()
             )
 
             current_time = self._clock.time_msec()
             return [
-                event_id
-                for event_id, last_attempt_ts, num_attempts in event_failed_pull_attempts
+                event_failed_pull_attempt["event_id"]
+                for event_failed_pull_attempt in event_failed_pull_attempts
                 # Exponential back-off (up to the upper bound) so we don't try to
                 # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
                 if current_time
-                < last_attempt_ts
+                < event_failed_pull_attempt["last_attempt_ts"]
                 + (
                     2
                     ** min(
-                        num_attempts,
+                        event_failed_pull_attempt["num_attempts"],
                         BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
                     )
                 )
