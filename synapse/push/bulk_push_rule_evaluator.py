@@ -13,18 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
     Union,
 )
@@ -38,7 +35,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
-from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRuleEvaluator
+from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
@@ -116,9 +113,6 @@ class BulkPushRuleEvaluator:
             cache=[],  # Meaningless size, as this isn't a cache that stores values,
             resizable=False,
         )
-
-        # Whether to support MSC3772 is supported.
-        self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
 
     async def _get_rules_for_event(
         self,
@@ -200,51 +194,6 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _get_mutual_relations(
-        self, parent_id: str, rules: Iterable[Tuple[PushRule, bool]]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
-        """
-        Fetch event metadata for events which related to the same event as the given event.
-
-        If the given event has no relation information, returns an empty dictionary.
-
-        Args:
-            parent_id: The event ID which is targeted by relations.
-            rules: The push rules which will be processed for this event.
-
-        Returns:
-            A dictionary of relation type to:
-                A set of tuples of:
-                    The sender
-                    The event type
-        """
-
-        # If the experimental feature is not enabled, skip fetching relations.
-        if not self._relations_match_enabled:
-            return {}
-
-        # Pre-filter to figure out which relation types are interesting.
-        rel_types = set()
-        for rule, enabled in rules:
-            if not enabled:
-                continue
-
-            for condition in rule.conditions:
-                if condition["kind"] != "org.matrix.msc3772.relation_match":
-                    continue
-
-                # rel_type is required.
-                rel_type = condition.get("rel_type")
-                if rel_type:
-                    rel_types.add(rel_type)
-
-        # If no valid rules were found, no mutual relations.
-        if not rel_types:
-            return {}
-
-        # If any valid rules were found, fetch the mutual relations.
-        return await self.store.get_mutual_event_relations(parent_id, rel_types)
-
     @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
         self, event: EventBase, context: EventContext
@@ -276,16 +225,11 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
+        # Find the event's thread ID.
         relation = relation_from_event(event)
-        # If the event does not have a relation, then cannot have any mutual
-        # relations or thread ID.
-        relations = {}
+        # If the event does not have a relation, then it cannot have a thread ID.
         thread_id = MAIN_TIMELINE
         if relation:
-            relations = await self._get_mutual_relations(
-                relation.parent_id,
-                itertools.chain(*(r.rules() for r in rules_by_user.values())),
-            )
             # Recursively attempt to find the thread this event relates to.
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
@@ -294,13 +238,18 @@ class BulkPushRuleEvaluator:
                 # the parent is part of a thread.
                 thread_id = await self.store.get_thread_id(relation.parent_id) or "main"
 
+        # It's possible that old room versions have non-integer power levels (floats or
+        # strings). Workaround this by explicitly converting to int.
+        notification_levels = power_levels.get("notifications", {})
+        if not event.room_version.msc3667_int_only_power_levels:
+            for user_id, level in notification_levels.items():
+                notification_levels[user_id] = int(level)
+
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels.get("notifications", {}),
-            relations,
-            self._relations_match_enabled,
+            notification_levels,
         )
 
         users = rules_by_user.keys()
