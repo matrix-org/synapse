@@ -1,0 +1,1 @@
+Fix race conditions with room membership in sync when using synapse workers. Contributed by Nick @ Beeper (@fizzadar).
