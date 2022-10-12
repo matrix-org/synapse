@@ -148,6 +148,7 @@ jobs:
     outputs:
       trial_test_matrix: ${{ steps.get-matrix.outputs.trial_test_matrix }}
       sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
+      complement_test_matrix: ${{ steps.get-matrix.outputs.complement_test_matrix }}
 
   trial:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
@@ -428,21 +429,13 @@ jobs:
 
   complement:
     if: "${{ !failure() && !cancelled() }}"
-    needs: linting-done
+    needs: calculate-test-jobs
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arrangement: monolith
-            database: SQLite
-
-          - arrangement: monolith
-            database: Postgres
-
-          - arrangement: workers
-            database: Postgres
+        job: ${{ fromJson(needs.calculate-test-jobs.outputs.complement_test_matrix) }}
 
     steps:
       - name: Run actions/checkout@v3 for synapse
@@ -460,11 +453,15 @@ jobs:
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
-      - run: |
-          set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+      - name: Run Complement Tests
         shell: bash
-        name: Run Complement Tests
+        env:
+          POSTGRES: ${{ (matrix.job.database == 'Postgres') && 1 || '' }}
+          WORKERS: ${{ (matrix.job.arrangement == 'workers') && 1 || '' }}
+          SYNAPSE_WORKER_TYPES: ${{ matrix.worker_types }}
+        run: |
+          set -o pipefail
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
 
   cargo-test:
     if: ${{ needs.changes.outputs.rust == 'true' }}
