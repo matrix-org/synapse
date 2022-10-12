@@ -316,7 +316,7 @@ build-backend = "poetry.core.masonry.api"
 skip = "cp36* *-musllinux_i686"
 
 # We need a rust compiler
-before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
+before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
 environment= { PATH = "$PATH:$HOME/.cargo/bin" }
 
 # For some reason if we don't manually clean the build directory we
