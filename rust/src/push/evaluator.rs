@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::BTreeMap;
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
@@ -49,13 +46,6 @@ pub struct PushRuleEvaluator {
     /// The `notifications` section of the current power levels in the room.
     notification_power_levels: BTreeMap<String, i64>,
 
-    /// The relations related to the event as a mapping from relation type to
-    /// set of sender/event type 2-tuples.
-    relations: BTreeMap<String, BTreeSet<(String, String)>>,
-
-    /// Is running "relation" conditions enabled?
-    relation_match_enabled: bool,
-
     /// The power level of the sender of the event, or None if event is an
     /// outlier.
     sender_power_level: Option<i64>,
@@ -70,8 +60,6 @@ impl PushRuleEvaluator {
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
-        relations: BTreeMap<String, BTreeSet<(String, String)>>,
-        relation_match_enabled: bool,
     ) -> Result<Self, Error> {
         let body = flattened_keys
             .get("content.body")
@@ -83,8 +71,6 @@ impl PushRuleEvaluator {
             body,
             room_member_count,
             notification_power_levels,
-            relations,
-            relation_match_enabled,
             sender_power_level,
         })
     }
@@ -203,87 +189,9 @@ impl PushRuleEvaluator {
                     false
                 }
             }
-            KnownCondition::RelationMatch {
-                rel_type,
-                event_type_pattern,
-                sender,
-                sender_type,
-            } => {
-                self.match_relations(rel_type, sender, sender_type, user_id, event_type_pattern)?
-            }
         };
 
         Ok(result)
-    }
-
-    /// Evaluates a relation condition.
-    fn match_relations(
-        &self,
-        rel_type: &str,
-        sender: &Option<Cow<str>>,
-        sender_type: &Option<Cow<str>>,
-        user_id: Option<&str>,
-        event_type_pattern: &Option<Cow<str>>,
-    ) -> Result<bool, Error> {
-        // First check if relation matching is enabled...
-        if !self.relation_match_enabled {
-            return Ok(false);
-        }
-
-        // ... and if there are any relations to match against.
-        let relations = if let Some(relations) = self.relations.get(rel_type) {
-            relations
-        } else {
-            return Ok(false);
-        };
-
-        // Extract the sender pattern from the condition
-        let sender_pattern = if let Some(sender) = sender {
-            Some(sender.as_ref())
-        } else if let Some(sender_type) = sender_type {
-            if sender_type == "user_id" {
-                if let Some(user_id) = user_id {
-                    Some(user_id)
-                } else {
-                    return Ok(false);
-                }
-            } else {
-                warn!("Unrecognized sender_type: {sender_type}");
-                return Ok(false);
-            }
-        } else {
-            None
-        };
-
-        let mut sender_compiled_pattern = if let Some(pattern) = sender_pattern {
-            Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
-        } else {
-            None
-        };
-
-        let mut type_compiled_pattern = if let Some(pattern) = event_type_pattern {
-            Some(get_glob_matcher(pattern, GlobMatchType::Whole)?)
-        } else {
-            None
-        };
-
-        for (relation_sender, event_type) in relations {
-            if let Some(pattern) = &mut sender_compiled_pattern {
-                if !pattern.is_match(relation_sender)? {
-                    continue;
-                }
-            }
-
-            if let Some(pattern) = &mut type_compiled_pattern {
-                if !pattern.is_match(event_type)? {
-                    continue;
-                }
-            }
-
-            return Ok(true);
-        }
-
-        Ok(false)
     }
 
     /// Evaluates a `event_match` condition.
@@ -359,15 +267,8 @@ impl PushRuleEvaluator {
 fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
-    let evaluator = PushRuleEvaluator::py_new(
-        flattened_keys,
-        10,
-        Some(0),
-        BTreeMap::new(),
-        BTreeMap::new(),
-        true,
-    )
-    .unwrap();
+    let evaluator =
+        PushRuleEvaluator::py_new(flattened_keys, 10, Some(0), BTreeMap::new()).unwrap();
 
     let result = evaluator.run(&FilteredPushRules::default(), None, Some("bob"));
     assert_eq!(result.len(), 3);

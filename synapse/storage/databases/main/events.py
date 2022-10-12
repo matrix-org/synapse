@@ -2053,11 +2053,8 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
             )
-            txn.call_after(self.store.get_threads.invalidate, (room_id,))
             self.store._invalidate_cache_and_stream(
-                txn,
-                self.store.get_mutual_event_relations_for_rel_type,
-                (redacted_relates_to,),
+                txn, self.store.get_threads, (room_id,)
             )
 
         self.db_pool.simple_delete_txn(
