@@ -792,7 +792,6 @@ class FederationHandler:
             # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
             # Thus, we also check for a 'knock_state_events' to support old instances.
             # See https://github.com/matrix-org/synapse/issues/14088.
-            # TODO: Remove when enough of the ecosystem have upgraded to Synapse v1.xx+.
             or knock_response.get("knock_state_events")
         )
 

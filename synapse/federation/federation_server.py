@@ -830,7 +830,6 @@ class FederationServer(FederationBase):
             # Thus, we also populate a 'knock_state_events' with the same content to
             # support old instances.
             # See https://github.com/matrix-org/synapse/issues/14088.
-            # TODO: Remove when enough of the ecosystem have upgraded to Synapse v1.xx+.
             "knock_state_events": stripped_room_state,
         }
 
