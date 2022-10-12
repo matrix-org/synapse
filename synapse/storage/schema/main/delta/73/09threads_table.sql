@@ -24,5 +24,7 @@ CREATE TABLE threads (
     CONSTRAINT threads_uniqueness UNIQUE (room_id, thread_id)
 );
 
+CREATE INDEX threads_ordering_idx ON threads(room_id, topological_ordering, stream_ordering);
+
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (7309, 'threads_backfill', '{}');
