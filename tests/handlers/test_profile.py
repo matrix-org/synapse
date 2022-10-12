@@ -344,6 +344,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 user_id=UserID.from_string("@whatever:test"),
             )
         )
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/local")
+        )
+        self.assertTrue(res)
+
         self.get_success(
             store.store_cached_remote_media(
                 media_id="remote",
@@ -355,12 +360,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 filesystem_id="remote",
             )
         )
-
-        res = self.get_success(
-            self.handler.check_avatar_size_and_mime_type("mxc://test/local")
-        )
-        self.assertTrue(res)
-
         res = self.get_success(
             self.handler.check_avatar_size_and_mime_type(
                 "mxc://" + remote_server + "/remote"
