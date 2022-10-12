@@ -578,6 +578,57 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return rows
 
+    async def get_highest_membership_state_for_user_in_room(self, user_id: str, room_id: str) -> Membership:
+        """Retrieve the highest local membership state for a local user in a room. Only considers join and invite memberships.
+
+        Args:
+            user_id: The ID of the user.
+            room_id: The ID of the room.
+
+        Returns:
+            Highest Membership of either 'join' | 'invite' | None
+        """
+        # Paranoia check.
+        if not self.hs.is_mine_id(user_id):
+            raise Exception(
+                "Cannot call 'get_local_current_membership_for_user_in_room' on "
+                "non-local user %s" % (user_id,),
+            )
+
+        return await self.db_pool.runInteraction(
+            "get_highest_membership_state_for_user_in_room",
+            self._get_highest_membership_state_for_user_in_room,
+            user_id=user_id,
+            room_id=room_id,
+        )
+
+    def _get_highest_membership_state_for_user_in_room(self, txn: LoggingTransaction, user_id: str, room_id: str) -> Membership:
+        sql = """
+            SELECT json FROM events
+            INNER JOIN event_json USING (room_id, event_id)
+            WHERE room_id = ? AND type = 'm.room.member' AND state_key = ? AND (json LIKE '%%\"membership\":\"join\"%%' OR json LIKE '%%\"membership\":\"invite\"%%')
+        """
+
+        txn.execute(sql, (room_id, user_id))
+        
+        highest_membership: Membership = None
+        for event_json in txn:
+            event_dict = db_to_json(event_json[0])
+            if (
+                event_dict
+                and event_dict["content"]
+                and event_dict["content"]["membership"]
+            ):
+                if event_dict["content"]["membership"] == str(Membership.JOIN):
+                    return event_dict["content"]["membership"]
+                
+                if highest_membership == None:
+                    highest_membership = event_dict["content"]["membership"]
+                
+                
+        return highest_membership
+
+
     async def get_local_membership_history_for_user_in_room(
         self, user_id: str, room_id: str, limit: int = 10, start: int = 0
     ) -> List[Tuple[Optional[str], Optional[str], Optional[int]]]:
@@ -609,26 +660,38 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     async def is_user_an_absent_knocker_for_room(
-        self, user_id: str, room_id: str
+        self,
+        user_id: str,
+        room_id: str,
+        consider_membership_before_knock: bool = True,
     ) -> bool:
         """Checks to see if the specified user's current membership changed directly from 'knock' to 'leave'.
         User needs to be local.
+        If the user
 
         Args:
             user_id: The ID of the user.
             room_id: The ID of the room.
+            consider_membership_before_knock: If False, this function returns true strictly if the membership changed from 'knock' to 'leave' without considering the user's membership before the knock. If True, 
 
         Returns:
             True if the specified user's last 2 membership state events is 'leave' and 'knock' respectively.
         """
         membership_history = await self.get_local_membership_history_for_user_in_room(
-            user_id=user_id, room_id=room_id, limit=2, start=0
+            user_id=user_id, room_id=room_id, limit=3, start=0
         )
+
+        was_user_at_least_invited_before: bool = False
+        if consider_membership_before_knock and len(membership_history) > 2:
+            highest_membership = await self.get_highest_membership_state_for_user_in_room(user_id, room_id)
+            was_user_at_least_invited_before = highest_membership != None
+
         return bool(
             membership_history
-            and len(membership_history) == 2
+            and len(membership_history) >= 2
             and membership_history[0][1] == "leave"
             and membership_history[1][1] == "knock"
+            and not was_user_at_least_invited_before
         )
 
     @cached(max_entries=500000, iterable=True)
