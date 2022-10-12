@@ -203,6 +203,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
     ^/_matrix/client/v1/rooms/.*/hierarchy$
+    ^/_matrix/client/(v1|unstable)/rooms/.*/relations/
     ^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(r0|v3|unstable)/account/3pid$
@@ -488,6 +489,12 @@ pusher_instances:
     - pusher_worker2
 ```
 
+An example for a pusher instance:
+
+```yaml
+{{#include systemd-with-workers/workers/pusher_worker.yaml}}
+```
+
 
 ### `synapse.app.appservice`
 
@@ -516,6 +523,12 @@ For example:
 federation_sender_instances:
     - federation_sender1
     - federation_sender2
+```
+
+An example for a federation sender instance:
+
+```yaml
+{{#include systemd-with-workers/workers/federation_sender.yaml}}
 ```
 
 ### `synapse.app.media_repository`
