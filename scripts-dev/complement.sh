@@ -140,7 +140,7 @@ if [[ -n "$WORKERS" ]]; then
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
 
   # Pass through the workers defined. If none, it will be an empty string
-  export PASS_SYNAPSE_WORKER_TYPES="$SYNAPSE_WORKER_TYPES"
+  export PASS_SYNAPSE_WORKER_TYPES="$WORKER_TYPES"
 
   # Workers can only use Postgres as a database.
   export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
