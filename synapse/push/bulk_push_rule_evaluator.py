@@ -236,7 +236,7 @@ class BulkPushRuleEvaluator:
             else:
                 # Since the event has not yet been persisted we check whether
                 # the parent is part of a thread.
-                thread_id = await self.store.get_thread_id(relation.parent_id) or "main"
+                thread_id = await self.store.get_thread_id(relation.parent_id)
 
         # It's possible that old room versions have non-integer power levels (floats or
         # strings). Workaround this by explicitly converting to int.
