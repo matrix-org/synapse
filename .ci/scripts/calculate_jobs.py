@@ -155,6 +155,7 @@ complement_test_jobs = [
                 "federation_reader",
                 "federation_sender",
                 "synchrotron",
+                "client_reader",
                 "appservice",
                 "pusher",
             ]
