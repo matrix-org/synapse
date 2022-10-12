@@ -258,19 +258,6 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3772.thread_reply"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelationMatch {
-            rel_type: Cow::Borrowed("m.thread"),
-            event_type_pattern: None,
-            sender: None,
-            sender_type: Some(Cow::Borrowed("user_id")),
-        })]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
         rule_id: Cow::Borrowed("global/underride/.m.rule.message"),
         priority_class: 1,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
