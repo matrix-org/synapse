@@ -958,6 +958,9 @@ class FederationEventHandler:
             The event context.
 
         Raises:
+            FederationPullAttemptBackoffError if we are are deliberately not attempting
+                to pull the given event over federation because we've already done so
+                recently and are backing off.
             FederationError if we fail to get the state from the remote server after any
                 missing `prev_event`s.
         """
@@ -976,7 +979,7 @@ class FederationEventHandler:
         )
         if len(prevs_to_ignore) > 0:
             raise FederationPullAttemptBackoffError(
-                event_id=prevs_to_ignore[0],
+                event_ids=prevs_to_ignore,
                 message=f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
             )
 
