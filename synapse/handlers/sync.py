@@ -494,6 +494,7 @@ class SyncHandler:
         since_token: Optional[StreamToken] = None,
         potential_recents: Optional[List[EventBase]] = None,
         newly_joined_room: bool = False,
+        is_user_absent_knocking_member: bool = False,
     ) -> TimelineBatch:
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
@@ -542,6 +543,7 @@ class SyncHandler:
                     sync_config.user.to_string(),
                     recents,
                     always_include_ids=current_state_ids,
+                    is_peeking=is_user_absent_knocking_member,
                 )
                 log_kv({"recents_after_visibility_filtering": len(recents)})
             else:
@@ -619,6 +621,7 @@ class SyncHandler:
                     sync_config.user.to_string(),
                     loaded_recents,
                     always_include_ids=current_state_ids,
+                    is_peeking=is_user_absent_knocking_member,
                 )
 
                 log_kv({"loaded_recents_after_client_filtering": len(loaded_recents)})
@@ -2288,6 +2291,14 @@ class SyncHandler:
                 }
             )
 
+            is_user_absent_knocking_member: bool = False
+            if room_builder.rtype == "archived":
+                is_user_absent_knocking_member = (
+                    await self.store.is_user_an_absent_knocker_for_room(
+                        sync_config.user.to_string(), room_id
+                    )
+                )
+
             batch = await self._load_filtered_recents(
                 room_id,
                 sync_config,
@@ -2295,6 +2306,7 @@ class SyncHandler:
                 since_token=since_token,
                 potential_recents=events,
                 newly_joined_room=newly_joined,
+                is_user_absent_knocking_member=is_user_absent_knocking_member,
             )
             log_kv(
                 {
