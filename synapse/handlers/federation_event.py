@@ -974,7 +974,7 @@ class FederationEventHandler:
         seen = await self._store.have_events_in_timeline(prevs)
         missing_prevs = prevs - seen
 
-        # If we've already recently attempted to pull this missing event recently, don't
+        # If we've already recently attempted to pull this missing event, don't
         # try it again so soon. Since we have to fetch all of the prev_events, we can
         # bail early here if we find any to ignore.
         prevs_to_ignore = await self._store.filter_event_ids_with_pull_attempt_backoff(
