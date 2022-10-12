@@ -1,1 +1,1 @@
-Document encryption_enabled_by_default_for_room_type under the right name
+Correct the name of the config option [`encryption_enabled_by_default_for_room_type`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#encryption_enabled_by_default_for_room_type).
