@@ -207,7 +207,7 @@ class HttpListenerConfig:
     additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
     request_id_header: Optional[str] = None
-    # If true, the listener will return CORS responses compatible with MSC3886:
+    # If true, the listener will return CORS response headers compatible with MSC3886:
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3886
     experimental_cors_msc3886: bool = False
 
