@@ -28,7 +28,7 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
@@ -776,61 +776,8 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
         )
 
-    @cached(iterable=True)
-    async def get_mutual_event_relations_for_rel_type(
-        self, event_id: str, relation_type: str
-    ) -> Set[Tuple[str, str]]:
-        raise NotImplementedError()
-
-    @cachedList(
-        cached_method_name="get_mutual_event_relations_for_rel_type",
-        list_name="relation_types",
-    )
-    async def get_mutual_event_relations(
-        self, event_id: str, relation_types: Collection[str]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
-        """
-        Fetch event metadata for events which related to the same event as the given event.
-
-        If the given event has no relation information, returns an empty dictionary.
-
-        Args:
-            event_id: The event ID which is targeted by relations.
-            relation_types: The relation types to check for mutual relations.
-
-        Returns:
-            A dictionary of relation type to:
-                A set of tuples of:
-                    The sender
-                    The event type
-        """
-        rel_type_sql, rel_type_args = make_in_list_sql_clause(
-            self.database_engine, "relation_type", relation_types
-        )
-
-        sql = f"""
-            SELECT DISTINCT relation_type, sender, type FROM event_relations
-            INNER JOIN events USING (event_id)
-            WHERE relates_to_id = ? AND {rel_type_sql}
-        """
-
-        def _get_event_relations(
-            txn: LoggingTransaction,
-        ) -> Dict[str, Set[Tuple[str, str]]]:
-            txn.execute(sql, [event_id] + rel_type_args)
-            result: Dict[str, Set[Tuple[str, str]]] = {
-                rel_type: set() for rel_type in relation_types
-            }
-            for rel_type, sender, type in txn.fetchall():
-                result[rel_type].add((sender, type))
-            return result
-
-        return await self.db_pool.runInteraction(
-            "get_event_relations", _get_event_relations
-        )
-
     @cached()
-    async def get_thread_id(self, event_id: str) -> Optional[str]:
+    async def get_thread_id(self, event_id: str) -> str:
         """
         Get the thread ID for an event. This considers multi-level relations,
         e.g. an annotation to an event which is part of a thread.
@@ -840,7 +787,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         Returns:
             The event ID of the root event in the thread, if this event is part
-            of a thread. None, otherwise.
+            of a thread. "main", otherwise.
         """
         # Since event relations form a tree, we should only ever find 0 or 1
         # results from the below query.
@@ -855,13 +802,15 @@ class RelationsWorkerStore(SQLBaseStore):
             ) SELECT relates_to_id FROM related_events WHERE relation_type = 'm.thread';
         """
 
-        def _get_thread_id(txn: LoggingTransaction) -> Optional[str]:
+        def _get_thread_id(txn: LoggingTransaction) -> str:
             txn.execute(sql, (event_id,))
             # TODO Should we ensure there's only a single result here?
             row = txn.fetchone()
             if row:
                 return row[0]
-            return None
+
+            # If no thread was found, it is part of the main timeline.
+            return MAIN_TIMELINE
 
         return await self.db_pool.runInteraction("get_thread_id", _get_thread_id)
 

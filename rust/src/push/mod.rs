@@ -275,16 +275,6 @@ pub enum KnownCondition {
     SenderNotificationPermission {
         key: Cow<'static, str>,
     },
-    #[serde(rename = "org.matrix.msc3772.relation_match")]
-    RelationMatch {
-        rel_type: Cow<'static, str>,
-        #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-        event_type_pattern: Option<Cow<'static, str>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender: Option<Cow<'static, str>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender_type: Option<Cow<'static, str>>,
-    },
 }
 
 impl IntoPy<PyObject> for Condition {
@@ -401,21 +391,15 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
-    msc3772_enabled: bool,
 }
 
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    pub fn py_new(
-        push_rules: PushRules,
-        enabled_map: BTreeMap<String, bool>,
-        msc3772_enabled: bool,
-    ) -> Self {
+    pub fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3772_enabled,
         }
     }
 
@@ -430,25 +414,13 @@ impl FilteredPushRules {
     /// Iterates over all the rules and their enabled state, including base
     /// rules, in the order they should be executed in.
     fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {
-        self.push_rules
-            .iter()
-            .filter(|rule| {
-                // Ignore disabled experimental push rules
-                if !self.msc3772_enabled
-                    && rule.rule_id == "global/underride/.org.matrix.msc3772.thread_reply"
-                {
-                    return false;
-                }
-
-                true
-            })
-            .map(|r| {
-                let enabled = *self
-                    .enabled_map
-                    .get(&*r.rule_id)
-                    .unwrap_or(&r.default_enabled);
-                (r, enabled)
-            })
+        self.push_rules.iter().map(|r| {
+            let enabled = *self
+                .enabled_map
+                .get(&*r.rule_id)
+                .unwrap_or(&r.default_enabled);
+            (r, enabled)
+        })
     }
 }
 
