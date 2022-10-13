@@ -1,1 +1,1 @@
-Fix docker build OOMing in CI for amr64 builds.
+Fix docker build OOMing in CI for arm64 builds.
