@@ -1704,7 +1704,7 @@ class FederationHandler:
                             destination, event
                         )
                         break
-                    except (NotRetryingDestination, FederationError) as e:
+                    except FederationError as e:
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
                             # TODO(faster_joins) giving up isn't the right thing to do
