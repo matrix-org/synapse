@@ -118,6 +118,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$",
             "^/_matrix/client/v1/rooms/.*/hierarchy$",
             "^/_matrix/client/(v1|unstable)/rooms/.*/relations/",
+            "^/_matrix/client/v1/rooms/.*/threads$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/login$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/account/whoami$",
