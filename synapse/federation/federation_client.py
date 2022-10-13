@@ -1294,7 +1294,7 @@ class FederationClient(FederationBase):
         return resp[1]
 
     async def send_knock(self, destinations: List[str], pdu: EventBase) -> JsonDict:
-        """Attempts to send a knock event to given a list of servers. Iterates
+        """Attempts to send a knock event to a given list of servers. Iterates
         through the list until one attempt succeeds.
 
         Doing so will cause the remote server to add the event to the graph,
