@@ -420,8 +420,6 @@ def generate_worker_files(
 
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
-        worker_type = worker_type.strip()
-
         worker_config = WORKERS_CONFIG.get(worker_type)
         if worker_config:
             worker_config = worker_config.copy()
