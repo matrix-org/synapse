@@ -711,6 +711,37 @@ class FederationEventHandler:
                 ):
                     event.internal_metadata.stream_ordering = stream
 
+            logger.info(
+                "backfill chronological_events=%s",
+                [
+                    "event_id=%s,depth=%d,stream_ordering=%s,body=%s(%s),prevs=%s\n"
+                    % (
+                        event.event_id,
+                        event.depth,
+                        event.internal_metadata.stream_ordering,
+                        event.content.get("body", event.type),
+                        getattr(event, "state_key", None),
+                        event.prev_event_ids(),
+                    )
+                    for event in chronological_events
+                ],
+            )
+            logger.info(
+                "backfill reverse_chronological_events=%s",
+                [
+                    "event_id=%s,depth=%d,stream_ordering=%s,body=%s(%s),prevs=%s\n"
+                    % (
+                        event.event_id,
+                        event.depth,
+                        event.internal_metadata.stream_ordering,
+                        event.content.get("body", event.type),
+                        getattr(event, "state_key", None),
+                        event.prev_event_ids(),
+                    )
+                    for event in reverse_chronological_events
+                ],
+            )
+
             await self._process_pulled_events(
                 dest,
                 # Expecting to persist in chronological order here (oldest ->
@@ -869,13 +900,14 @@ class FederationEventHandler:
         sorted_events = sorted(events, key=lambda x: x.depth)
 
         logger.info(
-            "backfill sorted_events=%s",
+            "_process_pulled_events backfill sorted_events=%s",
             json.dumps(
                 [
-                    "event_id=%s,depth=%d,body=%s(%s),prevs=%s\n"
+                    "event_id=%s,depth=%d,stream_ordering=%s,body=%s(%s),prevs=%s\n"
                     % (
                         event.event_id,
                         event.depth,
+                        event.internal_metadata.stream_ordering,
                         event.content.get("body", event.type),
                         getattr(event, "state_key", None),
                         event.prev_event_ids(),

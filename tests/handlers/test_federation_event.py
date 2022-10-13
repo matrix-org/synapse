@@ -1222,6 +1222,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             if event.internal_metadata.outlier:
                 self.fail("Our pristine events should not be marked as an outlier")
 
+        # TODO: We currently don't set the `stream_ordering` on `pulled_events` here
+        # like we normally would via `backfill(..._` before passing it off to
+        # `_process_pulled_events(...)`
         self.get_success(
             self.hs.get_federation_event_handler()._process_pulled_events(
                 self.OTHER_SERVER_NAME,
