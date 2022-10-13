@@ -336,11 +336,12 @@ oidc_providers:
        issuer: "https://accounts.google.com/"
        client_id: "your-client-id" # TO BE FILLED
        client_secret: "your-client-secret" # TO BE FILLED
-       scopes: ["openid", "profile"]
+       scopes: ["openid", "profile", "email"] # email is optional, read below
        user_mapping_provider:
          config:
            localpart_template: "{{ user.given_name|lower }}"
            display_name_template: "{{ user.name }}"
+           email_template: "{{ user.email }}" # needs "email" in scopes above
    ```
 4. Back in the Google console, add this Authorized redirect URI: `[synapse
    public baseurl]/_synapse/client/oidc/callback`.
@@ -423,7 +424,7 @@ Synapse config:
     user_mapping_provider:
       config:
         display_name_template: "{{ user.name }}"
-        email_template: "{{ '{{ user.email }}' }}"
+        email_template: "{{ user.email }}"
 ```
 
 Relevant documents:
