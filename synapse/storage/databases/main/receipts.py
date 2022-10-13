@@ -416,10 +416,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
             event_entry = room_event["content"].setdefault(row["event_id"], {})
             receipt_type = event_entry.setdefault(row["receipt_type"], {})
-            if row["thread_id"]:
-                receipt_type[row["user_id"]]["thread_id"] = row["thread_id"]
 
             receipt_type[row["user_id"]] = db_to_json(row["data"])
+            if row["thread_id"]:
+                receipt_type[row["user_id"]]["thread_id"] = row["thread_id"]
 
         results = {
             room_id: [results[room_id]] if room_id in results else []
