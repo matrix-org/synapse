@@ -88,9 +88,11 @@ shared configuration file.
 ### Shared configuration
 
 Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an "HTTP replication
-listener" for the main process; and secondly, you need to enable redis-based
-replication. Optionally, a shared secret can be used to authenticate HTTP
+file suitable for use with workers. First, you need to enable an
+["HTTP replication listener"](usage/configuration/config_documentation.html#listeners)
+for the main process; and secondly, you need to enable
+[redis-based replication](usage/configuration/config_documentation.html#redis).
+Optionally, a shared secret can be used to authenticate HTTP
 traffic between workers. For example:
 
 ```yaml
@@ -111,7 +113,8 @@ redis:
     enabled: true
 ```
 
-See the [configuration manual](usage/configuration/config_documentation.html) for the full documentation of each option.
+See the [configuration manual](usage/configuration/config_documentation.html)
+for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; replication traffic is:
@@ -123,15 +126,14 @@ public internet; replication traffic is:
 ### Worker configuration
 
 In the config file for each worker, you must specify:
- * The type of worker ([`worker_app`](usage/configuration/config_documentation.md#worker_app)).
-   The currently available worker applications are listed below.
- * A unique name for the worker ([`worker_name`](usage/configuration/config_documentation.md#worker_name)).
+ * The type of worker ([`worker_app`](#worker_app)).
+   The currently available worker applications are listed [below](#available-worker-applications).
+ * A unique name for the worker ([`worker_name`](#worker_name)).
  * The HTTP replication endpoint that it should talk to on the main synapse process
-   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
-   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port))
- * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners)
-   option with an `http` listener, in the same way as the
-   [`listeners`](usage/configuration/config_documentation.md#listeners) option in the shared config.
+   ([`worker_replication_host`](#worker_replication_host) and
+   [`worker_replication_http_port`](#worker_replication_http_port)).
+ * If handling HTTP requests, a [`worker_listeners`](#worker_listeners) option
+   with an `http` listener.
  * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`).
 
@@ -148,6 +150,99 @@ plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
 Obviously you should configure your reverse-proxy to route the relevant
 endpoints to the worker (`localhost:8083` in the above example).
 
+---
+#### `worker_app`
+
+The type of worker. The currently available worker applications are listed
+[below](#available-worker-applications).
+
+The most common worker is the `synapse.app.generic_worker`.
+
+Example configuration:
+```yaml
+worker_app: synapse.app.generic_worker
+```
+---
+#### `worker_name`
+
+A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files.
+
+Example configuration:
+```yaml
+worker_name: generic_worker1
+```
+---
+#### `worker_replication_host`
+
+The HTTP replication endpoint that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_host: 127.0.0.1
+```
+---
+#### `worker_replication_http_port`
+
+The HTTP replication port that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](usage/configuration/config_documentation.html#listeners).
+
+Example configuration:
+```yaml
+worker_replication_http_port: 9093
+```
+---
+#### `worker_listeners`
+
+A worker can handle HTTP requests. If handling HTTP requests, a `worker_listeners`
+option with an http listener, in the same way as the
+[`listeners` option](usage/configuration/config_documentation.html#listeners)
+in the shared config.
+
+Example configuration:
+```yaml
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+```
+---
+#### `worker_daemonize`
+
+Specifies whether the worker should be daemonize. If [systemd](systemd-with-workers/README.md)
+is used, this must not configured. Systemd manages daemonization itself. Defaults to `false`.
+
+Example configuration:
+```yaml
+worker_daemonize: true
+```
+---
+#### `worker_pid_file`
+
+When running Synapse worker as a daemon, the file to store the pid in. Defaults to none.
+This is the same way as the[`pid_file` option](usage/configuration/config_documentation.html#pid_file)
+in the shared config.
+
+Example configuration:
+```yaml
+worker_pid_file: DATADIR/generic_worker1.pid
+```
+---
+#### `worker_log_config`
+
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
+This is the same way as the [`log_config` option](usage/configuration/config_documentation.html#log_config)
+in the shared config.
+
+Example configuration:
+```yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+```
 
 ### Running Synapse with workers
 

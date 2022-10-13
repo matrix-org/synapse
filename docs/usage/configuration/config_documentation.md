@@ -159,7 +159,7 @@ including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
 reverse proxy, this should be the URL to reach Synapse via the proxy.
 Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
-'listeners' below).
+['listeners'](#listeners) below).
 
 Defaults to `https://<server_name>/`.
 
@@ -3673,55 +3673,14 @@ opentracing:
 ---
 ## Workers ##
 Configuration options related to workers.
+Workers are used to scale horizontally and distribute the load to different processes.
 
-Please also note the [further documentation for workers](../../workers.md).
+These switches are all for the shared configuration to give the main process
+the necessary information. The configuration of the workers is described
+in detail in the [worker documentation](../../workers.md).
 
 ---
-### `worker_app`
-
-The type of worker. The currently available worker applications are listed
-in [worker documentation](../../workers.md#available-worker-applications).
-
-The most common worker is the `synapse.app.generic_worker`.
-
-Example configuration:
-```yaml
-worker_app: synapse.app.generic_worker
-```
----
-### `worker_name`
-
-A unique name for the worker. The worker needs a name to be addressed in
-further parameters and identification in log files.
-
-Example configuration:
-```yaml
-worker_name: generic_worker1
-```
----
-### `worker_replication_host`
-
-The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_host: 127.0.0.1
-```
----
-### `worker_replication_http_port`
-
-The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_http_port: 9093
-```
----
-### `worker_replication_secret`
+#### `worker_replication_secret`
 
 A shared secret used by the replication APIs to authenticate HTTP requests
 from workers.
@@ -3731,52 +3690,6 @@ By default this is unused and traffic is not authenticated.
 Example configuration:
 ```yaml
 worker_replication_secret: "secret_secret"
-```
----
-### `worker_listeners`
-
-A worker can handle HTTP requests. If handling HTTP requests, a `worker_listeners`
-option with an http listener, in the same way as the [`listeners` option](#listeners)
-in the shared config.
-
-Example configuration:
-```yaml
-worker_listeners:
-  - type: http
-    port: 8083
-    resources:
-      - names: [client, federation]
-```
----
-### `worker_daemonize`
-
-Specifies whether the worker should be daemonize. If [systemd](../../systemd-with-workers/README.md)
-is used, this must not configured. Systemd manages daemonization itself. Defaults to `false`.
-
-Example configuration:
-```yaml
-worker_daemonize: true
-```
----
-### `worker_pid_file`
-
-When running Synapse worker as a daemon, the file to store the pid in. Defaults to none.
-This is the same way as the [`pid_file` option](#pid_file) in the shared config.
-
-Example configuration:
-```yaml
-worker_pid_file: DATADIR/generic_worker1.pid
-```
----
-### `worker_log_config`
-
-This option specifies a yaml python logging config file as described
-[here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
-This is the same way as the [`log_config` option](#log_config) in the shared config.
-
-Example configuration:
-```yaml
-worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
 ---
 ### `start_pushers`
@@ -3791,8 +3704,9 @@ start_pushers: false
 ---
 ### `pusher_instances`
 
-It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher), in which case the
-work is balanced across them. Use this setting to list the pushers by [`worker_name`](#worker_name).
+It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
+in which case the work is balanced across them. Use this setting to list the pushers by
+[`worker_name`](../../workers.md#worker_name).
 
 If only one pusher worker is configured, this setting is not necessary.
 
@@ -3816,8 +3730,9 @@ send_federation: false
 ---
 ### `federation_sender_instances`
 
-It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders.
+It is possible to run multiple
+[federation sender worker](../../workers.md#synapseappfederation_sender), in which
+case the work is balanced across them. Use this setting to list the senders.
 
 This configuration setting must be shared between all federation sender workers, and if
 changed all federation sender workers must be stopped at the same time and then
@@ -3834,6 +3749,7 @@ federation_sender_instances:
 
 When using workers this should be a map from worker name to the
 HTTP replication listener of the worker, if configured.
+Not every type of worker needs a HTTP replications listener.
 
 Example configuration:
 ```yaml
@@ -3869,8 +3785,7 @@ run_background_tasks_on: worker1
 ---
 ### `redis`
 
-Configuration for Redis when using workers. This *must* be enabled when
-using workers (unless using old style direct TCP configuration).
+Configuration for Redis when using workers. This *must* be enabled when using workers.
 This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
