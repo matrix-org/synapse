@@ -297,9 +297,15 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             sql = f"""
             UPDATE {table_name}
             SET thread_id = 'main'
-            WHERE stream_ordering <= ? AND thread_id IS NULL
+            WHERE ? < stream_ordering AND stream_ordering <= ? AND thread_id IS NULL
             """
-            txn.execute(sql, (max_stream_ordering,))
+            txn.execute(
+                sql,
+                (
+                    start_stream_ordering,
+                    max_stream_ordering,
+                ),
+            )
 
             # Update progress.
             processed_rows = txn.rowcount
