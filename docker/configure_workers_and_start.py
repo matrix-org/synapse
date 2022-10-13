@@ -400,8 +400,8 @@ def generate_worker_files(
         # No workers, just the main process
         worker_types = []
     else:
-        # Split type names by comma
-        worker_types = worker_types_env.split(",")
+        # Split type names by comma, remove extra whitespace, sometimes it's there.
+        worker_types = [x.strip() for x in worker_types_env.split(",")]
 
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
