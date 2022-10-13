@@ -138,7 +138,7 @@ class RelationsWorkerStore(SQLBaseStore):
             if isinstance(txn.database_engine, PostgresEngine):
                 txn.execute_values(sql % ("?",), rows, fetch=False)
             else:
-                txn.execute_batch(sql % ("?, ?, ?, ?, ?",), rows)
+                txn.execute_batch(sql % ("(?, ?, ?, ?, ?)",), rows)
 
             # Mark the progress.
             self.db_pool.updates._background_update_progress_txn(
