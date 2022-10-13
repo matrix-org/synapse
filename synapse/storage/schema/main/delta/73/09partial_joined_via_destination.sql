@@ -15,5 +15,4 @@
 
 -- When we resync partial state, we prioritise doing so using the server we
 -- partial-joined from. To do this we need to record which server that was!
--- Both columns are backwards compatible.
 ALTER TABLE partial_state_rooms ADD COLUMN joined_via TEXT;
