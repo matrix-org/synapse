@@ -13,15 +13,22 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+from pydantic import StrictStr
 
 from twisted.web.server import Request
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import (
+    RestServlet,
+    parse_and_validate_json_object_from_request,
+    parse_json_object_from_request,
+)
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
+from synapse.rest.models import RequestBodyModel
 from synapse.types import JsonDict, RoomAlias
 
 if TYPE_CHECKING:
@@ -54,6 +61,12 @@ class ClientDirectoryServer(RestServlet):
 
         return 200, res
 
+    class PutBody(RequestBodyModel):
+        # TODO: get Pydantic to validate that this is a valid room id?
+        room_id: StrictStr
+        # `servers` is unspecced
+        servers: Optional[List[StrictStr]] = None
+
     async def on_PUT(
         self, request: SynapseRequest, room_alias: str
     ) -> Tuple[int, JsonDict]:
@@ -61,31 +74,22 @@ class ClientDirectoryServer(RestServlet):
             raise SynapseError(400, "Room alias invalid", errcode=Codes.INVALID_PARAM)
         room_alias_obj = RoomAlias.from_string(room_alias)
 
-        content = parse_json_object_from_request(request)
-        if "room_id" not in content:
-            raise SynapseError(
-                400, 'Missing params: ["room_id"]', errcode=Codes.BAD_JSON
-            )
+        content = parse_and_validate_json_object_from_request(request, self.PutBody)
 
         logger.debug("Got content: %s", content)
         logger.debug("Got room name: %s", room_alias_obj.to_string())
 
-        room_id = content["room_id"]
-        servers = content["servers"] if "servers" in content else None
+        logger.debug("Got room_id: %s", content.room_id)
+        logger.debug("Got servers: %s", content.servers)
 
-        logger.debug("Got room_id: %s", room_id)
-        logger.debug("Got servers: %s", servers)
-
-        # TODO(erikj): Check types.
-
-        room = await self.store.get_room(room_id)
+        room = await self.store.get_room(content.room_id)
         if room is None:
             raise SynapseError(400, "Room does not exist")
 
         requester = await self.auth.get_user_by_req(request)
 
         await self.directory_handler.create_association(
-            requester, room_alias_obj, room_id, servers
+            requester, room_alias_obj, content.room_id, content.servers
         )
 
         return 200, {}
