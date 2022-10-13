@@ -112,6 +112,7 @@ RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-tool
 # arm64 builds consume a lot of memory if `CARGO_NET_GIT_FETCH_WITH_CLI` is not
 # set to true, so we expose it as a build-arg.
 ARG CARGO_NET_GIT_FETCH_WITH_CLI
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=$CARGO_NET_GIT_FETCH_WITH_CLI
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
