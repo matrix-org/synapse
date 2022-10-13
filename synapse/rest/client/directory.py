@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from pydantic import StrictStr
+from typing_extensions import Literal
 
 from twisted.web.server import Request
 
@@ -141,16 +142,18 @@ class ClientDirectoryListServer(RestServlet):
 
         return 200, {"visibility": "public" if room["is_public"] else "private"}
 
+    class PutBody(RequestBodyModel):
+        visibility: Literal["public", "private"] = "public"
+
     async def on_PUT(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        content = parse_json_object_from_request(request)
-        visibility = content.get("visibility", "public")
+        content = parse_and_validate_json_object_from_request(request, self.PutBody)
 
         await self.directory_handler.edit_published_room_list(
-            requester, room_id, visibility
+            requester, room_id, content.visibility
         )
 
         return 200, {}

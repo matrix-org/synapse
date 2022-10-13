@@ -16,6 +16,8 @@ import logging
 import string
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
+from typing_extensions import Literal
+
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
@@ -429,7 +431,10 @@ class DirectoryHandler:
         return await self.auth.check_can_change_room_list(room_id, requester)
 
     async def edit_published_room_list(
-        self, requester: Requester, room_id: str, visibility: str
+        self,
+        requester: Requester,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Edit the entry of the room in the published room list.
 
@@ -450,9 +455,6 @@ class DirectoryHandler:
 
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
-
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
 
         if visibility == "public" and not self.enable_room_list_search:
             # The room list has been disabled.
