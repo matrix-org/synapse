@@ -82,11 +82,7 @@ class RelationPaginationServlet(RestServlet):
 
 
 class ThreadsServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"
-        ),
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"),)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
