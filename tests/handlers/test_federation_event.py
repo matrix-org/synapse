@@ -38,6 +38,10 @@ from tests import unittest
 from tests.test_utils import event_injection, make_awaitable
 from tests.test_utils.event_injection import create_event, inject_event
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
     servlets = [
@@ -1053,6 +1057,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             )
         )
         _add_to_known_event_list(maria_membership_event, historical_state_events)
+        logger.info("maria_membership_event=%s", maria_membership_event.event_id)
 
         historical_state_events.append(maria_membership_event)
         historical_state_event_ids.append(maria_membership_event.event_id)
@@ -1207,9 +1212,6 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         #     # Latest in the room (newest messages)
         # ]
 
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.info(
             "pulled_events=%s",
             json.dumps(
