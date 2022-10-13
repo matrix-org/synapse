@@ -876,7 +876,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         def _debug_event_string(event: EventBase) -> str:
             debug_body = event.content.get("body", event.type)
             maybe_state_key = getattr(event, "state_key", None)
-            return f"event_id={event.event_id},depth={event.depth},body={debug_body}({maybe_state_key}),prevs={event.prev_event_ids()}"
+            return f"event_id={event.event_id},depth={event.depth},stream_ordering={event.internal_metadata.stream_ordering},body={debug_body}({maybe_state_key}),prevs={event.prev_event_ids()}"
 
         known_event_dict: Dict[str, Tuple[EventBase, List[EventBase]]] = {}
 
