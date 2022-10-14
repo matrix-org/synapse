@@ -50,7 +50,7 @@ jobs:
       - name: Build and push all platforms
         uses: docker/build-push-action@v3
         with:
-          # push: true
+          push: true
           labels: "gitsha1=${{ github.sha }}"
           tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
