@@ -269,11 +269,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         event_push_actions_done = progress.get("event_push_actions_done", False)
 
         def add_thread_id_txn(
-            txn: LoggingTransaction, table_name: str, start_stream_ordering: int
+            txn: LoggingTransaction, start_stream_ordering: int
         ) -> int:
             sql = f"""
             SELECT stream_ordering
-            FROM {table_name}
+            FROM event_push_actions
             WHERE
                 thread_id IS NULL
                 AND stream_ordering > ?
@@ -285,7 +285,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             # No more rows to process.
             rows = txn.fetchall()
             if not rows:
-                progress[f"{table_name}_done"] = True
+                progress["event_push_actions_done"] = True
                 self.db_pool.updates._background_update_progress_txn(
                     txn, "event_push_backfill_thread_id", progress
                 )
@@ -294,8 +294,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             # Update the thread ID for any of those rows.
             max_stream_ordering = rows[-1][0]
 
-            sql = f"""
-            UPDATE {table_name}
+            sql = """
+            UPDATE event_push_actions
             SET thread_id = 'main'
             WHERE ? < stream_ordering AND stream_ordering <= ? AND thread_id IS NULL
             """
@@ -309,7 +309,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             # Update progress.
             processed_rows = txn.rowcount
-            progress[f"max_{table_name}_stream_ordering"] = max_stream_ordering
+            progress["max_event_push_actions_stream_ordering"] = max_stream_ordering
             self.db_pool.updates._background_update_progress_txn(
                 txn, "event_push_backfill_thread_id", progress
             )
