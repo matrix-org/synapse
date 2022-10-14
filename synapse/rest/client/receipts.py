@@ -130,7 +130,7 @@ class ReceiptRestServlet(RestServlet):
 
         It is valid to send a receipt for thread A on A, B, C, D, or E.
 
-        It is valid to send a receipt for the main thread on A, D, and E.
+        It is valid to send a receipt for the main timeline on A, D, and E.
 
         Args:
             event_id: The event ID to check.
