@@ -25,7 +25,6 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     parse_and_validate_json_object_from_request,
-    parse_json_object_from_request,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
@@ -170,12 +169,14 @@ class ClientAppserviceDirectoryListServer(RestServlet):
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
+    class PutBody(RequestBodyModel):
+        visibility: Literal["public", "private"] = "public"
+
     async def on_PUT(
         self, request: SynapseRequest, network_id: str, room_id: str
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-        visibility = content.get("visibility", "public")
-        return await self._edit(request, network_id, room_id, visibility)
+        content = parse_and_validate_json_object_from_request(request, self.PutBody)
+        return await self._edit(request, network_id, room_id, content.visibility)
 
     async def on_DELETE(
         self, request: SynapseRequest, network_id: str, room_id: str
@@ -183,7 +184,11 @@ class ClientAppserviceDirectoryListServer(RestServlet):
         return await self._edit(request, network_id, room_id, "private")
 
     async def _edit(
-        self, request: SynapseRequest, network_id: str, room_id: str, visibility: str
+        self,
+        request: SynapseRequest,
+        network_id: str,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         if not requester.app_service:
