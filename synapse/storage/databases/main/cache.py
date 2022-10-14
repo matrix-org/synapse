@@ -245,6 +245,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_relations_for_event", (redacts,))
             self._attempt_to_invalidate_cache("get_applicable_edit", (redacts,))
             self._attempt_to_invalidate_cache("get_thread_id", (redacts,))
+            self._attempt_to_invalidate_cache("get_thread_id_for_receipts", (redacts,))
 
         if etype == EventTypes.Member:
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
