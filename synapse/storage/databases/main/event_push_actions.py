@@ -320,37 +320,35 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             min_user_id = progress.get("max_summary_user_id", "")
             min_room_id = progress.get("max_summary_room_id", "")
 
+            # Slightly overcomplicated query for getting the Nth user ID / room
+            # ID tuple, or the last if there are less than N remaining.
             sql = """
-            SELECT user_id, room_id FROM event_push_summary
-            WHERE (user_id, room_id) > (?, ?)
-                AND thread_id IS NULL
-            ORDER BY user_id, room_id
+            SELECT user_id, room_id FROM (
+                SELECT user_id, room_id FROM event_push_summary
+                WHERE (user_id, room_id) > (?, ?)
+                    AND thread_id IS NULL
+                ORDER BY user_id, room_id
+                LIMIT ?
+            ) AS e
+            ORDER BY user_id DESC, room_id DESC
             LIMIT 1
-            OFFSET ?
             """
 
             txn.execute(sql, (min_user_id, min_room_id, batch_size))
             row = txn.fetchone()
+            if not row:
+                return 0
 
-            # Calculate an upper bound. If the previous query doesn't return
-            # anything then we are almost at the end and process any remaining
-            # rows.
-            upper_bound = ""
-            upper_bound_args = []
-            if row:
-                max_user_id, max_room_id = row
-
-                upper_bound = "AND (user_id, room_id) <= (?, ?)"
-                upper_bound_args = [max_user_id, max_room_id]
+            max_user_id, max_room_id = row
 
             sql = f"""
             UPDATE event_push_summary
             SET thread_id = 'main'
             WHERE
-                (?, ?) < (user_id, room_id) {upper_bound}
+                (?, ?) < (user_id, room_id) AND (user_id, room_id) <= (?, ?)
                 AND thread_id IS NULL
             """
-            txn.execute(sql, [min_user_id, min_room_id] + upper_bound_args)
+            txn.execute(sql, (min_user_id, min_room_id, max_user_id, max_room_id))
             processed_rows = txn.rowcount
 
             progress["max_summary_user_id"] = max_user_id
