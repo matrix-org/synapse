@@ -341,7 +341,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             max_user_id, max_room_id = row
 
-            sql = f"""
+            sql = """
             UPDATE event_push_summary
             SET thread_id = 'main'
             WHERE
