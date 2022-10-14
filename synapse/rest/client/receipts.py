@@ -137,7 +137,7 @@ class ReceiptRestServlet(RestServlet):
             thread_id: The thread ID the event is potentially part of.
 
         Returns:
-            True if the event belongs to the given thread.
+            True if the event belongs to the given thread, otherwise False.
         """
 
         # If the receipt is on the main timeline, it is enough to check whether
