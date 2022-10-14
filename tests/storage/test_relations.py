@@ -38,7 +38,7 @@ class RelationsStoreTestCase(unittest.HomeserverTestCase):
         self._create_relation("A", "B", "m.thread")
         self._create_relation("B", "C", "m.annotation")
         self._create_relation("A", "D", "m.reference")
-        self._create_relation("A", "E", "m.annotation")
+        self._create_relation("D", "E", "m.annotation")
         self._create_relation("F", "G", "m.annotation")
 
     def _create_relation(self, parent_id: str, event_id: str, rel_type: str) -> None:
