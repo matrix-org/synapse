@@ -55,6 +55,8 @@ jobs:
           tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64
-          build-args:
-            # arm64 builds OOM otherwise. c.f. https://github.com/rust-lang/cargo/issues/10583
-            CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+          # arm64 builds OOM without the git fetch setting. c.f.
+          # https://github.com/rust-lang/cargo/issues/10583
+          build-args: |
+            CARGO_NET_GIT_FETCH_WITH_CLI=true
