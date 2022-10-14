@@ -39,6 +39,7 @@
 # continue to work if so.
 
 import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -630,6 +631,14 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         # Mark workers as being configured
         with open(mark_filepath, "w") as f:
             f.write("")
+
+    # Lifted right out of start.py
+    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
+
+    if os.path.isfile(jemallocpath):
+        environ["LD_PRELOAD"] = jemallocpath
+    else:
+        log("Could not find %s, will not use" % (jemallocpath,))
 
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
