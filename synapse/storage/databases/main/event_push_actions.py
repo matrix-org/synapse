@@ -340,7 +340,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             UPDATE event_push_summary
             SET thread_id = 'main'
             WHERE
-                (?, ?) < (user_id, room_id) AND (user_id, room_id) < (?, ?)
+                (?, ?) < (user_id, room_id) AND (user_id, room_id) <= (?, ?)
                 AND thread_is IS NULL
             """
             txn.execute(sql, (min_user_id, min_room_id, max_user_id, max_room_id))
