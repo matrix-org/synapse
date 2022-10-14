@@ -363,7 +363,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             result = await self.db_pool.runInteraction(
                 "event_push_backfill_thread_id",
                 add_thread_id_txn,
-                "event_push_actions",
                 progress.get("max_event_push_actions_stream_ordering", 0),
             )
         else:
