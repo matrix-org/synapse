@@ -946,8 +946,17 @@ class RelationsWorkerStore(SQLBaseStore):
         Get the thread ID for an event. This considers multi-level relations,
         e.g. an annotation to an event which is part of a thread.
 
-        It only searches up the relations tree, i.e. it only considers events
-        which are the parent of the given event.
+        It only searches up the relations tree, i.e. it only searches for events
+        which the given event is related to (and which those events are related
+        to, etc.)
+
+        Given the following DAG:
+
+            A <---[m.thread]-- B <--[m.annotation]-- C
+            ^
+            |--[m.reference]-- D <--[m.annotation]-- E
+
+        get_thread_id(X) considers events B and C as part of thread A.
 
         See also get_thread_id_for_receipts.
 
@@ -959,8 +968,13 @@ class RelationsWorkerStore(SQLBaseStore):
             of a thread. "main", otherwise.
         """
 
-        # Since event relations form a tree, we should only ever find 0 or 1
-        # results from the below query.
+        # Recurse event relations up to the *root* event, then search that chain
+        # of relations for a thread relation. If one is found, the root event is
+        # returned.
+        #
+        # Note that this should only ever find 0 or 1 entries since it is invalid
+        # for an event to have a thread relation to an event which also has a
+        # relation.
         sql = """
             WITH RECURSIVE related_events AS (
                 SELECT event_id, relates_to_id, relation_type, 0 depth
@@ -1013,8 +1027,13 @@ class RelationsWorkerStore(SQLBaseStore):
             of a thread. "main", otherwise.
         """
 
-        # Recurse up to the *root* node, then select relations of that to
-        # see if there are thread children.
+        # Recurse event relations up to the *root* event, then search for any events
+        # related to that root node for a thread relation. If one is found, the
+        # root event is returned.
+        #
+        # Note that there cannot be thread relations in the middle of the chain since
+        # it is invalid for an event to have a thread relation to an event which also
+        # has a relation.
         sql = """
         SELECT relates_to_id FROM event_relations WHERE relates_to_id = COALESCE((
             WITH RECURSIVE related_events AS (

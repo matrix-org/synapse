@@ -114,12 +114,12 @@ class ReceiptRestServlet(RestServlet):
         The event must be related to the thread ID (in a vague sense) to ensure
         clients aren't sending bogus receipts.
 
-        A thread ID is considered valid if:
+        A thread ID is considered valid for a given event E if:
 
-        1. The event has a thread relation which matches the thread ID.
-        2. The event has children events which form a thread relation (i.e. the
-           event is a thread root).
-        3. The event is related to an event (recursively, up to a point) which
+        1. E has a thread relation which matches the thread ID;
+        2. E has another event which has a thread relation to E matching the
+           thread ID; or
+        3. E is recursively related (via any rel_type) to an event which
            satisfies 1 or 2.
 
         Given the following DAG:
