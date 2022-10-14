@@ -316,6 +316,44 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             return processed_rows
 
+        def add_thread_id_summary_txn(txn: LoggingTransaction) -> int:
+            min_user_id = progress.get("max_summary_user_id", "")
+            min_room_id = progress.get("max_summary_room_id", "")
+
+            sql = """
+            SELECT user_id, room_id FROM event_push_summary
+            WHERE (user_id, room_id) > (?, ?)
+                AND thread_id IS NULL
+            ORDER BY user_id, room_id
+            LIMIT 1
+            OFFSET ?
+            """
+
+            txn.execute(sql, (min_user_id, min_room_id, batch_size))
+            row = txn.fetchone()
+            if not row:
+                return 0
+
+            max_user_id, max_room_id = row
+
+            sql = """
+            UPDATE event_push_summary
+            SET thread_id = 'main'
+            WHERE
+                (?, ?) < (user_id, room_id) AND (user_id, room_id) < (?, ?)
+                AND thread_is IS NULL
+            """
+            txn.execute(sql, (min_user_id, min_room_id, max_user_id, max_room_id))
+            processed_rows = txn.rowcount
+
+            progress["max_summary_user_id"] = max_user_id
+            progress["max_summary_room_id"] = max_room_id
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "event_push_backfill_thread_id", progress
+            )
+
+            return processed_rows
+
         # First update the event_push_actions table, then the event_push_summary table.
         #
         # Note that the event_push_actions_staging table is ignored since it is
@@ -331,9 +369,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         else:
             result = await self.db_pool.runInteraction(
                 "event_push_backfill_thread_id",
-                add_thread_id_txn,
-                "event_push_summary",
-                progress.get("max_event_push_summary_stream_ordering", 0),
+                add_thread_id_summary_txn,
             )
 
             # Only done after the event_push_summary table is done.
