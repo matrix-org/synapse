@@ -271,7 +271,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         def add_thread_id_txn(
             txn: LoggingTransaction, start_stream_ordering: int
         ) -> int:
-            sql = f"""
+            sql = """
             SELECT stream_ordering
             FROM event_push_actions
             WHERE
