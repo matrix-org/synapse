@@ -643,11 +643,12 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
     log("Starting supervisord")
-    os.execl(
+    os.execle(
         "/usr/local/bin/supervisord",
         "supervisord",
         "-c",
         "/etc/supervisor/supervisord.conf",
+        environ,
     )
 
 
