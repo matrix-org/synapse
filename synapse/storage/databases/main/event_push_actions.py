@@ -348,7 +348,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             SET thread_id = 'main'
             WHERE
                 (?, ?) < (user_id, room_id) {upper_bound}
-                AND thread_is IS NULL
+                AND thread_id IS NULL
             """
             txn.execute(sql, [min_user_id, min_room_id] + upper_bound_args)
             processed_rows = txn.rowcount
