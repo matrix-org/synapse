@@ -119,7 +119,8 @@ class ReceiptRestServlet(RestServlet):
         1. The event has a thread relation which matches the thread ID.
         2. The event has children events which form a thread relation (i.e. the
            event is a thread root).
-        2. The event is related to an event (recursively) which satisfies 1 or 2.
+        3. The event is related to an event (recursively, up to a point) which
+           satisfies 1 or 2.
 
         Given the following DAG:
 
