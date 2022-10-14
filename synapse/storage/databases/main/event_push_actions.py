@@ -331,19 +331,26 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             txn.execute(sql, (min_user_id, min_room_id, batch_size))
             row = txn.fetchone()
-            if not row:
-                return 0
 
-            max_user_id, max_room_id = row
+            # Calculate an upper bound. If the previous query doesn't return
+            # anything then we are almost at the end and process any remaining
+            # rows.
+            upper_bound = ""
+            upper_bound_args = []
+            if row:
+                max_user_id, max_room_id = row
 
-            sql = """
+                upper_bound = "AND (user_id, room_id) <= (?, ?)"
+                upper_bound_args = [max_user_id, max_room_id]
+
+            sql = f"""
             UPDATE event_push_summary
             SET thread_id = 'main'
             WHERE
-                (?, ?) < (user_id, room_id) AND (user_id, room_id) <= (?, ?)
+                (?, ?) < (user_id, room_id) {upper_bound}
                 AND thread_is IS NULL
             """
-            txn.execute(sql, (min_user_id, min_room_id, max_user_id, max_room_id))
+            txn.execute(sql, [min_user_id, min_room_id] + upper_bound_args)
             processed_rows = txn.rowcount
 
             progress["max_summary_user_id"] = max_user_id
