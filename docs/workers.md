@@ -204,6 +204,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
     ^/_matrix/client/v1/rooms/.*/hierarchy$
     ^/_matrix/client/(v1|unstable)/rooms/.*/relations/
+    ^/_matrix/client/v1/rooms/.*/threads$
     ^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(r0|v3|unstable)/account/3pid$

@@ -82,11 +82,7 @@ class RelationPaginationServlet(RestServlet):
 
 
 class ThreadsServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc3856/rooms/(?P<room_id>[^/]*)/threads"
-        ),
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"),)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -126,5 +122,4 @@ class ThreadsServlet(RestServlet):
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RelationPaginationServlet(hs).register(http_server)
-    if hs.config.experimental.msc3856_enabled:
-        ThreadsServlet(hs).register(http_server)
+    ThreadsServlet(hs).register(http_server)
