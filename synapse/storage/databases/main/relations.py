@@ -1000,7 +1000,8 @@ class RelationsWorkerStore(SQLBaseStore):
             ^
             |--[m.reference]-- D <--[m.annotation]-- E
 
-        It considers A, B, C, D, and E as part of the thread.
+        get_thread_id_for_receipts(X) considers events A, B, C, D, and E as part
+        of thread A.
 
         See also get_thread_id.
 

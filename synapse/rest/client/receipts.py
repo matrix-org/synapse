@@ -83,7 +83,7 @@ class ReceiptRestServlet(RestServlet):
                 )
 
             # Ensure the event ID roughly correlates to the thread ID.
-            if not await self._is_valid_thread_id(event_id, thread_id):
+            if not await self._is_event_in_thread(event_id, thread_id):
                 raise SynapseError(
                     400,
                     f"event_id {event_id} is not related to thread {thread_id}",
@@ -109,11 +109,10 @@ class ReceiptRestServlet(RestServlet):
 
         return 200, {}
 
-    async def _is_valid_thread_id(self, event_id: str, thread_id: str) -> bool:
+    async def _is_event_in_thread(self, event_id: str, thread_id: str) -> bool:
         """
-        The thread ID provided must relate (in a vague sense) to the event ID.
-
-        We check this to ensure clients aren't sending bogus receipts.
+        The event must be related to the thread ID (in a vague sense) to ensure
+        clients aren't sending bogus receipts.
 
         A thread ID is considered valid if:
 
