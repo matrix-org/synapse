@@ -1,1 +1,1 @@
-Fix [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) Comlement test flake by making sure we the event returned by `/timestamp_to_event` is backfillfed first.
+Fix [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) `/timestamp_to_event` endpoint not backfilling found local event which could be an `outlier`.
