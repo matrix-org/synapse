@@ -1724,7 +1724,7 @@ class FederationHandler:
                     except FederationPullAttemptBackoffError as exc:
                         # Log a warning about why we failed to process the event (the error message
                         # for `FederationPullAttemptBackoffError` is pretty good)
-                        logger.warning("_sync_partial_state_room: " + str(exc))
+                        logger.warning("_sync_partial_state_room: %s", exc)
                         # We do not record a failed pull attempt when we backoff fetching a missing
                         # `prev_event` because not being able to fetch the `prev_events` just means
                         # we won't be able to de-outlier the pulled event. But we can still use an
