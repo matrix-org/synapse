@@ -156,6 +156,7 @@ class RedirectException(CodeMessageException):
 class SynapseError(CodeMessageException):
     """A base exception type for matrix errors which have an errcode and error
     message (as well as an HTTP status code).
+    TODO
 
     Attributes:
         errcode: Matrix error code e.g 'M_FORBIDDEN'
@@ -602,6 +603,7 @@ def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
 class FederationError(RuntimeError):
     """This class is used to inform remote homeservers about erroneous
     PDUs they sent us.
+    TODO
 
     FATAL: The remote server could not interpret the source event.
         (e.g., it was missing a required field)
