@@ -13,7 +13,7 @@ import jinja2
 
 # Utility functions
 def log(txt: str) -> None:
-    print(txt, file=sys.stderr)
+    print(txt, flush=True)
 
 
 def error(txt: str) -> NoReturn:

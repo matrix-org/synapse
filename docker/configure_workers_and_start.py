@@ -235,7 +235,7 @@ def log(txt: str) -> None:
     Args:
         txt: The text to log.
     """
-    print(txt)
+    print(txt, flush=True)
 
 
 def error(txt: str) -> NoReturn:
