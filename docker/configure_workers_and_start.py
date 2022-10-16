@@ -50,7 +50,12 @@ from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
-
+# Workers with exposed endpoints needs either "client", "federation", or "media" listener_resources
+# Watching /_matrix/client needs a "client" listener
+# Watching /_matrix/federation needs a "federation" listener
+# Watching /_matrix/media and related needs a "media" listener
+# Stream Writers require "client" and "replication" listeners because they
+#   have to attach by instance_map to the master process and have client endpoints.
 WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     "pusher": {
         "app": "synapse.app.pusher",
@@ -208,6 +213,49 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "worker_main_http_uri: http://127.0.0.1:%d"
             % (MAIN_PROCESS_HTTP_LISTENER_PORT,)
         ),
+    },
+    "account_data": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client", "replication"],
+        "endpoint_patterns": [
+            "^/_matrix/client/(r0|v3|unstable)/.*/tags",
+            "^/_matrix/client/(r0|v3|unstable)/.*/account_data",
+        ],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "presence": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client", "replication"],
+        "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|v3|unstable)/presence/"],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "receipts": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client", "replication"],
+        "endpoint_patterns": [
+            "^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt",
+            "^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers",
+        ],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "to_device": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client", "replication"],
+        "endpoint_patterns": ["^/_matrix/client/(r0|v3|unstable)/sendToDevice/"],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "typing": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client", "replication"],
+        "endpoint_patterns": [
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing"
+        ],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
     },
 }
 
