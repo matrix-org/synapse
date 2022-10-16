@@ -9,6 +9,7 @@ echo "  Args: $@"
 echo "  Env: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE"
 echo "  Env: SYNAPSE_COMPLEMENT_USE_WORKERS=$SYNAPSE_COMPLEMENT_USE_WORKERS"
 echo "  Env: SYNAPSE_WORKER_TYPES=$SYNAPSE_WORKER_TYPES"
+echo "  NOTE: if using the backward compatibility mode, worker types aren't declared yet."
 
 function log {
     d=$(date +"%Y-%m-%d %H:%M:%S,%3N")
@@ -46,8 +47,36 @@ esac
 
 
 if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
+  # Specify the workers to test with
+  # Allow overriding by explicitly setting SYNAPSE_WORKER_TYPES outside, while still
+  # utilizing WORKERS=1 for backwards compatibility.
+  # -n True if the length of string is non-zero.
+  # -z True if the length of string is zero.
+  if [[ -z "$SYNAPSE_WORKER_TYPES" ]]; then
+    export SYNAPSE_WORKER_TYPES="\
+      event_persister, \
+      event_persister, \
+      background_worker, \
+      frontend_proxy, \
+      event_creator, \
+      user_dir, \
+      media_repository, \
+      federation_inbound, \
+      federation_reader, \
+      federation_sender, \
+      synchrotron, \
+      appservice, \
+      account_data, \
+      to_device, \
+      pusher"
+
+    log "Workers now declared: $SYNAPSE_WORKER_TYPES"
+  fi
   # Improve startup times by using a launcher based on fork()
   export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
+else
+  # Empty string here means 'main process only'
+  export SYNAPSE_WORKER_TYPES=""
 fi
 
 
