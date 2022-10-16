@@ -363,6 +363,20 @@ def add_sharding_to_shared_config(
             "port": worker_port,
         }
 
+    elif worker_type in ["account_data", "presence", "receipts", "to_device", "typing"]:
+        # Update the list of stream writers
+        # It's convienent that the name of the worker type is the same as the event stream
+        shared_config.setdefault("stream_writers", {}).setdefault(
+            worker_type, []
+        ).append(worker_name)
+
+        # Map of stream writer instance names to host/ports combos
+        # For now, all stream writers need http replication ports
+        instance_map[worker_name] = {
+            "host": "localhost",
+            "port": worker_port,
+        }
+
     elif worker_type == "media_repository":
         # The first configured media worker will run the media background jobs
         shared_config.setdefault("media_instance_running_background_jobs", worker_name)
