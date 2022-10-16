@@ -149,6 +149,7 @@ jobs:
       trial_test_matrix: ${{ steps.get-matrix.outputs.trial_test_matrix }}
       sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
       complement_test_matrix: ${{ steps.get-matrix.outputs.complement_test_matrix }}
+      complement_backwards_compatibility_test_matrix: ${{ steps.get-matrix.outputs.complement_backwards_compatibility_test_matrix }}
 
   trial:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
@@ -458,7 +459,44 @@ jobs:
         env:
           POSTGRES: ${{ (matrix.job.database == 'Postgres') && 1 || '' }}
           WORKERS: ${{ (matrix.job.arrangement == 'workers') && 1 || '' }}
-          WORKER_TYPES: ${{ matrix.worker_types }}
+          WORKER_TYPES: ${{ matrix.job.worker_types }}
+        run: |
+          set -o pipefail
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+
+  back-compat:
+    name: "Backwards Compatibility Test"
+    if: "${{ !failure() && !cancelled() }}"
+    needs: calculate-test-jobs
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        job: ${{ fromJson(needs.calculate-test-jobs.outputs.complement_backwards_compatibility_test_matrix) }}
+
+    steps:
+      - name: Run actions/checkout@v3 for synapse
+        uses: actions/checkout@v3
+        with:
+          path: synapse
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.58.1
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prepare Complement's Prerequisites
+        run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      - name: Run Complement Tests
+        shell: bash
+        env:
+          POSTGRES: ${{ (matrix.job.database == 'Postgres') && 1 || '' }}
+          WORKERS: ${{ (matrix.job.arrangement == 'workers') && 1 || '' }}
+          WORKER_TYPES: ${{ matrix.job.worker_types }}
         run: |
           set -o pipefail
           COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt

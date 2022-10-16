@@ -163,9 +163,28 @@ complement_test_jobs = [
     },
 ]
 
+# Testing for backwards compatibility mode. It's a simple matter of just NOT putting in
+# a worker_types string. It will resolve to an empty string on the other side.
+
+complement_backwards_compatibility_tests = [
+    {
+        "database": "Postgres",
+        "arrangement": "workers",
+    }
+]
+
 print("::group::Calculated complement job with workers")
 print(json.dumps(complement_test_jobs, indent=4))
 print("::endgroup::")
 
+print("::group::Calculated backwards compatibility complement job with workers")
+print(json.dumps(complement_backwards_compatibility_tests, indent=4))
+print("::endgroup::")
+
 test_matrix = json.dumps(complement_test_jobs)
 print(f"::set-output name=complement_test_matrix::{test_matrix}")
+
+test_matrix = json.dumps(complement_backwards_compatibility_tests)
+print(
+    f"::set-output name=complement_backwards_compatibility_test_matrix::{test_matrix}"
+)
