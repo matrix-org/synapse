@@ -1,4 +1,4 @@
-name: Tests
+name: Complement Tests
 
 on:
 #  push:
@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   calculate-test-jobs:
+    name: "Calculate Test Jobs"
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +25,7 @@ jobs:
 #      sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
 
   complement:
+    name: Complement
     if: "${{ !failure() && !cancelled() }}"
     needs: calculate-test-jobs
     runs-on: ubuntu-latest
@@ -65,6 +67,7 @@ jobs:
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
+    name: Tests Done
     if: ${{ always() }}
     needs:
       - complement
