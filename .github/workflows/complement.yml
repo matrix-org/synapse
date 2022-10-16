@@ -4,6 +4,7 @@ on:
 #  push:
 #    branches: ["develop", "release-*"]
 #  pull_request:
+# Note: this will only work if this test exists on default branch, which is 'develop'
   workflow_dispatch:
 
 concurrency:
@@ -21,11 +22,13 @@ jobs:
       - id: get-matrix
         run: .ci/scripts/calculate_jobs.py
     outputs:
-#      trial_test_matrix: ${{ steps.get-matrix.outputs.trial_test_matrix }}
-#      sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
+#      complement_singles_test_matrix: ${{ steps.get-matrix.outputs.complement_singles_test_matrix}}
+#      complement_sharding_test_matrix: ${{ steps.get-matrix.outputs.complement_sharding_test_matrix}}
+#      complement_stream_writers_test_matrix: ${{ steps.get-matrix.outputs.complement_stream_writers_test_matrix}}
+      complement_test_matrix: ${{ steps.get-matrix.outputs.complement_test_matrix }}
 
   complement:
-    name: Complement
+    name: Defaults
     if: "${{ !failure() && !cancelled() }}"
     needs: calculate-test-jobs
     runs-on: ubuntu-latest
@@ -33,15 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arrangement: monolith
-            database: SQLite
-
-          - arrangement: monolith
-            database: Postgres
-
-          - arrangement: workers
-            database: Postgres
+        job: ${{ fromJson(needs.calculate-test-jobs.outputs.complement_test_matrix) }}
 
     steps:
       - name: Run actions/checkout@v3 for synapse
@@ -59,11 +54,16 @@ jobs:
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
-      - run: |
-          set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+      - name: Run Complement Tests
         shell: bash
-        name: Run Complement Tests
+        env:
+          POSTGRES: ${{ (matrix.job.database == 'Postgres') && 1 || '' }}
+          WORKERS: ${{ (matrix.job.arrangement == 'workers') && 1 || '' }}
+          SYNAPSE_WORKER_TYPES: ${{ matrix.worker_types }}
+        run: |
+          set -o pipefail
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
