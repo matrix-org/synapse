@@ -1646,7 +1646,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         self,
         user: UserID,
         from_key: RoomStreamToken,
-        limit: Optional[int],
+        limit: int,
         room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
