@@ -509,11 +509,11 @@ def generate_worker_files(
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
-        if worker_type_total_count > 1:
-            # Update the shared config with sharding-related options if necessary
-            add_sharding_to_shared_config(
-                shared_config, worker_type, worker_name, worker_port
-            )
+
+        # Update the shared config with sharding-related options if necessary
+        add_sharding_to_shared_config(
+            shared_config, worker_type, worker_name, worker_port
+        )
 
         # Enable the worker in supervisord
         worker_descriptors.append(worker_config)
