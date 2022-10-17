@@ -230,7 +230,8 @@ upstream {upstream_worker_type} {{
 
 # Utility functions
 def log(txt: str) -> None:
-    """Log something to the stdout.
+    """
+    Log something to the stdout.
 
     Args:
         txt: The text to log.
@@ -239,13 +240,22 @@ def log(txt: str) -> None:
 
 
 def error(txt: str) -> NoReturn:
-    """Log something and exit with an error code.
+    """
+    Log something to the stderr and exit with an error code.
 
     Args:
         txt: The text to log in error.
     """
-    log(txt)
+    print(txt, file=sys.stderr)
     sys.exit(2)
+
+
+def flush_buffers() -> None:
+    """
+    Flush stdout and stderr buffers
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def convert(src: str, dst: str, **template_vars: object) -> None:
@@ -642,6 +652,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
     log("Starting supervisord")
+    flush_buffers()
     os.execle(
         "/usr/local/bin/supervisord",
         "supervisord",

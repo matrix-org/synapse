@@ -13,12 +13,32 @@ import jinja2
 
 # Utility functions
 def log(txt: str) -> None:
-    print(txt, file=sys.stderr)
+    """
+    Log something to the stdout.
+
+    Args:
+        txt: The text to log.
+    """
+    print(txt)
 
 
 def error(txt: str) -> NoReturn:
-    log(txt)
+    """
+    Log something to the stderr and exit with an error code.
+
+    Args:
+        txt: The text to log in error.
+    """
+    print(txt, file=sys.stderr)
     sys.exit(2)
+
+
+def flush_buffers() -> None:
+    """
+    Flush stdout and stderr buffers
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def convert(src: str, dst: str, environ: Mapping[str, object]) -> None:
@@ -185,6 +205,7 @@ def run_generate_config(environ: Mapping[str, str], ownership: Optional[str]) ->
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
+    flush_buffers()
     os.execv(sys.executable, args)
 
 
@@ -267,8 +288,10 @@ running with 'migrate_config'. See the README for more details.
     args = [sys.executable] + args
     if ownership is not None:
         args = ["gosu", ownership] + args
+        flush_buffers()
         os.execve("/usr/sbin/gosu", args, environ)
     else:
+        flush_buffers()
         os.execve(sys.executable, args, environ)
 
 
