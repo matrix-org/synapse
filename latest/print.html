@@ -350,7 +350,7 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 </code></pre>
 <h4 id="nixos"><a class="header" href="#nixos">NixOS</a></h4>
 <p>Robin Lambertz has packaged Synapse for NixOS at:
-<a href="https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix">https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix</a></p>
+<a href="https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix">https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix</a></p>
 <h3 id="installing-as-a-python-module-from-pypi"><a class="header" href="#installing-as-a-python-module-from-pypi">Installing as a Python module from PyPI</a></h3>
 <p>It's also possible to install Synapse as a Python module from PyPI.</p>
 <p>When following this route please make sure that the <a href="setup/installation.html#platform-specific-prerequisites">Platform-specific prerequisites</a> are already installed.</p>
@@ -1624,6 +1624,57 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1690"><a class="header" href="#upgrading-to-v1690">Upgrading to v1.69.0</a></h1>
+<h2 id="changes-to-the-receipts-replication-streams"><a class="header" href="#changes-to-the-receipts-replication-streams">Changes to the receipts replication streams</a></h2>
+<p>Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.</p>
+<p>Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.</p>
+<h2 id="deprecation-of-legacy-prometheus-metric-names"><a class="header" href="#deprecation-of-legacy-prometheus-metric-names">Deprecation of legacy Prometheus metric names</a></h2>
+<p>In current versions of Synapse, some Prometheus metrics are emitted under two different names,
+with one of the names being older but non-compliant with OpenMetrics and Prometheus conventions
+and one of the names being newer but compliant.</p>
+<p>Synapse v1.71.0 will turn the old metric names off <em>by default</em>.
+For administrators that still rely on them and have not had chance to update their
+uses of the metrics, it's possible to specify <code>enable_legacy_metrics: true</code> in
+the configuration to re-enable them temporarily.</p>
+<p>Synapse v1.73.0 will <strong>remove legacy metric names altogether</strong> and it will no longer
+be possible to re-enable them.</p>
+<p>The Grafana dashboard, Prometheus recording rules and Prometheus Consoles included
+in the <code>contrib</code> directory in the Synapse repository have been updated to no longer
+rely on the legacy names. These can be used on a current version of Synapse
+because current versions of Synapse emit both old and new names.</p>
+<p>You may need to update your alerting rules or any other rules that depend on
+the names of Prometheus metrics.
+If you want to test your changes before legacy names are disabled by default,
+you may specify <code>enable_legacy_metrics: false</code> in your homeserver configuration.</p>
+<p>A list of affected metrics is available on the <a href="https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12">Metrics How-to page</a>.</p>
+<h2 id="deprecation-of-the-generate_short_term_login_token-module-api-method"><a class="header" href="#deprecation-of-the-generate_short_term_login_token-module-api-method">Deprecation of the <code>generate_short_term_login_token</code> module API method</a></h2>
+<p>The following method of the module API has been deprecated, and is scheduled to
+be remove in v1.71.0:</p>
+<pre><code class="language-python">def generate_short_term_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: str = &quot;&quot;,
+    auth_provider_session_id: Optional[str] = None,
+) -&gt; str:
+    ...
+</code></pre>
+<p>It has been replaced by an asynchronous equivalent:</p>
+<pre><code class="language-python">async def create_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: Optional[str] = None,
+    auth_provider_session_id: Optional[str] = None,
+) -&gt; str:
+    ...
+</code></pre>
+<p>Synapse will log a warning when a module uses the deprecated method, to help
+administrators find modules using it.</p>
 <h1 id="upgrading-to-v1680"><a class="header" href="#upgrading-to-v1680">Upgrading to v1.68.0</a></h1>
 <p>Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.</p>
 <h2 id="sqlite-version-requirement"><a class="header" href="#sqlite-version-requirement">SQLite version requirement</a></h2>
@@ -3369,7 +3420,7 @@ be inconvenient in some environments.</p>
 option configures Synapse to serve a file at <code>https://&lt;server_name&gt;/.well-known/matrix/server</code>.
 This will tell other servers to send traffic to port 443 instead.</p>
 <p>This option currently defaults to false.</p>
-<p>See https://matrix-org.github.io/synapse/latest/delegate.html for more
+<p>See <a href="usage/configuration/../../delegate.html">Delegation of incoming federation traffic</a> for more
 information.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">serve_server_wellknown: true
@@ -5046,6 +5097,8 @@ as a publicly joinable room when the first user registers for the
 homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.</p>
+<p>As Spaces are just rooms under the hood, Space aliases may also be
+used.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">auto_join_rooms:
   - &quot;#exampleroom:example.com&quot;
@@ -5055,7 +5108,7 @@ relating to auto-joining rooms below.</p>
 <h3 id="autocreate_auto_join_rooms"><a class="header" href="#autocreate_auto_join_rooms"><code>autocreate_auto_join_rooms</code></a></h3>
 <p>Where <code>auto_join_rooms</code> are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.</p>
+homeserver registers. This option will not create Spaces.</p>
 <p>By default the auto-created rooms are publicly joinable from any federated
 server. Use the <code>autocreate_auto_join_rooms_federated</code> and
 <code>autocreate_auto_join_room_preset</code> settings to customise this behaviour.</p>
@@ -5067,7 +5120,7 @@ users cannot be auto-joined since they do not exist.</p>
 </code></pre>
 <hr />
 <h3 id="autocreate_auto_join_rooms_federated"><a class="header" href="#autocreate_auto_join_rooms_federated"><code>autocreate_auto_join_rooms_federated</code></a></h3>
-<p>Whether the rooms listen in <code>auto_join_rooms</code> that are auto-created are available
+<p>Whether the rooms listed in <code>auto_join_rooms</code> that are auto-created are available
 via federation. Only has an effect if <code>autocreate_auto_join_rooms</code> is true.</p>
 <p>Note that whether a room is federated cannot be modified after
 creation.</p>
@@ -5190,6 +5243,24 @@ Defaults to false.</p>
 <pre><code class="language-yaml">enable_metrics: true
 </code></pre>
 <hr />
+<h3 id="enable_legacy_metrics"><a class="header" href="#enable_legacy_metrics"><code>enable_legacy_metrics</code></a></h3>
+<p>Set to <code>true</code> to publish both legacy and non-legacy Prometheus metric names,
+or to <code>false</code> to only publish non-legacy Prometheus metric names.
+Defaults to <code>true</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
+<strong>In Synapse v1.71.0, this will default to <code>false</code> before being removed in Synapse v1.73.0.</strong></p>
+<p>Legacy metric names include:</p>
+<ul>
+<li>metrics containing colons in the name, such as <code>synapse_util_caches_response_cache:hits</code>, because colons are supposed to be reserved for user-defined recording rules;</li>
+<li>counters that don't end with the <code>_total</code> suffix, such as <code>synapse_federation_client_sent_edus</code>, therefore not adhering to the OpenMetrics standard.</li>
+</ul>
+<p>These legacy metric names are unconventional and not compliant with OpenMetrics standards.
+They are included for backwards compatibility.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">enable_legacy_metrics: false
+</code></pre>
+<p>See https://github.com/matrix-org/synapse/issues/11106 for context.</p>
+<p><em>Since v1.67.0.</em></p>
+<h2 id="will-be-removed-in-v1730"><a class="header" href="#will-be-removed-in-v1730"><strong>Will be removed in v1.73.0.</strong></a></h2>
 <h3 id="sentry"><a class="header" href="#sentry"><code>sentry</code></a></h3>
 <p>Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
 with the <code>dsn</code> setting.</p>
@@ -5676,7 +5747,7 @@ sub-properties:</p>
 <li>
 <p><code>module</code>: The class name of a custom mapping module. Default is
 <code>synapse.handlers.oidc.JinjaOidcMappingProvider</code>.
-See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
+See <a href="usage/configuration/../../sso_mapping_providers.html#openid-mapping-providers">OpenID Mapping Providers</a>
 for information on implementing a custom mapping provider.</p>
 </li>
 <li>
@@ -6113,23 +6184,29 @@ will also not affect rooms created by other servers.</p>
 <p>This setting defines options related to the user directory.</p>
 <p>This option has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>:  Defines whether users can search the user directory. If false then
-empty responses are returned to all queries. Defaults to true.</li>
-<li><code>search_all_users</code>: Defines whether to search all users visible to your HS when searching
+<li>
+<p><code>enabled</code>:  Defines whether users can search the user directory. If false then
+empty responses are returned to all queries. Defaults to true.</p>
+</li>
+<li>
+<p><code>search_all_users</code>: Defines whether to search all users visible to your HS when searching
 the user directory. If false, search results will only contain users
 visible in public rooms and users sharing a room with the requester.
-Defaults to false.
-NB. If you set this to true, and the last time the user_directory search
+Defaults to false.</p>
+<p>NB. If you set this to true, and the last time the user_directory search
 indexes were (re)built was before Synapse 1.44, you'll have to
-rebuild the indexes in order to search through all known users.
-These indexes are built the first time Synapse starts; admins can
-manually trigger a rebuild via API following the instructions at
-https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
-Set to true to return search results containing all known users, even if that
-user does not share a room with the requester.</li>
-<li><code>prefer_local_users</code>: Defines whether to prefer local users in search query results.
+rebuild the indexes in order to search through all known users.</p>
+<p>These indexes are built the first time Synapse starts; admins can
+manually trigger a rebuild via the API following the instructions
+<a href="usage/configuration/../administration/admin_api/background_updates.html#run">for running background updates</a>,
+set to true to return search results containing all known users, even if that
+user does not share a room with the requester.</p>
+</li>
+<li>
+<p><code>prefer_local_users</code>: Defines whether to prefer local users in search query results.
 If set to true, local users are more likely to appear above remote users when searching the
-user directory. Defaults to false.</li>
+user directory. Defaults to false.</p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">user_directory:
@@ -7567,8 +7644,8 @@ for the user. Commonly the <code>sub</code> claim of the response.</li>
 <li>This method must be async.</li>
 <li>Arguments:
 <ul>
-<li><code>userinfo</code> - A <code>authlib.oidc.core.claims.UserInfo</code> object to extract user
-information from.</li>
+<li><code>userinfo</code> - An <a href="https://docs.authlib.org/en/latest/specs/oidc.html#authlib.oidc.core.UserInfo"><code>authlib.oidc.core.claims.UserInfo</code></a>
+object to extract user information from.</li>
 <li><code>token</code> - A dictionary which includes information necessary to make
 further requests to the OpenID provider.</li>
 <li><code>failures</code> - An <code>int</code> that represents the amount of times the returned
@@ -7588,7 +7665,13 @@ with failures=1. The method should then return a different
 <code>None</code>, the user is prompted to pick their own username. This is only used
 during a user's first login. Once a localpart has been associated with a
 remote user ID (see <code>get_remote_user_id</code>) it cannot be updated.</li>
-<li><code>displayname</code>: An optional string, the display name for the user.</li>
+<li><code>confirm_localpart</code>: A boolean. If set to <code>True</code>, when a <code>localpart</code>
+string is returned from this method, Synapse will prompt the user to
+either accept this localpart or pick their own username. Otherwise this
+option has no effect. If omitted, defaults to <code>False</code>.</li>
+<li><code>display_name</code>: An optional string, the display name for the user.</li>
+<li><code>emails</code>: A list of strings, the email address(es) to associate with
+this user. If omitted, defaults to an empty list.</li>
 </ul>
 </li>
 </ul>
@@ -9820,7 +9903,8 @@ public internet; replication traffic is:</p>
 <li>The HTTP replication endpoint that it should talk to on the main synapse process
 (<code>worker_replication_host</code> and <code>worker_replication_http_port</code>)</li>
 <li>If handling HTTP requests, a <code>worker_listeners</code> option with an <code>http</code>
-listener, in the same way as the <code>listeners</code> option in the shared config.</li>
+listener, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code></a>
+option in the shared config.</li>
 <li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>).</li>
 </ul>
@@ -9975,8 +10059,9 @@ using):</p>
 For multiple workers not handling the SSO endpoints properly, see
 <a href="https://github.com/matrix-org/synapse/issues/7530">#7530</a> and
 <a href="https://github.com/matrix-org/synapse/issues/9427">#9427</a>.</p>
-<p>Note that a HTTP listener with <code>client</code> and <code>federation</code> resources must be
-configured in the <code>worker_listeners</code> option in the worker config.</p>
+<p>Note that a <a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a>
+with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the <code>worker_listeners</code>
+option in the worker config.</p>
 <h4 id="load-balancing"><a class="header" href="#load-balancing">Load balancing</a></h4>
 <p>It is possible to run multiple instances of this worker app, with incoming requests
 being load-balanced between them by the reverse-proxy. However, different endpoints
@@ -10006,7 +10091,8 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 <h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
 <p>Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.</p>
-<p>To enable this, the worker must have a HTTP replication listener configured,
+<p>To enable this, the worker must have a
+<a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
 have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
 can handle multiple streams, but unless otherwise documented, each stream can only
 have a single writer.</p>
@@ -10089,7 +10175,7 @@ the stream writer for the <code>presence</code> stream:</p>
 <p>There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
-stats is enabled).</p>
+stats is enabled). This worker doesn't handle any REST endpoints itself.</p>
 <p>To enable this, the worker must have a <code>worker_name</code> and can be configured to run
 background tasks. For example, to move background tasks to a dedicated worker,
 the shared configuration would include:</p>
@@ -10123,8 +10209,9 @@ it to the chosen user directory worker.</p>
 <p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
 worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
-<p>You can designate one generic worker to send output traffic to Application Services.</p>
-<p>Specify its name in the shared configuration as follows:</p>
+<p>You can designate one generic worker to send output traffic to Application Services.
+Doesn't handle any REST endpoints itself, but you should specify its name in the
+shared configuration as follows:</p>
 <pre><code class="language-yaml">notify_appservices_from_worker: worker_name
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
@@ -10176,14 +10263,23 @@ For example:</p>
 file to stop the main synapse running background jobs related to managing the
 media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.</p>
-<p>In the <code>media_repository</code> worker configuration file, configure the http listener to
+<p>In the <code>media_repository</code> worker configuration file, configure the
+<a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a> to
 expose the <code>media</code> resource. For example:</p>
-<pre><code class="language-yaml">worker_listeners:
- - type: http
-   port: 8085
-   resources:
-     - names:
-       - media
+<pre><code class="language-yaml">worker_app: synapse.app.media_repository
+worker_name: media_worker
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 8085
+    resources:
+      - names: [media]
+
+worker_log_config: /etc/matrix-synapse/media-worker-log.yaml
 </code></pre>
 <p>Note that if running multiple media repositories they must be on the same server
 and you must configure a single instance to run the background tasks, e.g.:</p>
@@ -10932,7 +11028,7 @@ a purge id:</p>
 non-interactive way. This is generally used for bootstrapping a Synapse
 instance with administrator accounts.</p>
 <p>To authenticate yourself to the server, you will need both the shared secret
-(<a href="admin_api/../configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>
+(<a href="admin_api/../usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>
 in the homeserver configuration), and a one-time nonce. If the registration
 shared secret is not configured, this API is not enabled.</p>
 <p>To fetch the nonce, you need to request one from the API:</p>
@@ -13713,7 +13809,9 @@ The labels are used to group graphs in grafana.</p>
 <p>Synapse 1.2 updates the Prometheus metrics to match the naming
 convention of the upstream <code>prometheus_client</code>. The old names are
 considered deprecated and will be removed in a future version of
-Synapse.</p>
+Synapse.
+<strong>The old names will be disabled by default in Synapse v1.71.0 and removed
+altogether in Synapse v1.73.0.</strong></p>
 <table><thead><tr><th>New Name</th><th>Old Name</th></tr></thead><tbody>
 <tr><td>python_gc_objects_collected_total</td><td>python_gc_objects_collected</td></tr>
 <tr><td>python_gc_objects_uncollectable_total</td><td>python_gc_objects_uncollectable</td></tr>
@@ -13723,6 +13821,13 @@ Synapse.</p>
 <tr><td>synapse_federation_client_events_processed_total</td><td>synapse_federation_client_events_processed</td></tr>
 <tr><td>synapse_event_processing_loop_count_total</td><td>synapse_event_processing_loop_count</td></tr>
 <tr><td>synapse_event_processing_loop_room_count_total</td><td>synapse_event_processing_loop_room_count</td></tr>
+<tr><td>synapse_util_caches_cache_hits</td><td>synapse_util_caches_cache:hits</td></tr>
+<tr><td>synapse_util_caches_cache_size</td><td>synapse_util_caches_cache:size</td></tr>
+<tr><td>synapse_util_caches_cache_evicted_size</td><td>synapse_util_caches_cache:evicted_size</td></tr>
+<tr><td>synapse_util_caches_cache</td><td>synapse_util_caches_cache:total</td></tr>
+<tr><td>synapse_util_caches_response_cache_size</td><td>synapse_util_caches_response_cache:size</td></tr>
+<tr><td>synapse_util_caches_response_cache_hits</td><td>synapse_util_caches_response_cache:hits</td></tr>
+<tr><td>synapse_util_caches_response_cache_evicted_size</td><td>synapse_util_caches_response_cache:evicted_size</td></tr>
 <tr><td>synapse_util_metrics_block_count_total</td><td>synapse_util_metrics_block_count</td></tr>
 <tr><td>synapse_util_metrics_block_time_seconds_total</td><td>synapse_util_metrics_block_time_seconds</td></tr>
 <tr><td>synapse_util_metrics_block_ru_utime_seconds_total</td><td>synapse_util_metrics_block_ru_utime_seconds</td></tr>
@@ -13822,7 +13927,7 @@ they are replacing.</p>
 <h2 id="standard-metric-names"><a class="header" href="#standard-metric-names">Standard Metric Names</a></h2>
 <p>As of synapse version 0.18.2, the format of the process-wide metrics has
 been changed to fit prometheus standard naming conventions. Additionally
-the units have been changed to seconds, from miliseconds.</p>
+the units have been changed to seconds, from milliseconds.</p>
 <table><thead><tr><th>New name</th><th>Old name</th></tr></thead><tbody>
 <tr><td>process_cpu_user_seconds_total</td><td>process_resource_utime / 1000</td></tr>
 <tr><td>process_cpu_system_seconds_total</td><td>process_resource_stime / 1000</td></tr>
@@ -14489,6 +14594,9 @@ Make sure that you have saved all your files.</p>
 <p>The unit tests run parts of Synapse, including your changes, to see if anything
 was broken. They are slower than the linters but will typically catch more errors.</p>
 <pre><code class="language-sh">poetry run trial tests
+</code></pre>
+<p>You can run unit tests in parallel by specifying <code>-jX</code> argument to <code>trial</code> where <code>X</code> is the number of parallel runners you want. To use 4 cpu cores, you would run them like:</p>
+<pre><code class="language-sh">poetry run trial -j4 tests
 </code></pre>
 <p>If you wish to only run <em>some</em> unit tests, you may specify
 another module instead of <code>tests</code> - or a test class or a method:</p>
@@ -15374,21 +15482,21 @@ in Python, evaluates to <code>True</code>.</p>
 </li>
 </ul>
 <h2 id="event_id-global-uniqueness"><a class="header" href="#event_id-global-uniqueness"><code>event_id</code> global uniqueness</a></h2>
-<p>In room versions <code>1</code> and <code>2</code> it's possible to end up with two events with the
-same <code>event_id</code> (in the same or different rooms). After room version <code>3</code>, that
-can only happen with a hash collision, which we basically hope will never
-happen.</p>
-<p>There are several places in Synapse and even Matrix APIs like <a href="https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid"><code>GET /_matrix/federation/v1/event/{eventId}</code></a>
-where we assume that event IDs are globally unique.</p>
-<p>But hash collisions are still possible, and by treating event IDs as room
-scoped, we can reduce the possibility of a hash collision. When scoping
-<code>event_id</code> in the database schema, it should be also accompanied by <code>room_id</code>
-(<code>PRIMARY KEY (room_id, event_id)</code>) and lookups should be done through the pair
-<code>(room_id, event_id)</code>.</p>
-<p>There has been a lot of debate on this in places like
-https://github.com/matrix-org/matrix-spec-proposals/issues/2779 and
+<p><code>event_id</code>'s can be considered globally unique although there has been a lot of
+debate on this topic in places like
+<a href="https://github.com/matrix-org/matrix-spec-proposals/issues/2779">MSC2779</a> and
 <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/2848">MSC2848</a> which
-has no resolution yet (as of 2022-09-01).</p>
+has no resolution yet (as of 2022-09-01). There are several places in Synapse
+and even in the Matrix APIs like <a href="https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid"><code>GET /_matrix/federation/v1/event/{eventId}</code></a>
+where we assume that event IDs are globally unique.</p>
+<p>When scoping <code>event_id</code> in a database schema, it is often nice to accompany it
+with <code>room_id</code> (<code>PRIMARY KEY (room_id, event_id)</code> and a <code>FOREIGN KEY(room_id) REFERENCES rooms(room_id)</code>) which makes flexible lookups easy. For example it
+makes it very easy to find and clean up everything in a room when it needs to be
+purged (no need to use sub-<code>select</code> query or join from the <code>events</code> table).</p>
+<p>A note on collisions: In room versions <code>1</code> and <code>2</code> it's possible to end up with
+two events with the same <code>event_id</code> (in the same or different rooms). After room
+version <code>3</code>, that can only happen with a hash collision, which we basically hope
+will never happen (SHA256 has a massive big key space).</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="implementing-experimental-features-in-synapse"><a class="header" href="#implementing-experimental-features-in-synapse">Implementing experimental features in Synapse</a></h1>
 <p>It can be desirable to implement &quot;experimental&quot; features which are disabled by
 default and must be explicitly enabled via the Synapse configuration. This is

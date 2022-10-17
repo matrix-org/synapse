@@ -288,7 +288,7 @@ be inconvenient in some environments.</p>
 option configures Synapse to serve a file at <code>https://&lt;server_name&gt;/.well-known/matrix/server</code>.
 This will tell other servers to send traffic to port 443 instead.</p>
 <p>This option currently defaults to false.</p>
-<p>See https://matrix-org.github.io/synapse/latest/delegate.html for more
+<p>See <a href="../../delegate.html">Delegation of incoming federation traffic</a> for more
 information.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">serve_server_wellknown: true
@@ -1965,6 +1965,8 @@ as a publicly joinable room when the first user registers for the
 homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.</p>
+<p>As Spaces are just rooms under the hood, Space aliases may also be
+used.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">auto_join_rooms:
   - &quot;#exampleroom:example.com&quot;
@@ -1974,7 +1976,7 @@ relating to auto-joining rooms below.</p>
 <h3 id="autocreate_auto_join_rooms"><a class="header" href="#autocreate_auto_join_rooms"><code>autocreate_auto_join_rooms</code></a></h3>
 <p>Where <code>auto_join_rooms</code> are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.</p>
+homeserver registers. This option will not create Spaces.</p>
 <p>By default the auto-created rooms are publicly joinable from any federated
 server. Use the <code>autocreate_auto_join_rooms_federated</code> and
 <code>autocreate_auto_join_room_preset</code> settings to customise this behaviour.</p>
@@ -1986,7 +1988,7 @@ users cannot be auto-joined since they do not exist.</p>
 </code></pre>
 <hr />
 <h3 id="autocreate_auto_join_rooms_federated"><a class="header" href="#autocreate_auto_join_rooms_federated"><code>autocreate_auto_join_rooms_federated</code></a></h3>
-<p>Whether the rooms listen in <code>auto_join_rooms</code> that are auto-created are available
+<p>Whether the rooms listed in <code>auto_join_rooms</code> that are auto-created are available
 via federation. Only has an effect if <code>autocreate_auto_join_rooms</code> is true.</p>
 <p>Note that whether a room is federated cannot be modified after
 creation.</p>
@@ -2109,6 +2111,24 @@ Defaults to false.</p>
 <pre><code class="language-yaml">enable_metrics: true
 </code></pre>
 <hr />
+<h3 id="enable_legacy_metrics"><a class="header" href="#enable_legacy_metrics"><code>enable_legacy_metrics</code></a></h3>
+<p>Set to <code>true</code> to publish both legacy and non-legacy Prometheus metric names,
+or to <code>false</code> to only publish non-legacy Prometheus metric names.
+Defaults to <code>true</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
+<strong>In Synapse v1.71.0, this will default to <code>false</code> before being removed in Synapse v1.73.0.</strong></p>
+<p>Legacy metric names include:</p>
+<ul>
+<li>metrics containing colons in the name, such as <code>synapse_util_caches_response_cache:hits</code>, because colons are supposed to be reserved for user-defined recording rules;</li>
+<li>counters that don't end with the <code>_total</code> suffix, such as <code>synapse_federation_client_sent_edus</code>, therefore not adhering to the OpenMetrics standard.</li>
+</ul>
+<p>These legacy metric names are unconventional and not compliant with OpenMetrics standards.
+They are included for backwards compatibility.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">enable_legacy_metrics: false
+</code></pre>
+<p>See https://github.com/matrix-org/synapse/issues/11106 for context.</p>
+<p><em>Since v1.67.0.</em></p>
+<h2 id="will-be-removed-in-v1730"><a class="header" href="#will-be-removed-in-v1730"><strong>Will be removed in v1.73.0.</strong></a></h2>
 <h3 id="sentry"><a class="header" href="#sentry"><code>sentry</code></a></h3>
 <p>Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
 with the <code>dsn</code> setting.</p>
@@ -2595,7 +2615,7 @@ sub-properties:</p>
 <li>
 <p><code>module</code>: The class name of a custom mapping module. Default is
 <code>synapse.handlers.oidc.JinjaOidcMappingProvider</code>.
-See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
+See <a href="../../sso_mapping_providers.html#openid-mapping-providers">OpenID Mapping Providers</a>
 for information on implementing a custom mapping provider.</p>
 </li>
 <li>
@@ -3032,23 +3052,29 @@ will also not affect rooms created by other servers.</p>
 <p>This setting defines options related to the user directory.</p>
 <p>This option has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>:  Defines whether users can search the user directory. If false then
-empty responses are returned to all queries. Defaults to true.</li>
-<li><code>search_all_users</code>: Defines whether to search all users visible to your HS when searching
+<li>
+<p><code>enabled</code>:  Defines whether users can search the user directory. If false then
+empty responses are returned to all queries. Defaults to true.</p>
+</li>
+<li>
+<p><code>search_all_users</code>: Defines whether to search all users visible to your HS when searching
 the user directory. If false, search results will only contain users
 visible in public rooms and users sharing a room with the requester.
-Defaults to false.
-NB. If you set this to true, and the last time the user_directory search
+Defaults to false.</p>
+<p>NB. If you set this to true, and the last time the user_directory search
 indexes were (re)built was before Synapse 1.44, you'll have to
-rebuild the indexes in order to search through all known users.
-These indexes are built the first time Synapse starts; admins can
-manually trigger a rebuild via API following the instructions at
-https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
-Set to true to return search results containing all known users, even if that
-user does not share a room with the requester.</li>
-<li><code>prefer_local_users</code>: Defines whether to prefer local users in search query results.
+rebuild the indexes in order to search through all known users.</p>
+<p>These indexes are built the first time Synapse starts; admins can
+manually trigger a rebuild via the API following the instructions
+<a href="../administration/admin_api/background_updates.html#run">for running background updates</a>,
+set to true to return search results containing all known users, even if that
+user does not share a room with the requester.</p>
+</li>
+<li>
+<p><code>prefer_local_users</code>: Defines whether to prefer local users in search query results.
 If set to true, local users are more likely to appear above remote users when searching the
-user directory. Defaults to false.</li>
+user directory. Defaults to false.</p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">user_directory:
