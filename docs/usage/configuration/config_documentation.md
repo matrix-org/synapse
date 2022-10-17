@@ -2088,7 +2088,7 @@ set.
 
 This is primarily intended for use with the `register_new_matrix_user` script
 (see [Registering a user](../../setup/installation.md#registering-a-user));
-however, the interface is [documented](../admin_api/register_api.html).
+however, the interface is [documented](../../admin_api/register_api.html).
 
 See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
