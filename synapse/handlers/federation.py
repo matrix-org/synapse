@@ -45,6 +45,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     FederationError,
+    FederationPullAttemptBackoffError,
     HttpResponseException,
     LimitExceededError,
     NotFoundError,
@@ -782,15 +783,27 @@ class FederationHandler:
 
         # Send the signed event back to the room, and potentially receive some
         # further information about the room in the form of partial state events
-        stripped_room_state = await self.federation_client.send_knock(
-            target_hosts, event
-        )
+        knock_response = await self.federation_client.send_knock(target_hosts, event)
 
         # Store any stripped room state events in the "unsigned" key of the event.
         # This is a bit of a hack and is cribbing off of invites. Basically we
         # store the room state here and retrieve it again when this event appears
         # in the invitee's sync stream. It is stripped out for all other local users.
-        event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
+        stripped_room_state = (
+            knock_response.get("knock_room_state")
+            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
+            # Thus, we also check for a 'knock_state_events' to support old instances.
+            # See https://github.com/matrix-org/synapse/issues/14088.
+            or knock_response.get("knock_state_events")
+        )
+
+        if stripped_room_state is None:
+            raise KeyError(
+                "Missing 'knock_room_state' (or legacy 'knock_state_events') field in "
+                "send_knock response"
+            )
+
+        event.unsigned["knock_room_state"] = stripped_room_state
 
         context = EventContext.for_outlier(self._storage_controllers)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
@@ -1693,7 +1706,22 @@ class FederationHandler:
                             destination, event
                         )
                         break
+                    except FederationPullAttemptBackoffError as exc:
+                        # Log a warning about why we failed to process the event (the error message
+                        # for `FederationPullAttemptBackoffError` is pretty good)
+                        logger.warning("_sync_partial_state_room: %s", exc)
+                        # We do not record a failed pull attempt when we backoff fetching a missing
+                        # `prev_event` because not being able to fetch the `prev_events` just means
+                        # we won't be able to de-outlier the pulled event. But we can still use an
+                        # `outlier` in the state/auth chain for another event. So we shouldn't stop
+                        # a downstream event from trying to pull it.
+                        #
+                        # This avoids a cascade of backoff for all events in the DAG downstream from
+                        # one event backoff upstream.
                     except FederationError as e:
+                        # TODO: We should `record_event_failed_pull_attempt` here,
+                        #   see https://github.com/matrix-org/synapse/issues/13700
+
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
                             # TODO(faster_joins) giving up isn't the right thing to do
