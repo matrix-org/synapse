@@ -619,8 +619,6 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     if not os.path.exists(config_path):
         log("Generating base homeserver config")
         generate_base_homeserver_config()
-    else:
-        log("Homeserver config already exists at: " + config_path)
 
     # This script may be run multiple times (mostly by Complement, see note at top of file).
     # Don't re-configure workers in this instance.
