@@ -66,8 +66,6 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       federation_sender, \
       synchrotron, \
       appservice, \
-      account_data, \
-      to_device, \
       pusher"
 
     log "Workers now declared: $SYNAPSE_WORKER_TYPES"
