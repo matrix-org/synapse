@@ -226,9 +226,13 @@ class MessageSearchTest(HomeserverTestCase):
         ("fox -brown", False),
         ("fox AND ( brown OR nope )", True),
         ("fox AND ( nope OR doublenope )", False),
+        ("fox AND (brown OR nope)", True),
+        ("fox AND (nope OR doublenope)", False),
         ('"fox" quick', True),
         ('"fox quick', False),
         ('"quick brown', True),
+        ('" quick"', True),
+        ('" nope"', False),
     ]
 
     def prepare(
@@ -263,9 +267,22 @@ class MessageSearchTest(HomeserverTestCase):
                     SearchToken.RParen,
                 ],
             ),
+            (
+                "fox AND (brown OR nope)",
+                [
+                    "fox",
+                    SearchToken.And,
+                    SearchToken.LParen,
+                    "brown",
+                    SearchToken.Or,
+                    "nope",
+                    SearchToken.RParen,
+                ],
+            ),
             ('"fox" quick', [Phrase(["fox"]), "quick"]),
             # No trailing double quoe.
             ('"fox quick', [Phrase(["fox", "quick"])]),
+            ('" quick"', [Phrase(["", "quick"])]),
         )
 
         for query, expected in cases:

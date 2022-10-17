@@ -816,14 +816,14 @@ def _tokenize_query(query: str) -> TokenList:
     words = deque(query.split(" "))
     while words:
         word = words.popleft()
-        if word[0] == '"':
+        if word.startswith('"'):
             phrase_word = word[1:]
             # Continue to handle additional words until a word ends in a
             # double quote.
             phrase = []
             while True:
-                # XXX Will this break if the first word is just a double quote.
-                if phrase_word[-1] == '"':
+                # If the phrase word is blank, then a bare double quote was found.
+                if phrase_word and phrase_word[-1] == '"':
                     phrase.append(phrase_word[:-1])
                     break
                 else:
@@ -833,16 +833,22 @@ def _tokenize_query(query: str) -> TokenList:
                     break
                 phrase_word = words.popleft()
             tokens.append(Phrase(phrase))
-        elif word[0] == "-":
+        elif word.startswith("-"):
             tokens.append(SearchToken.Not)
             tokens.append(word[1:])
         elif word.lower() == "or":
             tokens.append(SearchToken.Or)
         elif word.lower() == "and":
             tokens.append(SearchToken.And)
-        elif word == "(":
+        elif word.startswith("("):
             tokens.append(SearchToken.LParen)
-        elif word == ")":
+            word = word[1:]
+            if word:
+                tokens.append(word)
+        elif word.endswith(")"):
+            word = word[:-1]
+            if word:
+                tokens.append(word)
             tokens.append(SearchToken.RParen)
         else:
             tokens.append(word)
