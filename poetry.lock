@@ -1373,7 +1373,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "types-bleach"
-version = "4.1.4"
+version = "5.0.3"
 description = "Typing stubs for bleach"
 category = "dev"
 optional = false
@@ -1432,8 +1432,8 @@ optional = false
 python-versions = "*"
 
 [[package]]
-name = "types-Pillow"
-version = "9.2.2"
+name = "types-pillow"
+version = "9.2.2.1"
 description = "Typing stubs for Pillow"
 category = "dev"
 optional = false
@@ -2742,8 +2742,8 @@ typed-ast = [
     {file = "typed_ast-1.5.2.tar.gz", hash = "sha256:525a2d4088e70a9f75b08b3f87a51acc9cde640e19cc523c7e41aa355564ae27"},
 ]
 types-bleach = [
-    {file = "types-bleach-4.1.4.tar.gz", hash = "sha256:2d30c2c4fb6854088ac636471352c9a51bf6c089289800d2a8060820a01cd43a"},
-    {file = "types_bleach-4.1.4-py3-none-any.whl", hash = "sha256:edffe173ed6d7b6f3543036a96204a9319c3bf6c3645917b14274e43f000cc9b"},
+    {file = "types-bleach-5.0.3.tar.gz", hash = "sha256:f7b3df8278efe176d9670d0f063a66c866c77577f71f54b9c7a320e31b1a7bbd"},
+    {file = "types_bleach-5.0.3-py3-none-any.whl", hash = "sha256:5931525d03571f36b2bb40210c34b662c4d26c8fd6f2b1e1e83fe4d2d2fd63c7"},
 ]
 types-commonmark = [
     {file = "types-commonmark-0.9.2.tar.gz", hash = "sha256:b894b67750c52fd5abc9a40a9ceb9da4652a391d75c1b480bba9cef90f19fc86"},
@@ -2769,9 +2769,9 @@ types-opentracing = [
     {file = "types-opentracing-2.4.7.tar.gz", hash = "sha256:be60e9618355aa892571ace002e6b353702538b1c0dc4fbc1c921219d6658830"},
     {file = "types_opentracing-2.4.7-py3-none-any.whl", hash = "sha256:861fb8103b07cf717f501dd400cb274ca9992552314d4d6c7a824b11a215e512"},
 ]
-types-Pillow = [
-    {file = "types-Pillow-9.2.2.tar.gz", hash = "sha256:6b525b0951ada076f3aefe2347e0bff6231283ce959ad8577a4416604acc673c"},
-    {file = "types_Pillow-9.2.2-py3-none-any.whl", hash = "sha256:bfe14afa1e9047a52b3dc326c93b4f57db72641794e194f11b511f68b0061814"},
+types-pillow = [
+    {file = "types-Pillow-9.2.2.1.tar.gz", hash = "sha256:85c139e06e1c46ec5f9c634d5c54a156b0958d5d0e8be024ed353db0c804b426"},
+    {file = "types_Pillow-9.2.2.1-py3-none-any.whl", hash = "sha256:3a6a871cade8428433a21ef459bb0a65532b87d05f9e836a0664431ce445bdcf"},
 ]
 types-psycopg2 = [
     {file = "types-psycopg2-2.9.21.1.tar.gz", hash = "sha256:f5532cf15afdc6b5ebb1e59b7d896617217321f488fd1fbd74e7efb94decfab6"},

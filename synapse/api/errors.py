@@ -640,6 +640,27 @@ class FederationError(RuntimeError):
         }
 
 
+class FederationPullAttemptBackoffError(RuntimeError):
+    """
+    Raised to indicate that we are are deliberately not attempting to pull the given
+    event over federation because we've already done so recently and are backing off.
+
+    Attributes:
+        event_id: The event_id which we are refusing to pull
+        message: A custom error message that gives more context
+    """
+
+    def __init__(self, event_ids: List[str], message: Optional[str]):
+        self.event_ids = event_ids
+
+        if message:
+            error_message = message
+        else:
+            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+
+        super().__init__(error_message)
+
+
 class HttpResponseException(CodeMessageException):
     """
     Represents an HTTP-level failure of an outbound request
