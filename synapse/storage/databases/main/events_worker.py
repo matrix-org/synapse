@@ -1976,11 +1976,16 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: room where the event lives
-            event_id: event to check
+            event: event to check (can't be an `outlier`)
 
         Returns:
             Boolean indicating whether it's an extremity
         """
+
+        assert not event.internal_metadata.is_outlier(), (
+            "is_event_next_to_backward_gap(...) can't be used with `outlier` events. "
+            "This function relies on `event_backward_extremities` which won't be filled in for `outliers`."
+        )
 
         def is_event_next_to_backward_gap_txn(txn: LoggingTransaction) -> bool:
             # If the event in question has any of its prev_events listed as a
@@ -2031,11 +2036,16 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: room where the event lives
-            event_id: event to check
+            event: event to check (can't be an `outlier`)
 
         Returns:
             Boolean indicating whether it's an extremity
         """
+
+        assert not event.internal_metadata.is_outlier(), (
+            "is_event_next_to_forward_gap(...) can't be used with `outlier` events. "
+            "This function relies on `event_edges` and `event_forward_extremities` which won't be filled in for `outliers`."
+        )
 
         def is_event_next_to_gap_txn(txn: LoggingTransaction) -> bool:
             # If the event in question is a forward extremity, we will just
