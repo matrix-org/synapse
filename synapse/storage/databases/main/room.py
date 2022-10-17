@@ -1200,12 +1200,15 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         for row in rows:
             room_id = row["room_id"]
             server_name = row["server_name"]
-            # There is a foreign key constraint which enforces that every room_id in
-            # partial_state_rooms_servers appears in partial_state_rooms, so this lookup
-            # should always succeed.
-            # TODO(faster joins): To make this robust we should run both SELECTs in the
-            #   same transaction.
-            room_servers[room_id].servers_in_room.append(server_name)
+            entry = room_servers.get(room_id)
+            if entry is None:
+                # There is a foreign key constraint which enforces that every room_id in
+                # partial_state_rooms_servers appears in partial_state_rooms. So we
+                # expect `entry` to be non-null. (This reasoning fails if we've
+                # partial-joined between the two SELECTs, but this is unlikely to happen
+                # in practice.)
+                continue
+            entry.servers_in_room.append(server_name)
 
         return room_servers
 
