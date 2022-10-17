@@ -4,6 +4,10 @@ on:
 #  push:
 #    branches: ["develop", "release-*"]
 #  pull_request:
+#  schedule:
+# eg. runs everyday at 4am    - 0 4 * * *
+# eg. runs every sundat at 4am  - 0 4 * * 0
+
 # Note: this will only work if this test exists on default branch, which is 'develop'
   workflow_dispatch:
 
