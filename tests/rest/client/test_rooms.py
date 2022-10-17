@@ -35,7 +35,6 @@ from synapse.api.constants import (
     EventTypes,
     Membership,
     PublicRoomsFilterFields,
-    RelationTypes,
     RoomTypes,
 )
 from synapse.api.errors import Codes, HttpResponseException
@@ -50,6 +49,7 @@ from synapse.util.stringutils import random_string
 
 from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
+from tests.storage.test_stream import PaginationTestCase
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -2213,14 +2213,17 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         )
 
     def make_public_rooms_request(
-        self, room_types: Union[List[Union[str, None]], None]
+        self,
+        room_types: Optional[List[Union[str, None]]],
+        instance_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
-        channel = self.make_request(
-            "POST",
-            self.url,
-            {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}},
-            self.token,
-        )
+        body: JsonDict = {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}}
+        if instance_id:
+            body["third_party_instance_id"] = "test|test"
+
+        channel = self.make_request("POST", self.url, body, self.token)
+        self.assertEqual(channel.code, 200)
+
         chunk = channel.json_body["chunk"]
         count = channel.json_body["total_room_count_estimate"]
 
@@ -2230,8 +2233,16 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
 
     def test_returns_both_rooms_and_spaces_if_no_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(None)
-
         self.assertEqual(count, 2)
+
+        # Also check if there's no filter property at all in the body.
+        channel = self.make_request("POST", self.url, {}, self.token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["chunk"]), 2)
+        self.assertEqual(channel.json_body["total_room_count_estimate"], 2)
+
+        chunk, count = self.make_public_rooms_request(None, "test|test")
+        self.assertEqual(count, 0)
 
     def test_returns_only_rooms_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request([None])
@@ -2239,21 +2250,31 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(count, 1)
         self.assertEqual(chunk[0].get("room_type", None), None)
 
+        chunk, count = self.make_public_rooms_request([None], "test|test")
+        self.assertEqual(count, 0)
+
     def test_returns_only_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space"])
 
         self.assertEqual(count, 1)
         self.assertEqual(chunk[0].get("room_type", None), "m.space")
 
+        chunk, count = self.make_public_rooms_request(["m.space"], "test|test")
+        self.assertEqual(count, 0)
+
     def test_returns_both_rooms_and_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space", None])
-
         self.assertEqual(count, 2)
+
+        chunk, count = self.make_public_rooms_request(["m.space", None], "test|test")
+        self.assertEqual(count, 0)
 
     def test_returns_both_rooms_and_spaces_if_array_is_empty(self) -> None:
         chunk, count = self.make_public_rooms_request([])
-
         self.assertEqual(count, 2)
+
+        chunk, count = self.make_public_rooms_request([], "test|test")
+        self.assertEqual(count, 0)
 
 
 class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
@@ -2894,149 +2915,20 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         return event_id
 
 
-class RelationsTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        room.register_servlets,
-        login.register_servlets,
-    ]
-
-    def default_config(self) -> Dict[str, Any]:
-        config = super().default_config()
-        config["experimental_features"] = {"msc3440_enabled": True}
-        return config
-
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.user_id = self.register_user("test", "test")
-        self.tok = self.login("test", "test")
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
-
-        self.second_user_id = self.register_user("second", "test")
-        self.second_tok = self.login("second", "test")
-        self.helper.join(
-            room=self.room_id, user=self.second_user_id, tok=self.second_tok
-        )
-
-        self.third_user_id = self.register_user("third", "test")
-        self.third_tok = self.login("third", "test")
-        self.helper.join(room=self.room_id, user=self.third_user_id, tok=self.third_tok)
-
-        # An initial event with a relation from second user.
-        res = self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "Message 1"},
-            tok=self.tok,
-        )
-        self.event_id_1 = res["event_id"]
-        self.helper.send_event(
-            room_id=self.room_id,
-            type="m.reaction",
-            content={
-                "m.relates_to": {
-                    "rel_type": RelationTypes.ANNOTATION,
-                    "event_id": self.event_id_1,
-                    "key": "👍",
-                }
-            },
-            tok=self.second_tok,
-        )
-
-        # Another event with a relation from third user.
-        res = self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "Message 2"},
-            tok=self.tok,
-        )
-        self.event_id_2 = res["event_id"]
-        self.helper.send_event(
-            room_id=self.room_id,
-            type="m.reaction",
-            content={
-                "m.relates_to": {
-                    "rel_type": RelationTypes.REFERENCE,
-                    "event_id": self.event_id_2,
-                }
-            },
-            tok=self.third_tok,
-        )
-
-        # An event with no relations.
-        self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "No relations"},
-            tok=self.tok,
-        )
-
-    def _filter_messages(self, filter: JsonDict) -> List[JsonDict]:
+class RelationsTestCase(PaginationTestCase):
+    def _filter_messages(self, filter: JsonDict) -> List[str]:
         """Make a request to /messages with a filter, returns the chunk of events."""
+        from_token = self.get_success(
+            self.from_token.to_string(self.hs.get_datastores().main)
+        )
         channel = self.make_request(
             "GET",
-            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, json.dumps(filter)),
+            f"/rooms/{self.room_id}/messages?filter={json.dumps(filter)}&dir=f&from={from_token}",
             access_token=self.tok,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
-        return channel.json_body["chunk"]
-
-    def test_filter_relation_senders(self) -> None:
-        # Messages which second user reacted to.
-        filter = {"related_by_senders": [self.second_user_id]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
-
-        # Messages which third user reacted to.
-        filter = {"related_by_senders": [self.third_user_id]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_2)
-
-        # Messages which either user reacted to.
-        filter = {"related_by_senders": [self.second_user_id, self.third_user_id]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c["event_id"] for c in chunk], [self.event_id_1, self.event_id_2]
-        )
-
-    def test_filter_relation_type(self) -> None:
-        # Messages which have annotations.
-        filter = {"related_by_rel_types": [RelationTypes.ANNOTATION]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
-
-        # Messages which have references.
-        filter = {"related_by_rel_types": [RelationTypes.REFERENCE]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_2)
-
-        # Messages which have either annotations or references.
-        filter = {
-            "related_by_rel_types": [
-                RelationTypes.ANNOTATION,
-                RelationTypes.REFERENCE,
-            ]
-        }
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c["event_id"] for c in chunk], [self.event_id_1, self.event_id_2]
-        )
-
-    def test_filter_relation_senders_and_type(self) -> None:
-        # Messages which second user reacted to.
-        filter = {
-            "related_by_senders": [self.second_user_id],
-            "related_by_rel_types": [RelationTypes.ANNOTATION],
-        }
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
+        return [ev["event_id"] for ev in channel.json_body["chunk"]]
 
 
 class ContextTestCase(unittest.HomeserverTestCase):

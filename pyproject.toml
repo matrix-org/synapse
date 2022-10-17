@@ -57,7 +57,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.69.0rc2"
+version = "1.69.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -267,7 +267,7 @@ all = [
 
 [tool.poetry.dev-dependencies]
 ## We pin black so that our tests don't start failing on new releases.
-isort = "==5.7.0"
+isort = "==5.10.1"
 black = "==22.3.0"
 flake8-comprehensions = "*"
 flake8-bugbear = "==21.3.2"
@@ -321,7 +321,7 @@ build-backend = "poetry.core.masonry.api"
 skip = "cp36* *-musllinux_i686"
 
 # We need a rust compiler
-before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y"
+before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
 environment= { PATH = "$PATH:$HOME/.cargo/bin" }
 
 # For some reason if we don't manually clean the build directory we
