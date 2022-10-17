@@ -1744,12 +1744,12 @@ def _prioritise_destinations_for_partial_state_resync(
     if initial_destination is None and len(other_destinations) == 0:
         raise ValueError(f"Cannot resync state of {room_id}: no destinations provided")
 
-    if initial_destination is not None:
-        # Move `initial_destination` to the front of the list.
-        destinations = list(other_destinations)
-        if initial_destination in destinations:
-            destinations.remove(initial_destination)
-        destinations = [initial_destination] + destinations
-    else:
-        destinations = list(other_destinations)
+    if initial_destination is None:
+        return other_destinations
+
+    # Move `initial_destination` to the front of the list.
+    destinations = list(other_destinations)
+    if initial_destination in destinations:
+        destinations.remove(initial_destination)
+    destinations = [initial_destination] + destinations
     return destinations
