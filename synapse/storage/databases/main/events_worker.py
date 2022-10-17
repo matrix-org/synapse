@@ -2127,13 +2127,33 @@ class EventsWorkerStore(SQLBaseStore):
             The closest event_id otherwise None if we can't find any event in
             the given direction.
         """
+        if direction == "b":
+            # Find closest event *before* a given timestamp. We use descending
+            # (which gives values largest to smallest) because we want the
+            # largest possible timestamp *before* the given timestamp.
+            comparison_operator = "<="
+            order = "DESC"
+        else:
+            # Find closest event *after* a given timestamp. We use ascending
+            # (which gives values smallest to largest) because we want the
+            # closest possible timestamp *after* the given timestamp.
+            comparison_operator = ">="
+            order = "ASC"
 
-        sql_template = """
+        sql_template = f"""
             SELECT event_id FROM events
             LEFT JOIN rejections USING (event_id)
             WHERE
-                origin_server_ts %s ?
-                AND room_id = ?
+                room_id = ?
+                AND origin_server_ts {comparison_operator} ?
+                /**
+                 * Make sure the event isn't an `outlier` because we have no way
+                 * to later check whether it's next to a gap. `outliers` do not
+                 * have entries in the `event_edges`, `event_forward_extremeties`,
+                 * and `event_backward_extremities` tables to check against
+                 * (used by `is_event_next_to_backward_gap` and `is_event_next_to_forward_gap`).
+                 */
+                AND outlier = ? /* False */
                 /* Make sure event is not rejected */
                 AND rejections.event_id IS NULL
             /**
@@ -2143,27 +2163,14 @@ class EventsWorkerStore(SQLBaseStore):
              * Finally, we can tie-break based on when it was received on the server
              * (`stream_ordering`).
              */
-            ORDER BY origin_server_ts %s, depth %s, stream_ordering %s
+            ORDER BY origin_server_ts {order}, depth {order}, stream_ordering {order}
             LIMIT 1;
         """
 
         def get_event_id_for_timestamp_txn(txn: LoggingTransaction) -> Optional[str]:
-            if direction == "b":
-                # Find closest event *before* a given timestamp. We use descending
-                # (which gives values largest to smallest) because we want the
-                # largest possible timestamp *before* the given timestamp.
-                comparison_operator = "<="
-                order = "DESC"
-            else:
-                # Find closest event *after* a given timestamp. We use ascending
-                # (which gives values smallest to largest) because we want the
-                # closest possible timestamp *after* the given timestamp.
-                comparison_operator = ">="
-                order = "ASC"
-
             txn.execute(
-                sql_template % (comparison_operator, order, order, order),
-                (timestamp, room_id),
+                sql_template,
+                (room_id, timestamp, False),
             )
             row = txn.fetchone()
             if row:
