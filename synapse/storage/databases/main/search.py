@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import deque
 import logging
 import re
 from dataclasses import dataclass
@@ -817,29 +818,31 @@ def _tokenize_query(query: str) -> TokenList:
     The following constructs are supported:
 
     - phrase queries using "double quotes"
-    - case-insensitive or and and operators, with parentheses to change operator precedence
-    - negation of a keyword via unary -
+    - case-insensitive `or` and `and` operators, with parentheses to change operator precedence
+    - negation of a keyword via unary `-`
     - unary hyphen to denote NOT e.g. 'include -exclude'
 
     """
     tokens: TokenList = []
-    words = query.split(" ")
-    i = 0
-    while i < len(words):
-        word = words[i]
+    words = deque(query.split(" "))
+    while words:
+        word = words.popleft()
         if word[0] == '"':
             phrase_word = word[1:]
+            # Continue to handle additional words until a word ends in a
+            # double quote.
             phrase = []
             while True:
+                # XXX Will this break if the first word is just a double quote.
                 if phrase_word[-1] == '"':
                     phrase.append(phrase_word[:-1])
                     break
                 else:
                     phrase.append(phrase_word)
-                i = i + 1
-                if i == len(words):
+                # Nothing left to process.
+                if not words:
                     break
-                phrase_word = words[i]
+                phrase_word = words.popleft()
             tokens.append(Phrase(phrase))
         elif word[0] == "-":
             tokens.append(Not())
@@ -854,7 +857,6 @@ def _tokenize_query(query: str) -> TokenList:
             tokens.append(RParen())
         else:
             tokens.append(word)
-        i = i + 1
     return tokens
 
 
