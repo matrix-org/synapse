@@ -39,6 +39,16 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         self.store = hs.get_datastores().main
         self.registration_handler = hs.get_registration_handler()
 
+        # Default value if the worker that sent the replication request did not include
+        # an 'approved' property.
+        if (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        ):
+            self._approval_default = False
+        else:
+            self._approval_default = True
+
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
         user_id: str,
@@ -51,6 +61,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         user_type: Optional[str],
         address: Optional[str],
         shadow_banned: bool,
+        approved: bool,
     ) -> JsonDict:
         """
         Args:
@@ -68,6 +79,8 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
                 or None for a normal user.
             address: the IP address used to perform the regitration.
             shadow_banned: Whether to shadow-ban the user
+            approved: Whether the user should be considered already approved by an
+                administrator.
         """
         return {
             "password_hash": password_hash,
@@ -79,6 +92,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "user_type": user_type,
             "address": address,
             "shadow_banned": shadow_banned,
+            "approved": approved,
         }
 
     async def _handle_request(  # type: ignore[override]
@@ -87,6 +101,12 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         content = parse_json_object_from_request(request)
 
         await self.registration_handler.check_registration_ratelimit(content["address"])
+
+        # Always default admin users to approved (since it means they were created by
+        # an admin).
+        approved_default = self._approval_default
+        if content["admin"]:
+            approved_default = True
 
         await self.registration_handler.register_with_store(
             user_id=user_id,
@@ -99,6 +119,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type=content["user_type"],
             address=content["address"],
             shadow_banned=content["shadow_banned"],
+            approved=content.get("approved", approved_default),
         )
 
         return 200, {}

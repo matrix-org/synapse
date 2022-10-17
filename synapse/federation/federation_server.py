@@ -530,12 +530,9 @@ class FederationServer(FederationBase):
     async def on_room_state_request(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
-
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
 
         # we grab the linearizer to protect ourselves from servers which hammer
         # us. In theory we might already have the response to this query
@@ -560,12 +557,9 @@ class FederationServer(FederationBase):
         if not event_id:
             raise NotImplementedError("Specify an event")
 
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
-
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
 
         resp = await self._state_ids_resp_cache.wrap(
             (room_id, event_id),
@@ -830,7 +824,14 @@ class FederationServer(FederationBase):
                 context, self._room_prejoin_state_types
             )
         )
-        return {"knock_state_events": stripped_room_state}
+        return {
+            "knock_room_state": stripped_room_state,
+            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
+            # Thus, we also populate a 'knock_state_events' with the same content to
+            # support old instances.
+            # See https://github.com/matrix-org/synapse/issues/14088.
+            "knock_state_events": stripped_room_state,
+        }
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
@@ -955,6 +956,7 @@ class FederationServer(FederationBase):
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, Dict[str, Any]]:
         async with self._server_linearizer.queue((origin, room_id)):
+            await self._event_auth_handler.assert_host_in_room(room_id, origin)
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 

@@ -266,7 +266,7 @@ def _setup_new_database(
             ".sql." + specific
         ):
             logger.debug("Applying schema %s", entry.absolute_path)
-            executescript(cur, entry.absolute_path)
+            database_engine.execute_script_file(cur, entry.absolute_path)
 
     cur.execute(
         "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
@@ -517,7 +517,7 @@ def _upgrade_existing_database(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying schema %s", relative_path)
-                executescript(cur, absolute_path)
+                database_engine.execute_script_file(cur, absolute_path)
             elif ext == specific_engine_extension and root_name.endswith(".sql"):
                 # A .sql file specific to our engine; just read and execute it
                 if is_worker:
@@ -525,7 +525,7 @@ def _upgrade_existing_database(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying engine-specific schema %s", relative_path)
-                executescript(cur, absolute_path)
+                database_engine.execute_script_file(cur, absolute_path)
             elif ext in specific_engine_extensions and root_name.endswith(".sql"):
                 # A .sql file for a different engine; skip it.
                 continue
@@ -666,7 +666,7 @@ def _get_or_create_schema_state(
 ) -> Optional[_SchemaState]:
     # Bluntly try creating the schema_version tables.
     sql_path = os.path.join(schema_path, "common", "schema_version.sql")
-    executescript(txn, sql_path)
+    database_engine.execute_script_file(txn, sql_path)
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()

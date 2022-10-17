@@ -44,6 +44,7 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     FederationError,
+    FederationPullAttemptBackoffError,
     HttpResponseException,
     RequestSendFailed,
     SynapseError,
@@ -238,7 +239,7 @@ class FederationEventHandler:
         #
         # Note that if we were never in the room then we would have already
         # dropped the event, since we wouldn't know the room version.
-        is_in_room = await self._event_auth_handler.check_host_in_room(
+        is_in_room = await self._event_auth_handler.is_host_in_room(
             room_id, self._server_name
         )
         if not is_in_room:
@@ -414,7 +415,9 @@ class FederationEventHandler:
 
         # First, precalculate the joined hosts so that the federation sender doesn't
         # need to.
-        await self._event_creation_handler.cache_joined_hosts_for_event(event, context)
+        await self._event_creation_handler.cache_joined_hosts_for_events(
+            [(event, context)]
+        )
 
         await self._check_for_soft_fail(event, context=context, origin=origin)
         await self._run_push_actions_and_persist_event(event, context)
@@ -565,6 +568,9 @@ class FederationEventHandler:
             event: partial-state event to be de-partial-stated
 
         Raises:
+            FederationPullAttemptBackoffError if we are are deliberately not attempting
+                to pull the given event over federation because we've already done so
+                recently and are backing off.
             FederationError if we fail to request state from the remote server.
         """
         logger.info("Updating state for %s", event.event_id)
@@ -866,11 +872,6 @@ class FederationEventHandler:
                 event.room_id, event_id, str(err)
             )
             return
-        except Exception as exc:
-            await self._store.record_event_failed_pull_attempt(
-                event.room_id, event_id, str(exc)
-            )
-            raise exc
 
         try:
             try:
@@ -904,6 +905,18 @@ class FederationEventHandler:
                     context,
                     backfilled=backfilled,
                 )
+        except FederationPullAttemptBackoffError as exc:
+            # Log a warning about why we failed to process the event (the error message
+            # for `FederationPullAttemptBackoffError` is pretty good)
+            logger.warning("_process_pulled_event: %s", exc)
+            # We do not record a failed pull attempt when we backoff fetching a missing
+            # `prev_event` because not being able to fetch the `prev_events` just means
+            # we won't be able to de-outlier the pulled event. But we can still use an
+            # `outlier` in the state/auth chain for another event. So we shouldn't stop
+            # a downstream event from trying to pull it.
+            #
+            # This avoids a cascade of backoff for all events in the DAG downstream from
+            # one event backoff upstream.
         except FederationError as e:
             await self._store.record_event_failed_pull_attempt(
                 event.room_id, event_id, str(e)
@@ -913,11 +926,6 @@ class FederationEventHandler:
                 logger.warning("Pulled event %s failed history check.", event_id)
             else:
                 raise
-        except Exception as exc:
-            await self._store.record_event_failed_pull_attempt(
-                event.room_id, event_id, str(exc)
-            )
-            raise exc
 
     @trace
     async def _compute_event_context_with_maybe_missing_prevs(
@@ -955,6 +963,9 @@ class FederationEventHandler:
             The event context.
 
         Raises:
+            FederationPullAttemptBackoffError if we are are deliberately not attempting
+                to pull the given event over federation because we've already done so
+                recently and are backing off.
             FederationError if we fail to get the state from the remote server after any
                 missing `prev_event`s.
         """
@@ -964,6 +975,18 @@ class FederationEventHandler:
         prevs = set(event.prev_event_ids())
         seen = await self._store.have_events_in_timeline(prevs)
         missing_prevs = prevs - seen
+
+        # If we've already recently attempted to pull this missing event, don't
+        # try it again so soon. Since we have to fetch all of the prev_events, we can
+        # bail early here if we find any to ignore.
+        prevs_to_ignore = await self._store.get_event_ids_to_not_pull_from_backoff(
+            room_id, missing_prevs
+        )
+        if len(prevs_to_ignore) > 0:
+            raise FederationPullAttemptBackoffError(
+                event_ids=prevs_to_ignore,
+                message=f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
+            )
 
         if not missing_prevs:
             return await self._state_handler.compute_event_context(event)
@@ -2170,6 +2193,7 @@ class FederationEventHandler:
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
             # here as that is what we default to in `max_request_body_size(..)`
+            result = {}
             try:
                 for batch in batch_iter(event_and_contexts, 200):
                     result = await self._send_events(
@@ -2249,8 +2273,8 @@ class FederationEventHandler:
         event_pos = PersistedEventPosition(
             self._instance_name, event.internal_metadata.stream_ordering
         )
-        await self._notifier.on_new_room_event(
-            event, event_pos, max_stream_token, extra_users=extra_users
+        await self._notifier.on_new_room_events(
+            [(event, event_pos)], max_stream_token, extra_users=extra_users
         )
 
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:

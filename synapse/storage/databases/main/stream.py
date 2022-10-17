@@ -1024,28 +1024,31 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "after": {"event_ids": events_after, "token": end_token},
         }
 
-    async def get_all_new_events_stream(
-        self, from_id: int, current_id: int, limit: int, get_prev_content: bool = False
-    ) -> Tuple[int, List[EventBase], Dict[str, Optional[int]]]:
+    async def get_all_new_event_ids_stream(
+        self,
+        from_id: int,
+        current_id: int,
+        limit: int,
+    ) -> Tuple[int, Dict[str, Optional[int]]]:
         """Get all new events
 
-        Returns all events with from_id < stream_ordering <= current_id.
+        Returns all event ids with from_id < stream_ordering <= current_id.
 
         Args:
             from_id:  the stream_ordering of the last event we processed
             current_id:  the stream_ordering of the most recently processed event
             limit: the maximum number of events to return
-            get_prev_content: whether to fetch previous event content
 
         Returns:
-            A tuple of (next_id, events, event_to_received_ts), where `next_id`
+            A tuple of (next_id, event_to_received_ts), where `next_id`
             is the next value to pass as `from_id` (it will either be the
             stream_ordering of the last returned event, or, if fewer than `limit`
             events were found, the `current_id`). The `event_to_received_ts` is
-            a dictionary mapping event ID to the event `received_ts`.
+            a dictionary mapping event ID to the event `received_ts`, sorted by ascending
+            stream_ordering.
         """
 
-        def get_all_new_events_stream_txn(
+        def get_all_new_event_ids_stream_txn(
             txn: LoggingTransaction,
         ) -> Tuple[int, Dict[str, Optional[int]]]:
             sql = (
@@ -1070,15 +1073,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             return upper_bound, event_to_received_ts
 
         upper_bound, event_to_received_ts = await self.db_pool.runInteraction(
-            "get_all_new_events_stream", get_all_new_events_stream_txn
+            "get_all_new_event_ids_stream", get_all_new_event_ids_stream_txn
         )
 
-        events = await self.get_events_as_list(
-            event_to_received_ts.keys(),
-            get_prev_content=get_prev_content,
-        )
-
-        return upper_bound, events, event_to_received_ts
+        return upper_bound, event_to_received_ts
 
     async def get_federation_out_pos(self, typ: str) -> int:
         if self._need_to_reset_federation_stream_positions:
@@ -1201,8 +1199,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             been reached (i.e. there are no events between `from_token` and
             `to_token`), or `limit` is zero.
         """
-
-        assert int(limit) >= 0
 
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
@@ -1334,15 +1330,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if rows:
             topo = rows[-1].topological_ordering
-            toke = rows[-1].stream_ordering
+            token = rows[-1].stream_ordering
             if direction == "b":
                 # Tokens are positions between events.
                 # This token points *after* the last event in the chunk.
                 # We need it to point to the event before it in the chunk
                 # when we are going backwards so we subtract one from the
                 # stream part.
-                toke -= 1
-            next_token = RoomStreamToken(topo, toke)
+                token -= 1
+            next_token = RoomStreamToken(topo, token)
         else:
             # TODO (erikj): We should work out what to do here instead.
             next_token = to_token if to_token else from_token

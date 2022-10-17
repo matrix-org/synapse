@@ -104,6 +104,14 @@ class Codes(str, Enum):
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
 
+    # Returned for federation requests where we can't process a request as we
+    # can't ensure the sending server is in a room which is partial-stated on
+    # our side.
+    # Part of MSC3895.
+    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
+
+    USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
@@ -564,6 +572,20 @@ class UnredactedContentDeletedError(SynapseError):
         return cs_error(self.msg, self.errcode, **extra)
 
 
+class NotApprovedError(SynapseError):
+    def __init__(
+        self,
+        msg: str,
+        approval_notice_medium: str,
+    ):
+        super().__init__(
+            code=403,
+            msg=msg,
+            errcode=Codes.USER_AWAITING_APPROVAL,
+            additional_fields={"approval_notice_medium": approval_notice_medium},
+        )
+
+
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
     """Utility method for constructing an error response for client-server
     interactions.
@@ -620,6 +642,27 @@ class FederationError(RuntimeError):
             "affected": self.affected,
             "source": self.source if self.source else self.affected,
         }
+
+
+class FederationPullAttemptBackoffError(RuntimeError):
+    """
+    Raised to indicate that we are are deliberately not attempting to pull the given
+    event over federation because we've already done so recently and are backing off.
+
+    Attributes:
+        event_id: The event_id which we are refusing to pull
+        message: A custom error message that gives more context
+    """
+
+    def __init__(self, event_ids: List[str], message: Optional[str]):
+        self.event_ids = event_ids
+
+        if message:
+            error_message = message
+        else:
+            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+
+        super().__init__(error_message)
 
 
 class HttpResponseException(CodeMessageException):

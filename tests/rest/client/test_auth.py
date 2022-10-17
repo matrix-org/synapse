@@ -20,7 +20,8 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType
+from synapse.api.constants import ApprovalNoticeMedium, LoginType
+from synapse.api.errors import Codes
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client import account, auth, devices, login, logout, register
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
@@ -566,6 +567,36 @@ class UIAuthTests(unittest.HomeserverTestCase):
             HTTPStatus.FORBIDDEN,
             body={"auth": {"session": session_id}},
         )
+
+    @skip_unless(HAS_OIDC, "requires OIDC")
+    @override_config(
+        {
+            "oidc_config": TEST_OIDC_CONFIG,
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            },
+        }
+    )
+    def test_sso_not_approved(self) -> None:
+        """Tests that if we register a user via SSO while requiring approval for new
+        accounts, we still raise the correct error before logging the user in.
+        """
+        login_resp = self.helper.login_via_oidc("username", expected_status=403)
+
+        self.assertEqual(login_resp["errcode"], Codes.USER_AWAITING_APPROVAL)
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, login_resp["approval_notice_medium"]
+        )
+
+        # Check that we didn't register a device for the user during the login attempt.
+        devices = self.get_success(
+            self.hs.get_datastores().main.get_devices_by_user("@username:test")
+        )
+
+        self.assertEqual(len(devices), 0)
 
 
 class RefreshAuthTests(unittest.HomeserverTestCase):

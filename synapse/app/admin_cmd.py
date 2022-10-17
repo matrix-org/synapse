@@ -53,9 +53,9 @@ logger = logging.getLogger("synapse.app.admin_cmd")
 
 class AdminCmdSlavedStore(
     SlavedFilteringStore,
-    SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
+    SlavedDeviceStore,
     TagsWorkerStore,
     DeviceInboxWorkerStore,
     AccountDataWorkerStore,

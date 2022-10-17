@@ -474,7 +474,7 @@ class EventsWorkerStore(SQLBaseStore):
             return []
 
         # there may be duplicates so we cast the list to a set
-        event_entry_map = await self._get_events_from_cache_or_db(
+        event_entry_map = await self.get_unredacted_events_from_cache_or_db(
             set(event_ids), allow_rejected=allow_rejected
         )
 
@@ -509,7 +509,9 @@ class EventsWorkerStore(SQLBaseStore):
                     continue
 
                 redacted_event_id = entry.event.redacts
-                event_map = await self._get_events_from_cache_or_db([redacted_event_id])
+                event_map = await self.get_unredacted_events_from_cache_or_db(
+                    [redacted_event_id]
+                )
                 original_event_entry = event_map.get(redacted_event_id)
                 if not original_event_entry:
                     # we don't have the redacted event (or it was rejected).
@@ -588,10 +590,15 @@ class EventsWorkerStore(SQLBaseStore):
         return events
 
     @cancellable
-    async def _get_events_from_cache_or_db(
-        self, event_ids: Iterable[str], allow_rejected: bool = False
+    async def get_unredacted_events_from_cache_or_db(
+        self,
+        event_ids: Iterable[str],
+        allow_rejected: bool = False,
     ) -> Dict[str, EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
+
+        Note that the events pulled by this function will not have any redactions
+        applied, and no guarantee is made about the ordering of the events returned.
 
         If events are pulled from the database, they will be cached for future lookups.
 
@@ -1474,32 +1481,38 @@ class EventsWorkerStore(SQLBaseStore):
         # the batches as big as possible.
 
         results: Set[str] = set()
-        for chunk in batch_iter(event_ids, 500):
-            r = await self._have_seen_events_dict(
-                [(room_id, event_id) for event_id in chunk]
+        for event_ids_chunk in batch_iter(event_ids, 500):
+            events_seen_dict = await self._have_seen_events_dict(
+                room_id, event_ids_chunk
             )
-            results.update(eid for ((_rid, eid), have_event) in r.items() if have_event)
+            results.update(
+                eid for (eid, have_event) in events_seen_dict.items() if have_event
+            )
 
         return results
 
-    @cachedList(cached_method_name="have_seen_event", list_name="keys")
+    @cachedList(cached_method_name="have_seen_event", list_name="event_ids")
     async def _have_seen_events_dict(
-        self, keys: Collection[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], bool]:
+        self,
+        room_id: str,
+        event_ids: Collection[str],
+    ) -> Dict[str, bool]:
         """Helper for have_seen_events
 
         Returns:
-             a dict {(room_id, event_id)-> bool}
+             a dict {event_id -> bool}
         """
         # if the event cache contains the event, obviously we've seen it.
 
         cache_results = {
-            (rid, eid)
-            for (rid, eid) in keys
-            if await self._get_event_cache.contains((eid,))
+            event_id
+            for event_id in event_ids
+            if await self._get_event_cache.contains((event_id,))
         }
         results = dict.fromkeys(cache_results, True)
-        remaining = [k for k in keys if k not in cache_results]
+        remaining = [
+            event_id for event_id in event_ids if event_id not in cache_results
+        ]
         if not remaining:
             return results
 
@@ -1511,23 +1524,21 @@ class EventsWorkerStore(SQLBaseStore):
 
             sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", [eid for (_rid, eid) in remaining]
+                txn.database_engine, "e.event_id", remaining
             )
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
             # ... and then we can update the results for each key
-            results.update(
-                {(rid, eid): (eid in found_events) for (rid, eid) in remaining}
-            )
+            results.update({eid: (eid in found_events) for eid in remaining})
 
         await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
         return results
 
     @cached(max_entries=100000, tree=True)
     async def have_seen_event(self, room_id: str, event_id: str) -> bool:
-        res = await self._have_seen_events_dict(((room_id, event_id),))
-        return res[(room_id, event_id)]
+        res = await self._have_seen_events_dict(room_id, [event_id])
+        return res[event_id]
 
     def _get_current_state_event_counts_txn(
         self, txn: LoggingTransaction, room_id: str

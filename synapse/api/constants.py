@@ -31,6 +31,9 @@ MAX_ALIAS_LENGTH = 255
 # the maximum length for a user id is 255 characters
 MAX_USERID_LENGTH = 255
 
+# Constant value used for the pseudo-thread which is the main timeline.
+MAIN_TIMELINE: Final = "main"
+
 
 class Membership:
 
@@ -270,3 +273,14 @@ class PublicRoomsFilterFields:
 
     GENERIC_SEARCH_TERM: Final = "generic_search_term"
     ROOM_TYPES: Final = "room_types"
+
+
+class ApprovalNoticeMedium:
+    """Identifier for the medium this server will use to serve notice of approval for a
+    specific user's registration.
+
+    As defined in https://github.com/matrix-org/matrix-spec-proposals/blob/babolivier/m_not_approved/proposals/3866-user-not-approved-error.md
+    """
+
+    NONE = "org.matrix.msc3866.none"
+    EMAIL = "org.matrix.msc3866.email"

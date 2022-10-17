@@ -4,6 +4,7 @@ on:
   push:
     branches: ["develop", "release-*"]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,8 +31,8 @@ jobs:
   check-sampleconfig:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
       - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "all"
@@ -41,8 +42,8 @@ jobs:
   check-schema-delta:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
       - run: "pip install 'click==8.1.1' 'GitPython>=3.1.20'"
       - run: scripts-dev/check_schema_delta.py --force-colors
 
@@ -54,19 +55,19 @@ jobs:
   lint-crlf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Check line endings
         run: scripts-dev/check_line_terminators.sh
 
   lint-newsfile:
-    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
+    if: ${{ (github.base_ref == 'develop'  || contains(github.base_ref, 'release-')) && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
       - run: "pip install 'towncrier>=18.6.0rc1'"
       - run: scripts-dev/check-newsfragment.sh
         env:
@@ -75,7 +76,7 @@ jobs:
   lint-pydantic:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: matrix-org/setup-python-poetry@v1
@@ -89,12 +90,12 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
             components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -107,12 +108,12 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
             components: rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -140,8 +141,8 @@ jobs:
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
       - id: get-matrix
         run: .ci/scripts/calculate_jobs.py
     outputs:
@@ -157,7 +158,7 @@ jobs:
         job:  ${{ fromJson(needs.calculate-test-jobs.outputs.trial_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
@@ -199,12 +200,12 @@ jobs:
     needs: linting-done
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
@@ -270,7 +271,7 @@ jobs:
         extras: ["all"]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # Install libs necessary for PyPy to build binary wheels for dependencies
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
       - uses: matrix-org/setup-python-poetry@v1
@@ -313,14 +314,14 @@ jobs:
         job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
@@ -331,7 +332,7 @@ jobs:
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
       - name: Upload SyTest logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.job.*, ', ') }})
@@ -361,7 +362,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -402,7 +403,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -444,15 +445,15 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v2 for synapse
-        uses: actions/checkout@v2
+      - name: Run actions/checkout@v3 for synapse
+        uses: actions/checkout@v3
         with:
           path: synapse
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
@@ -473,12 +474,12 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.61.0
+            toolchain: 1.58.1
             override: true
       - uses: Swatinem/rust-cache@v2
 
