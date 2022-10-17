@@ -27,7 +27,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Tuple,
     Union,
 )
@@ -1617,7 +1616,7 @@ class FederationHandler:
     async def _sync_partial_state_room(
         self,
         initial_destination: Optional[str],
-        other_destinations: Sequence[str],
+        other_destinations: Collection[str],
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
@@ -1733,7 +1732,7 @@ def _prioritise_destinations_for_partial_state_resync(
     initial_destination: Optional[str],
     other_destinations: Collection[str],
     room_id: str,
-) -> Sequence[str]:
+) -> Collection[str]:
     """Work out the order in which we should ask servers to resync events.
 
     If an `initial_destination` is given, it takes top priority. Otherwise
