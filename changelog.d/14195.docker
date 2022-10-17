@@ -1,1 +1,1 @@
-Fix early logging from Dockerfile-workers image.
+Fix pre-startup logging being lost when using the `Dockerfile-workers` image.
