@@ -26,13 +26,12 @@ jobs:
       - id: get-matrix
         run: .ci/scripts/calculate_jobs.py
     outputs:
-#      complement_singles_test_matrix: ${{ steps.get-matrix.outputs.complement_singles_test_matrix}}
-#      complement_sharding_test_matrix: ${{ steps.get-matrix.outputs.complement_sharding_test_matrix}}
-#      complement_stream_writers_test_matrix: ${{ steps.get-matrix.outputs.complement_stream_writers_test_matrix}}
-      complement_test_matrix: ${{ steps.get-matrix.outputs.complement_test_matrix }}
+      complement_singles_test_matrix: ${{ steps.get-matrix.outputs.complement_singles_test_matrix }}
+      complement_sharding_test_matrix: ${{ steps.get-matrix.outputs.complement_sharding_test_matrix }}
+      complement_stream_writers_test_matrix: ${{ steps.get-matrix.outputs.complement_stream_writers_test_matrix }}
 
-  complement:
-    name: Defaults
+  singles:
+    name: Singles
     if: "${{ !failure() && !cancelled() }}"
     needs: calculate-test-jobs
     runs-on: ubuntu-latest
@@ -40,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job: ${{ fromJson(needs.calculate-test-jobs.outputs.complement_test_matrix) }}
+        job: ${{ fromJson(needs.calculate-test-jobs.outputs.complement_singles_test_matrix) }}
 
     steps:
       - name: Run actions/checkout@v3 for synapse
@@ -61,9 +60,9 @@ jobs:
       - name: Run Complement Tests
         shell: bash
         env:
-          POSTGRES: ${{ (matrix.job.database == 'Postgres') && 1 || '' }}
-          WORKERS: ${{ (matrix.job.arrangement == 'workers') && 1 || '' }}
-          SYNAPSE_WORKER_TYPES: ${{ matrix.worker_types }}
+          POSTGRES: "true"
+          WORKERS: "true"
+          SYNAPSE_WORKER_TYPES: ${{ matrix.job.worker_types }}
         run: |
           set -o pipefail
           COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
@@ -74,7 +73,7 @@ jobs:
     name: Tests Done
     if: ${{ always() }}
     needs:
-      - complement
+      - singles
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
