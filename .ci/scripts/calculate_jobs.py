@@ -126,3 +126,73 @@ print("::endgroup::")
 
 test_matrix = json.dumps(sytest_tests)
 print(f"::set-output name=sytest_test_matrix::{test_matrix}")
+
+
+# Calculate a comprehensive list of workers by type to hunt for specific problems with them.
+# Won't need to include if it's a 'worker' setup, because obviously it is. Postgres is implied
+# because it's necessary for worker at this time.
+
+complement_single_worker_tests = [
+    {
+        "worker_types": workers,
+    }
+    for workers in (
+        "account_data",
+        "appservice",
+        "background_worker",
+        "event_creator",
+        "event_persister",
+        "federation_inbound",
+        "federation_reader",
+        "federation_sender",
+        "frontend_proxy",
+        "media_repository",
+        "presence",
+        "pusher",
+        "receipts",
+        "synchrotron",
+        "to_device",
+        "typing",
+        "user_dir",
+    )
+]
+
+complement_sharding_worker_tests = [
+    {"worker_types": "event_persister, event_persister, event_persister"},
+    {"worker_types": "federation_sender, federation_sender, federation_sender"},
+    {"worker_types": "pusher, pusher, pusher"},
+    {"worker_types": "synchrotron, synchrotron, synchrotron"},
+]
+
+complement_stream_writers_worker_tests = [
+    {
+        "worker_types": "account_data, event_persister, presence, receipts, to_device, typing"
+    }
+]
+
+complement_fullset_worker_tests = [
+    {
+        "worker_types": "account_data, appservice, background_worker, event_creator, event_persister, event_persister, federation_inbound, federation_reader, federation_sender, federation_sender, frontend_proxy, media_repository, pusher, pusher, synchrotron, to_device, typing, user_dir"
+    }
+]
+
+print("::group::Calculated Complement jobs")
+print(
+    json.dumps(
+        complement_single_worker_tests
+        + complement_sharding_worker_tests
+        + complement_stream_writers_worker_tests
+        + complement_fullset_worker_tests,
+        indent=4,
+    )
+)
+print("::endgroup::")
+
+test_matrix = json.dumps(complement_single_worker_tests)
+print(f"::set-output name=complement_singles_test_matrix::{test_matrix}")
+test_matrix = json.dumps(complement_sharding_worker_tests)
+print(f"::set-output name=complement_sharding_test_matrix::{test_matrix}")
+test_matrix = json.dumps(complement_stream_writers_worker_tests)
+print(f"::set-output name=complement_stream_writers_test_matrix::{test_matrix}")
+test_matrix = json.dumps(complement_fullset_worker_tests)
+print(f"::set-output name=complement_fullset_test_matrix::{test_matrix}")
