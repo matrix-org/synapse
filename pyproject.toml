@@ -270,7 +270,7 @@ all = [
 isort = "==5.10.1"
 black = "==22.3.0"
 flake8-comprehensions = "*"
-flake8-bugbear = "==21.3.2"
+flake8-bugbear = "==22.9.23"
 flake8 = "*"
 
 # Typechecking
