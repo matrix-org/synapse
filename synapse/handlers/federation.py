@@ -1645,15 +1645,10 @@ class FederationHandler:
         #   homeservers for large rooms.
         #   https://github.com/matrix-org/synapse/issues/12999
 
-        if initial_destination is None and len(other_destinations) == 0:
-            raise ValueError(
-                f"Cannot resync state of {room_id}: no destinations provided"
-            )
-
         # Make an infinite iterator of destinations to try. Once we find a working
         # destination, we'll stick with it until it flakes.
         destinations = _prioritise_destinations_for_partial_state_resync(
-            initial_destination, other_destinations
+            initial_destination, other_destinations, room_id
         )
         destination_iter = itertools.cycle(destinations)
 
@@ -1740,13 +1735,20 @@ class FederationHandler:
 
 
 def _prioritise_destinations_for_partial_state_resync(
-    initial_destination: Optional[str], other_destinations: Collection[str]
+    initial_destination: Optional[str],
+    other_destinations: Collection[str],
+    room_id: str,
 ) -> Sequence[str]:
     """Work out the order in which we should ask servers to resync events.
 
     If an `initial_destination` is given, it takes top priority. Otherwise
     all servers are treated equally.
+
+    :raises ValueError: if no destination is provided at all.
     """
+    if initial_destination is None and len(other_destinations) == 0:
+        raise ValueError(f"Cannot resync state of {room_id}: no destinations provided")
+
     if initial_destination is not None:
         # Move `initial_destination` to the front of the list.
         destinations = list(other_destinations)
