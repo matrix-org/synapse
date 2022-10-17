@@ -20,7 +20,7 @@ FROM debian:bullseye-slim AS deps_base
 # which makes it much easier to copy (but we need to make sure we use an image
 # based on the same debian version as the synapse image, to make sure we get
 # the expected version of libc.
-FROM redis:6-bullseye AS redis_base
+FROM redis:7-bullseye AS redis_base
 
 # now build the final image, based on the the regular Synapse docker image
 FROM matrixdotorg/synapse:$SYNAPSE_VERSION
