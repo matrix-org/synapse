@@ -110,7 +110,11 @@ def generate_config_from_template(
 
     log_config_file = environ["SYNAPSE_LOG_CONFIG"]
     log("Generating log config file " + log_config_file)
-    convert("/conf/log.config", log_config_file, environ)
+    convert(
+        "/conf/log.config",
+        log_config_file,
+        {**environ, "include_worker_name_in_log_line": False},
+    )
 
     # Hopefully we already have a signing key, but generate one if not.
     args = [

@@ -285,7 +285,10 @@ class BackgroundUpdater:
         back_to_back_failures = 0
 
         try:
-            logger.info("Starting background schema updates")
+            logger.info(
+                "Starting background schema updates for database %s",
+                self._database_name,
+            )
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
@@ -507,25 +510,6 @@ class BackgroundUpdater:
             update_handler
         )
 
-    def register_noop_background_update(self, update_name: str) -> None:
-        """Register a noop handler for a background update.
-
-        This is useful when we previously did a background update, but no
-        longer wish to do the update. In this case the background update should
-        be removed from the schema delta files, but there may still be some
-        users who have the background update queued, so this method should
-        also be called to clear the update.
-
-        Args:
-            update_name: Name of update
-        """
-
-        async def noop_update(progress: JsonDict, batch_size: int) -> int:
-            await self._end_background_update(update_name)
-            return 1
-
-        self.register_background_update_handler(update_name, noop_update)
-
     def register_background_index_update(
         self,
         update_name: str,
@@ -552,6 +536,7 @@ class BackgroundUpdater:
             index_name: name of index to add
             table: table to add index to
             columns: columns/expressions to include in index
+            where_clause: A WHERE clause to specify a partial unique index.
             unique: true to make a UNIQUE index
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)
@@ -600,9 +585,6 @@ class BackgroundUpdater:
         def create_index_sqlite(conn: Connection) -> None:
             # Sqlite doesn't support concurrent creation of indexes.
             #
-            # We don't use partial indices on SQLite as it wasn't introduced
-            # until 3.8, and wheezy and CentOS 7 have 3.7
-            #
             # We assume that sqlite doesn't give us invalid indices; however
             # we may still end up with the index existing but the
             # background_updates not having been recorded if synapse got shut
@@ -610,12 +592,13 @@ class BackgroundUpdater:
             # has supported CREATE TABLE|INDEX IF NOT EXISTS since 3.3.0.)
             sql = (
                 "CREATE %(unique)s INDEX IF NOT EXISTS %(name)s ON %(table)s"
-                " (%(columns)s)"
+                " (%(columns)s) %(where_clause)s"
             ) % {
                 "unique": "UNIQUE" if unique else "",
                 "name": index_name,
                 "table": table,
                 "columns": ", ".join(columns),
+                "where_clause": "WHERE " + where_clause if where_clause else "",
             }
 
             c = conn.cursor()

@@ -361,6 +361,7 @@ class ReceiptsStream(Stream):
         receipt_type: str
         user_id: str
         event_id: str
+        thread_id: Optional[str]
         data: dict
 
     NAME = "receipts"
@@ -583,26 +584,6 @@ class AccountDataStream(Stream):
         # `TypeError` from comparing a `str` vs `None`.
         updates = list(heapq.merge(room_rows, global_rows, key=lambda row: row[0]))
         return updates, to_token, limited
-
-
-class GroupServerStream(Stream):
-    @attr.s(slots=True, frozen=True, auto_attribs=True)
-    class GroupsStreamRow:
-        group_id: str
-        user_id: str
-        type: str
-        content: JsonDict
-
-    NAME = "groups"
-    ROW_TYPE = GroupsStreamRow
-
-    def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastores().main
-        super().__init__(
-            hs.get_instance_name(),
-            current_token_without_instance(store.get_group_stream_token),
-            store.get_all_groups_changes,
-        )
 
 
 class UserSignatureStream(Stream):

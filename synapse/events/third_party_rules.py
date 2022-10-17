@@ -152,6 +152,7 @@ class ThirdPartyEventRules:
         self.third_party_rules = None
 
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
 
         self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
         self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []
@@ -463,14 +464,7 @@ class ThirdPartyEventRules:
         Returns:
             A dict mapping (event type, state key) to state event.
         """
-        state_ids = await self.store.get_filtered_current_state_ids(room_id)
-        room_state_events = await self.store.get_events(state_ids.values())
-
-        state_events = {}
-        for key, event_id in state_ids.items():
-            state_events[key] = room_state_events[event_id]
-
-        return state_events
+        return await self._storage_controllers.state.get_current_state(room_id)
 
     async def on_profile_update(
         self, user_id: str, new_profile: ProfileInfo, by_admin: bool, deactivation: bool

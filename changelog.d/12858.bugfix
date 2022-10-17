@@ -1,1 +1,0 @@
-Fix [MSC3787](https://github.com/matrix-org/matrix-spec-proposals/pull/3787) rooms being omitted from room directory, room summary and space hierarchy responses.

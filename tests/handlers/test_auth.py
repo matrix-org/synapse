@@ -38,7 +38,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # MAU tests
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
-        self.auth_blocking = hs.get_auth()._auth_blocking
+        self.auth_blocking = hs.get_auth_blocking()
         self.auth_blocking._max_mau_value = 50
 
         self.small_number_of_users = 1

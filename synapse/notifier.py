@@ -221,13 +221,14 @@ class Notifier:
         self.room_to_user_streams: Dict[str, Set[_NotifierUserStream]] = {}
 
         self.hs = hs
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastores().main
         self.pending_new_room_events: List[_PendingRoomEventEntry] = []
 
         # Called when there are new things to stream over replication
         self.replication_callbacks: List[Callable[[], None]] = []
+        self._new_join_in_room_callbacks: List[Callable[[str, str], None]] = []
 
         self._federation_client = hs.get_federation_http_client()
 
@@ -280,35 +281,44 @@ class Notifier:
         """
         self.replication_callbacks.append(cb)
 
-    async def on_new_room_event(
+    def add_new_join_in_room_callback(self, cb: Callable[[str, str], None]) -> None:
+        """Add a callback that will be called when a user joins a room.
+
+        This only fires on genuine membership changes, e.g. "invite" -> "join".
+        Membership transitions like "join" -> "join" (for e.g. displayname changes) do
+        not trigger the callback.
+
+        When called, the callback receives two arguments: the event ID and the room ID.
+        It should *not* return a Deferred - if it needs to do any asynchronous work, a
+        background thread should be started and wrapped with run_as_background_process.
+        """
+        self._new_join_in_room_callbacks.append(cb)
+
+    async def on_new_room_events(
         self,
-        event: EventBase,
-        event_pos: PersistedEventPosition,
+        events_and_pos: List[Tuple[EventBase, PersistedEventPosition]],
         max_room_stream_token: RoomStreamToken,
         extra_users: Optional[Collection[UserID]] = None,
     ) -> None:
-        """Unwraps event and calls `on_new_room_event_args`."""
-        await self.on_new_room_event_args(
-            event_pos=event_pos,
-            room_id=event.room_id,
-            event_id=event.event_id,
-            event_type=event.type,
-            state_key=event.get("state_key"),
-            membership=event.content.get("membership"),
-            max_room_stream_token=max_room_stream_token,
-            extra_users=extra_users or [],
-        )
+        """Creates a _PendingRoomEventEntry for each of the listed events and calls
+        notify_new_room_events with the results."""
+        event_entries = []
+        for event, pos in events_and_pos:
+            entry = self.create_pending_room_event_entry(
+                pos,
+                extra_users,
+                event.room_id,
+                event.type,
+                event.get("state_key"),
+                event.content.get("membership"),
+            )
+            event_entries.append((entry, event.event_id))
+        await self.notify_new_room_events(event_entries, max_room_stream_token)
 
-    async def on_new_room_event_args(
+    async def notify_new_room_events(
         self,
-        room_id: str,
-        event_id: str,
-        event_type: str,
-        state_key: Optional[str],
-        membership: Optional[str],
-        event_pos: PersistedEventPosition,
+        event_entries: List[Tuple[_PendingRoomEventEntry, str]],
         max_room_stream_token: RoomStreamToken,
-        extra_users: Optional[Collection[UserID]] = None,
     ) -> None:
         """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
@@ -324,21 +334,32 @@ class Notifier:
         until all previous events have been persisted before notifying
         the client streams.
         """
-        self.pending_new_room_events.append(
-            _PendingRoomEventEntry(
-                event_pos=event_pos,
-                extra_users=extra_users or [],
-                room_id=room_id,
-                type=event_type,
-                state_key=state_key,
-                membership=membership,
-            )
-        )
+        for event_entry, event_id in event_entries:
+            self.pending_new_room_events.append(event_entry)
+            await self._third_party_rules.on_new_event(event_id)
+
         self._notify_pending_new_room_events(max_room_stream_token)
 
-        await self._third_party_rules.on_new_event(event_id)
-
         self.notify_replication()
+
+    def create_pending_room_event_entry(
+        self,
+        event_pos: PersistedEventPosition,
+        extra_users: Optional[Collection[UserID]],
+        room_id: str,
+        event_type: str,
+        state_key: Optional[str],
+        membership: Optional[str],
+    ) -> _PendingRoomEventEntry:
+        """Creates and returns a _PendingRoomEventEntry"""
+        return _PendingRoomEventEntry(
+            event_pos=event_pos,
+            extra_users=extra_users or [],
+            room_id=room_id,
+            type=event_type,
+            state_key=state_key,
+            membership=membership,
+        )
 
     def _notify_pending_new_room_events(
         self, max_room_stream_token: RoomStreamToken
@@ -623,7 +644,7 @@ class Notifier:
 
                 if name == "room":
                     new_events = await filter_events_for_client(
-                        self.storage,
+                        self._storage_controllers,
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,
@@ -681,7 +702,7 @@ class Notifier:
         return joined_room_ids, True
 
     async def _is_world_readable(self, room_id: str) -> bool:
-        state = await self.state_handler.get_current_state(
+        state = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
@@ -722,6 +743,10 @@ class Notifier:
         """Notify the any replication listeners that there's a new event"""
         for cb in self.replication_callbacks:
             cb()
+
+    def notify_user_joined_room(self, event_id: str, room_id: str) -> None:
+        for cb in self._new_join_in_room_callbacks:
+            cb(event_id, room_id)
 
     def notify_remote_server_up(self, server: str) -> None:
         """Notify any replication that a remote server has come back up"""

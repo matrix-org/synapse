@@ -46,16 +46,3 @@ class StatsConfig(Config):
             self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
         if not self.stats_enabled:
             logger.warning(ROOM_STATS_DISABLED_WARN)
-
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """
-        # Settings for local room and user statistics collection. See
-        # https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.
-        #
-        stats:
-          # Uncomment the following to disable room and user statistics. Note that doing
-          # so may cause certain features (such as the room directory) not to work
-          # correctly.
-          #
-          #enabled: false
-        """

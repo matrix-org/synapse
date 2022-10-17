@@ -11,18 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import attr
 from frozendict import frozendict
-from typing_extensions import Literal
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
-    from synapse.storage import Storage
+    from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
     from synapse.storage.state import StateFilter
 
@@ -33,7 +32,7 @@ class EventContext:
     Holds information relevant to persisting an event
 
     Attributes:
-        rejected: A rejection reason if the event was rejected, else False
+        rejected: A rejection reason if the event was rejected, else None
 
         _state_group: The ID of the state group for this event. Note that state events
             are persisted with a state group which includes the new event, so this is
@@ -84,8 +83,8 @@ class EventContext:
             incomplete state.
     """
 
-    _storage: "Storage"
-    rejected: Union[Literal[False], str] = False
+    _storage: "StorageControllers"
+    rejected: Optional[str] = None
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
     _state_delta_due_to_event: Optional[StateMap[str]] = None
@@ -97,7 +96,7 @@ class EventContext:
 
     @staticmethod
     def with_state(
-        storage: "Storage",
+        storage: "StorageControllers",
         state_group: Optional[int],
         state_group_before_event: Optional[int],
         state_delta_due_to_event: Optional[StateMap[str]],
@@ -117,7 +116,7 @@ class EventContext:
 
     @staticmethod
     def for_outlier(
-        storage: "Storage",
+        storage: "StorageControllers",
     ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
         return EventContext(storage=storage)
@@ -147,7 +146,7 @@ class EventContext:
         }
 
     @staticmethod
-    def deserialize(storage: "Storage", input: JsonDict) -> "EventContext":
+    def deserialize(storage: "StorageControllers", input: JsonDict) -> "EventContext":
         """Converts a dict that was produced by `serialize` back into a
         EventContext.
 

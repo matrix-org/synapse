@@ -18,14 +18,15 @@ from typing import Tuple
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes
-from synapse.http.server import JsonResource, cancellable
+from synapse.http.server import JsonResource
 from synapse.replication.http import REPLICATION_PREFIX
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util.cancellation import cancellable
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestHelperMixin
+from tests.http.server._base import test_disconnect
 
 
 class CancellableReplicationEndpoint(ReplicationEndpoint):
@@ -69,9 +70,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
         return HTTPStatus.OK, {"result": True}
 
 
-class ReplicationEndpointCancellationTestCase(
-    unittest.HomeserverTestCase, EndpointCancellationTestHelperMixin
-):
+class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     """Tests for `ReplicationEndpoint` cancellation."""
 
     def create_test_resource(self):
@@ -87,7 +86,7 @@ class ReplicationEndpointCancellationTestCase(
         """Test that handlers with the `@cancellable` flag can be cancelled."""
         path = f"{REPLICATION_PREFIX}/{CancellableReplicationEndpoint.NAME}/"
         channel = self.make_request("POST", path, await_result=False)
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=True,
@@ -98,7 +97,7 @@ class ReplicationEndpointCancellationTestCase(
         """Test that handlers without the `@cancellable` flag cannot be cancelled."""
         path = f"{REPLICATION_PREFIX}/{UncancellableReplicationEndpoint.NAME}/"
         channel = self.make_request("POST", path, await_result=False)
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=False,

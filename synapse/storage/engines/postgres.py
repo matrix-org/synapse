@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Any, Mapping, NoReturn, Optional, Tuple, cast
 
+import psycopg2.extensions
+
 from synapse.storage.engines._base import (
     BaseDatabaseEngine,
     IncorrectDatabaseSetup,
@@ -23,18 +25,16 @@ from synapse.storage.engines._base import (
 from synapse.storage.types import Cursor
 
 if TYPE_CHECKING:
-    import psycopg2  # noqa: F401
-
     from synapse.storage.database import LoggingDatabaseConnection
 
 
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
+class PostgresEngine(
+    BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
+):
     def __init__(self, database_config: Mapping[str, Any]):
-        import psycopg2.extensions
-
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
@@ -69,7 +69,9 @@ class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
         return collation, ctype
 
     def check_database(
-        self, db_conn: "psycopg2.connection", allow_outdated_version: bool = False
+        self,
+        db_conn: psycopg2.extensions.connection,
+        allow_outdated_version: bool = False,
     ) -> None:
         # Get the version of PostgreSQL that we're using. As per the psycopg2
         # docs: The number is formed by converting the major, minor, and
@@ -159,13 +161,6 @@ class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
         db_conn.commit()
 
     @property
-    def can_native_upsert(self) -> bool:
-        """
-        Can we use native UPSERTs?
-        """
-        return True
-
-    @property
     def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return True
@@ -180,8 +175,6 @@ class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
         return int(self.server_version.split(".")[0]) >= 11
 
     def is_deadlock(self, error: Exception) -> bool:
-        import psycopg2.extensions
-
         if isinstance(error, psycopg2.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html
             # "40001" serialization_failure
@@ -189,7 +182,7 @@ class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
             return error.pgcode in ["40001", "40P01"]
         return False
 
-    def is_connection_closed(self, conn: "psycopg2.connection") -> bool:
+    def is_connection_closed(self, conn: psycopg2.extensions.connection) -> bool:
         return bool(conn.closed)
 
     def lock_table(self, txn: Cursor, table: str) -> None:
@@ -209,21 +202,27 @@ class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
         else:
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
 
-    def in_transaction(self, conn: "psycopg2.connection") -> bool:
-        import psycopg2.extensions
-
+    def in_transaction(self, conn: psycopg2.extensions.connection) -> bool:
         return conn.status != psycopg2.extensions.STATUS_READY
 
     def attempt_to_set_autocommit(
-        self, conn: "psycopg2.connection", autocommit: bool
+        self, conn: psycopg2.extensions.connection, autocommit: bool
     ) -> None:
         return conn.set_session(autocommit=autocommit)
 
     def attempt_to_set_isolation_level(
-        self, conn: "psycopg2.connection", isolation_level: Optional[int]
+        self, conn: psycopg2.extensions.connection, isolation_level: Optional[int]
     ) -> None:
         if isolation_level is None:
             isolation_level = self.default_isolation_level
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)
+
+    @staticmethod
+    def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+        """
+        cursor.execute(script)

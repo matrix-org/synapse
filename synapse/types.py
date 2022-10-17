@@ -52,6 +52,7 @@ from twisted.internet.interfaces import (
 )
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.util.cancellation import cancellable
 from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
@@ -267,7 +268,6 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
             )
 
         domain = parts[1]
-
         # This code will need changing if we want to support multiple domain
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
@@ -279,6 +279,8 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
         """Parses the input string and attempts to ensure it is valid."""
+        # TODO: this does not reject an empty localpart or an overly-long string.
+        # See https://spec.matrix.org/v1.2/appendices/#identifier-grammar
         try:
             obj = cls.from_string(s)
             # Apply additional validation to the domain. This is only done
@@ -639,7 +641,7 @@ class StreamToken:
         6. `push_rules_key`: `541479`
         7. `to_device_key`: `274711`
         8. `device_list_key`: `265584`
-        9. `groups_key`: `1`
+        9. `groups_key`: `1` (note that this key is now unused)
 
     You can see how many of these keys correspond to the various
     fields in a "/sync" response:
@@ -691,13 +693,18 @@ class StreamToken:
     push_rules_key: int
     to_device_key: int
     device_list_key: int
+    # Note that the groups key is no longer used and may have bogus values.
     groups_key: int
 
     _SEPARATOR = "_"
     START: ClassVar["StreamToken"]
 
     @classmethod
+    @cancellable
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
+        """
+        Creates a RoomStreamToken from its textual representation.
+        """
         try:
             keys = string.split(cls._SEPARATOR)
             while len(keys) < len(attr.fields(cls)):
@@ -722,6 +729,9 @@ class StreamToken:
                 str(self.push_rules_key),
                 str(self.to_device_key),
                 str(self.device_list_key),
+                # Note that the groups key is no longer used, but it is still
+                # serialized so that there will not be confusion in the future
+                # if additional tokens are added.
                 str(self.groups_key),
             ]
         )
@@ -825,6 +835,7 @@ class ReadReceipt:
     receipt_type: str
     user_id: str
     event_ids: List[str]
+    thread_id: Optional[str]
     data: JsonDict
 
 

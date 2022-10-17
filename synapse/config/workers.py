@@ -27,7 +27,7 @@ from ._base import (
     RoutableShardedWorkerHandlingConfig,
     ShardedWorkerHandlingConfig,
 )
-from .server import ListenerConfig, parse_listener_def
+from .server import DIRECT_TCP_ERROR, ListenerConfig, parse_listener_def
 
 _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
 The send_federation config option must be disabled in the main
@@ -128,7 +128,8 @@ class WorkerConfig(Config):
             self.worker_app = None
 
         self.worker_listeners = [
-            parse_listener_def(x) for x in config.get("worker_listeners", [])
+            parse_listener_def(i, x)
+            for i, x in enumerate(config.get("worker_listeners", []))
         ]
         self.worker_daemonize = bool(config.get("worker_daemonize"))
         self.worker_pid_file = config.get("worker_pid_file")
@@ -142,7 +143,8 @@ class WorkerConfig(Config):
         self.worker_replication_host = config.get("worker_replication_host", None)
 
         # The port on the main synapse for TCP replication
-        self.worker_replication_port = config.get("worker_replication_port", None)
+        if "worker_replication_port" in config:
+            raise ConfigError(DIRECT_TCP_ERROR, ("worker_replication_port",))
 
         # The port on the main synapse for HTTP replication endpoint
         self.worker_replication_http_port = config.get("worker_replication_http_port")
@@ -409,55 +411,6 @@ class WorkerConfig(Config):
         # either is True.
         # (By this point, these are either the same value or only one is not None.)
         return bool(new_option_should_run_here or legacy_option_should_run_here)
-
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        ## Workers ##
-
-        # Disables sending of outbound federation transactions on the main process.
-        # Uncomment if using a federation sender worker.
-        #
-        #send_federation: false
-
-        # It is possible to run multiple federation sender workers, in which case the
-        # work is balanced across them.
-        #
-        # This configuration must be shared between all federation sender workers, and if
-        # changed all federation sender workers must be stopped at the same time and then
-        # started, to ensure that all instances are running with the same config (otherwise
-        # events may be dropped).
-        #
-        #federation_sender_instances:
-        #  - federation_sender1
-
-        # When using workers this should be a map from `worker_name` to the
-        # HTTP replication listener of the worker, if configured.
-        #
-        #instance_map:
-        #  worker1:
-        #    host: localhost
-        #    port: 8034
-
-        # Experimental: When using workers you can define which workers should
-        # handle event persistence and typing notifications. Any worker
-        # specified here must also be in the `instance_map`.
-        #
-        #stream_writers:
-        #  events: worker1
-        #  typing: worker1
-
-        # The worker that is used to run background tasks (e.g. cleaning up expired
-        # data). If not provided this defaults to the main process.
-        #
-        #run_background_tasks_on: worker1
-
-        # A shared secret used by the replication APIs to authenticate HTTP requests
-        # from workers.
-        #
-        # By default this is unused and traffic is not authenticated.
-        #
-        #worker_replication_secret: ""
-        """
 
     def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in

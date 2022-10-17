@@ -26,6 +26,7 @@ from twisted.web import http
 from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
+    from synapse.config.homeserver import HomeServerConfig
     from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,12 @@ class Codes(str, Enum):
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
 
+    # Part of MSC3848
+    # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
+    ALREADY_JOINED = "ORG.MATRIX.MSC3848.ALREADY_JOINED"
+    NOT_JOINED = "ORG.MATRIX.MSC3848.NOT_JOINED"
+    INSUFFICIENT_POWER = "ORG.MATRIX.MSC3848.INSUFFICIENT_POWER"
+
     # The account has been suspended on the server.
     # By opposition to `USER_DEACTIVATED`, this is a reversible measure
     # that can possibly be appealed and reverted.
@@ -92,6 +99,14 @@ class Codes(str, Enum):
     UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
+
+    # Returned for federation requests where we can't process a request as we
+    # can't ensure the sending server is in a room which is partial-stated on
+    # our side.
+    # Part of MSC3895.
+    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
+
+    USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
 
 
 class CodeMessageException(RuntimeError):
@@ -167,7 +182,7 @@ class SynapseError(CodeMessageException):
         else:
             self._additional_fields = dict(additional_fields)
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, **self._additional_fields)
 
 
@@ -213,7 +228,7 @@ class ConsentNotGivenError(SynapseError):
         )
         self._consent_uri = consent_uri
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
@@ -297,8 +312,45 @@ class AuthError(SynapseError):
     other poorly-defined times.
     """
 
-    def __init__(self, code: int, msg: str, errcode: str = Codes.FORBIDDEN):
-        super().__init__(code, msg, errcode)
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str = Codes.FORBIDDEN,
+        additional_fields: Optional[dict] = None,
+    ):
+        super().__init__(code, msg, errcode, additional_fields)
+
+
+class UnstableSpecAuthError(AuthError):
+    """An error raised when a new error code is being proposed to replace a previous one.
+    This error will return a "org.matrix.unstable.errcode" property with the new error code,
+    with the previous error code still being defined in the "errcode" property.
+
+    This error will include `org.matrix.msc3848.unstable.errcode` in the C-S error body.
+    """
+
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str,
+        previous_errcode: str = Codes.FORBIDDEN,
+        additional_fields: Optional[dict] = None,
+    ):
+        self.previous_errcode = previous_errcode
+        super().__init__(code, msg, errcode, additional_fields)
+
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
+        fields = {}
+        if config is not None and config.experimental.msc3848_enabled:
+            fields["org.matrix.msc3848.unstable.errcode"] = self.errcode
+        return cs_error(
+            self.msg,
+            self.previous_errcode,
+            **fields,
+            **self._additional_fields,
+        )
 
 
 class InvalidClientCredentialsError(SynapseError):
@@ -332,8 +384,8 @@ class InvalidClientTokenError(InvalidClientCredentialsError):
         super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
         self._soft_logout = soft_logout
 
-    def error_dict(self) -> "JsonDict":
-        d = super().error_dict()
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
+        d = super().error_dict(config)
         d["soft_logout"] = self._soft_logout
         return d
 
@@ -356,7 +408,7 @@ class ResourceLimitError(SynapseError):
         self.limit_type = limit_type
         super().__init__(code, msg, errcode=errcode)
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(
             self.msg,
             self.errcode,
@@ -391,7 +443,7 @@ class InvalidCaptchaError(SynapseError):
         super().__init__(code, msg, errcode)
         self.error_url = error_url
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, error_url=self.error_url)
 
 
@@ -408,7 +460,7 @@ class LimitExceededError(SynapseError):
         super().__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
 
 
@@ -423,7 +475,7 @@ class RoomKeysVersionError(SynapseError):
         super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, current_version=self.current_version)
 
 
@@ -463,7 +515,7 @@ class IncompatibleRoomVersionError(SynapseError):
 
         self._room_version = room_version
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, room_version=self._room_version)
 
 
@@ -509,11 +561,25 @@ class UnredactedContentDeletedError(SynapseError):
         )
         self.content_keep_ms = content_keep_ms
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         extra = {}
         if self.content_keep_ms is not None:
             extra = {"fi.mau.msc2815.content_keep_ms": self.content_keep_ms}
         return cs_error(self.msg, self.errcode, **extra)
+
+
+class NotApprovedError(SynapseError):
+    def __init__(
+        self,
+        msg: str,
+        approval_notice_medium: str,
+    ):
+        super().__init__(
+            code=403,
+            msg=msg,
+            errcode=Codes.USER_AWAITING_APPROVAL,
+            additional_fields={"approval_notice_medium": approval_notice_medium},
+        )
 
 
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
@@ -572,6 +638,27 @@ class FederationError(RuntimeError):
             "affected": self.affected,
             "source": self.source if self.source else self.affected,
         }
+
+
+class FederationPullAttemptBackoffError(RuntimeError):
+    """
+    Raised to indicate that we are are deliberately not attempting to pull the given
+    event over federation because we've already done so recently and are backing off.
+
+    Attributes:
+        event_id: The event_id which we are refusing to pull
+        message: A custom error message that gives more context
+    """
+
+    def __init__(self, event_ids: List[str], message: Optional[str]):
+        self.event_ids = event_ids
+
+        if message:
+            error_message = message
+        else:
+            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+
+        super().__init__(error_message)
 
 
 class HttpResponseException(CodeMessageException):

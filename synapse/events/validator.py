@@ -35,13 +35,17 @@ class EventValidator:
     def validate_new(self, event: EventBase, config: HomeServerConfig) -> None:
         """Validates the event has roughly the right format
 
+        Suitable for checking a locally-created event. It has stricter checks than
+        is appropriate for an event received over federation (for which, see
+        event_auth.validate_event_for_room_version)
+
         Args:
             event: The event to validate.
             config: The homeserver's configuration.
         """
         self.validate_builder(event)
 
-        if event.format_version == EventFormatVersions.V1:
+        if event.format_version == EventFormatVersions.ROOM_V1_V2:
             EventID.from_string(event.event_id)
 
         required = [

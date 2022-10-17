@@ -32,7 +32,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.util.caches.descriptors import _CachedFunction
+from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.util.caches.descriptors import CachedFunction
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -64,6 +65,31 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             columns=("instance_name", "stream_id"),
             psql_only=True,  # The table is only on postgres DBs.
         )
+
+        self._cache_id_gen: Optional[MultiWriterIdGenerator]
+        if isinstance(self.database_engine, PostgresEngine):
+            # We set the `writers` to an empty list here as we don't care about
+            # missing updates over restarts, as we'll not have anything in our
+            # caches to invalidate. (This reduces the amount of writes to the DB
+            # that happen).
+            self._cache_id_gen = MultiWriterIdGenerator(
+                db_conn,
+                database,
+                stream_name="caches",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    (
+                        "cache_invalidation_stream_by_instance",
+                        "instance_name",
+                        "stream_id",
+                    )
+                ],
+                sequence_name="cache_invalidation_stream_seq",
+                writers=[],
+            )
+
+        else:
+            self._cache_id_gen = None
 
     async def get_all_updated_caches(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -179,6 +205,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 self.get_rooms_for_user_with_stream_ordering.invalidate(
                     (data.state_key,)
                 )
+                self.get_rooms_for_user.invalidate((data.state_key,))
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 
@@ -193,37 +220,52 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         relates_to: Optional[str],
         backfilled: bool,
     ) -> None:
-        self._invalidate_get_event_cache(event_id)
-        self.have_seen_event.invalidate((room_id, event_id))
+        # This invalidates any local in-memory cached event objects, the original
+        # process triggering the invalidation is responsible for clearing any external
+        # cached objects.
+        self._invalidate_local_get_event_cache(event_id)
 
-        self.get_latest_event_ids_in_room.invalidate((room_id,))
-
-        self.get_unread_event_push_actions_by_room_for_user.invalidate((room_id,))
+        self._attempt_to_invalidate_cache("have_seen_event", (room_id, event_id))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
 
         # The `_get_membership_from_event_id` is immutable, except for the
         # case where we look up an event *before* persisting it.
-        self._get_membership_from_event_id.invalidate((event_id,))
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", (event_id,))
 
         if not backfilled:
             self._events_stream_cache.entity_has_changed(room_id, stream_ordering)
 
         if redacts:
-            self._invalidate_get_event_cache(redacts)
+            self._invalidate_local_get_event_cache(redacts)
             # Caches which might leak edits must be invalidated for the event being
             # redacted.
-            self.get_relations_for_event.invalidate((redacts,))
-            self.get_applicable_edit.invalidate((redacts,))
+            self._attempt_to_invalidate_cache("get_relations_for_event", (redacts,))
+            self._attempt_to_invalidate_cache("get_applicable_edit", (redacts,))
+            self._attempt_to_invalidate_cache("get_thread_id", (redacts,))
+            self._attempt_to_invalidate_cache("get_thread_id_for_receipts", (redacts,))
 
         if etype == EventTypes.Member:
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
-            self.get_invited_rooms_for_local_user.invalidate((state_key,))
+            self._attempt_to_invalidate_cache(
+                "get_invited_rooms_for_local_user", (state_key,)
+            )
+            self._attempt_to_invalidate_cache(
+                "get_rooms_for_user_with_stream_ordering", (state_key,)
+            )
+            self._attempt_to_invalidate_cache("get_rooms_for_user", (state_key,))
 
         if relates_to:
-            self.get_relations_for_event.invalidate((relates_to,))
-            self.get_aggregation_groups_for_event.invalidate((relates_to,))
-            self.get_applicable_edit.invalidate((relates_to,))
-            self.get_thread_summary.invalidate((relates_to,))
-            self.get_thread_participated.invalidate((relates_to,))
+            self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
+            self._attempt_to_invalidate_cache(
+                "get_aggregation_groups_for_event", (relates_to,)
+            )
+            self._attempt_to_invalidate_cache("get_applicable_edit", (relates_to,))
+            self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
+            self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
+            self._attempt_to_invalidate_cache("get_threads", (room_id,))
 
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
@@ -240,9 +282,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             return
 
         cache_func.invalidate(keys)
-        await self.db_pool.runInteraction(
-            "invalidate_cache_and_stream",
-            self._send_invalidation_to_replication,
+        await self.send_invalidation_to_replication(
             cache_func.__name__,
             keys,
         )
@@ -250,7 +290,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
     def _invalidate_cache_and_stream(
         self,
         txn: LoggingTransaction,
-        cache_func: _CachedFunction,
+        cache_func: CachedFunction,
         keys: Tuple[Any, ...],
     ) -> None:
         """Invalidates the cache and adds it to the cache stream so slaves
@@ -264,7 +304,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self._send_invalidation_to_replication(txn, cache_func.__name__, keys)
 
     def _invalidate_all_cache_and_stream(
-        self, txn: LoggingTransaction, cache_func: _CachedFunction
+        self, txn: LoggingTransaction, cache_func: CachedFunction
     ) -> None:
         """Invalidates the entire cache and adds it to the cache stream so slaves
         will know to invalidate their caches.
@@ -304,6 +344,16 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._send_invalidation_to_replication(
                 txn, CURRENT_STATE_CACHE_NAME, [room_id]
             )
+
+    async def send_invalidation_to_replication(
+        self, cache_name: str, keys: Optional[Collection[Any]]
+    ) -> None:
+        await self.db_pool.runInteraction(
+            "send_invalidation_to_replication",
+            self._send_invalidation_to_replication,
+            cache_name,
+            keys,
+        )
 
     def _send_invalidation_to_replication(
         self, txn: LoggingTransaction, cache_name: str, keys: Optional[Iterable[Any]]

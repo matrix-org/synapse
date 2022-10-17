@@ -106,4 +106,5 @@ isort "${files[@]}"
 python3 -m black "${files[@]}"
 ./scripts-dev/config-lint.sh
 flake8 "${files[@]}"
+./scripts-dev/check_pydantic_models.py lint
 mypy

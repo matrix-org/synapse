@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import urllib.parse
-from http import HTTPStatus
 
 from parameterized import parameterized
 
@@ -58,7 +57,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(method, self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -76,7 +75,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -85,7 +84,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(["GET", "PUT", "DELETE"])
     def test_user_does_not_exist(self, method: str) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = (
             "/_synapse/admin/v2/users/@unknown_person:test/devices/%s"
@@ -98,13 +97,13 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "PUT", "DELETE"])
     def test_user_is_not_local(self, method: str) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = (
             "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices/%s"
@@ -117,12 +116,12 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
     def test_unknown_device(self) -> None:
         """
-        Tests that a lookup for a device that does not exist returns either HTTPStatus.NOT_FOUND or HTTPStatus.OK.
+        Tests that a lookup for a device that does not exist returns either 404 or 200.
         """
         url = "/_synapse/admin/v2/users/%s/devices/unknown_device" % urllib.parse.quote(
             self.other_user
@@ -134,7 +133,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
         channel = self.make_request(
@@ -143,7 +142,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         channel = self.make_request(
             "DELETE",
@@ -151,8 +150,8 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        # Delete unknown device returns status HTTPStatus.OK
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        # Delete unknown device returns status 200
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def test_update_device_too_long_display_name(self) -> None:
         """
@@ -179,7 +178,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             content=update,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.TOO_LARGE, channel.json_body["errcode"])
 
         # Ensure the display name was not updated.
@@ -189,12 +188,12 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("new display", channel.json_body["display_name"])
 
     def test_update_no_display_name(self) -> None:
         """
-        Tests that a update for a device without JSON returns a HTTPStatus.OK
+        Tests that a update for a device without JSON returns a 200
         """
         # Set iniital display name.
         update = {"display_name": "new display"}
@@ -210,7 +209,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Ensure the display name was not updated.
         channel = self.make_request(
@@ -219,7 +218,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("new display", channel.json_body["display_name"])
 
     def test_update_display_name(self) -> None:
@@ -234,7 +233,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             content={"display_name": "new displayname"},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Check new display_name
         channel = self.make_request(
@@ -243,7 +242,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("new displayname", channel.json_body["display_name"])
 
     def test_get_device(self) -> None:
@@ -256,7 +255,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(self.other_user, channel.json_body["user_id"])
         # Check that all fields are available
         self.assertIn("user_id", channel.json_body)
@@ -281,7 +280,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Ensure that the number of devices is decreased
         res = self.get_success(self.handler.get_devices_by_user(self.other_user))
@@ -312,7 +311,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -331,7 +330,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -339,7 +338,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = "/_synapse/admin/v2/users/@unknown_person:test/devices"
         channel = self.make_request(
@@ -348,12 +347,12 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices"
 
@@ -363,7 +362,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
     def test_user_has_no_devices(self) -> None:
@@ -379,7 +378,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["devices"]))
 
@@ -399,7 +398,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_devices, channel.json_body["total"])
         self.assertEqual(number_devices, len(channel.json_body["devices"]))
         self.assertEqual(self.other_user, channel.json_body["devices"][0]["user_id"])
@@ -438,7 +437,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -457,7 +456,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -465,7 +464,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = "/_synapse/admin/v2/users/@unknown_person:test/delete_devices"
         channel = self.make_request(
@@ -474,12 +473,12 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/delete_devices"
 
@@ -489,12 +488,12 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
     def test_unknown_devices(self) -> None:
         """
-        Tests that a remove of a device that does not exist returns HTTPStatus.OK.
+        Tests that a remove of a device that does not exist returns 200.
         """
         channel = self.make_request(
             "POST",
@@ -503,8 +502,8 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             content={"devices": ["unknown_device1", "unknown_device2"]},
         )
 
-        # Delete unknown devices returns status HTTPStatus.OK
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        # Delete unknown devices returns status 200
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def test_delete_devices(self) -> None:
         """
@@ -533,7 +532,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             content={"devices": device_ids},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         res = self.get_success(self.handler.get_devices_by_user(self.other_user))
         self.assertEqual(0, len(res))

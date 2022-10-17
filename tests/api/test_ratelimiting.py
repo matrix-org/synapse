@@ -31,7 +31,6 @@ class TestRatelimiter(unittest.HomeserverTestCase):
     def test_allowed_appservice_ratelimited_via_can_requester_do_action(self):
         appservice = ApplicationService(
             None,
-            "example.com",
             id="foo",
             rate_limited=True,
             sender="@as:example.com",
@@ -62,7 +61,6 @@ class TestRatelimiter(unittest.HomeserverTestCase):
     def test_allowed_appservice_via_can_requester_do_action(self):
         appservice = ApplicationService(
             None,
-            "example.com",
             id="foo",
             rate_limited=False,
             sender="@as:example.com",
@@ -248,7 +246,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertTrue(allowed)
         self.assertEqual(10.0, time_allowed)
 
-        # Test that, after doing these 3 actions, we can't do any more action without
+        # Test that, after doing these 3 actions, we can't do any more actions without
         # waiting.
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", n_actions=1, _time_now_s=0)
@@ -256,7 +254,8 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertFalse(allowed)
         self.assertEqual(10.0, time_allowed)
 
-        # Test that after waiting we can do only 1 action.
+        # Test that after waiting we would be able to do only 1 action.
+        # Note that we don't actually do it (update=False) here.
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(
                 None,
@@ -267,23 +266,125 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             )
         )
         self.assertTrue(allowed)
-        # The time allowed is the current time because we could still repeat the action
-        # once.
-        self.assertEqual(10.0, time_allowed)
+        # We would be able to do the 5th action at t=20.
+        self.assertEqual(20.0, time_allowed)
 
+        # Attempt (but fail) to perform TWO actions at t=10.
+        # Those would be the 4th and 5th actions.
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", n_actions=2, _time_now_s=10)
         )
         self.assertFalse(allowed)
-        # The time allowed doesn't change despite allowed being False because, while we
-        # don't allow 2 actions, we could still do 1.
+        # The returned time allowed for the next action is now even though we weren't
+        # allowed to perform the action because whilst we don't allow 2 actions,
+        # we could still do 1.
         self.assertEqual(10.0, time_allowed)
 
-        # Test that after waiting a bit more we can do 2 actions.
+        # Test that after waiting until t=20, we can do perform 2 actions.
+        # These are the 4th and 5th actions.
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", n_actions=2, _time_now_s=20)
         )
         self.assertTrue(allowed)
-        # The time allowed is the current time because we could still repeat the action
-        # once.
-        self.assertEqual(20.0, time_allowed)
+        # We would be able to do the 6th action at t=30.
+        self.assertEqual(30.0, time_allowed)
+
+    def test_rate_limit_burst_only_given_once(self) -> None:
+        """
+        Regression test against a bug that meant that you could build up
+        extra tokens by timing requests.
+        """
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        def consume_at(time: float) -> bool:
+            success, _ = self.get_success_or_raise(
+                limiter.can_do_action(requester=None, key="a", _time_now_s=time)
+            )
+            return success
+
+        # Use all our 3 burst tokens
+        self.assertTrue(consume_at(0.0))
+        self.assertTrue(consume_at(0.1))
+        self.assertTrue(consume_at(0.2))
+
+        # Wait to recover 1 token (10 seconds at 0.1 Hz).
+        self.assertTrue(consume_at(10.1))
+
+        # Check that we get rate limited after using that token.
+        self.assertFalse(consume_at(11.1))
+
+    def test_record_action_which_doesnt_fill_bucket(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        # Observe two actions, leaving room in the bucket for one more.
+        limiter.record_action(requester=None, key="a", n_actions=2, _time_now_s=0.0)
+
+        # We should be able to take a new action now.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertTrue(success)
+
+        # ... but not two.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertFalse(success)
+
+    def test_record_action_which_fills_bucket(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        # Observe three actions, filling up the bucket.
+        limiter.record_action(requester=None, key="a", n_actions=3, _time_now_s=0.0)
+
+        # We should be unable to take a new action now.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertFalse(success)
+
+        # If we wait 10 seconds to leak a token, we should be able to take one action...
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=10.0)
+        )
+        self.assertTrue(success)
+
+        # ... but not two.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=10.0)
+        )
+        self.assertFalse(success)
+
+    def test_record_action_which_overfills_bucket(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        # Observe four actions, exceeding the bucket.
+        limiter.record_action(requester=None, key="a", n_actions=4, _time_now_s=0.0)
+
+        # We should be prevented from taking a new action now.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=0.0)
+        )
+        self.assertFalse(success)
+
+        # If we wait 10 seconds to leak a token, we should be unable to take an action
+        # because the bucket is still full.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=10.0)
+        )
+        self.assertFalse(success)
+
+        # But after another 10 seconds we leak a second token, giving us room for
+        # action.
+        success, _ = self.get_success_or_raise(
+            limiter.can_do_action(requester=None, key="a", _time_now_s=20.0)
+        )
+        self.assertTrue(success)

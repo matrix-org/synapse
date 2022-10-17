@@ -16,6 +16,7 @@
 import itertools
 import logging
 from collections import OrderedDict
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,9 +36,11 @@ from prometheus_client import Counter
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
+from synapse.logging.opentracing import trace
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -46,7 +49,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.storage.databases.main.search import SearchEntry
-from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
@@ -67,6 +70,24 @@ event_counter = Counter(
     "",
     ["type", "origin_type", "origin_entity"],
 )
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg="Cannot persist partial state event in un-partial stated room",
+            errcode=Codes.UNKNOWN,
+        )
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -125,6 +146,7 @@ class PersistEventsStore:
         self._backfill_id_gen: AbstractStreamIdGenerator = self.store._backfill_id_gen
         self._stream_id_gen: AbstractStreamIdGenerator = self.store._stream_id_gen
 
+    @trace
     async def _persist_events_and_state_updates(
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
@@ -154,6 +176,10 @@ class PersistEventsStore:
 
         Returns:
             Resolves when the events have been persisted
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
 
         # We want to calculate the stream orderings as late as possible, as
@@ -354,6 +380,9 @@ class PersistEventsStore:
                 For each room, a list of the event ids which are the forward
                 extremities.
 
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         state_delta_for_room = state_delta_for_room or {}
         new_forward_extremities = new_forward_extremities or {}
@@ -380,6 +409,31 @@ class PersistEventsStore:
         # stream orderings should have been assigned by now
         assert min_stream_order
         assert max_stream_order
+
+        # Once the txn completes, invalidate all of the relevant caches. Note that we do this
+        # up here because it captures all the events_and_contexts before any are removed.
+        for event, _ in events_and_contexts:
+            self.store.invalidate_get_event_cache_after_txn(txn, event.event_id)
+            if event.redacts:
+                self.store.invalidate_get_event_cache_after_txn(txn, event.redacts)
+
+            relates_to = None
+            relation = relation_from_event(event)
+            if relation:
+                relates_to = relation.parent_id
+
+            assert event.internal_metadata.stream_ordering is not None
+            txn.call_after(
+                self.store._invalidate_caches_for_event,
+                event.internal_metadata.stream_ordering,
+                event.event_id,
+                event.room_id,
+                event.type,
+                getattr(event, "state_key", None),
+                event.redacts,
+                relates_to,
+                backfilled=False,
+            )
 
         self._update_forward_extremities_txn(
             txn,
@@ -430,6 +484,7 @@ class PersistEventsStore:
 
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.
+        # NB: This function invalidates all state related caches
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
 
     def _persist_event_auth_chain_txn(
@@ -980,16 +1035,16 @@ class PersistEventsStore:
         self,
         room_id: str,
         state_delta: DeltaState,
-        stream_id: int,
     ) -> None:
         """Update the current state stored in the datatabase for the given room"""
 
-        await self.db_pool.runInteraction(
-            "update_current_state",
-            self._update_current_state_txn,
-            state_delta_by_room={room_id: state_delta},
-            stream_id=stream_id,
-        )
+        async with self._stream_id_gen.get_next() as stream_ordering:
+            await self.db_pool.runInteraction(
+                "update_current_state",
+                self._update_current_state_txn,
+                state_delta_by_room={room_id: state_delta},
+                stream_id=stream_ordering,
+            )
 
     def _update_current_state_txn(
         self,
@@ -1143,15 +1198,14 @@ class PersistEventsStore:
             )
 
             # Invalidate the various caches
-
-            for member in members_changed:
-                txn.call_after(
-                    self.store.get_rooms_for_user_with_stream_ordering.invalidate,
-                    (member,),
-                )
-
             self.store._invalidate_state_caches_and_stream(
                 txn, room_id, members_changed
+            )
+
+            # Check if any of the remote membership changes requires us to
+            # unsubscribe from their device lists.
+            self.store.handle_potentially_left_users_txn(
+                txn, {m for m in members_changed if not self.hs.is_mine_id(m)}
             )
 
     def _upsert_room_version_txn(self, txn: LoggingTransaction, room_id: str) -> None:
@@ -1192,9 +1246,6 @@ class PersistEventsStore:
         for room_id in new_forward_extremities.keys():
             self.db_pool.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
-            )
-            txn.call_after(
-                self.store.get_latest_event_ids_in_room.invalidate, (room_id,)
             )
 
         self.db_pool.simple_insert_many_txn(
@@ -1265,8 +1316,6 @@ class PersistEventsStore:
         """
         depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
-            # Remove the any existing cache entries for the event_ids
-            txn.call_after(self.store._invalidate_get_event_cache, event.event_id)
             # Then update the `stream_ordering` position to mark the latest
             # event as the front of the room. This should not be done for
             # backfilled events because backfilled events have negative
@@ -1304,6 +1353,10 @@ class PersistEventsStore:
 
         Returns:
             new list, without events which are already in the events table.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         txn.execute(
             "SELECT event_id, outlier FROM events WHERE event_id in (%s)"
@@ -1315,9 +1368,24 @@ class PersistEventsStore:
             event_id: outlier for event_id, outlier in txn
         }
 
+        logger.debug(
+            "_update_outliers_txn: events=%s have_persisted=%s",
+            [ev.event_id for ev, _ in events_and_contexts],
+            have_persisted,
+        )
+
         to_remove = set()
         for event, context in events_and_contexts:
-            if event.event_id not in have_persisted:
+            outlier_persisted = have_persisted.get(event.event_id)
+            logger.debug(
+                "_update_outliers_txn: event=%s outlier=%s outlier_persisted=%s",
+                event.event_id,
+                event.internal_metadata.is_outlier(),
+                outlier_persisted,
+            )
+
+            # Ignore events which we haven't persisted at all
+            if outlier_persisted is None:
                 continue
 
             to_remove.add(event)
@@ -1327,7 +1395,6 @@ class PersistEventsStore:
                 # was an outlier or not - what we have is at least as good.
                 continue
 
-            outlier_persisted = have_persisted[event.event_id]
             if not event.internal_metadata.is_outlier() and outlier_persisted:
                 # We received a copy of an event that we had already stored as
                 # an outlier in the database. We now have some state at that event
@@ -1338,7 +1405,10 @@ class PersistEventsStore:
                 # events down /sync. In general they will be historical events, so that
                 # doesn't matter too much, but that is not always the case.
 
-                logger.info("Updating state for ex-outlier event %s", event.event_id)
+                logger.info(
+                    "_update_outliers_txn: Updating state for ex-outlier event %s",
+                    event.event_id,
+                )
 
                 # insert into event_to_state_groups.
                 try:
@@ -1442,7 +1512,7 @@ class PersistEventsStore:
                     event.sender,
                     "url" in event.content and isinstance(event.content["url"], str),
                     event.get_state_key(),
-                    context.rejected or None,
+                    context.rejected,
                 )
                 for event, context in events_and_contexts
             ),
@@ -1546,7 +1616,7 @@ class PersistEventsStore:
                 )
 
                 # Remove from relations table.
-                self._handle_redact_relations(txn, event.redacts)
+                self._handle_redact_relations(txn, event.room_id, event.redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
@@ -1638,25 +1708,16 @@ class PersistEventsStore:
             if not row["rejects"] and not row["redacts"]:
                 to_prefill.append(EventCacheEntry(event=event, redacted_event=None))
 
-        def prefill() -> None:
+        async def prefill() -> None:
             for cache_entry in to_prefill:
-                self.store._get_event_cache.set(
+                await self.store._get_event_cache.set(
                     (cache_entry.event.event_id,), cache_entry
                 )
 
-        txn.call_after(prefill)
+        txn.async_call_after(prefill)
 
     def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
-        """Invalidate the caches for the redacted event.
-
-        Note that these caches are also cleared as part of event replication in
-        _invalidate_caches_for_event.
-        """
         assert event.redacts is not None
-        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
-        txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
-        txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
-
         self.db_pool.simple_upsert_txn(
             txn,
             table="redactions",
@@ -1757,22 +1818,6 @@ class PersistEventsStore:
 
         for event in events:
             assert event.internal_metadata.stream_ordering is not None
-            txn.call_after(
-                self.store._membership_stream_cache.entity_has_changed,
-                event.state_key,
-                event.internal_metadata.stream_ordering,
-            )
-            txn.call_after(
-                self.store.get_invited_rooms_for_local_user.invalidate,
-                (event.state_key,),
-            )
-
-            # The `_get_membership_from_event_id` is immutable, except for the
-            # case where we look up an event *before* persisting it.
-            txn.call_after(
-                self.store._get_membership_from_event_id.invalidate,
-                (event.event_id,),
-            )
 
             # We update the local_current_membership table only if the event is
             # "current", i.e., its something that has just happened.
@@ -1821,33 +1866,32 @@ class PersistEventsStore:
             },
         )
 
-        txn.call_after(
-            self.store.get_relations_for_event.invalidate, (relation.parent_id,)
-        )
-        txn.call_after(
-            self.store.get_aggregation_groups_for_event.invalidate,
-            (relation.parent_id,),
-        )
-        txn.call_after(
-            self.store.get_mutual_event_relations_for_rel_type.invalidate,
-            (relation.parent_id,),
-        )
-
-        if relation.rel_type == RelationTypes.REPLACE:
-            txn.call_after(
-                self.store.get_applicable_edit.invalidate, (relation.parent_id,)
-            )
-
         if relation.rel_type == RelationTypes.THREAD:
-            txn.call_after(
-                self.store.get_thread_summary.invalidate, (relation.parent_id,)
-            )
-            # It should be safe to only invalidate the cache if the user has not
-            # previously participated in the thread, but that's difficult (and
-            # potentially error-prone) so it is always invalidated.
-            txn.call_after(
-                self.store.get_thread_participated.invalidate,
-                (relation.parent_id, event.sender),
+            # Upsert into the threads table, but only overwrite the value if the
+            # new event is of a later topological order OR if the topological
+            # ordering is equal, but the stream ordering is later.
+            sql = """
+            INSERT INTO threads (room_id, thread_id, latest_event_id, topological_ordering, stream_ordering)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (room_id, thread_id)
+            DO UPDATE SET
+                latest_event_id = excluded.latest_event_id,
+                topological_ordering = excluded.topological_ordering,
+                stream_ordering = excluded.stream_ordering
+            WHERE
+                threads.topological_ordering <= excluded.topological_ordering AND
+                threads.stream_ordering < excluded.stream_ordering
+            """
+
+            txn.execute(
+                sql,
+                (
+                    event.room_id,
+                    relation.parent_id,
+                    event.event_id,
+                    event.depth,
+                    event.internal_metadata.stream_ordering,
+                ),
             )
 
     def _handle_insertion_event(
@@ -1973,13 +2017,14 @@ class PersistEventsStore:
         txn.execute(sql, (batch_id,))
 
     def _handle_redact_relations(
-        self, txn: LoggingTransaction, redacted_event_id: str
+        self, txn: LoggingTransaction, room_id: str, redacted_event_id: str
     ) -> None:
         """Handles receiving a redaction and checking whether the redacted event
         has any relations which must be removed from the database.
 
         Args:
             txn
+            room_id: The room ID of the event that was redacted.
             redacted_event_id: The event that was redacted.
         """
 
@@ -2009,9 +2054,7 @@ class PersistEventsStore:
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn,
-                self.store.get_mutual_event_relations_for_rel_type,
-                (redacted_relates_to,),
+                txn, self.store.get_threads, (room_id,)
             )
 
         self.db_pool.simple_delete_txn(
@@ -2118,26 +2161,26 @@ class PersistEventsStore:
                 appear in events_and_context.
         """
 
-        # Only non outlier events will have push actions associated with them,
+        # Only notifiable events will have push actions associated with them,
         # so let's filter them out. (This makes joining large rooms faster, as
         # these queries took seconds to process all the state events).
-        non_outlier_events = [
+        notifiable_events = [
             event
             for event, _ in events_and_contexts
-            if not event.internal_metadata.is_outlier()
+            if event.internal_metadata.is_notifiable()
         ]
 
         sql = """
             INSERT INTO event_push_actions (
                 room_id, event_id, user_id, actions, stream_ordering,
-                topological_ordering, notif, highlight, unread
+                topological_ordering, notif, highlight, unread, thread_id
             )
-            SELECT ?, event_id, user_id, actions, ?, ?, notif, highlight, unread
+            SELECT ?, event_id, user_id, actions, ?, ?, notif, highlight, unread, thread_id
             FROM event_push_actions_staging
             WHERE event_id = ?
         """
 
-        if non_outlier_events:
+        if notifiable_events:
             txn.execute_batch(
                 sql,
                 (
@@ -2147,31 +2190,9 @@ class PersistEventsStore:
                         event.depth,
                         event.event_id,
                     )
-                    for event in non_outlier_events
+                    for event in notifiable_events
                 ),
             )
-
-            room_to_event_ids: Dict[str, List[str]] = {}
-            for e in non_outlier_events:
-                room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
-
-            for room_id, event_ids in room_to_event_ids.items():
-                rows = self.db_pool.simple_select_many_txn(
-                    txn,
-                    table="event_push_actions_staging",
-                    column="event_id",
-                    iterable=event_ids,
-                    keyvalues={},
-                    retcols=("user_id",),
-                )
-
-                user_ids = {row["user_id"] for row in rows}
-
-                for user_id in user_ids:
-                    txn.call_after(
-                        self.store.get_unread_event_push_actions_by_room_for_user.invalidate,
-                        (room_id, user_id),
-                    )
 
         # Now we delete the staging area for *all* events that were being
         # persisted.
@@ -2180,18 +2201,13 @@ class PersistEventsStore:
             (
                 (event.event_id,)
                 for event, _ in all_events_and_contexts
-                if not event.internal_metadata.is_outlier()
+                if event.internal_metadata.is_notifiable()
             ),
         )
 
     def _remove_push_actions_for_event_id_txn(
         self, txn: LoggingTransaction, room_id: str, event_id: str
     ) -> None:
-        # Sad that we have to blow away the cache for the whole room here
-        txn.call_after(
-            self.store.get_unread_event_push_actions_by_room_for_user.invalidate,
-            (room_id,),
-        )
         txn.execute(
             "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
             (room_id, event_id),
@@ -2215,6 +2231,11 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: Collection[Tuple[EventBase, EventContext]],
     ) -> None:
+        """
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
+        """
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
@@ -2239,19 +2260,37 @@ class PersistEventsStore:
         # if we have partial state for these events, record the fact. (This happens
         # here rather than in _store_event_txn because it also needs to happen when
         # we de-outlier an event.)
-        self.db_pool.simple_insert_many_txn(
-            txn,
-            table="partial_state_events",
-            keys=("room_id", "event_id"),
-            values=[
-                (
-                    event.room_id,
-                    event.event_id,
-                )
-                for event, ctx in events_and_contexts
-                if ctx.partial_state
-            ],
-        )
+        try:
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="partial_state_events",
+                keys=("room_id", "event_id"),
+                values=[
+                    (
+                        event.room_id,
+                        event.event_id,
+                    )
+                    for event, ctx in events_and_contexts
+                    if ctx.partial_state
+                ],
+            )
+        except self.db_pool.engine.module.IntegrityError:
+            logger.info(
+                "Cannot persist events %s in rooms %s: room has been un-partial stated",
+                [
+                    event.event_id
+                    for event, ctx in events_and_contexts
+                    if ctx.partial_state
+                ],
+                list(
+                    {
+                        event.room_id
+                        for event, ctx in events_and_contexts
+                        if ctx.partial_state
+                    }
+                ),
+            )
+            raise PartialStateConflictError()
 
         self.db_pool.simple_upsert_many_txn(
             txn,
@@ -2296,11 +2335,9 @@ class PersistEventsStore:
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_edges",
-            keys=("event_id", "prev_event_id", "room_id", "is_state"),
+            keys=("event_id", "prev_event_id"),
             values=[
-                (ev.event_id, e_id, ev.room_id, False)
-                for ev in events
-                for e_id in ev.prev_event_ids()
+                (ev.event_id, e_id) for ev in events for e_id in ev.prev_event_ids()
             ],
         )
 
@@ -2352,17 +2389,31 @@ class PersistEventsStore:
             "DELETE FROM event_backward_extremities"
             " WHERE event_id = ? AND room_id = ?"
         )
+        backward_extremity_tuples_to_remove = [
+            (ev.event_id, ev.room_id)
+            for ev in events
+            if not ev.internal_metadata.is_outlier()
+            # If we encountered an event with no prev_events, then we might
+            # as well remove it now because it won't ever have anything else
+            # to backfill from.
+            or len(ev.prev_event_ids()) == 0
+        ]
         txn.execute_batch(
             query,
-            [
-                (ev.event_id, ev.room_id)
-                for ev in events
-                if not ev.internal_metadata.is_outlier()
-                # If we encountered an event with no prev_events, then we might
-                # as well remove it now because it won't ever have anything else
-                # to backfill from.
-                or len(ev.prev_event_ids()) == 0
-            ],
+            backward_extremity_tuples_to_remove,
+        )
+
+        # Clear out the failed backfill attempts after we successfully pulled
+        # the event. Since we no longer need these events as backward
+        # extremities, it also means that they won't be backfilled from again so
+        # we no longer need to store the backfill attempts around it.
+        query = """
+            DELETE FROM event_failed_pull_attempts
+            WHERE event_id = ? and room_id = ?
+        """
+        txn.execute_batch(
+            query,
+            backward_extremity_tuples_to_remove,
         )
 
 

@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
-
 from twisted.web.resource import Resource
 
 from synapse.rest.well_known import well_known_resource
@@ -38,7 +36,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(channel.code, HTTPStatus.OK)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
             {
@@ -57,7 +55,29 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(channel.code, HTTPStatus.NOT_FOUND)
+        self.assertEqual(channel.code, 404)
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://tesths",
+            "default_identity_server": "https://testis",
+            "extra_well_known_client_content": {"custom": False},
+        }
+    )
+    def test_client_well_known_custom(self) -> None:
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/client", shorthand=False
+        )
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body,
+            {
+                "m.homeserver": {"base_url": "https://tesths/"},
+                "m.identity_server": {"base_url": "https://testis"},
+                "custom": False,
+            },
+        )
 
     @unittest.override_config({"serve_server_wellknown": True})
     def test_server_well_known(self) -> None:
@@ -65,7 +85,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/server", shorthand=False
         )
 
-        self.assertEqual(channel.code, HTTPStatus.OK)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
             {"m.server": "test:443"},
@@ -75,4 +95,4 @@ class WellKnownTests(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "/.well-known/matrix/server", shorthand=False
         )
-        self.assertEqual(channel.code, HTTPStatus.NOT_FOUND)
+        self.assertEqual(channel.code, 404)

@@ -28,56 +28,6 @@ Ignoring 'database_path' setting: not using a sqlite3 database.
 """
 
 DEFAULT_CONFIG = """\
-## Database ##
-
-# The 'database' setting defines the database that synapse uses to store all of
-# its data.
-#
-# 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
-# 'psycopg2' (for PostgreSQL).
-#
-# 'txn_limit' gives the maximum number of transactions to run per connection
-# before reconnecting. Defaults to 0, which means no limit.
-#
-# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
-# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
-# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
-# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
-# https://wiki.postgresql.org/wiki/Locale_data_changes
-#
-# 'args' gives options which are passed through to the database engine,
-# except for options starting 'cp_', which are used to configure the Twisted
-# connection pool. For a reference to valid arguments, see:
-#   * for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
-#   * for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
-#   * for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
-#
-#
-# Example SQLite configuration:
-#
-#database:
-#  name: sqlite3
-#  args:
-#    database: /path/to/homeserver.db
-#
-#
-# Example Postgres configuration:
-#
-#database:
-#  name: psycopg2
-#  txn_limit: 10000
-#  args:
-#    user: synapse_user
-#    password: secretpassword
-#    database: synapse
-#    host: localhost
-#    port: 5432
-#    cp_min: 5
-#    cp_max: 10
-#
-# For more information on using Synapse with Postgres,
-# see https://matrix-org.github.io/synapse/latest/postgres.html.
-#
 database:
   name: sqlite3
   args:

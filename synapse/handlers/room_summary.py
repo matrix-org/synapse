@@ -28,11 +28,11 @@ from synapse.api.constants import (
     RoomTypes,
 )
 from synapse.api.errors import (
-    AuthError,
     Codes,
     NotFoundError,
     StoreError,
     SynapseError,
+    UnstableSpecAuthError,
     UnsupportedRoomVersionError,
 )
 from synapse.api.ratelimiting import Ratelimiter
@@ -90,6 +90,7 @@ class RoomSummaryHandler:
     def __init__(self, hs: "HomeServer"):
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
@@ -174,10 +175,11 @@ class RoomSummaryHandler:
 
         # First of all, check that the room is accessible.
         if not await self._is_local_room_accessible(requested_room_id, requester):
-            raise AuthError(
+            raise UnstableSpecAuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
                 % (requester, requested_room_id),
+                errcode=Codes.NOT_JOINED,
             )
 
         # If this is continuing a previous session, pull the persisted data.
@@ -451,7 +453,6 @@ class RoomSummaryHandler:
                 "type": e.type,
                 "state_key": e.state_key,
                 "content": e.content,
-                "room_id": e.room_id,
                 "sender": e.sender,
                 "origin_server_ts": e.origin_server_ts,
             }
@@ -537,7 +538,7 @@ class RoomSummaryHandler:
         Returns:
              True if the room is accessible to the requesting user or server.
         """
-        state_ids = await self._store.get_current_state_ids(room_id)
+        state_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
@@ -608,7 +609,7 @@ class RoomSummaryHandler:
         # If this is a request over federation, check if the host is in the room or
         # has a user who could join the room.
         elif origin:
-            if await self._event_auth_handler.check_host_in_room(
+            if await self._event_auth_handler.is_host_in_room(
                 room_id, origin
             ) or await self._store.is_host_invited(room_id, origin):
                 return True
@@ -623,9 +624,7 @@ class RoomSummaryHandler:
                     await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 for space_id in allowed_rooms:
-                    if await self._event_auth_handler.check_host_in_room(
-                        space_id, origin
-                    ):
+                    if await self._event_auth_handler.is_host_in_room(space_id, origin):
                         return True
 
         logger.info(
@@ -702,7 +701,9 @@ class RoomSummaryHandler:
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 
-        current_state_ids = await self._store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
         create_event = await self._store.get_event(
             current_state_ids[(EventTypes.Create, "")]
         )
@@ -760,7 +761,9 @@ class RoomSummaryHandler:
         """
 
         # look for child rooms/spaces.
-        current_state_ids = await self._store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
 
         events = await self._store.get_events_as_list(
             [

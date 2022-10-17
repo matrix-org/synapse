@@ -37,7 +37,9 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.handler = self.hs.get_event_creation_handler()
-        self.persist_event_storage = self.hs.get_storage().persistence
+        self._persist_event_storage_controller = (
+            self.hs.get_storage_controllers().persistence
+        )
 
         self.user_id = self.register_user("tester", "foobar")
         self.access_token = self.login("tester", "foobar")
@@ -65,7 +67,9 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.persist_event_storage.persist_event(memberEvent, memberEventContext)
+            self._persist_event_storage_controller.persist_event(
+                memberEvent, memberEventContext
+            )
         )
 
         return memberEvent, memberEventContext
@@ -101,7 +105,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         event1, context = self._create_duplicate_event(txn_id)
 
         ret_event1 = self.get_success(
-            self.handler.handle_new_client_event(self.requester, event1, context)
+            self.handler.handle_new_client_event(
+                self.requester,
+                events_and_context=[(event1, context)],
+            )
         )
         stream_id1 = ret_event1.internal_metadata.stream_ordering
 
@@ -114,7 +121,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.assertNotEqual(event1.event_id, event2.event_id)
 
         ret_event2 = self.get_success(
-            self.handler.handle_new_client_event(self.requester, event2, context)
+            self.handler.handle_new_client_event(
+                self.requester,
+                events_and_context=[(event2, context)],
+            )
         )
         stream_id2 = ret_event2.internal_metadata.stream_ordering
 
@@ -129,7 +139,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.assertNotEqual(event1.event_id, event3.event_id)
 
         ret_event3, event_pos3, _ = self.get_success(
-            self.persist_event_storage.persist_event(event3, context)
+            self._persist_event_storage_controller.persist_event(event3, context)
         )
 
         # Assert that the returned values match those from the initial event
@@ -143,7 +153,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.assertNotEqual(event1.event_id, event3.event_id)
 
         events, _ = self.get_success(
-            self.persist_event_storage.persist_events([(event3, context)])
+            self._persist_event_storage_controller.persist_events([(event3, context)])
         )
         ret_event4 = events[0]
 
@@ -166,7 +176,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.assertNotEqual(event1.event_id, event2.event_id)
 
         events, _ = self.get_success(
-            self.persist_event_storage.persist_events(
+            self._persist_event_storage_controller.persist_events(
                 [(event1, context1), (event2, context2)]
             )
         )
@@ -310,4 +320,4 @@ class ServerAclValidationTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", path, content={}, access_token=self.access_token
         )
-        self.assertEqual(int(channel.result["code"]), 403)
+        self.assertEqual(channel.code, 403)

@@ -31,7 +31,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self._storage = hs.get_storage_controllers()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
 
@@ -71,7 +71,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(self.storage.persistence.persist_event(event, context))
+        self.get_success(self._storage.persistence.persist_event(event, context))
 
         return event
 
@@ -93,7 +93,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(self.storage.persistence.persist_event(event, context))
+        self.get_success(self._storage.persistence.persist_event(event, context))
 
         return event
 
@@ -114,7 +114,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(self.storage.persistence.persist_event(event, context))
+        self.get_success(self._storage.persistence.persist_event(event, context))
 
         return event
 
@@ -268,7 +268,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.get_success(self.storage.persistence.persist_event(event_1, context_1))
+        self.get_success(self._storage.persistence.persist_event(event_1, context_1))
 
         event_2, context_2 = self.get_success(
             self.event_creation_handler.create_new_client_event(
@@ -287,7 +287,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 )
             )
         )
-        self.get_success(self.storage.persistence.persist_event(event_2, context_2))
+        self.get_success(self._storage.persistence.persist_event(event_2, context_2))
 
         # fetch one of the redactions
         fetched = self.get_success(self.store.get_event(redaction_event_id1))
@@ -411,7 +411,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.storage.persistence.persist_event(redaction_event, context)
+            self._storage.persistence.persist_event(redaction_event, context)
         )
 
         # Now lets jump to the future where we have censored the redaction event

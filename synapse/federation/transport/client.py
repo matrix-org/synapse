@@ -45,6 +45,7 @@ from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser
 from synapse.http.types import QueryParams
 from synapse.types import JsonDict
+from synapse.util import ExceptionBundle
 
 logger = logging.getLogger(__name__)
 
@@ -619,7 +620,7 @@ class TransportLayerClient:
         )
 
     async def claim_client_keys(
-        self, destination: str, query_content: JsonDict, timeout: int
+        self, destination: str, query_content: JsonDict, timeout: Optional[int]
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
@@ -926,8 +927,7 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         return len(data)
 
     def finish(self) -> SendJoinResponse:
-        for c in self._coros:
-            c.close()
+        _close_coros(self._coros)
 
         if self._response.event_dict:
             self._response.event = make_event_from_dict(
@@ -970,6 +970,27 @@ class _StateParser(ByteParser[StateRequestResponse]):
         return len(data)
 
     def finish(self) -> StateRequestResponse:
-        for c in self._coros:
-            c.close()
+        _close_coros(self._coros)
         return self._response
+
+
+def _close_coros(coros: Iterable[Generator[None, bytes, None]]) -> None:
+    """Close each of the given coroutines.
+
+    Always calls .close() on each coroutine, even if doing so raises an exception.
+    Any exceptions raised are aggregated into an ExceptionBundle.
+
+    :raises ExceptionBundle: if at least one coroutine fails to close.
+    """
+    exceptions = []
+    for c in coros:
+        try:
+            c.close()
+        except Exception as e:
+            exceptions.append(e)
+
+    if exceptions:
+        # raise from the first exception so that the traceback has slightly more context
+        raise ExceptionBundle(
+            f"There were {len(exceptions)} errors closing coroutines", exceptions
+        ) from exceptions[0]

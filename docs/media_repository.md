@@ -7,8 +7,7 @@ The media repository
    users.
  * caches avatars, attachments and their thumbnails for media uploaded by remote
    users.
- * caches resources and thumbnails used for
-   [URL previews](development/url_previews.md).
+ * caches resources and thumbnails used for URL previews.
 
 All media in Matrix can be identified by a unique
 [MXC URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris),
@@ -59,8 +58,6 @@ remote_thumbnail/matrix.org/aa/bb/cccccccccccccccccccc/128-96-image-jpeg
 Note that `remote_thumbnail/` does not have an `s`.
 
 ## URL Previews
-See [URL Previews](development/url_previews.md) for documentation on the URL preview
-process.
 
 When generating previews for URLs, Synapse may download and cache various
 resources, including images. These resources are assigned temporary media IDs

@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument(
         "--report-stats",
         action="store",
-        help="Whether the generated config reports anonymized usage statistics",
+        help="Whether the generated config reports homeserver usage statistics",
         choices=["yes", "no"],
     )
 

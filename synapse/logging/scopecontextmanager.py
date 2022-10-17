@@ -16,11 +16,15 @@ import logging
 from types import TracebackType
 from typing import Optional, Type
 
-from opentracing import Scope, ScopeManager
+from opentracing import Scope, ScopeManager, Span
 
 import twisted
 
-from synapse.logging.context import current_context, nested_logging_context
+from synapse.logging.context import (
+    LoggingContext,
+    current_context,
+    nested_logging_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +39,11 @@ class LogContextScopeManager(ScopeManager):
     but currently that doesn't work due to https://twistedmatrix.com/trac/ticket/10301.
     """
 
-    def __init__(self, config):
+    def __init__(self) -> None:
         pass
 
     @property
-    def active(self):
+    def active(self) -> Optional[Scope]:
         """
         Returns the currently active Scope which can be used to access the
         currently active Scope.span.
@@ -48,19 +52,18 @@ class LogContextScopeManager(ScopeManager):
         Tracer.start_active_span() time.
 
         Return:
-            (Scope) : the Scope that is active, or None if not
-            available.
+            The Scope that is active, or None if not available.
         """
         ctx = current_context()
         return ctx.scope
 
-    def activate(self, span, finish_on_close):
+    def activate(self, span: Span, finish_on_close: bool) -> Scope:
         """
         Makes a Span active.
         Args
-            span (Span): the span that should become active.
-            finish_on_close (Boolean): whether Span should be automatically
-                finished when Scope.close() is called.
+            span: the span that should become active.
+            finish_on_close: whether Span should be automatically finished when
+                Scope.close() is called.
 
         Returns:
             Scope to control the end of the active period for
@@ -112,8 +115,8 @@ class _LogContextScope(Scope):
     def __init__(
         self,
         manager: LogContextScopeManager,
-        span,
-        logcontext,
+        span: Span,
+        logcontext: LoggingContext,
         enter_logcontext: bool,
         finish_on_close: bool,
     ):
@@ -121,13 +124,13 @@ class _LogContextScope(Scope):
         Args:
             manager:
                 the manager that is responsible for this scope.
-            span (Span):
+            span:
                 the opentracing span which this scope represents the local
                 lifetime for.
-            logcontext (LogContext):
-                the logcontext to which this scope is attached.
+            logcontext:
+                the log context to which this scope is attached.
             enter_logcontext:
-                if True the logcontext will be exited when the scope is finished
+                if True the log context will be exited when the scope is finished
             finish_on_close:
                 if True finish the span when the scope is closed
         """
