@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from collections import deque
+import enum
 import logging
 import re
+from collections import deque
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -29,6 +29,7 @@ from typing import (
 )
 
 import attr
+from typing_extensions import Literal
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -786,27 +787,15 @@ class Phrase:
     phrase: List[str]
 
 
-class Not:
-    pass
+class SearchToken(enum.Enum):
+    Not = enum.auto()
+    Or = enum.auto()
+    And = enum.auto()
+    LParen = enum.auto()
+    RParen = enum.auto()
 
 
-class Or:
-    pass
-
-
-class And:
-    pass
-
-
-class LParen:
-    pass
-
-
-class RParen:
-    pass
-
-
-Token = Union[str, Phrase, Not, Or, And, LParen, RParen]
+Token = Union[str, Phrase, SearchToken]
 TokenList = List[Token]
 
 
@@ -845,16 +834,16 @@ def _tokenize_query(query: str) -> TokenList:
                 phrase_word = words.popleft()
             tokens.append(Phrase(phrase))
         elif word[0] == "-":
-            tokens.append(Not())
+            tokens.append(SearchToken.Not)
             tokens.append(word[1:])
         elif word.lower() == "or":
-            tokens.append(Or())
+            tokens.append(SearchToken.Or)
         elif word.lower() == "and":
-            tokens.append(And())
+            tokens.append(SearchToken.And)
         elif word == "(":
-            tokens.append(LParen())
+            tokens.append(SearchToken.LParen)
         elif word == ")":
-            tokens.append(RParen())
+            tokens.append(SearchToken.RParen)
         else:
             tokens.append(word)
     return tokens
@@ -873,23 +862,24 @@ def _tokens_to_tsquery(tokens: TokenList) -> str:
             tsquery.append(token)
         elif isinstance(token, Phrase):
             tsquery.append(" ( " + " <-> ".join(token.phrase) + " ) ")
-        elif isinstance(token, Not):
+        elif token == SearchToken.Not:
             tsquery.append("!")
-        elif isinstance(token, Or):
+        elif token == SearchToken.Or:
             tsquery.append(" | ")
-        elif isinstance(token, And):
+        elif token == SearchToken.And:
             tsquery.append(" & ")
-        elif isinstance(token, LParen):
+        elif token == SearchToken.LParen:
             tsquery.append(" ( ")
-        elif isinstance(token, RParen):
+        elif token == SearchToken.RParen:
             tsquery.append(" ) ")
         else:
-            raise Exception("unknown token " + token)
+            raise ValueError(f"unknown token {token}")
 
         if (
             i != len(tokens) - 1
             and isinstance(token, (str, Phrase))
-            and not isinstance(tokens[i + 1], (Or, And, RParen))
+            and tokens[i + 1]
+            not in (SearchToken.Or, SearchToken.And, SearchToken.RParen)
         ):
             tsquery.append(" & ")
     return "".join(tsquery)
@@ -909,18 +899,18 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
             match_query.append(" ")
         elif isinstance(token, Phrase):
             match_query.append(' "' + " ".join(token.phrase) + '" ')
-        elif isinstance(token, Not):
+        elif token == SearchToken.Not:
             match_query.append("NOT ")
-        elif isinstance(token, Or):
+        elif token == SearchToken.Or:
             match_query.append("OR ")
-        elif isinstance(token, And):
+        elif token == SearchToken.And:
             match_query.append("AND ")
-        elif isinstance(token, LParen):
+        elif token == SearchToken.LParen:
             match_query.append("( ")
-        elif isinstance(token, RParen):
+        elif token == SearchToken.RParen:
             match_query.append(") ")
         else:
-            raise Exception("unknown token " + str(token))
+            raise ValueError(f"unknown token {token}")
 
     return "".join(match_query)
 

@@ -16,13 +16,18 @@ from typing import List, Tuple
 from unittest.case import SkipTest
 from unittest.mock import PropertyMock, patch
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage.databases.main import DataStore
+from synapse.storage.databases.main.search import Phrase, SearchToken, _tokenize_query
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines.sqlite import Sqlite3Engine
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase, skip_unless
 from tests.utils import USE_POSTGRES_FOR_TESTS
@@ -226,9 +231,9 @@ class MessageSearchTest(HomeserverTestCase):
         ('"quick brown', True),
     ]
 
-    def setUp(self):
-        super().setUp()
-
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         # Register a user and create a room, create some messages
         self.register_user("alice", "password")
         self.access_token = self.login("alice", "password")
@@ -237,6 +242,37 @@ class MessageSearchTest(HomeserverTestCase):
         # Send the phrase as a message and check it was created
         response = self.helper.send(self.room_id, self.PHRASE, tok=self.access_token)
         self.assertIn("event_id", response)
+
+    def test_tokenize_query(self) -> None:
+        """Test the custom logic to token a user's query."""
+        cases = (
+            ("brown", ["brown"]),
+            ("quick brown", ["quick", "brown"]),
+            ('"brown quick"', [Phrase(["brown", "quick"])]),
+            ("furphy OR fox", ["furphy", SearchToken.Or, "fox"]),
+            ("fox -brown", ["fox", SearchToken.Not, "brown"]),
+            (
+                "fox AND ( brown OR nope )",
+                [
+                    "fox",
+                    SearchToken.And,
+                    SearchToken.LParen,
+                    "brown",
+                    SearchToken.Or,
+                    "nope",
+                    SearchToken.RParen,
+                ],
+            ),
+            ('"fox" quick', [Phrase(["fox"]), "quick"]),
+            # No trailing double quoe.
+            ('"fox quick', [Phrase(["fox", "quick"])]),
+        )
+
+        for query, expected in cases:
+            tokenized = _tokenize_query(query)
+            self.assertEqual(
+                tokenized, expected, f"{tokenized} != {expected} for {query}"
+            )
 
     def _check_test_cases(
         self, store: DataStore, cases: List[Tuple[str, bool]]
