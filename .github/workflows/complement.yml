@@ -1,7 +1,7 @@
 name: Complement Tests
 
 on:
-  push:
+#  push:
 #    branches: ["develop", "release-*"]
 #  pull_request:
 #  schedule:
