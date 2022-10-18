@@ -294,6 +294,22 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             self._background_backfill_thread_id,
         )
 
+        # Indexes which will be used to quickly make the thread_id column non-null.
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_thread_id_null",
+            index_name="event_push_actions_thread_id_null",
+            table="event_push_actions",
+            columns=["thread_id"],
+            where_clause="thread_id IS NULL",
+        )
+        self.db_pool.updates.register_background_index_update(
+            "event_push_summary_thread_id_null",
+            index_name="event_push_summary_thread_id_null",
+            table="event_push_summary",
+            columns=["thread_id"],
+            where_clause="thread_id IS NULL",
+        )
+
         # Check ASAP (and then later, every 1s) to see if we have finished
         # background updates the event_push_actions and event_push_summary tables.
         self._clock.call_later(0.0, self._check_event_push_backfill_thread_id)
