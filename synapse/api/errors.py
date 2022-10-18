@@ -607,11 +607,18 @@ def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
 
 class FederationError(RuntimeError):
     """
-    This class is used signal about erroneous PDUs that we pulled from a remote homeserver.
+    Raised when we process an erroneous PDU.
 
-    It's also used inform remote homeservers that the PDU they sent us (via `/send`) is
-    erroneous. These error responses and status codes are not specced so the remote
-    homeserver probably won't do anything about it.
+    There are two kinds scenarios where this exception can be raised:
+
+    1. We may pull an invalid PDU from a remote homeserver (e.g. during backfill). We
+       raise this exception to signal an error to the rest of the application.
+    2. We may be pushed an invalid PDU as part of a `/send` transaction from a remote
+       homeserver. We raise so that we can respond to the transaction with an
+       (unspecced) error response and status code, which will likely be ignored by the
+       remote homeserver.
+
+    TODO: In the future, we should split these usage scenarios into their own error types.
 
     FATAL: The remote server could not interpret the source event.
         (e.g., it was missing a required field)
