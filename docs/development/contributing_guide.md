@@ -333,7 +333,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/compleme
 ### Prettier formatting with `gotestfmt`
 
 If you want to format the output of the tests the same way as it looks in CI,
-install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+install [gotestfmt](https://github.com/GoTestTools/gotestfmt).
 
 You can then use this incantation to format the tests appropriately:
 

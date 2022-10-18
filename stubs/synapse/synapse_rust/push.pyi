@@ -25,9 +25,7 @@ class PushRules:
     def rules(self) -> Collection[PushRule]: ...
 
 class FilteredPushRules:
-    def __init__(
-        self, push_rules: PushRules, enabled_map: Dict[str, bool], msc3772_enabled: bool
-    ): ...
+    def __init__(self, push_rules: PushRules, enabled_map: Dict[str, bool]): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
 def get_base_rule_ids() -> Collection[str]: ...
@@ -39,8 +37,6 @@ class PushRuleEvaluator:
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
-        relations: Mapping[str, Set[Tuple[str, str]]],
-        relation_match_enabled: bool,
     ): ...
     def run(
         self,

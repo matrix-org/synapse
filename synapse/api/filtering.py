@@ -36,7 +36,7 @@ from jsonschema import FormatChecker
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.types import JsonDict, RoomID, UserID
 
 if TYPE_CHECKING:
@@ -53,6 +53,12 @@ FILTER_SCHEMA = {
         # check types are valid event types
         "types": {"type": "array", "items": {"type": "string"}},
         "not_types": {"type": "array", "items": {"type": "string"}},
+        # MSC3874, filtering /messages.
+        "org.matrix.msc3874.rel_types": {"type": "array", "items": {"type": "string"}},
+        "org.matrix.msc3874.not_rel_types": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
     },
 }
 
@@ -334,8 +340,15 @@ class Filter:
         self.labels = filter_json.get("org.matrix.labels", None)
         self.not_labels = filter_json.get("org.matrix.not_labels", [])
 
-        self.related_by_senders = self.filter_json.get("related_by_senders", None)
-        self.related_by_rel_types = self.filter_json.get("related_by_rel_types", None)
+        self.related_by_senders = filter_json.get("related_by_senders", None)
+        self.related_by_rel_types = filter_json.get("related_by_rel_types", None)
+
+        # For compatibility with _check_fields.
+        self.rel_types = None
+        self.not_rel_types = []
+        if hs.config.experimental.msc3874_enabled:
+            self.rel_types = filter_json.get("org.matrix.msc3874.rel_types", None)
+            self.not_rel_types = filter_json.get("org.matrix.msc3874.not_rel_types", [])
 
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
@@ -386,11 +399,19 @@ class Filter:
             # check if there is a string url field in the content for filtering purposes
             labels = content.get(EventContentFields.LABELS, [])
 
+            # Check if the event has a relation.
+            rel_type = None
+            if isinstance(event, EventBase):
+                relation = relation_from_event(event)
+                if relation:
+                    rel_type = relation.rel_type
+
             field_matchers = {
                 "rooms": lambda v: room_id == v,
                 "senders": lambda v: sender == v,
                 "types": lambda v: _matches_wildcard(ev_type, v),
                 "labels": lambda v: v in labels,
+                "rel_types": lambda v: rel_type == v,
             }
 
             result = self._check_fields(field_matchers)

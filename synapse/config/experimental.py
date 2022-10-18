@@ -95,8 +95,6 @@ class ExperimentalConfig(Config):
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
 
-        # MSC3772: A push rule for mutual relations.
-        self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
 
@@ -119,6 +117,9 @@ class ExperimentalConfig(Config):
         self.msc3882_token_timeout = self.parse_duration(
             experimental.get("msc3882_token_timeout", "5m")
         )
+
+        # MSC3874: Filtering /messages with rel_types / not_rel_types.
+        self.msc3874_enabled: bool = experimental.get("msc3874_enabled", False)
 
         # MSC3886: Simple client rendezvous capability
         self.msc3886_endpoint: Optional[str] = experimental.get(
