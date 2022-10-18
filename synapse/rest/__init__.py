@@ -26,11 +26,11 @@ from synapse.rest.client import (
     directory,
     events,
     filter,
-    groups,
     initial_sync,
     keys,
     knock,
     login as v1_login,
+    login_token_request,
     logout,
     mutual_rooms,
     notifications,
@@ -118,8 +118,6 @@ class ClientRestResource(JsonResource):
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
-        if hs.config.experimental.groups_enabled:
-            groups.register_servlets(hs, client_resource)
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
         room_batch.register_servlets(hs, client_resource)
         capabilities.register_servlets(hs, client_resource)
@@ -133,3 +131,4 @@ class ClientRestResource(JsonResource):
 
         # unstable
         mutual_rooms.register_servlets(hs, client_resource)
+        login_token_request.register_servlets(hs, client_resource)

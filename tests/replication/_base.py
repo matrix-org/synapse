@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from twisted.internet.address import IPv4Address
 from twisted.internet.protocol import Protocol
@@ -23,15 +24,16 @@ from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.handler import ReplicationCommandHandler
-from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
-from synapse.replication.tcp.resource import (
-    ReplicationStreamProtocolFactory,
+from synapse.replication.tcp.protocol import (
+    ClientReplicationStreamProtocol,
     ServerReplicationStreamProtocol,
 )
+from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.server import HomeServer
 
 from tests import unittest
 from tests.server import FakeTransport
+from tests.utils import USE_POSTGRES_FOR_TESTS
 
 try:
     import hiredis
@@ -218,15 +220,34 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests running multiple workers.
 
+    Enables Redis, providing a fake Redis server.
+
     Automatically handle HTTP replication requests from workers to master,
     unlike `BaseStreamTestCase`.
     """
+
+    if not hiredis:
+        skip = "Requires hiredis"
+
+    if not USE_POSTGRES_FOR_TESTS:
+        # Redis replication only takes place on Postgres
+        skip = "Requires Postgres"
+
+    def default_config(self) -> Dict[str, Any]:
+        """
+        Overrides the default config to enable Redis.
+        Even if the test only uses make_worker_hs, the main process needs Redis
+        enabled otherwise it won't create a Fake Redis server to listen on the
+        Redis port and accept fake TCP connections.
+        """
+        base = super().default_config()
+        base["redis"] = {"enabled": True}
+        return base
 
     def setUp(self):
         super().setUp()
 
         # build a replication server
-        self.server_factory = ReplicationStreamProtocolFactory(self.hs)
         self.streamer = self.hs.get_replication_streamer()
 
         # Fake in memory Redis server that servers can connect to.
@@ -245,15 +266,14 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # handling inbound HTTP requests to that instance.
         self._hs_to_site = {self.hs: self.site}
 
-        if self.hs.config.redis.redis_enabled:
-            # Handle attempts to connect to fake redis server.
-            self.reactor.add_tcp_client_callback(
-                "localhost",
-                6379,
-                self.connect_any_redis_attempts,
-            )
+        # Handle attempts to connect to fake redis server.
+        self.reactor.add_tcp_client_callback(
+            "localhost",
+            6379,
+            self.connect_any_redis_attempts,
+        )
 
-            self.hs.get_replication_command_handler().start_replication(self.hs)
+        self.hs.get_replication_command_handler().start_replication(self.hs)
 
         # When we see a connection attempt to the master replication listener we
         # automatically set up the connection. This is so that tests don't
@@ -337,27 +357,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         store = worker_hs.get_datastores().main
         store.db_pool._db_pool = self.database_pool._db_pool
 
-        # Set up TCP replication between master and the new worker if we don't
-        # have Redis support enabled.
-        if not worker_hs.config.redis.redis_enabled:
-            repl_handler = ReplicationCommandHandler(worker_hs)
-            client = ClientReplicationStreamProtocol(
-                worker_hs,
-                "client",
-                "test",
-                self.clock,
-                repl_handler,
-            )
-            server = self.server_factory.buildProtocol(
-                IPv4Address("TCP", "127.0.0.1", 0)
-            )
-
-            client_transport = FakeTransport(server, self.reactor)
-            client.makeConnection(client_transport)
-
-            server_transport = FakeTransport(client, self.reactor)
-            server.makeConnection(server_transport)
-
         # Set up a resource for the worker
         resource = ReplicationRestResource(worker_hs)
 
@@ -376,8 +375,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             reactor=self.reactor,
         )
 
-        if worker_hs.config.redis.redis_enabled:
-            worker_hs.get_replication_command_handler().start_replication(worker_hs)
+        worker_hs.get_replication_command_handler().start_replication(worker_hs)
 
         return worker_hs
 
@@ -475,22 +473,25 @@ class FakeRedisPubSubServer:
     """A fake Redis server for pub/sub."""
 
     def __init__(self):
-        self._subscribers = set()
+        self._subscribers_by_channel: Dict[
+            bytes, Set["FakeRedisPubSubProtocol"]
+        ] = defaultdict(set)
 
-    def add_subscriber(self, conn):
+    def add_subscriber(self, conn, channel: bytes):
         """A connection has called SUBSCRIBE"""
-        self._subscribers.add(conn)
+        self._subscribers_by_channel[channel].add(conn)
 
     def remove_subscriber(self, conn):
-        """A connection has called UNSUBSCRIBE"""
-        self._subscribers.discard(conn)
+        """A connection has lost connection"""
+        for subscribers in self._subscribers_by_channel.values():
+            subscribers.discard(conn)
 
-    def publish(self, conn, channel, msg) -> int:
+    def publish(self, conn, channel: bytes, msg) -> int:
         """A connection want to publish a message to subscribers."""
-        for sub in self._subscribers:
+        for sub in self._subscribers_by_channel[channel]:
             sub.send(["message", channel, msg])
 
-        return len(self._subscribers)
+        return len(self._subscribers_by_channel)
 
     def buildProtocol(self, addr):
         return FakeRedisPubSubProtocol(self)
@@ -531,9 +532,10 @@ class FakeRedisPubSubProtocol(Protocol):
             num_subscribers = self._server.publish(self, channel, message)
             self.send(num_subscribers)
         elif command == b"SUBSCRIBE":
-            (channel,) = args
-            self._server.add_subscriber(self)
-            self.send(["subscribe", channel, 1])
+            for idx, channel in enumerate(args):
+                num_channels = idx + 1
+                self._server.add_subscriber(self, channel)
+                self.send(["subscribe", channel, num_channels])
 
         # Since we use SET/GET to cache things we can safely no-op them.
         elif command == b"SET":

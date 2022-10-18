@@ -13,9 +13,33 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.types import GroupID, RoomAlias, UserID, map_username_to_mxid_localpart
+from synapse.types import (
+    RoomAlias,
+    UserID,
+    get_domain_from_id,
+    get_localpart_from_id,
+    map_username_to_mxid_localpart,
+)
 
 from tests import unittest
+
+
+class IsMineIDTests(unittest.HomeserverTestCase):
+    def test_is_mine_id(self) -> None:
+        self.assertTrue(self.hs.is_mine_id("@user:test"))
+        self.assertTrue(self.hs.is_mine_id("#room:test"))
+        self.assertTrue(self.hs.is_mine_id("invalid:test"))
+
+        self.assertFalse(self.hs.is_mine_id("@user:test\0"))
+        self.assertFalse(self.hs.is_mine_id("@user"))
+
+    def test_two_colons(self) -> None:
+        """Test handling of IDs containing more than one colon."""
+        # The domain starts after the first colon.
+        # These functions must interpret things consistently.
+        self.assertFalse(self.hs.is_mine_id("@user:test:test"))
+        self.assertEqual("user", get_localpart_from_id("@user:test:test"))
+        self.assertEqual("test:test", get_domain_from_id("@user:test:test"))
 
 
 class UserIDTestCase(unittest.HomeserverTestCase):
@@ -26,9 +50,20 @@ class UserIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual("test", user.domain)
         self.assertEqual(True, self.hs.is_mine(user))
 
-    def test_pase_empty(self):
+    def test_parse_rejects_empty_id(self):
         with self.assertRaises(SynapseError):
             UserID.from_string("")
+
+    def test_parse_rejects_missing_sigil(self):
+        with self.assertRaises(SynapseError):
+            UserID.from_string("alice:example.com")
+
+    def test_parse_rejects_missing_separator(self):
+        with self.assertRaises(SynapseError):
+            UserID.from_string("@alice.example.com")
+
+    def test_validation_rejects_missing_domain(self):
+        self.assertFalse(UserID.is_valid("@alice:"))
 
     def test_build(self):
         user = UserID("5678efgh", "my.domain")
@@ -60,25 +95,6 @@ class RoomAliasTestCase(unittest.HomeserverTestCase):
     def test_validate(self):
         id_string = "#test:domain,test"
         self.assertFalse(RoomAlias.is_valid(id_string))
-
-
-class GroupIDTestCase(unittest.TestCase):
-    def test_parse(self):
-        group_id = GroupID.from_string("+group/=_-.123:my.domain")
-        self.assertEqual("group/=_-.123", group_id.localpart)
-        self.assertEqual("my.domain", group_id.domain)
-
-    def test_validate(self):
-        bad_ids = ["$badsigil:domain", "+:empty"] + [
-            "+group" + c + ":domain" for c in "A%?æ£"
-        ]
-        for id_string in bad_ids:
-            try:
-                GroupID.from_string(id_string)
-                self.fail("Parsing '%s' should raise exception" % id_string)
-            except SynapseError as exc:
-                self.assertEqual(400, exc.code)
-                self.assertEqual("M_INVALID_PARAM", exc.errcode)
 
 
 class MapUsernameTestCase(unittest.TestCase):

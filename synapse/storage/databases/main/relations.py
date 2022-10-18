@@ -14,6 +14,7 @@
 
 import logging
 from typing import (
+    TYPE_CHECKING,
     Collection,
     Dict,
     FrozenSet,
@@ -28,16 +29,45 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, RelationTypes
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+    make_in_list_sql_clause,
+)
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThreadsNextBatch:
+    topological_ordering: int
+    stream_ordering: int
+
+    def __str__(self) -> str:
+        return f"{self.topological_ordering}_{self.stream_ordering}"
+
+    @classmethod
+    def from_string(cls, string: str) -> "ThreadsNextBatch":
+        """
+        Creates a ThreadsNextBatch from its textual representation.
+        """
+        try:
+            keys = (int(s) for s in string.split("_"))
+            return cls(*keys)
+        except Exception:
+            raise SynapseError(400, "Invalid threads token")
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -51,9 +81,81 @@ class _RelatedEvent:
     event_id: str
     # The sender of the related event.
     sender: str
+    topological_ordering: Optional[int]
+    stream_ordering: int
 
 
 class RelationsWorkerStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_update_handler(
+            "threads_backfill", self._backfill_threads
+        )
+
+    async def _backfill_threads(self, progress: JsonDict, batch_size: int) -> int:
+        """Backfill the threads table."""
+
+        def threads_backfill_txn(txn: LoggingTransaction) -> int:
+            last_thread_id = progress.get("last_thread_id", "")
+
+            # Get the latest event in each thread by topo ordering / stream ordering.
+            #
+            # Note that the MAX(event_id) is needed to abide by the rules of group by,
+            # but doesn't actually do anything since there should only be a single event
+            # ID per topo/stream ordering pair.
+            sql = f"""
+            SELECT room_id, relates_to_id, MAX(topological_ordering), MAX(stream_ordering), MAX(event_id)
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE
+                relates_to_id > ? AND
+                relation_type = '{RelationTypes.THREAD}'
+            GROUP BY room_id, relates_to_id
+            ORDER BY relates_to_id
+            LIMIT ?
+            """
+            txn.execute(sql, (last_thread_id, batch_size))
+
+            # No more rows to process.
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            # Insert the rows into the threads table. If a matching thread already exists,
+            # assume it is from a newer event.
+            sql = """
+            INSERT INTO threads (room_id, thread_id, topological_ordering, stream_ordering, latest_event_id)
+            VALUES %s
+            ON CONFLICT (room_id, thread_id)
+            DO NOTHING
+            """
+            if isinstance(txn.database_engine, PostgresEngine):
+                txn.execute_values(sql % ("?",), rows, fetch=False)
+            else:
+                txn.execute_batch(sql % ("(?, ?, ?, ?, ?)",), rows)
+
+            # Mark the progress.
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "threads_backfill", {"last_thread_id": rows[-1][1]}
+            )
+
+            return txn.rowcount
+
+        result = await self.db_pool.runInteraction(
+            "threads_backfill", threads_backfill_txn
+        )
+
+        if not result:
+            await self.db_pool.updates._end_background_update("threads_backfill")
+
+        return result
+
     @cached(uncached_args=("event",), tree=True)
     async def get_relations_for_event(
         self,
@@ -62,7 +164,6 @@ class RelationsWorkerStore(SQLBaseStore):
         room_id: str,
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
-        aggregation_key: Optional[str] = None,
         limit: int = 5,
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
@@ -76,7 +177,6 @@ class RelationsWorkerStore(SQLBaseStore):
             room_id: The room the event belongs to.
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
-            aggregation_key: Only fetch events with this aggregation key, if given.
             limit: Only fetch the most recent `limit` events.
             direction: Whether to fetch the most recent first (`"b"`) or the
                 oldest first (`"f"`).
@@ -93,6 +193,9 @@ class RelationsWorkerStore(SQLBaseStore):
         # it. The `event_id` must match the `event.event_id`.
         assert event.event_id == event_id
 
+        # Ensure bad limits aren't being passed in.
+        assert limit >= 0
+
         where_clause = ["relates_to_id = ?", "room_id = ?"]
         where_args: List[Union[str, int]] = [event.event_id, room_id]
         is_redacted = event.internal_metadata.is_redacted()
@@ -104,10 +207,6 @@ class RelationsWorkerStore(SQLBaseStore):
         if event_type is not None:
             where_clause.append("type = ?")
             where_args.append(event_type)
-
-        if aggregation_key:
-            where_clause.append("aggregation_key = ?")
-            where_args.append(aggregation_key)
 
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
@@ -145,21 +244,34 @@ class RelationsWorkerStore(SQLBaseStore):
         ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
             txn.execute(sql, where_args + [limit + 1])
 
-            last_topo_id = None
-            last_stream_id = None
             events = []
-            for row in txn:
+            for event_id, relation_type, sender, topo_ordering, stream_ordering in txn:
                 # Do not include edits for redacted events as they leak event
                 # content.
-                if not is_redacted or row[1] != RelationTypes.REPLACE:
-                    events.append(_RelatedEvent(row[0], row[2]))
-                last_topo_id = row[3]
-                last_stream_id = row[4]
+                if not is_redacted or relation_type != RelationTypes.REPLACE:
+                    events.append(
+                        _RelatedEvent(event_id, sender, topo_ordering, stream_ordering)
+                    )
 
-            # If there are more events, generate the next pagination key.
+            # If there are more events, generate the next pagination key from the
+            # last event returned.
             next_token = None
-            if len(events) > limit and last_topo_id and last_stream_id:
-                next_key = RoomStreamToken(last_topo_id, last_stream_id)
+            if len(events) > limit:
+                # Instead of using the last row (which tells us there is more
+                # data), use the last row to be returned.
+                events = events[:limit]
+
+                topo = events[-1].topological_ordering
+                token = events[-1].stream_ordering
+                if direction == "b":
+                    # Tokens are positions between events.
+                    # This token points *after* the last event in the chunk.
+                    # We need it to point to the event before it in the chunk
+                    # when we are going backwards so we subtract one from the
+                    # stream part.
+                    token -= 1
+                next_key = RoomStreamToken(topo, token)
+
                 if from_token:
                     next_token = from_token.copy_and_replace(
                         StreamKeyType.ROOM, next_key
@@ -372,12 +484,11 @@ class RelationsWorkerStore(SQLBaseStore):
             the event will map to None.
         """
 
-        # We only allow edits for `m.room.message` events that have the same sender
-        # and event type. We can't assert these things during regular event auth so
-        # we have to do the checks post hoc.
+        # We only allow edits for events that have the same sender and event type.
+        # We can't assert these things during regular event auth so we have to do
+        # the checks post hoc.
 
-        # Fetches latest edit that has the same type and sender as the
-        # original, and is an `m.room.message`.
+        # Fetches latest edit that has the same type and sender as the original.
         if isinstance(self.database_engine, PostgresEngine):
             # The `DISTINCT ON` clause will pick the *first* row it encounters,
             # so ordering by origin server ts + event ID desc will ensure we get
@@ -393,7 +504,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     %s
                     AND relation_type = ?
-                    AND edit.type = 'm.room.message'
                 ORDER by original.event_id DESC, edit.origin_server_ts DESC, edit.event_id DESC
             """
         else:
@@ -412,7 +522,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     %s
                     AND relation_type = ?
-                    AND edit.type = 'm.room.message'
                 ORDER by edit.origin_server_ts, edit.event_id
             """
 
@@ -765,6 +874,194 @@ class RelationsWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction(
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
+        )
+
+    @cached(tree=True)
+    async def get_threads(
+        self,
+        room_id: str,
+        limit: int = 5,
+        from_token: Optional[ThreadsNextBatch] = None,
+    ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
+        """Get a list of thread IDs, ordered by topological ordering of their
+        latest reply.
+
+        Args:
+            room_id: The room the event belongs to.
+            limit: Only fetch the most recent `limit` threads.
+            from_token: Fetch rows from a previous next_batch, or from the start if None.
+
+        Returns:
+            A tuple of:
+                A list of thread root event IDs.
+
+                The next_batch, if one exists.
+        """
+        # Generate the pagination clause, if necessary.
+        #
+        # Find any threads where the latest reply is equal / before the last
+        # thread's topo ordering and earlier in stream ordering.
+        pagination_clause = ""
+        pagination_args: tuple = ()
+        if from_token:
+            pagination_clause = "AND topological_ordering <= ? AND stream_ordering < ?"
+            pagination_args = (
+                from_token.topological_ordering,
+                from_token.stream_ordering,
+            )
+
+        sql = f"""
+            SELECT thread_id, topological_ordering, stream_ordering
+            FROM threads
+            WHERE
+                room_id = ?
+                {pagination_clause}
+            ORDER BY topological_ordering DESC, stream_ordering DESC
+            LIMIT ?
+        """
+
+        def _get_threads_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
+            txn.execute(sql, (room_id, *pagination_args, limit + 1))
+
+            rows = cast(List[Tuple[str, int, int]], txn.fetchall())
+            thread_ids = [r[0] for r in rows]
+
+            # If there are more events, generate the next pagination key from the
+            # last thread which will be returned.
+            next_token = None
+            if len(thread_ids) > limit:
+                last_topo_id = rows[-2][1]
+                last_stream_id = rows[-2][2]
+                next_token = ThreadsNextBatch(last_topo_id, last_stream_id)
+
+            return thread_ids[:limit], next_token
+
+        return await self.db_pool.runInteraction("get_threads", _get_threads_txn)
+
+    @cached()
+    async def get_thread_id(self, event_id: str) -> str:
+        """
+        Get the thread ID for an event. This considers multi-level relations,
+        e.g. an annotation to an event which is part of a thread.
+
+        It only searches up the relations tree, i.e. it only searches for events
+        which the given event is related to (and which those events are related
+        to, etc.)
+
+        Given the following DAG:
+
+            A <---[m.thread]-- B <--[m.annotation]-- C
+            ^
+            |--[m.reference]-- D <--[m.annotation]-- E
+
+        get_thread_id(X) considers events B and C as part of thread A.
+
+        See also get_thread_id_for_receipts.
+
+        Args:
+            event_id: The event ID to fetch the thread ID for.
+
+        Returns:
+            The event ID of the root event in the thread, if this event is part
+            of a thread. "main", otherwise.
+        """
+
+        # Recurse event relations up to the *root* event, then search that chain
+        # of relations for a thread relation. If one is found, the root event is
+        # returned.
+        #
+        # Note that this should only ever find 0 or 1 entries since it is invalid
+        # for an event to have a thread relation to an event which also has a
+        # relation.
+        sql = """
+            WITH RECURSIVE related_events AS (
+                SELECT event_id, relates_to_id, relation_type, 0 depth
+                FROM event_relations
+                WHERE event_id = ?
+                UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
+                FROM event_relations e
+                INNER JOIN related_events r ON r.relates_to_id = e.event_id
+                WHERE depth <= 3
+            )
+            SELECT relates_to_id FROM related_events
+            WHERE relation_type = 'm.thread'
+            ORDER BY depth DESC
+            LIMIT 1;
+        """
+
+        def _get_thread_id(txn: LoggingTransaction) -> str:
+            txn.execute(sql, (event_id,))
+            row = txn.fetchone()
+            if row:
+                return row[0]
+
+            # If no thread was found, it is part of the main timeline.
+            return MAIN_TIMELINE
+
+        return await self.db_pool.runInteraction("get_thread_id", _get_thread_id)
+
+    @cached()
+    async def get_thread_id_for_receipts(self, event_id: str) -> str:
+        """
+        Get the thread ID for an event by traversing to the top-most related event
+        and confirming any children events form a thread.
+
+        Given the following DAG:
+
+            A <---[m.thread]-- B <--[m.annotation]-- C
+            ^
+            |--[m.reference]-- D <--[m.annotation]-- E
+
+        get_thread_id_for_receipts(X) considers events A, B, C, D, and E as part
+        of thread A.
+
+        See also get_thread_id.
+
+        Args:
+            event_id: The event ID to fetch the thread ID for.
+
+        Returns:
+            The event ID of the root event in the thread, if this event is part
+            of a thread. "main", otherwise.
+        """
+
+        # Recurse event relations up to the *root* event, then search for any events
+        # related to that root node for a thread relation. If one is found, the
+        # root event is returned.
+        #
+        # Note that there cannot be thread relations in the middle of the chain since
+        # it is invalid for an event to have a thread relation to an event which also
+        # has a relation.
+        sql = """
+        SELECT relates_to_id FROM event_relations WHERE relates_to_id = COALESCE((
+            WITH RECURSIVE related_events AS (
+                SELECT event_id, relates_to_id, relation_type, 0 depth
+                FROM event_relations
+                WHERE event_id = ?
+                UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
+                FROM event_relations e
+                INNER JOIN related_events r ON r.relates_to_id = e.event_id
+                WHERE depth <= 3
+            )
+            SELECT relates_to_id FROM related_events
+            ORDER BY depth DESC
+            LIMIT 1
+        ), ?) AND relation_type = 'm.thread' LIMIT 1;
+        """
+
+        def _get_related_thread_id(txn: LoggingTransaction) -> str:
+            txn.execute(sql, (event_id, event_id))
+            row = txn.fetchone()
+            if row:
+                return row[0]
+
+            # If no thread was found, it is part of the main timeline.
+            return MAIN_TIMELINE
+
+        return await self.db_pool.runInteraction(
+            "get_related_thread_id", _get_related_thread_id
         )
 
 

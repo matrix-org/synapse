@@ -96,8 +96,12 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         # Test each of the registered users is marked as active
         timestamp = self.get_success(self.store.user_last_seen_monthly_active(user1))
+        # Mypy notes that one shouldn't compare Optional[int] to 0 with assertGreater.
+        # Check that timestamp really is an int.
+        assert timestamp is not None
         self.assertGreater(timestamp, 0)
         timestamp = self.get_success(self.store.user_last_seen_monthly_active(user2))
+        assert timestamp is not None
         self.assertGreater(timestamp, 0)
 
         # Test that users with reserved 3pids are not removed from the MAU table
@@ -166,10 +170,11 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.upsert_monthly_active_user(user_id2))
 
         result = self.get_success(self.store.user_last_seen_monthly_active(user_id1))
+        assert result is not None
         self.assertGreater(result, 0)
 
         result = self.get_success(self.store.user_last_seen_monthly_active(user_id3))
-        self.assertNotEqual(result, 0)
+        self.assertIsNone(result)
 
     @override_config({"max_mau_value": 5})
     def test_reap_monthly_active_users(self):
@@ -407,3 +412,86 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEqual(result[service1], 2)
         self.assertEqual(result[service2], 1)
         self.assertEqual(result[native], 1)
+
+    def test_get_monthly_active_users_by_service(self):
+        # (No users, no filtering) -> empty result
+        result = self.get_success(self.store.get_monthly_active_users_by_service())
+
+        self.assertEqual(len(result), 0)
+
+        # (Some users, no filtering) -> non-empty result
+        appservice1_user1 = "@appservice1_user1:example.com"
+        appservice2_user1 = "@appservice2_user1:example.com"
+        service1 = "service1"
+        service2 = "service2"
+        self.get_success(
+            self.store.register_user(
+                user_id=appservice1_user1, password_hash=None, appservice_id=service1
+            )
+        )
+        self.get_success(self.store.upsert_monthly_active_user(appservice1_user1))
+        self.get_success(
+            self.store.register_user(
+                user_id=appservice2_user1, password_hash=None, appservice_id=service2
+            )
+        )
+        self.get_success(self.store.upsert_monthly_active_user(appservice2_user1))
+
+        result = self.get_success(self.store.get_monthly_active_users_by_service())
+
+        self.assertEqual(len(result), 2)
+        self.assertIn((service1, appservice1_user1), result)
+        self.assertIn((service2, appservice2_user1), result)
+
+        # (Some users, end-timestamp filtering) -> non-empty result
+        appservice1_user2 = "@appservice1_user2:example.com"
+        timestamp1 = self.reactor.seconds()
+        self.reactor.advance(5)
+        timestamp2 = self.reactor.seconds()
+        self.get_success(
+            self.store.register_user(
+                user_id=appservice1_user2, password_hash=None, appservice_id=service1
+            )
+        )
+        self.get_success(self.store.upsert_monthly_active_user(appservice1_user2))
+
+        result = self.get_success(
+            self.store.get_monthly_active_users_by_service(
+                end_timestamp=round(timestamp1 * 1000)
+            )
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertNotIn((service1, appservice1_user2), result)
+
+        # (Some users, start-timestamp filtering) -> non-empty result
+        result = self.get_success(
+            self.store.get_monthly_active_users_by_service(
+                start_timestamp=round(timestamp2 * 1000)
+            )
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertIn((service1, appservice1_user2), result)
+
+        # (Some users, full-timestamp filtering) -> non-empty result
+        native_user1 = "@native_user1:example.com"
+        native = "native"
+        timestamp3 = self.reactor.seconds()
+        self.reactor.advance(100)
+        self.get_success(
+            self.store.register_user(
+                user_id=native_user1, password_hash=None, appservice_id=native
+            )
+        )
+        self.get_success(self.store.upsert_monthly_active_user(native_user1))
+
+        result = self.get_success(
+            self.store.get_monthly_active_users_by_service(
+                start_timestamp=round(timestamp2 * 1000),
+                end_timestamp=round(timestamp3 * 1000),
+            )
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertIn((service1, appservice1_user2), result)

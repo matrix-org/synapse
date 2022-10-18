@@ -21,10 +21,11 @@ from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -116,8 +117,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.room_members = []
 
-        async def check_user_in_room(room_id: str, user_id: str) -> None:
-            if user_id not in [u.to_string() for u in self.room_members]:
+        async def check_user_in_room(room_id: str, requester: Requester) -> None:
+            if requester.user.to_string() not in [
+                u.to_string() for u in self.room_members
+            ]:
                 raise AuthError(401, "User is not in the room")
             return None
 
@@ -126,12 +129,18 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         async def check_host_in_room(room_id: str, server_name: str) -> bool:
             return room_id == ROOM_ID
 
-        hs.get_event_auth_handler().check_host_in_room = check_host_in_room
+        hs.get_event_auth_handler().is_host_in_room = check_host_in_room
 
-        def get_joined_hosts_for_room(room_id: str):
+        async def get_current_hosts_in_room(room_id: str):
             return {member.domain for member in self.room_members}
 
-        self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
+        hs.get_storage_controllers().state.get_current_hosts_in_room = (
+            get_current_hosts_in_room
+        )
+
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
+            get_current_hosts_in_room
+        )
 
         async def get_users_in_room(room_id: str):
             return {str(u) for u in self.room_members}
@@ -145,7 +154,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.datastore.get_current_state_deltas = Mock(return_value=(0, None))
+        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))
 
         self.datastore.get_to_device_stream_token = lambda: 0
         self.datastore.get_new_device_msgs_for_remote = (
@@ -184,7 +193,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             events[0],
             [
                 {
-                    "type": "m.typing",
+                    "type": EduTypes.TYPING,
                     "room_id": ROOM_ID,
                     "content": {"user_ids": [U_APPLE.to_string()]},
                 }
@@ -209,7 +218,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             "farm",
             path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
-                "m.typing",
+                EduTypes.TYPING,
                 content={
                     "room_id": ROOM_ID,
                     "user_id": U_APPLE.to_string(),
@@ -231,7 +240,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             "PUT",
             "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
-                "m.typing",
+                EduTypes.TYPING,
                 content={
                     "room_id": ROOM_ID,
                     "user_id": U_ONION.to_string(),
@@ -254,7 +263,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             events[0],
             [
                 {
-                    "type": "m.typing",
+                    "type": EduTypes.TYPING,
                     "room_id": ROOM_ID,
                     "content": {"user_ids": [U_ONION.to_string()]},
                 }
@@ -270,7 +279,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             "PUT",
             "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
-                "m.typing",
+                EduTypes.TYPING,
                 content={
                     "room_id": OTHER_ROOM_ID,
                     "user_id": U_ONION.to_string(),
@@ -324,7 +333,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             "farm",
             path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
-                "m.typing",
+                EduTypes.TYPING,
                 content={
                     "room_id": ROOM_ID,
                     "user_id": U_APPLE.to_string(),
@@ -345,7 +354,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             events[0],
-            [{"type": "m.typing", "room_id": ROOM_ID, "content": {"user_ids": []}}],
+            [
+                {
+                    "type": EduTypes.TYPING,
+                    "room_id": ROOM_ID,
+                    "content": {"user_ids": []},
+                }
+            ],
         )
 
     def test_typing_timeout(self) -> None:
@@ -379,7 +394,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             events[0],
             [
                 {
-                    "type": "m.typing",
+                    "type": EduTypes.TYPING,
                     "room_id": ROOM_ID,
                     "content": {"user_ids": [U_APPLE.to_string()]},
                 }
@@ -402,7 +417,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             events[0],
-            [{"type": "m.typing", "room_id": ROOM_ID, "content": {"user_ids": []}}],
+            [
+                {
+                    "type": EduTypes.TYPING,
+                    "room_id": ROOM_ID,
+                    "content": {"user_ids": []},
+                }
+            ],
         )
 
         # SYN-230 - see if we can still set after timeout
@@ -433,7 +454,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             events[0],
             [
                 {
-                    "type": "m.typing",
+                    "type": EduTypes.TYPING,
                     "room_id": ROOM_ID,
                     "content": {"user_ids": [U_APPLE.to_string()]},
                 }

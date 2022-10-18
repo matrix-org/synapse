@@ -18,7 +18,6 @@ from typing import Tuple
 from unittest.mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.server import cancellable
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
@@ -28,18 +27,21 @@ from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util.cancellation import cancellable
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestHelperMixin
+from tests.http.server._base import test_disconnect
 
 
 def make_request(content):
     """Make an object that acts enough like a request."""
-    request = Mock(spec=["content"])
+    request = Mock(spec=["method", "uri", "content"])
 
     if isinstance(content, dict):
         content = json.dumps(content).encode("utf8")
 
+    request.method = bytes("STUB_METHOD", "ascii")
+    request.uri = bytes("/test_stub_uri", "ascii")
     request.content = BytesIO(content)
     return request
 
@@ -49,19 +51,21 @@ class TestServletUtils(unittest.TestCase):
         """Basic tests for parse_json_value_from_request."""
         # Test round-tripping.
         obj = {"foo": 1}
-        result = parse_json_value_from_request(make_request(obj))
-        self.assertEqual(result, obj)
+        result1 = parse_json_value_from_request(make_request(obj))
+        self.assertEqual(result1, obj)
 
         # Results don't have to be objects.
-        result = parse_json_value_from_request(make_request(b'["foo"]'))
-        self.assertEqual(result, ["foo"])
+        result2 = parse_json_value_from_request(make_request(b'["foo"]'))
+        self.assertEqual(result2, ["foo"])
 
         # Test empty.
         with self.assertRaises(SynapseError):
             parse_json_value_from_request(make_request(b""))
 
-        result = parse_json_value_from_request(make_request(b""), allow_empty_body=True)
-        self.assertIsNone(result)
+        result3 = parse_json_value_from_request(
+            make_request(b""), allow_empty_body=True
+        )
+        self.assertIsNone(result3)
 
         # Invalid UTF-8.
         with self.assertRaises(SynapseError):
@@ -106,9 +110,7 @@ class CancellableRestServlet(RestServlet):
         return HTTPStatus.OK, {"result": True}
 
 
-class TestRestServletCancellation(
-    unittest.HomeserverTestCase, EndpointCancellationTestHelperMixin
-):
+class TestRestServletCancellation(unittest.HomeserverTestCase):
     """Tests for `RestServlet` cancellation."""
 
     servlets = [
@@ -118,7 +120,7 @@ class TestRestServletCancellation(
     def test_cancellable_disconnect(self) -> None:
         """Test that handlers with the `@cancellable` flag can be cancelled."""
         channel = self.make_request("GET", "/sleep", await_result=False)
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=True,
@@ -128,7 +130,7 @@ class TestRestServletCancellation(
     def test_uncancellable_disconnect(self) -> None:
         """Test that handlers without the `@cancellable` flag cannot be cancelled."""
         channel = self.make_request("POST", "/sleep", await_result=False)
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=False,

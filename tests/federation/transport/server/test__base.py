@@ -17,14 +17,15 @@ from typing import Dict, List, Tuple
 
 from synapse.api.errors import Codes
 from synapse.federation.transport.server import BaseFederationServlet
-from synapse.federation.transport.server._base import Authenticator
-from synapse.http.server import JsonResource, cancellable
+from synapse.federation.transport.server._base import Authenticator, _parse_auth_header
+from synapse.http.server import JsonResource
 from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util.cancellation import cancellable
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestHelperMixin
+from tests.http.server._base import test_disconnect
 
 
 class CancellableFederationServlet(BaseFederationServlet):
@@ -54,9 +55,7 @@ class CancellableFederationServlet(BaseFederationServlet):
         return HTTPStatus.OK, {"result": True}
 
 
-class BaseFederationServletCancellationTests(
-    unittest.FederatingHomeserverTestCase, EndpointCancellationTestHelperMixin
-):
+class BaseFederationServletCancellationTests(unittest.FederatingHomeserverTestCase):
     """Tests for `BaseFederationServlet` cancellation."""
 
     skip = "`BaseFederationServlet` does not support cancellation yet."
@@ -86,7 +85,7 @@ class BaseFederationServletCancellationTests(
         # request won't be processed.
         self.pump()
 
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=True,
@@ -106,9 +105,36 @@ class BaseFederationServletCancellationTests(
         # request won't be processed.
         self.pump()
 
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=False,
             expected_body={"result": True},
+        )
+
+
+class BaseFederationAuthorizationTests(unittest.TestCase):
+    def test_authorization_header(self) -> None:
+        """Tests that the Authorization header is parsed correctly."""
+
+        # test a "normal" Authorization header
+        self.assertEqual(
+            _parse_auth_header(
+                b'X-Matrix origin=foo,key="ed25519:1",sig="sig",destination="bar"'
+            ),
+            ("foo", "ed25519:1", "sig", "bar"),
+        )
+        # test an Authorization with extra spaces, upper-case names, and escaped
+        # characters
+        self.assertEqual(
+            _parse_auth_header(
+                b'X-Matrix  ORIGIN=foo,KEY="ed25\\519:1",SIG="sig",destination="bar"'
+            ),
+            ("foo", "ed25519:1", "sig", "bar"),
+        )
+        self.assertEqual(
+            _parse_auth_header(
+                b'X-Matrix origin=foo,key="ed25519:1",sig="sig",destination="bar",extra_field=ignored'
+            ),
+            ("foo", "ed25519:1", "sig", "bar"),
         )

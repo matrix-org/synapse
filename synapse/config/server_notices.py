@@ -18,27 +18,6 @@ from synapse.types import JsonDict, UserID
 
 from ._base import Config
 
-DEFAULT_CONFIG = """\
-# Server Notices room configuration
-#
-# Uncomment this section to enable a room which can be used to send notices
-# from the server to users. It is a special room which cannot be left; notices
-# come from a special "notices" user id.
-#
-# If you uncomment this section, you *must* define the system_mxid_localpart
-# setting, which defines the id of the user which will be used to send the
-# notices.
-#
-# It's also possible to override the room name, the display name of the
-# "notices" user, and the avatar for the user.
-#
-#server_notices:
-#  system_mxid_localpart: notices
-#  system_mxid_display_name: "Server Notices"
-#  system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
-#  room_name: "Server Notices"
-"""
-
 
 class ServerNoticesConfig(Config):
     """Configuration for the server notices room.
@@ -83,6 +62,3 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_avatar_url = c.get("system_mxid_avatar_url", None)
         # todo: i18n
         self.server_notices_room_name = c.get("room_name", "Server Notices")
-
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return DEFAULT_CONFIG

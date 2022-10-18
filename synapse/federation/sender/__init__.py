@@ -15,7 +15,17 @@
 import abc
 import logging
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -52,12 +62,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 sent_pdus_destination_dist_count = Counter(
-    "synapse_federation_client_sent_pdu_destinations:count",
+    "synapse_federation_client_sent_pdu_destinations_count",
     "Number of PDUs queued for sending to one or more destinations",
 )
 
 sent_pdus_destination_dist_total = Counter(
-    "synapse_federation_client_sent_pdu_destinations:total",
+    "synapse_federation_client_sent_pdu_destinations",
     "Total number of PDUs queued for sending across all destinations",
 )
 
@@ -235,6 +245,8 @@ class FederationSender(AbstractFederationSender):
         self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
 
+        self._storage_controllers = hs.get_storage_controllers()
+
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
@@ -339,19 +351,27 @@ class FederationSender(AbstractFederationSender):
             self._is_processing = True
             while True:
                 last_token = await self.store.get_federation_out_pos("events")
-                next_token, events = await self.store.get_all_new_events_stream(
+                (
+                    next_token,
+                    event_to_received_ts,
+                ) = await self.store.get_all_new_event_ids_stream(
                     last_token, self._last_poked_id, limit=100
+                )
+
+                event_ids = event_to_received_ts.keys()
+                event_entries = await self.store.get_unredacted_events_from_cache_or_db(
+                    event_ids
                 )
 
                 logger.debug(
                     "Handling %i -> %i: %i events to send (current id %i)",
                     last_token,
                     next_token,
-                    len(events),
+                    len(event_entries),
                     self._last_poked_id,
                 )
 
-                if not events and next_token >= self._last_poked_id:
+                if not event_entries and next_token >= self._last_poked_id:
                     logger.debug("All events processed")
                     break
 
@@ -409,7 +429,7 @@ class FederationSender(AbstractFederationSender):
                         )
                         return
 
-                    destinations: Optional[Set[str]] = None
+                    destinations: Optional[Collection[str]] = None
                     if not event.prev_event_ids():
                         # If there are no prev event IDs then the state is empty
                         # and so no remote servers in the room
@@ -424,6 +444,19 @@ class FederationSender(AbstractFederationSender):
                         if sg:
                             destinations = await self._external_cache.get(
                                 "get_joined_hosts", str(sg)
+                            )
+                            if destinations is None:
+                                # Add logging to help track down #13444
+                                logger.info(
+                                    "Unexpectedly did not have cached destinations for %s / %s",
+                                    sg,
+                                    event.event_id,
+                                )
+                        else:
+                            # Add logging to help track down #13444
+                            logger.info(
+                                "Unexpectedly did not have cached prev group for %s",
+                                event.event_id,
                             )
 
                     if destinations is None:
@@ -444,7 +477,7 @@ class FederationSender(AbstractFederationSender):
                             )
                             return
 
-                    destinations = {
+                    sharded_destinations = {
                         d
                         for d in destinations
                         if self._federation_shard_config.should_handle(
@@ -456,15 +489,15 @@ class FederationSender(AbstractFederationSender):
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
                         # send the event to it.
-                        destinations.discard(send_on_behalf_of)
+                        sharded_destinations.discard(send_on_behalf_of)
 
-                    logger.debug("Sending %s to %r", event, destinations)
+                    logger.debug("Sending %s to %r", event, sharded_destinations)
 
-                    if destinations:
-                        await self._send_pdu(event, destinations)
+                    if sharded_destinations:
+                        await self._send_pdu(event, sharded_destinations)
 
                         now = self.clock.time_msec()
-                        ts = await self.store.get_received_ts(event.event_id)
+                        ts = event_to_received_ts[event.event_id]
                         assert ts is not None
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "federation_sender"
@@ -479,8 +512,14 @@ class FederationSender(AbstractFederationSender):
                             await handle_event(event)
 
                 events_by_room: Dict[str, List[EventBase]] = {}
-                for event in events:
-                    events_by_room.setdefault(event.room_id, []).append(event)
+
+                for event_id in event_ids:
+                    # `event_entries` is unsorted, so we have to iterate over `event_ids`
+                    # to ensure the events are in the right order
+                    event_cache = event_entries.get(event_id)
+                    if event_cache:
+                        event = event_cache.event
+                        events_by_room.setdefault(event.room_id, []).append(event)
 
                 await make_deferred_yieldable(
                     defer.gatherResults(
@@ -495,9 +534,10 @@ class FederationSender(AbstractFederationSender):
                 logger.debug("Successfully handled up to %i", next_token)
                 await self.store.update_federation_out_pos("events", next_token)
 
-                if events:
+                if event_entries:
                     now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
+                    last_id = next(reversed(event_ids))
+                    ts = event_to_received_ts[last_id]
                     assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
@@ -507,7 +547,7 @@ class FederationSender(AbstractFederationSender):
                         "federation_sender"
                     ).set(ts)
 
-                    events_processed_counter.inc(len(events))
+                    events_processed_counter.inc(len(event_entries))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
                         len(events_by_room)
@@ -592,7 +632,9 @@ class FederationSender(AbstractFederationSender):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains_set = await self.state.get_current_hosts_in_room(room_id)
+        domains_set = await self._storage_controllers.state.get_current_hosts_in_room(
+            room_id
+        )
         domains = [
             d
             for d in domains_set

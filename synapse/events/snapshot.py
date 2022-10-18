@@ -11,19 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import attr
 from frozendict import frozendict
-from typing_extensions import Literal
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
-    from synapse.storage import Storage
+    from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
+    from synapse.storage.state import StateFilter
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -32,7 +32,7 @@ class EventContext:
     Holds information relevant to persisting an event
 
     Attributes:
-        rejected: A rejection reason if the event was rejected, else False
+        rejected: A rejection reason if the event was rejected, else None
 
         _state_group: The ID of the state group for this event. Note that state events
             are persisted with a state group which includes the new event, so this is
@@ -83,8 +83,8 @@ class EventContext:
             incomplete state.
     """
 
-    _storage: "Storage"
-    rejected: Union[Literal[False], str] = False
+    _storage: "StorageControllers"
+    rejected: Optional[str] = None
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
     _state_delta_due_to_event: Optional[StateMap[str]] = None
@@ -96,7 +96,7 @@ class EventContext:
 
     @staticmethod
     def with_state(
-        storage: "Storage",
+        storage: "StorageControllers",
         state_group: Optional[int],
         state_group_before_event: Optional[int],
         state_delta_due_to_event: Optional[StateMap[str]],
@@ -116,7 +116,7 @@ class EventContext:
 
     @staticmethod
     def for_outlier(
-        storage: "Storage",
+        storage: "StorageControllers",
     ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
         return EventContext(storage=storage)
@@ -146,7 +146,7 @@ class EventContext:
         }
 
     @staticmethod
-    def deserialize(storage: "Storage", input: JsonDict) -> "EventContext":
+    def deserialize(storage: "StorageControllers", input: JsonDict) -> "EventContext":
         """Converts a dict that was produced by `serialize` back into a
         EventContext.
 
@@ -196,13 +196,18 @@ class EventContext:
 
         return self._state_group
 
-    async def get_current_state_ids(self) -> Optional[StateMap[str]]:
+    async def get_current_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> Optional[StateMap[str]]:
         """
         Gets the room state map, including this event - ie, the state in ``state_group``
 
         It is an error to access this for a rejected event, since rejected state should
         not make it into the room state. This method will raise an exception if
         ``rejected`` is set.
+
+        Arg:
+           state_filter: specifies the type of state event to fetch from DB, example: EventTypes.JoinRules
 
         Returns:
             Returns None if state_group is None, which happens when the associated
@@ -216,7 +221,7 @@ class EventContext:
 
         assert self._state_delta_due_to_event is not None
 
-        prev_state_ids = await self.get_prev_state_ids()
+        prev_state_ids = await self.get_prev_state_ids(state_filter)
 
         if self._state_delta_due_to_event:
             prev_state_ids = dict(prev_state_ids)
@@ -224,11 +229,16 @@ class EventContext:
 
         return prev_state_ids
 
-    async def get_prev_state_ids(self) -> StateMap[str]:
+    async def get_prev_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> StateMap[str]:
         """
         Gets the room state map, excluding this event.
 
         For a non-state event, this will be the same as get_current_state_ids().
+
+        Args:
+            state_filter: specifies the type of state event to fetch from DB, example: EventTypes.JoinRules
 
         Returns:
             Returns {} if state_group is None, which happens when the associated
@@ -239,7 +249,7 @@ class EventContext:
         """
         assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
-            self.state_group_before_event
+            self.state_group_before_event, state_filter
         )
 
 

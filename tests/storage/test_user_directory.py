@@ -134,7 +134,6 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
-            hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             sender="@as:test",

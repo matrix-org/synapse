@@ -15,7 +15,7 @@
 from copy import deepcopy
 from typing import List
 
-from synapse.api.constants import ReceiptTypes
+from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.types import JsonDict
 
 from tests import unittest
@@ -25,7 +25,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_source = hs.get_event_sources().sources.receipt
 
-    def test_filters_out_private_receipt(self):
+    def test_filters_out_private_receipt(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -39,13 +39,13 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [],
         )
 
-    def test_filters_out_private_receipt_and_ignores_rest(self):
+    def test_filters_out_private_receipt_and_ignores_rest(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -64,7 +64,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -79,12 +79,14 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
 
-    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(self):
+    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(
+        self,
+    ) -> None:
         self._test_filters_private(
             [
                 {
@@ -105,7 +107,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -120,12 +122,12 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
 
-    def test_handles_empty_event(self):
+    def test_handles_empty_event(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -140,7 +142,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -155,12 +157,14 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
 
-    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(self):
+    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(
+        self,
+    ) -> None:
         self._test_filters_private(
             [
                 {
@@ -174,7 +178,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
                 {
                     "content": {
@@ -187,7 +191,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
             ],
             [
@@ -202,12 +206,12 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
 
-    def test_handles_string_data(self):
+    def test_handles_string_data(self) -> None:
         """
         Tests that an invalid shape for read-receipts is handled.
         Context: https://github.com/matrix-org/synapse/issues/10603
@@ -224,7 +228,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
             ],
             [
@@ -237,12 +241,12 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
             ],
         )
 
-    def test_leaves_our_private_and_their_public(self):
+    def test_leaves_our_private_and_their_public(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -266,7 +270,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -291,12 +295,12 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
 
-    def test_we_do_not_mutate(self):
+    def test_we_do_not_mutate(self) -> None:
         """Ensure the input values are not modified."""
         events = [
             {
@@ -310,7 +314,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                     }
                 },
                 "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                "type": "m.receipt",
+                "type": EduTypes.RECEIPT,
             }
         ]
         original_events = deepcopy(events)
@@ -320,7 +324,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
 
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
-    ):
+    ) -> None:
         """Tests that the _filter_out_private returns the expected output"""
         filtered_events = self.event_source.filter_out_private_receipts(
             events, "@me:server.org"

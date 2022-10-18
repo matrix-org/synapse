@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tupl
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
-from synapse.http.server import HttpServer, ServletCallback, is_method_cancellable
+from synapse.http.server import HttpServer, ServletCallback
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
@@ -34,6 +34,7 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -169,14 +170,16 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
     """
     try:
         header_str = header_bytes.decode("utf-8")
-        params = header_str.split(" ")[1].split(",")
+        params = re.split(" +", header_str)[1].split(",")
         param_dict: Dict[str, str] = {
-            k: v for k, v in [param.split("=", maxsplit=1) for param in params]
+            k.lower(): v for k, v in [param.split("=", maxsplit=1) for param in params]
         }
 
         def strip_quotes(value: str) -> str:
             if value.startswith('"'):
-                return value[1:-1]
+                return re.sub(
+                    "\\\\(.)", lambda matchobj: matchobj.group(1), value[1:-1]
+                )
             else:
                 return value
 
@@ -307,7 +310,7 @@ class BaseFederationServlet:
                 raise
 
             # update the active opentracing span with the authenticated entity
-            set_tag("authenticated_entity", origin)
+            set_tag("authenticated_entity", str(origin))
 
             # if the origin is authenticated and whitelisted, use its span context
             # as the parent.
@@ -373,7 +376,7 @@ class BaseFederationServlet:
             if code is None:
                 continue
 
-            if is_method_cancellable(code):
+            if is_function_cancellable(code):
                 # The wrapper added by `self._wrap` will inherit the cancellable flag,
                 # but the wrapper itself does not support cancellation yet.
                 # Once resolved, the cancellation tests in

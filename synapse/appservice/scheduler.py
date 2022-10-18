@@ -319,7 +319,9 @@ class _ServiceQueuer:
         rooms_of_interesting_users.update(event.room_id for event in events)
         # EDUs
         rooms_of_interesting_users.update(
-            ephemeral["room_id"] for ephemeral in ephemerals
+            ephemeral["room_id"]
+            for ephemeral in ephemerals
+            if ephemeral.get("room_id") is not None
         )
 
         # Look up the AS users in those rooms
@@ -329,8 +331,9 @@ class _ServiceQueuer:
             )
 
         # Add recipients of to-device messages.
-        # device_message["user_id"] is the ID of the recipient.
-        users.update(device_message["user_id"] for device_message in to_device_messages)
+        users.update(
+            device_message["to_user_id"] for device_message in to_device_messages
+        )
 
         # Compute and return the counts / fallback key usage states
         otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)
@@ -384,6 +387,11 @@ class _TransactionController:
             device_list_summary: The device list summary to include in the transaction.
         """
         try:
+            service_is_up = await self._is_service_up(service)
+            # Don't create empty txns when in recovery mode (ephemeral events are dropped)
+            if not service_is_up and not events:
+                return
+
             txn = await self.store.create_appservice_txn(
                 service=service,
                 events=events,
@@ -393,7 +401,6 @@ class _TransactionController:
                 unused_fallback_keys=unused_fallback_keys or {},
                 device_list_summary=device_list_summary or DeviceListUpdates(),
             )
-            service_is_up = await self._is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
                 if sent:

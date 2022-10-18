@@ -6,12 +6,14 @@ CWD=$(pwd)
 
 cd "$DIR/.." || exit
 
-PYTHONPATH=$(readlink -f "$(pwd)")
-export PYTHONPATH
+# Do not override PYTHONPATH if we are in a virtual env
+if [ "$VIRTUAL_ENV" = "" ]; then
+    PYTHONPATH=$(readlink -f "$(pwd)")
+    export PYTHONPATH
+	echo "$PYTHONPATH"
+fi
 
-
-echo "$PYTHONPATH"
-
+# Create servers which listen on HTTP at 808x and HTTPS at 848x.
 for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
 
@@ -19,10 +21,12 @@ for port in 8080 8081 8082; do
     mkdir -p demo/$port
     pushd demo/$port || exit
 
-    # Generate the configuration for the homeserver at localhost:848x.
+    # Generate the configuration for the homeserver at localhost:848x, note that
+    # the homeserver name needs to match the HTTPS listening port for federation
+    # to properly work..
     python3 -m synapse.app.homeserver \
         --generate-config \
-        --server-name "localhost:$port" \
+        --server-name "localhost:$https_port" \
         --config-path "$port.config" \
         --report-stats no
 

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -23,6 +23,7 @@ from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
+from synapse.logging.opentracing import log_kv, trace
 from synapse.types import JsonDict, get_domain_from_id
 
 if TYPE_CHECKING:
@@ -30,6 +31,18 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class InvalidEventSignatureError(RuntimeError):
+    """Raised when the signature on an event is invalid.
+
+    The stringification of this exception is just the error message without reference
+    to the event id. The event id is available as a property.
+    """
+
+    def __init__(self, message: str, event_id: str):
+        super().__init__(message)
+        self.event_id = event_id
 
 
 class FederationBase:
@@ -41,9 +54,16 @@ class FederationBase:
         self.spam_checker = hs.get_spam_checker()
         self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
+        self._storage_controllers = hs.get_storage_controllers()
 
+    @trace
     async def _check_sigs_and_hash(
-        self, room_version: RoomVersion, pdu: EventBase
+        self,
+        room_version: RoomVersion,
+        pdu: EventBase,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> EventBase:
         """Checks that event is correctly signed by the sending server.
 
@@ -55,24 +75,27 @@ class FederationBase:
         Args:
             room_version: The room version of the PDU
             pdu: the event to be checked
+            record_failure_callback: A callback to run whenever the given event
+                fails signature or hash checks. This includes exceptions
+                that would be normally be thrown/raised but also things like
+                checking for event tampering where we just return the redacted
+                event.
 
         Returns:
               * the original event if the checks pass
               * a redacted version of the event (if the signature
-                matched but the hash did not)
+                matched but the hash did not). In this case a warning will be logged.
 
         Raises:
-              SynapseError if the signature check failed.
+          InvalidEventSignatureError if the signature check failed. Nothing
+             will be logged in this case.
         """
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
-        except SynapseError as e:
-            logger.warning(
-                "Signature check failed for %s: %s",
-                pdu.event_id,
-                e,
-            )
-            raise
+        except InvalidEventSignatureError as exc:
+            if record_failure_callback:
+                await record_failure_callback(pdu, str(exc))
+            raise exc
 
         if not check_event_content_hash(pdu):
             # let's try to distinguish between failures because the event was
@@ -87,21 +110,44 @@ class FederationBase:
             if set(redacted_event.keys()) == set(pdu.keys()) and set(
                 redacted_event.content.keys()
             ) == set(pdu.content.keys()):
-                logger.info(
+                logger.debug(
                     "Event %s seems to have been redacted; using our redacted copy",
                     pdu.event_id,
+                )
+                log_kv(
+                    {
+                        "message": "Event seems to have been redacted; using our redacted copy",
+                        "event_id": pdu.event_id,
+                    }
                 )
             else:
                 logger.warning(
                     "Event %s content has been tampered, redacting",
                     pdu.event_id,
                 )
+                log_kv(
+                    {
+                        "message": "Event content has been tampered, redacting",
+                        "event_id": pdu.event_id,
+                    }
+                )
+                if record_failure_callback:
+                    await record_failure_callback(
+                        pdu, "Event content has been tampered with"
+                    )
             return redacted_event
 
-        result = await self.spam_checker.check_event_for_spam(pdu)
+        spam_check = await self.spam_checker.check_event_for_spam(pdu)
 
-        if result:
+        if spam_check != self.spam_checker.NOT_SPAM:
             logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
+            log_kv(
+                {
+                    "message": "Event contains spam, redacting (to save disk space) "
+                    "as well as soft-failing (to stop using the event in prev_events)",
+                    "event_id": pdu.event_id,
+                }
+            )
             # we redact (to save disk space) as well as soft-failing (to stop
             # using the event in prev_events).
             redacted_event = prune_event(pdu)
@@ -111,17 +157,19 @@ class FederationBase:
         return pdu
 
 
+@trace
 async def _check_sigs_on_pdu(
     keyring: Keyring, room_version: RoomVersion, pdu: EventBase
 ) -> None:
     """Check that the given events are correctly signed
 
-    Raise a SynapseError if the event wasn't correctly signed.
-
     Args:
         keyring: keyring object to do the checks
         room_version: the room version of the PDUs
         pdus: the events to be checked
+
+    Raises:
+        InvalidEventSignatureError if the event wasn't correctly signed.
     """
 
     # we want to check that the event is signed by:
@@ -147,44 +195,38 @@ async def _check_sigs_on_pdu(
 
     # First we check that the sender event is signed by the sender's domain
     # (except if its a 3pid invite, in which case it may be sent by any server)
+    sender_domain = get_domain_from_id(pdu.sender)
     if not _is_invite_via_3pid(pdu):
         try:
             await keyring.verify_event_for_server(
-                get_domain_from_id(pdu.sender),
+                sender_domain,
                 pdu,
                 pdu.origin_server_ts if room_version.enforce_key_validity else 0,
             )
         except Exception as e:
-            errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+            raise InvalidEventSignatureError(
+                f"unable to verify signature for sender domain {sender_domain}: {e}",
                 pdu.event_id,
-                get_domain_from_id(pdu.sender),
-                e,
-            )
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+            ) from None
 
     # now let's look for events where the sender's domain is different to the
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     # (ie, the room version uses old-style non-hash event IDs).
-    if room_version.event_format == EventFormatVersions.V1 and get_domain_from_id(
-        pdu.event_id
-    ) != get_domain_from_id(pdu.sender):
-        try:
-            await keyring.verify_event_for_server(
-                get_domain_from_id(pdu.event_id),
-                pdu,
-                pdu.origin_server_ts if room_version.enforce_key_validity else 0,
-            )
-        except Exception as e:
-            errmsg = (
-                "event id %s: unable to verify signature for event id domain %s: %s"
-                % (
-                    pdu.event_id,
-                    get_domain_from_id(pdu.event_id),
-                    e,
+    if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
+        event_domain = get_domain_from_id(pdu.event_id)
+        if event_domain != sender_domain:
+            try:
+                await keyring.verify_event_for_server(
+                    event_domain,
+                    pdu,
+                    pdu.origin_server_ts if room_version.enforce_key_validity else 0,
                 )
-            )
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+            except Exception as e:
+                raise InvalidEventSignatureError(
+                    f"unable to verify signature for event domain {event_domain}: {e}",
+                    pdu.event_id,
+                ) from None
 
     # If this is a join event for a restricted room it may have been authorised
     # via a different server from the sending server. Check those signatures.
@@ -204,15 +246,10 @@ async def _check_sigs_on_pdu(
                 pdu.origin_server_ts if room_version.enforce_key_validity else 0,
             )
         except Exception as e:
-            errmsg = (
-                "event id %s: unable to verify signature for authorising server %s: %s"
-                % (
-                    pdu.event_id,
-                    authorising_server,
-                    e,
-                )
-            )
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+            raise InvalidEventSignatureError(
+                f"unable to verify signature for authorising serve {authorising_server}: {e}",
+                pdu.event_id,
+            ) from None
 
 
 def _is_invite_via_3pid(event: EventBase) -> bool:

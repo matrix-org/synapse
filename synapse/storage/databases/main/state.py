@@ -16,16 +16,20 @@ import collections.abc
 import logging
 from typing import TYPE_CHECKING, Collection, Dict, Iterable, Optional, Set, Tuple
 
+import attr
+
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.logging.opentracing import trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
+    make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
@@ -33,6 +37,8 @@ from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, JsonMapping, StateMap
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.cancellation import cancellable
+from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -41,6 +47,16 @@ logger = logging.getLogger(__name__)
 
 
 MAX_STATE_DELTA_HOPS = 100
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class EventMetadata:
+    """Returned by `get_metadata_for_events`"""
+
+    room_id: str
+    event_type: str
+    state_key: Optional[str]
+    rejection_reason: Optional[str]
 
 
 def _retrieve_and_check_room_version(room_id: str, room_version_id: str) -> RoomVersion:
@@ -113,13 +129,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             NotFoundError: if the room is unknown
         """
 
-        # First we try looking up room version from the database, but for old
-        # rooms we might not have added the room version to it yet so we fall
-        # back to previous behaviour and look in current state events.
-        #
         # We really should have an entry in the rooms table for every room we
-        # care about, but let's be a bit paranoid (at least while the background
-        # update is happening) to avoid breaking existing rooms.
+        # care about, but let's be a bit paranoid.
         room_version = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="rooms",
@@ -132,6 +143,58 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             raise NotFoundError("Could not find room_version for %s" % (room_id,))
 
         return room_version
+
+    @trace
+    async def get_metadata_for_events(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, EventMetadata]:
+        """Get some metadata (room_id, type, state_key) for the given events.
+
+        This method is a faster alternative than fetching the full events from
+        the DB, and should be used when the full event is not needed.
+
+        Returns metadata for rejected and redacted events. Events that have not
+        been persisted are omitted from the returned dict.
+        """
+
+        def get_metadata_for_events_txn(
+            txn: LoggingTransaction,
+            batch_ids: Collection[str],
+        ) -> Dict[str, EventMetadata]:
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "e.event_id", batch_ids
+            )
+
+            sql = f"""
+                SELECT e.event_id, e.room_id, e.type, se.state_key, r.reason
+                FROM events AS e
+                LEFT JOIN state_events se USING (event_id)
+                LEFT JOIN rejections r USING (event_id)
+                WHERE {clause}
+            """
+
+            txn.execute(sql, args)
+            return {
+                event_id: EventMetadata(
+                    room_id=room_id,
+                    event_type=event_type,
+                    state_key=state_key,
+                    rejection_reason=rejection_reason,
+                )
+                for event_id, room_id, event_type, state_key, rejection_reason in txn
+            }
+
+        result_map: Dict[str, EventMetadata] = {}
+        for batch_ids in batch_iter(event_ids, 1000):
+            result_map.update(
+                await self.db_pool.runInteraction(
+                    "get_metadata_for_events",
+                    get_metadata_for_events_txn,
+                    batch_ids=batch_ids,
+                )
+            )
+
+        return result_map
 
     async def get_room_predecessor(self, room_id: str) -> Optional[JsonMapping]:
         """Get the predecessor of an upgraded room if it exists.
@@ -177,7 +240,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             NotFoundError if the room is unknown
         """
-        state_ids = await self.get_current_state_ids(room_id)
+        state_ids = await self.get_partial_current_state_ids(room_id)
 
         if not state_ids:
             raise NotFoundError(f"Current state for room {room_id} is empty")
@@ -193,9 +256,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return create_event
 
     @cached(max_entries=100000, iterable=True)
-    async def get_current_state_ids(self, room_id: str) -> StateMap[str]:
+    async def get_partial_current_state_ids(self, room_id: str) -> StateMap[str]:
         """Get the current state event ids for a room based on the
         current_state_events table.
+
+        This may be the partial state if we're lazy joining the room.
 
         Args:
             room_id: The room to get the state IDs of.
@@ -215,16 +280,19 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
         return await self.db_pool.runInteraction(
-            "get_current_state_ids", _get_current_state_ids_txn
+            "get_partial_current_state_ids", _get_current_state_ids_txn
         )
 
     # FIXME: how should this be cached?
-    async def get_filtered_current_state_ids(
+    @cancellable
+    async def get_partial_filtered_current_state_ids(
         self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
         of doing a fresh state resolution as per state_handler.get_current_state
+
+        This may be the partial state if we're lazy joining the room.
 
         Args:
             room_id
@@ -241,7 +309,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if not where_clause:
             # We delegate to the cached version
-            return await self.get_current_state_ids(room_id)
+            return await self.get_partial_current_state_ids(room_id)
 
         def _get_filtered_current_state_ids_txn(
             txn: LoggingTransaction,
@@ -268,30 +336,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return await self.db_pool.runInteraction(
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
-
-    async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
-        """Get canonical alias for room, if any
-
-        Args:
-            room_id: The room ID
-
-        Returns:
-            The canonical alias, if any
-        """
-
-        state = await self.get_filtered_current_state_ids(
-            room_id, StateFilter.from_types([(EventTypes.CanonicalAlias, "")])
-        )
-
-        event_id = state.get((EventTypes.CanonicalAlias, ""))
-        if not event_id:
-            return None
-
-        event = await self.get_event(event_id, allow_none=True)
-        if not event:
-            return None
-
-        return event.content.get("canonical_alias")
 
     @cached(max_entries=50000)
     async def _get_state_group_for_event(self, event_id: str) -> Optional[int]:
@@ -379,14 +423,21 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # anything that was rejected should have the same state as its
         # predecessor.
         if context.rejected:
-            assert context.state_group == context.state_group_before_event
+            state_group = context.state_group_before_event
+        else:
+            state_group = context.state_group
 
         self.db_pool.simple_update_txn(
             txn,
             table="event_to_state_groups",
             keyvalues={"event_id": event.event_id},
-            updatevalues={"state_group": context.state_group},
+            updatevalues={"state_group": state_group},
         )
+
+        # the event may now be rejected where it was not before, or vice versa,
+        # in which case we need to update the rejected flags.
+        if bool(context.rejected) != (event.rejected_reason is not None):
+            self.mark_event_rejected_txn(txn, event.event_id, context.rejected)
 
         self.db_pool.simple_delete_one_txn(
             txn,
@@ -395,11 +446,12 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         # TODO(faster_joins): need to do something about workers here
+        #   https://github.com/matrix-org/synapse/issues/12994
         txn.call_after(self.is_partial_state_event.invalidate, (event.event_id,))
         txn.call_after(
             self._get_state_group_for_event.prefill,
             (event.event_id,),
-            context.state_group,
+            state_group,
         )
 
 

@@ -1,1 +1,0 @@
-Add `@cancellable` decorator, for use on endpoint methods that can be cancelled when clients disconnect.

@@ -57,9 +57,9 @@ class OembedConfig(Config):
         """
         # Whether to use the packaged providers.json file.
         if not oembed_config.get("disable_default_providers") or False:
-            providers = json.load(
-                pkg_resources.resource_stream("synapse", "res/providers.json")
-            )
+            with pkg_resources.resource_stream("synapse", "res/providers.json") as s:
+                providers = json.load(s)
+
             yield from self._parse_and_validate_provider(
                 providers, config_path=("oembed",)
             )
@@ -142,29 +142,6 @@ class OembedConfig(Config):
             + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
         )
         return re.compile(pattern)
-
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        # oEmbed allows for easier embedding content from a website. It can be
-        # used for generating URLs previews of services which support it.
-        #
-        oembed:
-          # A default list of oEmbed providers is included with Synapse.
-          #
-          # Uncomment the following to disable using these default oEmbed URLs.
-          # Defaults to 'false'.
-          #
-          #disable_default_providers: true
-
-          # Additional files with oEmbed configuration (each should be in the
-          # form of providers.json).
-          #
-          # By default, this list is empty (so only the default providers.json
-          # is used).
-          #
-          #additional_providers:
-          #  - oembed/my_providers.json
-        """
 
 
 _OEMBED_PROVIDER_SCHEMA = {

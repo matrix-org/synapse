@@ -14,16 +14,15 @@
 
 from typing import TYPE_CHECKING
 
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.filtering import FilteringStore
-
-from ._base import BaseSlavedStore
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class SlavedFilteringStore(BaseSlavedStore):
+class SlavedFilteringStore(SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,

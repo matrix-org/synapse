@@ -654,6 +654,14 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
         # We also expect to get the original event (the id of which is self.parent_id)
+        # when requesting the unstable endpoint.
+        self.assertNotIn("original_event", channel.json_body)
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
         self.assertEqual(
             channel.json_body["original_event"]["event_id"], self.parent_id
         )
@@ -755,11 +763,6 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             channel.json_body["chunk"][0],
         )
 
-        # We also expect to get the original event (the id of which is self.parent_id)
-        self.assertEqual(
-            channel.json_body["original_event"]["event_id"], self.parent_id
-        )
-
         # Make sure next_batch has something in it that looks like it could be a
         # valid token.
         self.assertIsInstance(
@@ -770,7 +773,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/_matrix/client/v1/rooms/{self.room}/relations"
-            f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
+            f"/{self.parent_id}?limit=1&dir=f",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -799,7 +802,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             )
             expected_event_ids.append(channel.json_body["event_id"])
 
-        prev_token = ""
+        prev_token: Optional[str] = ""
         found_event_ids: List[str] = []
         for _ in range(20):
             from_token = ""
@@ -808,7 +811,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
             channel = self.make_request(
                 "GET",
-                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=3{from_token}",
                 access_token=self.user_token,
             )
             self.assertEqual(200, channel.code, channel.json_body)
@@ -824,6 +827,32 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
         # We paginated backwards, so reverse
         found_event_ids.reverse()
+        self.assertEqual(found_event_ids, expected_event_ids)
+
+        # Test forward pagination.
+        prev_token = ""
+        found_event_ids = []
+        for _ in range(20):
+            from_token = ""
+            if prev_token:
+                from_token = "&from=" + prev_token
+
+            channel = self.make_request(
+                "GET",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?dir=f&limit=3{from_token}",
+                access_token=self.user_token,
+            )
+            self.assertEqual(200, channel.code, channel.json_body)
+
+            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
+            next_batch = channel.json_body.get("next_batch")
+
+            self.assertNotEqual(prev_token, next_batch)
+            prev_token = next_batch
+
+            if not prev_token:
+                break
+
         self.assertEqual(found_event_ids, expected_event_ids)
 
     def test_pagination_from_sync_and_messages(self) -> None:
@@ -896,6 +925,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         relation_type: str,
         assertion_callable: Callable[[JsonDict], None],
         expected_db_txn_for_event: int,
+        access_token: Optional[str] = None,
     ) -> None:
         """
         Makes requests to various endpoints which should include bundled aggregations
@@ -907,7 +937,9 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 for relation-specific assertions.
             expected_db_txn_for_event: The number of database transactions which
                 are expected for a call to /event/.
+            access_token: The access token to user, defaults to self.user_token.
         """
+        access_token = access_token or self.user_token
 
         def assert_bundle(event_json: JsonDict) -> None:
             """Assert the expected values of the bundled aggregations."""
@@ -921,7 +953,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/event/{self.parent_id}",
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(channel.json_body)
@@ -932,7 +964,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/messages?dir=b",
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(self._find_event_in_chunk(channel.json_body["chunk"]))
@@ -941,7 +973,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/context/{self.parent_id}",
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(channel.json_body["event"])
@@ -949,7 +981,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         # Request sync.
         filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 4}}}')
         channel = self.make_request(
-            "GET", f"/sync?filter={filter}", access_token=self.user_token
+            "GET", f"/sync?filter={filter}", access_token=access_token
         )
         self.assertEqual(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
@@ -962,7 +994,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             "/search",
             # Search term matches the parent message.
             content={"search_categories": {"room_events": {"search_term": "Hi"}}},
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         chunk = [
@@ -1037,30 +1069,61 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         """
         Test that threads get correctly bundled.
         """
-        self._send_relation(RelationTypes.THREAD, "m.room.test")
-        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        # The root message is from "user", send replies as "user2".
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
         thread_2 = channel.json_body["event_id"]
 
-        def assert_thread(bundled_aggregations: JsonDict) -> None:
-            self.assertEqual(2, bundled_aggregations.get("count"))
-            self.assertTrue(bundled_aggregations.get("current_user_participated"))
-            # The latest thread event has some fields that don't matter.
-            self.assert_dict(
-                {
-                    "content": {
-                        "m.relates_to": {
-                            "event_id": self.parent_id,
-                            "rel_type": RelationTypes.THREAD,
-                        }
+        # This needs two assertion functions which are identical except for whether
+        # the current_user_participated flag is True, create a factory for the
+        # two versions.
+        def _gen_assert(participated: bool) -> Callable[[JsonDict], None]:
+            def assert_thread(bundled_aggregations: JsonDict) -> None:
+                self.assertEqual(2, bundled_aggregations.get("count"))
+                self.assertEqual(
+                    participated, bundled_aggregations.get("current_user_participated")
+                )
+                # The latest thread event has some fields that don't matter.
+                self.assertIn("latest_event", bundled_aggregations)
+                self.assert_dict(
+                    {
+                        "content": {
+                            "m.relates_to": {
+                                "event_id": self.parent_id,
+                                "rel_type": RelationTypes.THREAD,
+                            }
+                        },
+                        "event_id": thread_2,
+                        "sender": self.user2_id,
+                        "type": "m.room.test",
                     },
-                    "event_id": thread_2,
-                    "sender": self.user_id,
-                    "type": "m.room.test",
-                },
-                bundled_aggregations.get("latest_event"),
-            )
+                    bundled_aggregations["latest_event"],
+                )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
+            return assert_thread
+
+        # The "user" sent the root event and is making queries for the bundled
+        # aggregations: they have participated.
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 9)
+        # The "user2" sent replies in the thread and is making queries for the
+        # bundled aggregations: they have participated.
+        #
+        # Note that this re-uses some cached values, so the total number of
+        # queries is much smaller.
+        self._test_bundled_aggregations(
+            RelationTypes.THREAD, _gen_assert(True), 3, access_token=self.user2_token
+        )
+
+        # A user with no interactions with the thread: they have not participated.
+        user3_id, user3_token = self._create_user("charlie")
+        self.helper.join(self.room, user=user3_id, tok=user3_token)
+        self._test_bundled_aggregations(
+            RelationTypes.THREAD, _gen_assert(False), 3, access_token=user3_token
+        )
 
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
         """
@@ -1078,6 +1141,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             self.assertEqual(2, bundled_aggregations.get("count"))
             self.assertTrue(bundled_aggregations.get("current_user_participated"))
             # The latest thread event has some fields that don't matter.
+            self.assertIn("latest_event", bundled_aggregations)
             self.assert_dict(
                 {
                     "content": {
@@ -1090,7 +1154,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                     "sender": self.user_id,
                     "type": "m.room.test",
                 },
-                bundled_aggregations.get("latest_event"),
+                bundled_aggregations["latest_event"],
             )
             # Check the unsigned field on the latest event.
             self.assert_dict(
@@ -1106,7 +1170,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
 
     def test_nested_thread(self) -> None:
         """
@@ -1613,7 +1677,6 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             {"chunk": [{"type": "m.reaction", "key": "👍", "count": 1}]},
         )
 
-    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_redact_parent_thread(self) -> None:
         """
         Test that thread replies are still available when the root event is redacted.
@@ -1643,3 +1706,165 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
             related_event_id,
         )
+
+
+class ThreadsTestCase(BaseRelationsTestCase):
+    def _get_threads(self, body: JsonDict) -> List[Tuple[str, str]]:
+        return [
+            (
+                ev["event_id"],
+                ev["unsigned"]["m.relations"]["m.thread"]["latest_event"]["event_id"],
+            )
+            for ev in body["chunk"]
+        ]
+
+    def test_threads(self) -> None:
+        """Create threads and ensure the ordering is due to their latest event."""
+        # Create 2 threads.
+        thread_1 = self.parent_id
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
+        thread_2 = res["event_id"]
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_1 = channel.json_body["event_id"]
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", parent_id=thread_2
+        )
+        reply_2 = channel.json_body["event_id"]
+
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_2, reply_2), (thread_1, reply_1)])
+
+        # Update the first thread, the ordering should swap.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_3 = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        # Tuple of (thread ID, latest event ID) for each thread.
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_1, reply_3), (thread_2, reply_2)])
+
+    def test_pagination(self) -> None:
+        """Create threads and paginate through them."""
+        # Create 2 threads.
+        thread_1 = self.parent_id
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
+        thread_2 = res["event_id"]
+
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2])
+
+        # Make sure next_batch has something in it that looks like it could be a
+        # valid token.
+        next_batch = channel.json_body.get("next_batch")
+        self.assertIsInstance(next_batch, str, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1&from={next_batch}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_1], channel.json_body)
+
+        self.assertNotIn("next_batch", channel.json_body, channel.json_body)
+
+    def test_include(self) -> None:
+        """Filtering threads to all or participated in should work."""
+        # Thread 1 has the user as the root event.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 has the user replying.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Thread 3 has the user not participating in.
+        res = self.helper.send(self.room, body="Another thread!", tok=self.user2_token)
+        thread_3 = res["event_id"]
+        self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.test",
+            access_token=self.user2_token,
+            parent_id=thread_3,
+        )
+
+        # All threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(
+            thread_roots, [thread_3, thread_2, thread_1], channel.json_body
+        )
+
+        # Only participated threads.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?include=participated",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2, thread_1], channel.json_body)
+
+    def test_ignored_user(self) -> None:
+        """Events from ignored users should be ignored."""
+        # Thread 1 has a reply from an ignored user.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 is created by an ignored user.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Ignore user2.
+        self.get_success(
+            self.store.add_account_data_for_user(
+                self.user_id,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {"ignored_users": {self.user2_id: {}}},
+            )
+        )
+
+        # Only thread 1 is returned.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_1], channel.json_body)

@@ -19,18 +19,23 @@ import attr
 
 class EventFormatVersions:
     """This is an internal enum for tracking the version of the event format,
-    independently from the room version.
+    independently of the room version.
+
+    To reduce confusion, the event format versions are named after the room
+    versions that they were used or introduced in.
+    The concept of an 'event format version' is specific to Synapse (the
+    specification does not mention this term.)
     """
 
-    V1 = 1  # $id:server event id format
-    V2 = 2  # MSC1659-style $hash event id format: introduced for room v3
-    V3 = 3  # MSC1884-style $hash format: introduced for room v4
+    ROOM_V1_V2 = 1  # $id:server event id format: used for room v1 and v2
+    ROOM_V3 = 2  # MSC1659-style $hash event id format: used for room v3
+    ROOM_V4_PLUS = 3  # MSC1884-style $hash format: introduced for room v4
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
-    EventFormatVersions.V1,
-    EventFormatVersions.V2,
-    EventFormatVersions.V3,
+    EventFormatVersions.ROOM_V1_V2,
+    EventFormatVersions.ROOM_V3,
+    EventFormatVersions.ROOM_V4_PLUS,
 }
 
 
@@ -81,13 +86,18 @@ class RoomVersion:
     msc2716_historical: bool
     # MSC2716: Adds support for redacting "insertion", "chunk", and "marker" events
     msc2716_redactions: bool
+    # MSC3787: Adds support for a `knock_restricted` join rule, mixing concepts of
+    # knocks and restricted join rules into the same join condition.
+    msc3787_knock_restricted_join_rule: bool
+    # MSC3667: Enforce integer power levels
+    msc3667_int_only_power_levels: bool
 
 
 class RoomVersions:
     V1 = RoomVersion(
         "1",
         RoomDisposition.STABLE,
-        EventFormatVersions.V1,
+        EventFormatVersions.ROOM_V1_V2,
         StateResolutionVersions.V1,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -99,11 +109,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V2 = RoomVersion(
         "2",
         RoomDisposition.STABLE,
-        EventFormatVersions.V1,
+        EventFormatVersions.ROOM_V1_V2,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -115,11 +127,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V3 = RoomVersion(
         "3",
         RoomDisposition.STABLE,
-        EventFormatVersions.V2,
+        EventFormatVersions.ROOM_V3,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -131,11 +145,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V4 = RoomVersion(
         "4",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
@@ -147,11 +163,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V5 = RoomVersion(
         "5",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=True,
@@ -163,11 +181,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V6 = RoomVersion(
         "6",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -179,11 +199,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
         RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -195,11 +217,13 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V7 = RoomVersion(
         "7",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -211,11 +235,13 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V8 = RoomVersion(
         "8",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -227,11 +253,13 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
     V9 = RoomVersion(
         "9",
         RoomDisposition.STABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -243,11 +271,49 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
-    MSC2716v3 = RoomVersion(
-        "org.matrix.msc2716v3",
+    MSC3787 = RoomVersion(
+        "org.matrix.msc3787",
         RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
+        EventFormatVersions.ROOM_V4_PLUS,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=True,
+        msc3667_int_only_power_levels=False,
+    )
+    V10 = RoomVersion(
+        "10",
+        RoomDisposition.STABLE,
+        EventFormatVersions.ROOM_V4_PLUS,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=True,
+        msc3667_int_only_power_levels=True,
+    )
+    MSC2716v4 = RoomVersion(
+        "org.matrix.msc2716v4",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
@@ -259,6 +325,8 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=True,
         msc2716_redactions=True,
+        msc3787_knock_restricted_join_rule=False,
+        msc3667_int_only_power_levels=False,
     )
 
 
@@ -275,7 +343,9 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V7,
         RoomVersions.V8,
         RoomVersions.V9,
-        RoomVersions.MSC2716v3,
+        RoomVersions.MSC3787,
+        RoomVersions.V10,
+        RoomVersions.MSC2716v4,
     )
 }
 

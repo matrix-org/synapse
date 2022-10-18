@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -28,7 +28,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.storage.databases.main.event_push_actions import HttpPushAction
 
-from . import push_rule_evaluator, push_tools
+from . import push_tools
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -56,6 +56,39 @@ http_badges_failed_counter = Counter(
 )
 
 
+def tweaks_for_actions(actions: List[Union[str, Dict]]) -> Dict[str, Any]:
+    """
+    Converts a list of actions into a `tweaks` dict (which can then be passed to
+        the push gateway).
+
+    This function ignores all actions other than `set_tweak` actions, and treats
+    absent `value`s as `True`, which agrees with the only spec-defined treatment
+    of absent `value`s (namely, for `highlight` tweaks).
+
+    Args:
+        actions: list of actions
+            e.g. [
+                {"set_tweak": "a", "value": "AAA"},
+                {"set_tweak": "b", "value": "BBB"},
+                {"set_tweak": "highlight"},
+                "notify"
+            ]
+
+    Returns:
+        dictionary of tweaks for those actions
+            e.g. {"a": "AAA", "b": "BBB", "highlight": True}
+    """
+    tweaks = {}
+    for a in actions:
+        if not isinstance(a, dict):
+            continue
+        if "set_tweak" in a:
+            # value is allowed to be absent in which case the value assumed
+            # should be True.
+            tweaks[a["set_tweak"]] = a.get("value", True)
+    return tweaks
+
+
 class HttpPusher(Pusher):
     INITIAL_BACKOFF_SEC = 1  # in seconds because that's what Twisted takes
     MAX_BACKOFF_SEC = 60 * 60
@@ -65,7 +98,7 @@ class HttpPusher(Pusher):
 
     def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         super().__init__(hs, pusher_config)
-        self.storage = self.hs.get_storage()
+        self._storage_controllers = self.hs.get_storage_controllers()
         self.app_display_name = pusher_config.app_display_name
         self.device_display_name = pusher_config.device_display_name
         self.pushkey_ts = pusher_config.ts
@@ -281,7 +314,7 @@ class HttpPusher(Pusher):
         if "notify" not in push_action.actions:
             return True
 
-        tweaks = push_rule_evaluator.tweaks_for_actions(push_action.actions)
+        tweaks = tweaks_for_actions(push_action.actions)
         badge = await push_tools.get_badge_count(
             self.hs.get_datastores().main,
             self.user_id,
@@ -343,7 +376,9 @@ class HttpPusher(Pusher):
             }
             return d
 
-        ctx = await push_tools.get_context_for_event(self.storage, event, self.user_id)
+        ctx = await push_tools.get_context_for_event(
+            self._storage_controllers, event, self.user_id
+        )
 
         d = {
             "notification": {
@@ -405,7 +440,7 @@ class HttpPusher(Pusher):
         rejected = []
         if "rejected" in resp:
             rejected = resp["rejected"]
-        else:
+        if not rejected:
             self.badge_count_last_call = badge
         return rejected
 

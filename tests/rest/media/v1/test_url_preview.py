@@ -656,6 +656,41 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             server.data,
         )
 
+    def test_nonexistent_image(self) -> None:
+        """If the preview image doesn't exist, ensure some data is returned."""
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+
+        end_content = (
+            b"""<html><body><img src="http://cdn.matrix.org/foo.jpg"></body></html>"""
+        )
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # The image should not be in the result.
+        self.assertNotIn("og:image", channel.json_body)
+
     def test_data_url(self) -> None:
         """
         Requesting to preview a data URL is not supported.

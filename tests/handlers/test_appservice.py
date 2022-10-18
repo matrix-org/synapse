@@ -22,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 import synapse.storage
+from synapse.api.constants import EduTypes
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeyCounts,
@@ -49,7 +50,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastores.return_value = Mock(main=self.mock_store)
-        self.mock_store.get_received_ts.return_value = make_awaitable(0)
+        self.mock_store.get_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(
             None
@@ -75,9 +76,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         event = Mock(
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
-        self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [])),
-            make_awaitable((1, [event])),
+        self.mock_store.get_all_new_event_ids_stream.side_effect = [
+            make_awaitable((0, {})),
+            make_awaitable((1, {event.event_id: 0})),
+        ]
+        self.mock_store.get_events_as_list.side_effect = [
+            make_awaitable([]),
+            make_awaitable([event]),
         ]
         self.handler.notify_interested_services(RoomStreamToken(None, 1))
 
@@ -94,10 +99,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [event])),
+        self.mock_store.get_all_new_event_ids_stream.side_effect = [
+            make_awaitable((0, {event.event_id: 0})),
         ]
-
+        self.mock_store.get_events_as_list.side_effect = [make_awaitable([event])]
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
 
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
@@ -111,8 +116,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [event])),
+        self.mock_store.get_all_new_event_ids_stream.side_effect = [
+            make_awaitable((0, [event], {event.event_id: 0})),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
@@ -434,16 +439,6 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        # "Complete" a transaction.
-        # All this really does for us is make an entry in the application_services_state
-        # database table, which tracks the current stream_token per stream ID per AS.
-        self.get_success(
-            self.hs.get_datastores().main.complete_appservice_txn(
-                0,
-                interested_appservice,
-            )
-        )
-
         # Now, pretend that we receive a large burst of read receipts (300 total) that
         # all come in at once.
         for i in range(300):
@@ -456,6 +451,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                     receipt_type="m.read",
                     user_id=self.local_user,
                     event_ids=[f"$eventid_{i}"],
+                    thread_id=None,
                     data={},
                 )
             )
@@ -486,7 +482,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
 
         # Check that the ephemeral event is a read receipt with the expected structure
         latest_read_receipt = all_ephemeral_events[-1]
-        self.assertEqual(latest_read_receipt["type"], "m.receipt")
+        self.assertEqual(latest_read_receipt["type"], EduTypes.RECEIPT)
 
         event_id = list(latest_read_receipt["content"].keys())[0]
         self.assertEqual(
@@ -706,7 +702,6 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Create an application service
         appservice = ApplicationService(
             token=random_string(10),
-            hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
             rate_limited=False,
@@ -785,7 +780,6 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
         # Create an appservice that is interested in "local_user"
         appservice = ApplicationService(
             token=random_string(10),
-            hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
             rate_limited=False,
@@ -852,7 +846,6 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         self._service_token = "VERYSECRET"
         self._service = ApplicationService(
             self._service_token,
-            "as1.invalid",
             "as1",
             "@as.sender:test",
             namespaces={

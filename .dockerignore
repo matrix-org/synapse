@@ -4,8 +4,15 @@
 # things to include
 !docker
 !synapse
+!rust
 !README.rst
 !pyproject.toml
 !poetry.lock
+!Cargo.lock
+!Cargo.toml
+!build_rust.py
+
+rust/target
+synapse/*.so
 
 **/__pycache__

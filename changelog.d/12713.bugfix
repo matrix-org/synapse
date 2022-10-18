@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.30.0 where empty rooms could be automatically created if a monthly active users limit is set.

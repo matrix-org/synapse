@@ -1,1 +1,0 @@
-Complain if a federation endpoint has the `@cancellable` flag, since some of the wrapper code may not handle cancellation correctly yet.

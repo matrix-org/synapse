@@ -1,4 +1,4 @@
-# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,6 +63,11 @@ class _BackgroundUpdates:
     INDEX_STREAM_ORDERING2_ROOM_STREAM = "index_stream_ordering2_room_stream"
     INDEX_STREAM_ORDERING2_TS = "index_stream_ordering2_ts"
     REPLACE_STREAM_ORDERING_COLUMN = "replace_stream_ordering_column"
+
+    EVENT_EDGES_DROP_INVALID_ROWS = "event_edges_drop_invalid_rows"
+    EVENT_EDGES_REPLACE_INDEX = "event_edges_replace_index"
+
+    EVENTS_POPULATE_STATE_KEY_REJECTIONS = "events_populate_state_key_rejections"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -177,11 +182,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             self._purged_chain_cover_index,
         )
 
-        # The event_thread_relation background update was replaced with the
-        # event_arbitrary_relations one, which handles any relation to avoid
-        # needed to potentially crawl the entire events table in the future.
-        self.db_pool.updates.register_noop_background_update("event_thread_relation")
-
         self.db_pool.updates.register_background_update_handler(
             "event_arbitrary_relations",
             self._event_arbitrary_relations,
@@ -239,6 +239,26 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         ################################################################################
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.EVENT_EDGES_DROP_INVALID_ROWS,
+            self._background_drop_invalid_event_edges_rows,
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.EVENT_EDGES_REPLACE_INDEX,
+            index_name="event_edges_event_id_prev_event_id_idx",
+            table="event_edges",
+            columns=["event_id", "prev_event_id"],
+            unique=True,
+            # the old index which just covered event_id is now redundant.
+            replaces_index="ev_edges_id",
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.EVENTS_POPULATE_STATE_KEY_REJECTIONS,
+            self._background_events_populate_state_key_rejections,
+        )
 
     async def _background_reindex_fields_sender(
         self, progress: JsonDict, batch_size: int
@@ -1290,3 +1310,179 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         return 0
+
+    async def _background_drop_invalid_event_edges_rows(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Drop invalid rows from event_edges
+
+        This only runs for postgres. For SQLite, it all happens synchronously.
+
+        Firstly, drop any rows with is_state=True. These may have been added a long time
+        ago, but they are no longer used.
+
+        We also drop rows that do not correspond to entries in `events`, and add a
+        foreign key.
+        """
+
+        last_event_id = progress.get("last_event_id", "")
+
+        def drop_invalid_event_edges_txn(txn: LoggingTransaction) -> bool:
+            """Returns True if we're done."""
+
+            # first we need to find an endpoint.
+            txn.execute(
+                """
+                SELECT event_id FROM event_edges
+                WHERE event_id > ?
+                ORDER BY event_id
+                LIMIT 1 OFFSET ?
+                """,
+                (last_event_id, batch_size),
+            )
+
+            endpoint = None
+            row = txn.fetchone()
+
+            if row:
+                endpoint = row[0]
+
+            where_clause = "ee.event_id > ?"
+            args = [last_event_id]
+            if endpoint:
+                where_clause += " AND ee.event_id <= ?"
+                args.append(endpoint)
+
+            # now delete any that:
+            #   - have is_state=TRUE, or
+            #   - do not correspond to a row in `events`
+            txn.execute(
+                f"""
+                DELETE FROM event_edges
+                WHERE event_id IN (
+                   SELECT ee.event_id
+                   FROM event_edges ee
+                     LEFT JOIN events ev USING (event_id)
+                   WHERE ({where_clause}) AND
+                     (is_state OR ev.event_id IS NULL)
+                )""",
+                args,
+            )
+
+            logger.info(
+                "cleaned up event_edges up to %s: removed %i/%i rows",
+                endpoint,
+                txn.rowcount,
+                batch_size,
+            )
+
+            if endpoint is not None:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    _BackgroundUpdates.EVENT_EDGES_DROP_INVALID_ROWS,
+                    {"last_event_id": endpoint},
+                )
+                return False
+
+            # if that was the final batch, we validate the foreign key.
+            #
+            # The constraint should have been in place and enforced for new rows since
+            # before we started deleting invalid rows, so there's no chance for any
+            # invalid rows to have snuck in the meantime. In other words, this really
+            # ought to succeed.
+            logger.info("cleaned up event_edges; enabling foreign key")
+            txn.execute(
+                "ALTER TABLE event_edges VALIDATE CONSTRAINT event_edges_event_id_fkey"
+            )
+            return True
+
+        done = await self.db_pool.runInteraction(
+            desc="drop_invalid_event_edges", func=drop_invalid_event_edges_txn
+        )
+
+        if done:
+            await self.db_pool.updates._end_background_update(
+                _BackgroundUpdates.EVENT_EDGES_DROP_INVALID_ROWS
+            )
+
+        return batch_size
+
+    async def _background_events_populate_state_key_rejections(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Back-populate `events.state_key` and `events.rejection_reason"""
+
+        min_stream_ordering_exclusive = progress["min_stream_ordering_exclusive"]
+        max_stream_ordering_inclusive = progress["max_stream_ordering_inclusive"]
+
+        def _populate_txn(txn: LoggingTransaction) -> bool:
+            """Returns True if we're done."""
+
+            # first we need to find an endpoint.
+            # we need to find the final row in the batch of batch_size, which means
+            # we need to skip over (batch_size-1) rows and get the next row.
+            txn.execute(
+                """
+                SELECT stream_ordering FROM events
+                WHERE stream_ordering > ? AND stream_ordering <= ?
+                ORDER BY stream_ordering
+                LIMIT 1 OFFSET ?
+                """,
+                (
+                    min_stream_ordering_exclusive,
+                    max_stream_ordering_inclusive,
+                    batch_size - 1,
+                ),
+            )
+
+            endpoint = None
+            row = txn.fetchone()
+            if row:
+                endpoint = row[0]
+
+            where_clause = "stream_ordering > ?"
+            args = [min_stream_ordering_exclusive]
+            if endpoint:
+                where_clause += " AND stream_ordering <= ?"
+                args.append(endpoint)
+
+            # now do the updates.
+            txn.execute(
+                f"""
+                UPDATE events
+                SET state_key = (SELECT state_key FROM state_events se WHERE se.event_id = events.event_id),
+                    rejection_reason = (SELECT reason FROM rejections rej WHERE rej.event_id = events.event_id)
+                WHERE ({where_clause})
+                """,
+                args,
+            )
+
+            logger.info(
+                "populated new `events` columns up to %s/%i: updated %i rows",
+                endpoint,
+                max_stream_ordering_inclusive,
+                txn.rowcount,
+            )
+
+            if endpoint is None:
+                # we're done
+                return True
+
+            progress["min_stream_ordering_exclusive"] = endpoint
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                _BackgroundUpdates.EVENTS_POPULATE_STATE_KEY_REJECTIONS,
+                progress,
+            )
+            return False
+
+        done = await self.db_pool.runInteraction(
+            desc="events_populate_state_key_rejections", func=_populate_txn
+        )
+
+        if done:
+            await self.db_pool.updates._end_background_update(
+                _BackgroundUpdates.EVENTS_POPULATE_STATE_KEY_REJECTIONS
+            )
+
+        return batch_size

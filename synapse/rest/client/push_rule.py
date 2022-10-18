@@ -148,9 +148,9 @@ class PushRuleRestServlet(RestServlet):
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rules = await self.store.get_push_rules_for_user(user_id)
+        rules_raw = await self.store.get_push_rules_for_user(user_id)
 
-        rules = format_push_rules_for_user(requester.user, rules)
+        rules = format_push_rules_for_user(requester.user, rules_raw)
 
         path_parts = path.split("/")[1:]
 

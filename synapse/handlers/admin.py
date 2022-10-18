@@ -30,8 +30,9 @@ logger = logging.getLogger(__name__)
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def get_whois(self, user: UserID) -> JsonDict:
         connections = []
@@ -70,9 +71,14 @@ class AdminHandler:
             "appservice_id",
             "consent_server_notice_sent",
             "consent_version",
+            "consent_ts",
             "user_type",
             "is_guest",
         }
+
+        if self._msc3866_enabled:
+            # Only include the approved flag if support for MSC3866 is enabled.
+            user_info_to_return.add("approved")
 
         # Restrict returned keys to a known set.
         user_info_dict = {
@@ -197,7 +203,9 @@ class AdminHandler:
 
                 from_key = events[-1].internal_metadata.after
 
-                events = await filter_events_for_client(self.storage, user_id, events)
+                events = await filter_events_for_client(
+                    self._storage_controllers, user_id, events
+                )
 
                 writer.write_events(room_id, events)
 
@@ -233,7 +241,9 @@ class AdminHandler:
             for event_id in extremities:
                 if not event_to_unseen_prevs[event_id]:
                     continue
-                state = await self.state_store.get_state_for_event(event_id)
+                state = await self._state_storage_controller.get_state_for_event(
+                    event_id
+                )
                 writer.write_state(room_id, event_id, state)
 
         return writer.finished()

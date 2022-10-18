@@ -54,13 +54,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         sqlite_config = {"name": "sqlite3"}
         engine = create_engine(sqlite_config)
         fake_engine = Mock(wraps=engine)
-        fake_engine.can_native_upsert = False
         fake_engine.in_transaction.return_value = False
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
 
-        self.datastore = SQLBaseStore(db, None, hs)
+        self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
 
     @defer.inlineCallbacks
     def test_insert_1col(self):

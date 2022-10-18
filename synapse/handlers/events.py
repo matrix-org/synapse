@@ -113,7 +113,7 @@ class EventStreamHandler:
                     states = await presence_handler.get_states(users)
                     to_add.extend(
                         {
-                            "type": EduTypes.Presence,
+                            "type": EduTypes.PRESENCE,
                             "content": format_user_presence_state(state, time_now),
                         }
                         for state in states
@@ -139,7 +139,7 @@ class EventStreamHandler:
 class EventHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event(
         self,
@@ -151,7 +151,7 @@ class EventHandler:
         """Retrieve a single specified event.
 
         Args:
-            user: The user requesting the event
+            user: The local user requesting the event
             room_id: The expected room id. We'll return None if the
                 event's room does not match.
             event_id: The event ID to obtain.
@@ -173,11 +173,14 @@ class EventHandler:
         if not event:
             return None
 
-        users = await self.store.get_users_in_room(event.room_id)
-        is_peeking = user.to_string() not in users
+        is_user_in_room = await self.store.check_local_user_in_room(
+            user_id=user.to_string(), room_id=event.room_id
+        )
+        # The user is peeking if they aren't in the room already
+        is_peeking = not is_user_in_room
 
         filtered = await filter_events_for_client(
-            self.storage, user.to_string(), [event], is_peeking=is_peeking
+            self._storage_controllers, user.to_string(), [event], is_peeking=is_peeking
         )
 
         if not filtered:

@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.30.0 where purging and rejoining a room without restarting in-between would result in a broken room.

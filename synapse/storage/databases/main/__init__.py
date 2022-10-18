@@ -24,13 +24,9 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.stats import UserSortOrder
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
-from synapse.storage.util.id_generators import (
-    IdGenerator,
-    MultiWriterIdGenerator,
-    StreamIdGenerator,
-)
+from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -49,7 +45,6 @@ from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
-from .group_server import GroupServerStore
 from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
@@ -88,11 +83,11 @@ logger = logging.getLogger(__name__)
 
 class DataStore(
     EventsBackgroundUpdatesStore,
+    DeviceStore,
     RoomMemberStore,
     RoomStore,
     RoomBatchStore,
     RegistrationStore,
-    StreamWorkerStore,
     ProfileStore,
     PresenceStore,
     TransactionWorkerStore,
@@ -109,19 +104,19 @@ class DataStore(
     PusherStore,
     PushRuleStore,
     ApplicationServiceTransactionStore,
+    EventPushActionsStore,
+    ServerMetricsStore,
     ReceiptsStore,
     EndToEndKeyStore,
     EndToEndRoomKeyStore,
     SearchStore,
     TagsStore,
     AccountDataStore,
-    EventPushActionsStore,
+    StreamWorkerStore,
     OpenIdStore,
     ClientIpWorkerStore,
-    DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
-    GroupServerStore,
     UserErasureStore,
     MonthlyActiveUsersWorkerStore,
     StatsStore,
@@ -130,7 +125,6 @@ class DataStore(
     UIAuthStore,
     EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
-    ServerMetricsStore,
     LockStore,
     SessionStore,
 ):
@@ -155,37 +149,6 @@ class DataStore(
             ],
         )
 
-        self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
-        self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
-        self._group_updates_id_gen = StreamIdGenerator(
-            db_conn, "local_group_updates", "stream_id"
-        )
-
-        self._cache_id_gen: Optional[MultiWriterIdGenerator]
-        if isinstance(self.database_engine, PostgresEngine):
-            # We set the `writers` to an empty list here as we don't care about
-            # missing updates over restarts, as we'll not have anything in our
-            # caches to invalidate. (This reduces the amount of writes to the DB
-            # that happen).
-            self._cache_id_gen = MultiWriterIdGenerator(
-                db_conn,
-                database,
-                stream_name="caches",
-                instance_name=hs.get_instance_name(),
-                tables=[
-                    (
-                        "cache_invalidation_stream_by_instance",
-                        "instance_name",
-                        "stream_id",
-                    )
-                ],
-                sequence_name="cache_invalidation_stream_seq",
-                writers=[],
-            )
-
-        else:
-            self._cache_id_gen = None
-
         super().__init__(database, db_conn, hs)
 
         events_max = self._stream_id_gen.get_current_token()
@@ -203,24 +166,11 @@ class DataStore(
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        _group_updates_prefill, min_group_updates_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "local_group_updates",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=self._group_updates_id_gen.get_current_token(),
-            limit=1000,
-        )
-        self._group_updates_stream_cache = StreamChangeCache(
-            "_group_updates_stream_cache",
-            min_group_updates_id,
-            prefilled_cache=_group_updates_prefill,
-        )
-
         self._stream_order_on_start = self.get_room_max_stream_ordering()
         self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
     def get_device_stream_token(self) -> int:
+        # TODO: shouldn't this be moved to `DeviceWorkerStore`?
         return self._device_list_id_gen.get_current_token()
 
     async def get_users(self) -> List[JsonDict]:
@@ -253,6 +203,7 @@ class DataStore(
         deactivated: bool = False,
         order_by: str = UserSortOrder.USER_ID.value,
         direction: str = "f",
+        approved: bool = True,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -267,6 +218,7 @@ class DataStore(
             deactivated: whether to include deactivated users
             order_by: the sort order of the returned list
             direction: sort ascending or descending
+            approved: whether to include approved users
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -299,6 +251,11 @@ class DataStore(
             if not deactivated:
                 filters.append("deactivated = 0")
 
+            if not approved:
+                # We ignore NULL values for the approved flag because these should only
+                # be already existing users that we consider as already approved.
+                filters.append("approved IS FALSE")
+
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql_base = f"""
@@ -312,7 +269,7 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
