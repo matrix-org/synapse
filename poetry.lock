@@ -136,7 +136,7 @@ unicode-backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
-version = "8.1.1"
+version = "8.1.3"
 description = "Composable command line interface toolkit"
 category = "dev"
 optional = false
@@ -1632,7 +1632,7 @@ url-preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "14066629fed6a562322fbe2ccedc838c9ab29a72e4cfd32ae95d9f72b9654b66"
+content-hash = "327eb55e543f29feac9ca1a014f17c48fdf01a96bbed9ed9237dab787e9ac614"
 
 [metadata.files]
 attrs = [
@@ -1764,8 +1764,8 @@ charset-normalizer = [
     {file = "charset_normalizer-2.0.12-py3-none-any.whl", hash = "sha256:6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df"},
 ]
 click = [
-    {file = "click-8.1.1-py3-none-any.whl", hash = "sha256:5e0d195c2067da3136efb897449ec1e9e6c98282fbf30d7f9e164af9be901a6b"},
-    {file = "click-8.1.1.tar.gz", hash = "sha256:7ab900e38149c9872376e8f9b5986ddcaf68c0f413cf73678a0bca5547e6f976"},
+    {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},
+    {file = "click-8.1.3.tar.gz", hash = "sha256:7682dc8afb30297001674575ea00d1814d808d6a36af415a82bd481d37ba7b8e"},
 ]
 click-default-group = [
     {file = "click-default-group-1.2.2.tar.gz", hash = "sha256:d9560e8e8dfa44b3562fbc9425042a0fd6d21956fcc2db0077f63f34253ab904"},
