@@ -283,7 +283,7 @@ class BulkPushRuleEvaluator:
             non_bot_room_member_count,
             sender_power_level,
             notification_levels,
-            _flatten_dict(related_event or {}),
+            _flatten_dict(related_event) if related_event else {},
             relations,
             self._relations_match_enabled,
         )
