@@ -227,7 +227,7 @@ jwt = ["authlib"]
 # (if it is not installed, we fall back to slow code.)
 redis = ["txredisapi", "hiredis"]
 # Required to use experimental `caches.track_memory_usage` config option.
-cache_memory = ["pympler"]
+cache-memory = ["pympler"]
 test = ["parameterized", "idna"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
@@ -258,7 +258,7 @@ all = [
     "jaeger-client", "opentracing",
     # redis
     "txredisapi", "hiredis",
-    # cache_memory
+    # cache-memory
     "pympler",
     # omitted:
     #   - test: it's useful to have this separate from dev deps in the olddeps job
