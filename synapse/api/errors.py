@@ -157,11 +157,11 @@ class SynapseError(CodeMessageException):
     """A base exception type for matrix errors which have an errcode and error
     message (as well as an HTTP status code). These often bubble all the way up to the
     client API response so the error code and status often reach the client directly as
-    defined here. If the error doesn't make sense for a client to interpret, then it
+    defined here. If the error doesn't make sense to present to a client, then it
     probably shouldn't be a `SynapseError`. For example, if we contact another
-    homeserver over federation, we shouldn't ferry that response error back to the
-    client on our end (a 500 from a remote server does not make sense to a client when
-    our server did not experience a 500).
+    homeserver over federation, we shouldn't automatically ferry response errors back to
+    the client on our end (a 500 from a remote server does not make sense to a client
+    when our server did not experience a 500).
 
     Attributes:
         errcode: Matrix error code e.g 'M_FORBIDDEN'
