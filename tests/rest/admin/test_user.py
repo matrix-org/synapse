@@ -1092,9 +1092,10 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         self.other_user = self.register_user("user", "pass", displayname="User1")
         self.other_user_token = self.login("user", "pass")
-        self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
+        self.url_users = "/_synapse/admin/v2/users"
+        self.url_other_user = "%s/%s" % (self.url_users, urllib.parse.quote(
             self.other_user
-        )
+        ))
         self.url = "/_synapse/admin/v1/deactivate/%s" % urllib.parse.quote(
             self.other_user
         )
@@ -1221,6 +1222,16 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(channel.json_body["displayname"])
 
         self._is_erased("@user:test", True)
+
+        channel = self.make_request(
+            "GET",
+            self.url_users + '?deactivated=true',
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(1, len(list(
+            filter(lambda user: user["erased"], channel.json_body["users"])
+        )))
 
     @override_config({"max_avatar_size": 1234})
     def test_deactivate_user_erase_true_avatar_nonnull_but_empty(self) -> None:
