@@ -811,9 +811,15 @@ def _tokenize_query(query: str) -> TokenList:
     - negation of a keyword via unary `-`
     - unary hyphen to denote NOT e.g. 'include -exclude'
 
+    The following differs from websearch_to_tsquery:
+
+    - Stop words are not removed.
+    - Unclosed phrases are treated differently.
+
     """
     tokens: TokenList = []
-    words = deque(query.split(" "))
+    # Split by runs on whitespace.
+    words = deque(query.split())
     while words:
         word = words.popleft()
         if word.startswith('"'):
@@ -822,17 +828,34 @@ def _tokenize_query(query: str) -> TokenList:
             # double quote.
             phrase = []
             while True:
-                # If the phrase word is blank, then a bare double quote was found.
+                # If the word ends in a double quote, the phrase is over. Strip
+                # the double quote from the word.
+                found_end_quote = False
                 if phrase_word.endswith('"'):
-                    phrase.append(phrase_word[:-1])
-                    break
-                else:
+                    phrase_word = phrase_word[:-1]
+                    found_end_quote = True
+
+                # If the phrase word is blank, then a bare double quote was found,
+                # do not add it to the phrase.
+                if phrase_word:
                     phrase.append(phrase_word)
-                # Nothing left to process.
-                if not words:
+
+                # When a double quote is found, all done with the phrase.
+                if found_end_quote:
                     break
+
+                # Nothing left to process, but no end double quote was found.
+                if not words:
+                    # Place each word in the phrase word back onto the deque.
+                    #
+                    # (Note that this word use the stripped double quote on the
+                    # first word, this is correct behavior to match websearch_to_tsquery.)
+                    words.extendleft(reversed(phrase))
+                    break
+
                 phrase_word = words.popleft()
-            tokens.append(Phrase(phrase))
+            if found_end_quote:
+                tokens.append(Phrase(phrase))
         elif word.startswith("-"):
             word = word[1:]
             # If there's no word after the hyphen, ignore.

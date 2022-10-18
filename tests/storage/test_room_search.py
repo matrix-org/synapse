@@ -215,6 +215,7 @@ class MessageSearchTest(HomeserverTestCase):
         ("brown", True),
         ("quick brown", True),
         ("brown quick", True),
+        ("quick \t brown", True),
         ("jump", True),
         ("brown nope", False),
         ('"brown quick"', False),
@@ -230,9 +231,10 @@ class MessageSearchTest(HomeserverTestCase):
         ("fox AND (brown OR nope)", True),
         ("fox AND (nope OR doublenope)", False),
         ('"fox" quick', True),
-        ('"fox quick', False),
+        ('"fox quick', True),
+        ('"-fox quick', False),
         ('"quick brown', True),
-        ('" quick"', True),
+        ('" quick "', True),
         ('" nope"', False),
         ("'nope", False),
     ]
@@ -254,6 +256,7 @@ class MessageSearchTest(HomeserverTestCase):
         cases = (
             ("brown", ["brown"]),
             ("quick brown", ["quick", "brown"]),
+            ("quick \t brown", ["quick", "brown"]),
             ('"brown quick"', [Phrase(["brown", "quick"])]),
             ("furphy OR fox", ["furphy", SearchToken.Or, "fox"]),
             ("fox -brown", ["fox", SearchToken.Not, "brown"]),
@@ -284,8 +287,9 @@ class MessageSearchTest(HomeserverTestCase):
             ),
             ('"fox" quick', [Phrase(["fox"]), "quick"]),
             # No trailing double quoe.
-            ('"fox quick', [Phrase(["fox", "quick"])]),
-            ('" quick"', [Phrase(["", "quick"])]),
+            ('"fox quick', ["fox", "quick"]),
+            ('"-fox quick', [SearchToken.Not, "fox", "quick"]),
+            ('" quick "', [Phrase(["quick"])]),
         )
 
         for query, expected in cases:
