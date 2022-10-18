@@ -3532,7 +3532,11 @@ class TimestampLookupTestCase(unittest.HomeserverTestCase):
         Test to make sure `/timestamp_to_event` does not return `outlier` events.
         We're unable to determine whether an `outlier` is next to a gap so we
         don't know whether it's actually the closest event. Instead, let's just
-        ignore `outliers` with this endpoint and just ask over federation.
+        ignore `outliers` with this endpoint.
+
+        This test is really seeing that we choose the non-`outlier` event behind the
+        `outlier`. Since the gap checking logic considers the latest message in the room
+        as *not* next to a gap, asking over federation does not come into play here.
         """
         room_id = self.helper.create_room_as(self.room_owner, tok=self.room_owner_tok)
 
