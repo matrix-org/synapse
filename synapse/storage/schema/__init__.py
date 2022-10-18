@@ -85,6 +85,7 @@ Changes in SCHEMA_VERSION = 73;
       events over federation.
     - Add indexes to various tables (`event_failed_pull_attempts`, `insertion_events`,
       `batch_events`) to make it easy to delete all associated rows when purging a room.
+    - `inserted_ts` column is added to `event_push_actions_staging` table.
 """
 
 

@@ -87,8 +87,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         federation_event_handler._check_event_auth = _check_event_auth
         self.client = self.homeserver.get_federation_client()
-        self.client._check_sigs_and_hash_and_fetch = lambda dest, pdus, **k: succeed(
-            pdus
+        self.client._check_sigs_and_hash_for_pulled_events_and_fetch = (
+            lambda dest, pdus, **k: succeed(pdus)
         )
 
         # Send the join, it should return None (which is not an error)

@@ -416,8 +416,7 @@ class RoomBatchHandler:
                     app_service_requester.app_service,
                     also_allow_user,
                 ),
-                event=event,
-                context=context,
+                events_and_context=[(event, context)],
             )
 
         return event_ids

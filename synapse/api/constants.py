@@ -270,3 +270,14 @@ class PublicRoomsFilterFields:
 
     GENERIC_SEARCH_TERM: Final = "generic_search_term"
     ROOM_TYPES: Final = "room_types"
+
+
+class ApprovalNoticeMedium:
+    """Identifier for the medium this server will use to serve notice of approval for a
+    specific user's registration.
+
+    As defined in https://github.com/matrix-org/matrix-spec-proposals/blob/babolivier/m_not_approved/proposals/3866-user-not-approved-error.md
+    """
+
+    NONE = "org.matrix.msc3866.none"
+    EMAIL = "org.matrix.msc3866.email"

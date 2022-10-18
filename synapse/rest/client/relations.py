@@ -56,15 +56,21 @@ class RelationPaginationServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         limit = parse_integer(request, "limit", default=5)
-        if self._msc3715_enabled:
-            direction = parse_string(
-                request,
-                "org.matrix.msc3715.dir",
-                default="b",
-                allowed_values=["f", "b"],
-            )
-        else:
-            direction = "b"
+        # Fetch the direction parameter, if provided.
+        #
+        # TODO Use PaginationConfig.from_request when the unstable parameter is
+        #      no longer needed.
+        direction = parse_string(request, "dir", allowed_values=["f", "b"])
+        if direction is None:
+            if self._msc3715_enabled:
+                direction = parse_string(
+                    request,
+                    "org.matrix.msc3715.dir",
+                    default="b",
+                    allowed_values=["f", "b"],
+                )
+            else:
+                direction = "b"
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
@@ -76,6 +82,11 @@ class RelationPaginationServlet(RestServlet):
         if to_token_str:
             to_token = await StreamToken.from_string(self.store, to_token_str)
 
+        # The unstable version of this API returns an extra field for client
+        # compatibility, see https://github.com/matrix-org/synapse/issues/12930.
+        assert request.path is not None
+        include_original_event = request.path.startswith(b"/_matrix/client/unstable/")
+
         result = await self._relations_handler.get_relations(
             requester=requester,
             event_id=parent_id,
@@ -86,6 +97,7 @@ class RelationPaginationServlet(RestServlet):
             direction=direction,
             from_token=from_token,
             to_token=to_token,
+            include_original_event=include_original_event,
         )
 
         return 200, result
