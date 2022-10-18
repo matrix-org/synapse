@@ -374,14 +374,10 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         # now check for avatar size & mime type restrictions
         self.assertTrue(
-            self.get_success(
-                self.handler.check_avatar_size_and_mime_type(local_mxc)
-            )
+            self.get_success(self.handler.check_avatar_size_and_mime_type(local_mxc))
         )
         self.assertTrue(
-            self.get_success(
-                self.handler.check_avatar_size_and_mime_type(remote_mxc)
-            )
+            self.get_success(self.handler.check_avatar_size_and_mime_type(remote_mxc))
         )
 
     def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
