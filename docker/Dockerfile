@@ -135,7 +135,9 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 # Install the synapse package itself.
 # If we have populated requirements.txt, we don't install any dependencies
 # as we should already have those from the previous `pip install` step.
-RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+RUN --mount=type=cache,target=/synapse/target,sharing=locked \
+  --mount=type=cache,target=${CARGO_HOME}/registry,sharing=locked \
+  if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
     pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
   else \
     pip install --prefix="/install" --no-warn-script-location /synapse[all]; \

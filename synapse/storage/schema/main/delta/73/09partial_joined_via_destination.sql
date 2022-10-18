@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
--- The columns can now be made non-nullable.
-ALTER TABLE event_push_actions_staging ALTER COLUMN thread_id SET NOT NULL;
-ALTER TABLE event_push_actions ALTER COLUMN thread_id SET NOT NULL;
-ALTER TABLE event_push_summary ALTER COLUMN thread_id SET NOT NULL;
+-- When we resync partial state, we prioritise doing so using the server we
+-- partial-joined from. To do this we need to record which server that was!
+ALTER TABLE partial_state_rooms ADD COLUMN joined_via TEXT;
