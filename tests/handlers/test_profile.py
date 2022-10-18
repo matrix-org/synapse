@@ -327,67 +327,41 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(res)
 
-    @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
+    @unittest.override_config({"server_name":"test:8888", "allowed_avatar_mimetypes": ["image/png"]})
     def test_avatar_fetching_metadata_right_source(self) -> None:
         """Tests that server_name is figured out correctly when checking for
         avatar size and mime type, by checking against from where it tries to retrieve
         the metadata for image i.e. locally for a file on our homeserver and from cache
         for a file on a remote server."""
-        # server_name for homeserver under unit tests is "test"
+        # default server_name for homeserver under unit tests is "test"
         # available under "self.hs.config.server.server_name"
+        # so we override it to have a port
         # and let us say remote server's server_name is "remoteserver"
-        remote_server = "remoteserver"
+        remote_server = "remote"
 
-        # so
-        # local media's mxc urls would be:
-        local_mxc_good = "mxc://" + self.hs.config.server.server_name + "/localgood"
-        local_mxc_bad = "mxc://" + self.hs.config.server.server_name + "/localbad"
-
-        # remote media's mxc urls would be:
-        remote_mxc_good = "mxc://remoteserver/remotegood"
-        remote_mxc_bad = "mxc://remoteserver/remotebad"
+        # so, mxc urls would be
+        local_mxc = "mxc://" + self.hs.config.server.server_name + "/local"
+        remote_mxc = "mxc://" + remote_server + "/remote"
 
         store = self.hs.get_datastores().main
 
-        # store all 4 of these images
-        # storing media itself for the local ones
-        # storing in cache for the remote ones
-
+        # store both of these images
+        # storing media itself for the local one
         self.get_success(
             store.store_local_media(
-                media_id="localgood",
+                media_id="local",
                 media_type="image/png",
                 media_length=50,
                 time_now_ms=self.clock.time_msec(),
                 upload_name=None,
-                user_id=UserID.from_string("@whatever:test"),
+                user_id=UserID.from_string("@rin:test"),
             )
         )
-        self.get_success(
-            store.store_local_media(
-                media_id="localbad",
-                media_type="image/jpg",
-                media_length=50,
-                time_now_ms=self.clock.time_msec(),
-                upload_name=None,
-                user_id=UserID.from_string("@whatever:test"),
-            )
-        )
+        # storing in cache for the remote one
         self.get_success(
             store.store_cached_remote_media(
-                media_id="remotegood",
+                media_id="remote",
                 media_type="image/png",
-                media_length=50,
-                origin=remote_server,
-                time_now_ms=self.clock.time_msec(),
-                upload_name=None,
-                filesystem_id="remote",
-            )
-        )
-        self.get_success(
-            store.store_cached_remote_media(
-                media_id="remotebad",
-                media_type="image/jpg",
                 media_length=50,
                 origin=remote_server,
                 time_now_ms=self.clock.time_msec(),
@@ -399,22 +373,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # now check for avatar size & mime type restrictions
         self.assertTrue(
             self.get_success(
-                self.handler.check_avatar_size_and_mime_type(local_mxc_good)
-            )
-        )
-        self.assertFalse(
-            self.get_success(
-                self.handler.check_avatar_size_and_mime_type(local_mxc_bad)
+                self.handler.check_avatar_size_and_mime_type(local_mxc)
             )
         )
         self.assertTrue(
             self.get_success(
-                self.handler.check_avatar_size_and_mime_type(remote_mxc_good)
-            )
-        )
-        self.assertFalse(
-            self.get_success(
-                self.handler.check_avatar_size_and_mime_type(remote_mxc_bad)
+                self.handler.check_avatar_size_and_mime_type(remote_mxc)
             )
         )
 
