@@ -29,7 +29,6 @@ from typing import (
 )
 
 import attr
-from typing_extensions import Literal
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
