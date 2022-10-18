@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-      - uses: matrix-org/setup-python-poetry@dmr/deal-with-deprecations
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           extras: "all"
       - run: poetry run scripts-dev/generate_sample_config.sh --check
