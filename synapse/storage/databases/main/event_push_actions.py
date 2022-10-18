@@ -322,12 +322,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         If not, we need to just-in-time update it so the queries work.
         """
-        done = await self.db_pool.simple_select_one_onecol(
-            "background_updates",
-            keyvalues={"update_name": "event_push_backfill_thread_id"},
-            retcol="1",
-            allow_none=True,
-            desc="check_event_push_backfill_thread_id",
+        done = await self.db_pool.updates.has_completed_background_update(
+            "event_push_backfill_thread_id"
         )
 
         if done:
