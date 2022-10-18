@@ -418,6 +418,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type = event_entry.setdefault(row["receipt_type"], {})
 
             receipt_type[row["user_id"]] = db_to_json(row["data"])
+            if row["thread_id"]:
+                receipt_type[row["user_id"]]["thread_id"] = row["thread_id"]
 
         results = {
             room_id: [results[room_id]] if room_id in results else []

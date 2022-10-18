@@ -1,10 +1,31 @@
-Synapse 1.69.0rc3 (2022-10-12)
-==============================
+Synapse 1.69.0 (2022-10-17)
+===========================
 
 Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
 Server administrators should update their dashboards and alerting rules to avoid using the deprecated metric names.
 See the [upgrade notes](https://matrix-org.github.io/synapse/v1.69/upgrade.html#upgrading-to-v1690) for more details.
 
+
+No significant changes since 1.69.0rc4.
+
+
+Synapse 1.69.0rc4 (2022-10-14)
+==============================
+
+Bugfixes
+--------
+
+- Fix poor performance of the `event_push_backfill_thread_id` background update, which was introduced in Synapse 1.68.0rc1. ([\#14172](https://github.com/matrix-org/synapse/issues/14172), [\#14181](https://github.com/matrix-org/synapse/issues/14181))
+
+
+Updates to the Docker image
+---------------------------
+
+- Fix docker build OOMing in CI for arm64 builds. ([\#14173](https://github.com/matrix-org/synapse/issues/14173))
+
+
+Synapse 1.69.0rc3 (2022-10-12)
+==============================
 
 Bugfixes
 --------

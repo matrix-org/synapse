@@ -1139,7 +1139,7 @@ number of entries that can be stored.
 
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory
-   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu)
+   usage and cache entry availability. You must be using [jemalloc](../administration/admin_faq.md#help-synapse-is-slow-and-eats-all-my-ramcpu)
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
@@ -2088,7 +2088,7 @@ set.
 
 This is primarily intended for use with the `register_new_matrix_user` script
 (see [Registering a user](../../setup/installation.md#registering-a-user));
-however, the interface is [documented](../admin_api/register_api.html).
+however, the interface is [documented](../../admin_api/register_api.html).
 
 See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
@@ -3541,9 +3541,9 @@ Example configuration:
 enable_room_list_search: false
 ```
 ---
-### `alias_creation`
+### `alias_creation_rules`
 
-The `alias_creation` option controls who is allowed to create aliases
+The `alias_creation_rules` option controls who is allowed to create aliases
 on this server.
 
 The format of this option is a list of rules that contain globs that
