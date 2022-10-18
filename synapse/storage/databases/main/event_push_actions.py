@@ -526,6 +526,24 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
 
+        # First ensure that the existing rows have an updated thread_id field.
+        txn.execute(
+            """
+            UPDATE event_push_summary
+            SET thread_id = ?
+            WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+            """,
+            (MAIN_TIMELINE, room_id, user_id),
+        )
+        txn.execute(
+            """
+            UPDATE event_push_actions
+            SET thread_id = ?
+            WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+            """,
+            (MAIN_TIMELINE, room_id, user_id),
+        )
+
         # First we pull the counts from the summary table.
         #
         # We check that `last_receipt_stream_ordering` matches the stream ordering of the
@@ -1341,6 +1359,24 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 (room_id, user_id, stream_ordering, *thread_args),
             )
 
+            # First ensure that the existing rows have an updated thread_id field.
+            txn.execute(
+                """
+                UPDATE event_push_summary
+                SET thread_id = ?
+                WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                """,
+                (MAIN_TIMELINE, room_id, user_id),
+            )
+            txn.execute(
+                """
+                UPDATE event_push_actions
+                SET thread_id = ?
+                WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                """,
+                (MAIN_TIMELINE, room_id, user_id),
+            )
+
             # Fetch the notification counts between the stream ordering of the
             # latest receipt and what was previously summarised.
             unread_counts = self._get_notif_unread_count_for_user_room(
@@ -1475,6 +1511,18 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             rotate_to_stream_ordering: The new maximum event stream ordering to summarise.
         """
 
+        # Ensure that any new actions have an updated thread_id.
+        txn.execute(
+            """
+            UPDATE event_push_actions
+            SET thread_id = ?
+            WHERE ? < stream_ordering AND stream_ordering <= ? AND thread_id IS NULL
+            """,
+            (MAIN_TIMELINE, old_rotate_stream_ordering, rotate_to_stream_ordering),
+        )
+
+        # XXX Do we need to update summaries here too?
+
         # Calculate the new counts that should be upserted into event_push_summary
         sql = """
             SELECT user_id, room_id, thread_id,
@@ -1536,6 +1584,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
+
+        # Ensure that any updated threads have the proper thread_id.
+        txn.execute_batch(
+            """
+            UPDATE event_push_summary
+            SET thread_id = ?
+            WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+            """,
+            [(MAIN_TIMELINE, room_id, user_id) for user_id, room_id, _ in summaries],
+        )
 
         self.db_pool.simple_upsert_many_txn(
             txn,
