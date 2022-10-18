@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+-- Allow there to be multiple summaries per user/room.
+DROP INDEX IF EXISTS event_push_summary_unique_index;
+
 INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
   (7306, 'event_push_actions_thread_id_null', '{}', 'event_push_backfill_thread_id');
 
