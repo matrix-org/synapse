@@ -1,1 +1,1 @@
-Add aarch64 wheels to CI.
+Build and publish binary wheels for `aarch64` platforms.
