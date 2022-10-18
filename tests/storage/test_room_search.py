@@ -201,6 +201,16 @@ class EventSearchInsertionTest(HomeserverTestCase):
 
 
 class MessageSearchTest(HomeserverTestCase):
+    """
+    Check message search.
+
+    A powerful way to check the behaviour is to run the following in Postgres >= 11:
+
+        # SELECT websearch_to_tsquery('english', <your string>);
+
+    The result can be compared to the tokenized version for SQLite and Postgres < 11.
+
+    """
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
