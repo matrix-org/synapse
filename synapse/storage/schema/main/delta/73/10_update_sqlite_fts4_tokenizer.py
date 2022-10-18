@@ -13,47 +13,50 @@
 # limitations under the License.
 import json
 
-from synapse.storage.engines import Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine, Sqlite3Engine
+from synapse.storage.types import Cursor
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    # Upgrade the event_search table to use the porter tokenizer if it isn't already
-    if isinstance(database_engine, Sqlite3Engine):
-        cur.execute("SELECT sql FROM sqlite_master WHERE name='event_search'")
-        sql = cur.fetchone()
-        if sql is None:
-            raise Exception("The event_search table doesn't exist")
-        if "tokenize=porter" not in sql[0]:
-            cur.execute("DROP TABLE event_search")
-            cur.execute(
-                "CREATE VIRTUAL TABLE event_search"
-                " USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"
-            )
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+    """
+    Upgrade the event_search table to use the porter tokenizer if it isn't already
 
-            # Run a background job to re-populate the event_search table.
-            cur.execute("SELECT MIN(stream_ordering) FROM events")
-            rows = cur.fetchall()
-            min_stream_id = rows[0][0]
+    Applies only for sqlite.
+    """
+    if not isinstance(database_engine, Sqlite3Engine):
+        return
 
-            cur.execute("SELECT MAX(stream_ordering) FROM events")
-            rows = cur.fetchall()
-            max_stream_id = rows[0][0]
+    # Rebuild the table event_search table with tokenize=porter configured.
+    cur.execute("DROP TABLE event_search")
+    cur.execute(
+        """
+        CREATE VIRTUAL TABLE event_search
+        USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )
+        """
+    )
 
-            if min_stream_id is not None and max_stream_id is not None:
-                progress = {
-                    "target_min_stream_id_inclusive": min_stream_id,
-                    "max_stream_id_exclusive": max_stream_id + 1,
-                    "rows_inserted": 0,
-                }
-                progress_json = json.dumps(progress)
+    # Re-run the background job to re-populate the event_search table.
+    cur.execute("SELECT MIN(stream_ordering) FROM events")
+    row = cur.fetchone()
+    min_stream_id = row[0]
 
-                sql = (
-                    "INSERT into background_updates (update_name, progress_json)"
-                    " VALUES (?, ?)"
-                )
+    # If there are not any events, nothing to do.
+    if min_stream_id is None:
+        return
 
-                cur.execute(sql, ("event_search", progress_json))
+    cur.execute("SELECT MAX(stream_ordering) FROM events")
+    row = cur.fetchone()
+    max_stream_id = row[0]
 
+    progress = {
+        "target_min_stream_id_inclusive": min_stream_id,
+        "max_stream_id_exclusive": max_stream_id + 1,
+    }
+    progress_json = json.dumps(progress)
 
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass
+    sql = """
+    INSERT into background_updates (ordering, update_name, progress_json)
+    VALUES (?, ?, ?)
+    """
+
+    cur.execute(sql, (7310, "event_search", progress_json))
