@@ -816,6 +816,7 @@ class FederationEventHandler:
                         "have already seen",
                         event.event_id,
                     )
+                    continue
 
                 # While we have seen this event before, it was stored as an outlier.
                 # We'll now persist it as a non-outlier.
