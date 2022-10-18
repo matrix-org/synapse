@@ -338,7 +338,7 @@ def generate_base_homeserver_config() -> None:
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
     os.environ["SYNAPSE_HTTP_PORT"] = str(MAIN_PROCESS_HTTP_LISTENER_PORT)
-    subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
+    subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
 def generate_worker_files(

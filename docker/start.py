@@ -151,10 +151,10 @@ def generate_config_from_template(
 
     if ownership is not None:
         log(f"Setting ownership on /data to {ownership}")
-        subprocess.check_output(["chown", "-R", ownership, "/data"])
+        subprocess.run(["chown", "-R", ownership, "/data"])
         args = ["gosu", ownership] + args
 
-    subprocess.check_output(args)
+    subprocess.run(args)
 
 
 def run_generate_config(environ: Mapping[str, str], ownership: Optional[str]) -> None:
@@ -178,7 +178,7 @@ def run_generate_config(environ: Mapping[str, str], ownership: Optional[str]) ->
     if ownership is not None:
         # make sure that synapse has perms to write to the data dir.
         log(f"Setting ownership on {data_dir} to {ownership}")
-        subprocess.check_output(["chown", ownership, data_dir])
+        subprocess.run(["chown", ownership, data_dir])
 
     # create a suitable log config from our template
     log_config_file = "%s/%s.log.config" % (config_dir, server_name)
