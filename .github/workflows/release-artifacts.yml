@@ -34,7 +34,7 @@ jobs:
           if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages.py --show-dists-json)
           fi
-          echo "::set-output name=distros::$dists"
+          echo "distros=$dists" >> "$GITHUB_OUTPUT"
     # map the step outputs to job outputs
     outputs:
       distros: ${{ steps.set-distros.outputs.distros }}
