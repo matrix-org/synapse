@@ -325,13 +325,13 @@ class GenericWorkerServer(HomeServer):
 
                     presence.register_servlets(self, resource)
 
-                    resources.update({CLIENT_API_PREFIX: resource})
+                    resources[CLIENT_API_PREFIX] = resource
 
                     resources.update(build_synapse_client_resource_tree(self))
-                    resources.update({"/.well-known": well_known_resource(self)})
+                    resources["/.well-known"] = well_known_resource(self)
 
                 elif name == "federation":
-                    resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(self)
                 elif name == "media":
                     if self.config.media.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
@@ -359,12 +359,8 @@ class GenericWorkerServer(HomeServer):
                     # Only load the openid resource separately if federation resource
                     # is not specified since federation resource includes openid
                     # resource.
-                    resources.update(
-                        {
-                            FEDERATION_PREFIX: TransportLayerServer(
-                                self, servlet_groups=["openid"]
-                            )
-                        }
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(
+                        self, servlet_groups=["openid"]
                     )
 
                 if name in ["keys", "federation"]:
