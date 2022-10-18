@@ -306,7 +306,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {
                 "m.relates_to": {
                     "event_id": "$parent_event_id",
-                    "key": "\ud83d\udc4d\ufe0f",
+                    "key": "sender",
                     "rel_type": "m.annotation",
                 }
             },
