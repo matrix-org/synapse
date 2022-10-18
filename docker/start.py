@@ -13,30 +13,15 @@ import jinja2
 
 # Utility functions
 def log(txt: str) -> None:
-    """
-    Log something to the stdout.
-
-    Args:
-        txt: The text to log.
-    """
     print(txt)
 
 
 def error(txt: str) -> NoReturn:
-    """
-    Log something to the stderr and exit with an error code.
-
-    Args:
-        txt: The text to log in error.
-    """
     print(txt, file=sys.stderr)
     sys.exit(2)
 
 
 def flush_buffers() -> None:
-    """
-    Flush stdout and stderr buffers
-    """
     sys.stdout.flush()
     sys.stderr.flush()
 
