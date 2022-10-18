@@ -328,7 +328,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertFalse(res)
 
     @unittest.override_config(
-        {"server_name":"test:8888", "allowed_avatar_mimetypes": ["image/png"]}
+        {"server_name": "test:8888", "allowed_avatar_mimetypes": ["image/png"]}
     )
     def test_avatar_fetching_metadata_right_source(self) -> None:
         """Tests that server_name is figured out correctly when checking for
