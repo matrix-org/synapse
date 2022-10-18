@@ -374,7 +374,7 @@ class EventsWorkerStore(SQLBaseStore):
                 If there is a mismatch, behave as per allow_none.
 
         Returns:
-            The event, or None if the event was not found.
+            The event, or None if the event was not found and allow_none is `True`.
         """
         if not isinstance(event_id, str):
             raise TypeError("Invalid event event_id %r" % (event_id,))
