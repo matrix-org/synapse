@@ -28,7 +28,7 @@ from synapse.api.urls import (
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
     MEDIA_V3_PREFIX,
-    SERVER_KEY_V2_PREFIX,
+    SERVER_KEY_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
@@ -364,7 +364,7 @@ class GenericWorkerServer(HomeServer):
                     )
 
                 if name in ["keys", "federation"]:
-                    resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
+                    resources[SERVER_KEY_PREFIX] = KeyApiV2Resource(self)
 
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
