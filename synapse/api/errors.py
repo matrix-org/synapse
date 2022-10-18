@@ -616,7 +616,7 @@ class FederationError(RuntimeError):
     2. We may be pushed an invalid PDU as part of a `/send` transaction from a remote
        homeserver. We raise so that we can respond to the transaction and include the
        error string in the "PDU Processing Result". The message which will likely be
-       ignored by the remote homeserver and not machine parse-able since it's just a
+       ignored by the remote homeserver and is not machine parse-able since it's just a
        string.
 
     TODO: In the future, we should split these usage scenarios into their own error types.
