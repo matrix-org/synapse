@@ -1,1 +1,1 @@
-Specify dev-dependencies using lower bounds, to reduce the likelihood of a dependabot merge conflict. (The lockfile continues to pin to specific versions.)
+Specify dev-dependencies using lower bounds, to reduce the likelihood of a dependabot merge conflict. The lockfile continues to pin to specific versions.
