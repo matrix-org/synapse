@@ -1,0 +1,759 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Workers - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html" class="active">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/workers.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="scaling-synapse-via-workers"><a class="header" href="#scaling-synapse-via-workers">Scaling synapse via workers</a></h1>
+<p>For small instances it is recommended to run Synapse in the default monolith mode.
+For larger instances where performance is a concern it can be helpful to split
+out functionality into multiple separate python processes. These processes are
+called 'workers', and are (eventually) intended to scale horizontally
+independently.</p>
+<p>Synapse's worker support is under active development and subject to change as
+we attempt to rapidly scale ever larger Synapse instances. However we are
+documenting it here to help admins needing a highly scalable Synapse instance
+similar to the one running <code>matrix.org</code>.</p>
+<p>All processes continue to share the same database instance, and as such,
+workers only work with PostgreSQL-based Synapse deployments. SQLite should only
+be used for demo purposes and any admin considering workers should already be
+running PostgreSQL.</p>
+<p>See also <a href="https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability">Matrix.org blog post</a>
+for a higher level overview.</p>
+<h2 id="main-processworker-communication"><a class="header" href="#main-processworker-communication">Main process/worker communication</a></h2>
+<p>The processes communicate with each other via a Synapse-specific protocol called
+'replication' (analogous to MySQL- or Postgres-style database replication) which
+feeds streams of newly written data between processes so they can be kept in
+sync with the database state.</p>
+<p>When configured to do so, Synapse uses a
+<a href="https://redis.io/docs/manual/pubsub/">Redis pub/sub channel</a> to send the replication
+stream between all configured Synapse processes. Additionally, processes may
+make HTTP requests to each other, primarily for operations which need to wait
+for a reply ─ such as sending an event.</p>
+<p>All the workers and the main process connect to Redis, which relays replication
+commands between processes.</p>
+<p>If Redis support is enabled Synapse will use it as a shared cache, as well as a
+pub/sub mechanism.</p>
+<p>See the <a href="#architectural-diagram">Architectural diagram</a> section at the end for
+a visualisation of what this looks like.</p>
+<h2 id="setting-up-workers"><a class="header" href="#setting-up-workers">Setting up workers</a></h2>
+<p>A Redis server is required to manage the communication between the processes.
+The Redis server should be installed following the normal procedure for your
+distribution (e.g. <code>apt install redis-server</code> on Debian). It is safe to use an
+existing Redis deployment if you have one.</p>
+<p>Once installed, check that Redis is running and accessible from the host running
+Synapse, for example by executing <code>echo PING | nc -q1 localhost 6379</code> and seeing
+a response of <code>+PONG</code>.</p>
+<p>The appropriate dependencies must also be installed for Synapse. If using a
+virtualenv, these can be installed with:</p>
+<pre><code class="language-sh">pip install &quot;matrix-synapse[redis]&quot;
+</code></pre>
+<p>Note that these dependencies are included when synapse is installed with <code>pip install matrix-synapse[all]</code>. They are also included in the debian packages from
+<code>matrix.org</code> and in the docker images at
+https://hub.docker.com/r/matrixdotorg/synapse/.</p>
+<p>To make effective use of the workers, you will need to configure an HTTP
+reverse-proxy such as nginx or haproxy, which will direct incoming requests to
+the correct worker, or to the main synapse instance. See
+<a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a reverse
+proxy.</p>
+<p>When using workers, each worker process has its own configuration file which
+contains settings specific to that worker, such as the HTTP listener that it
+provides (if any), logging configuration, etc.</p>
+<p>Normally, the worker processes are configured to read from a shared
+configuration file as well as the worker-specific configuration files. This
+makes it easier to keep common configuration settings synchronised across all
+the processes.</p>
+<p>The main process is somewhat special in this respect: it does not normally
+need its own configuration file and can take all of its configuration from the
+shared configuration file.</p>
+<h3 id="shared-configuration"><a class="header" href="#shared-configuration">Shared configuration</a></h3>
+<p>Normally, only a couple of changes are needed to make an existing configuration
+file suitable for use with workers. First, you need to enable an &quot;HTTP replication
+listener&quot; for the main process; and secondly, you need to enable redis-based
+replication. Optionally, a shared secret can be used to authenticate HTTP
+traffic between workers. For example:</p>
+<pre><code class="language-yaml"># extend the existing `listeners` section. This defines the ports that the
+# main process will listen on.
+listeners:
+  # The HTTP replication port
+  - port: 9093
+    bind_address: '127.0.0.1'
+    type: http
+    resources:
+     - names: [replication]
+
+# Add a random shared secret to authenticate traffic.
+worker_replication_secret: &quot;&quot;
+
+redis:
+    enabled: true
+</code></pre>
+<p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a> for the full documentation of each option.</p>
+<p>Under <strong>no circumstances</strong> should the replication listener be exposed to the
+public internet; replication traffic is:</p>
+<ul>
+<li>always unencrypted</li>
+<li>unauthenticated, unless <code>worker_replication_secret</code> is configured</li>
+</ul>
+<h3 id="worker-configuration"><a class="header" href="#worker-configuration">Worker configuration</a></h3>
+<p>In the config file for each worker, you must specify:</p>
+<ul>
+<li>The type of worker (<code>worker_app</code>). The currently available worker applications are listed below.</li>
+<li>A unique name for the worker (<code>worker_name</code>).</li>
+<li>The HTTP replication endpoint that it should talk to on the main synapse process
+(<code>worker_replication_host</code> and <code>worker_replication_http_port</code>)</li>
+<li>If handling HTTP requests, a <code>worker_listeners</code> option with an <code>http</code>
+listener, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code></a>
+option in the shared config.</li>
+<li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
+the main process (<code>worker_main_http_uri</code>).</li>
+</ul>
+<p>For example:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_main_http_uri: http://localhost:8008/
+
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+</code></pre>
+<p>...is a full configuration for a generic worker instance, which will expose a
+plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
+<code>/sync</code>, which are listed below.</p>
+<p>Obviously you should configure your reverse-proxy to route the relevant
+endpoints to the worker (<code>localhost:8083</code> in the above example).</p>
+<h3 id="running-synapse-with-workers"><a class="header" href="#running-synapse-with-workers">Running Synapse with workers</a></h3>
+<p>Finally, you need to start your worker processes. This can be done with either
+<code>synctl</code> or your distribution's preferred service manager such as <code>systemd</code>. We
+recommend the use of <code>systemd</code> where available: for information on setting up
+<code>systemd</code> to start synapse workers, see
+<a href="systemd-with-workers">Systemd with Workers</a>. To use <code>synctl</code>, see
+<a href="synctl_workers.html">Using synctl with Workers</a>.</p>
+<h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
+<h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
+<p>This worker can handle API requests matching the following regular expressions.
+These endpoints can be routed to any worker. If a worker is set up to handle a
+stream then, for maximum efficiency, additional endpoints should be routed to that
+worker: refer to the <a href="#stream-writers">stream writers</a> section below for further
+information.</p>
+<pre><code># Sync requests
+^/_matrix/client/(r0|v3)/sync$
+^/_matrix/client/(api/v1|r0|v3)/events$
+^/_matrix/client/(api/v1|r0|v3)/initialSync$
+^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$
+
+# Federation requests
+^/_matrix/federation/v1/event/
+^/_matrix/federation/v1/state/
+^/_matrix/federation/v1/state_ids/
+^/_matrix/federation/v1/backfill/
+^/_matrix/federation/v1/get_missing_events/
+^/_matrix/federation/v1/publicRooms
+^/_matrix/federation/v1/query/
+^/_matrix/federation/v1/make_join/
+^/_matrix/federation/v1/make_leave/
+^/_matrix/federation/(v1|v2)/send_join/
+^/_matrix/federation/(v1|v2)/send_leave/
+^/_matrix/federation/(v1|v2)/invite/
+^/_matrix/federation/v1/event_auth/
+^/_matrix/federation/v1/exchange_third_party_invite/
+^/_matrix/federation/v1/user/devices/
+^/_matrix/key/v2/query
+^/_matrix/federation/v1/hierarchy/
+
+# Inbound federation transaction request
+^/_matrix/federation/v1/send/
+
+# Client API requests
+^/_matrix/client/(api/v1|r0|v3|unstable)/createRoom$
+^/_matrix/client/(api/v1|r0|v3|unstable)/publicRooms$
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/joined_members$
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
+^/_matrix/client/v1/rooms/.*/hierarchy$
+^/_matrix/client/(v1|unstable)/rooms/.*/relations/
+^/_matrix/client/v1/rooms/.*/threads$
+^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
+^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
+^/_matrix/client/(r0|v3|unstable)/account/3pid$
+^/_matrix/client/(r0|v3|unstable)/account/whoami$
+^/_matrix/client/(r0|v3|unstable)/devices$
+^/_matrix/client/versions$
+^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
+^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
+^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+
+# Encryption requests
+# Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
+^/_matrix/client/(r0|v3|unstable)/keys/query$
+^/_matrix/client/(r0|v3|unstable)/keys/changes$
+^/_matrix/client/(r0|v3|unstable)/keys/claim$
+^/_matrix/client/(r0|v3|unstable)/room_keys/
+^/_matrix/client/(r0|v3|unstable)/keys/upload/
+
+# Registration/login requests
+^/_matrix/client/(api/v1|r0|v3|unstable)/login$
+^/_matrix/client/(r0|v3|unstable)/register$
+^/_matrix/client/v1/register/m.login.registration_token/validity$
+
+# Event sending requests
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
+^/_matrix/client/(api/v1|r0|v3|unstable)/join/
+^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
+
+# Account data requests
+^/_matrix/client/(r0|v3|unstable)/.*/tags
+^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+# Receipts requests
+^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+# Presence requests
+^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+
+# User directory search requests
+^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+</code></pre>
+<p>Additionally, the following REST endpoints can be handled for GET requests:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
+</code></pre>
+<p>Pagination requests can also be handled, but all requests for a given
+room must be routed to the same instance. Additionally, care must be taken to
+ensure that the purge history admin API is not used while pagination requests
+for the room are in flight:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/messages$
+</code></pre>
+<p>Additionally, the following endpoints should be included if Synapse is configured
+to use SSO (you only need to include the ones for whichever SSO provider you're
+using):</p>
+<pre><code># for all SSO providers
+^/_matrix/client/(api/v1|r0|v3|unstable)/login/sso/redirect
+^/_synapse/client/pick_idp$
+^/_synapse/client/pick_username
+^/_synapse/client/new_user_consent$
+^/_synapse/client/sso_register$
+
+# OpenID Connect requests.
+^/_synapse/client/oidc/callback$
+
+# SAML requests.
+^/_synapse/client/saml2/authn_response$
+
+# CAS requests.
+^/_matrix/client/(api/v1|r0|v3|unstable)/login/cas/ticket$
+</code></pre>
+<p>Ensure that all SSO logins go to a single process.
+For multiple workers not handling the SSO endpoints properly, see
+<a href="https://github.com/matrix-org/synapse/issues/7530">#7530</a> and
+<a href="https://github.com/matrix-org/synapse/issues/9427">#9427</a>.</p>
+<p>Note that a <a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a>
+with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the <code>worker_listeners</code>
+option in the worker config.</p>
+<h4 id="load-balancing"><a class="header" href="#load-balancing">Load balancing</a></h4>
+<p>It is possible to run multiple instances of this worker app, with incoming requests
+being load-balanced between them by the reverse-proxy. However, different endpoints
+have different characteristics and so admins
+may wish to run multiple groups of workers handling different endpoints so that
+load balancing can be done in different ways.</p>
+<p>For <code>/sync</code> and <code>/initialSync</code> requests it will be more efficient if all
+requests from a particular user are routed to a single instance. Extracting a
+user ID from the access token or <code>Authorization</code> header is currently left as an
+exercise for the reader. Admins may additionally wish to separate out <code>/sync</code>
+requests that have a <code>since</code> query parameter from those that don't (and
+<code>/initialSync</code>), as requests that don't are known as &quot;initial sync&quot; that happens
+when a user logs in on a new device and can be <em>very</em> resource intensive, so
+isolating these requests will stop them from interfering with other users ongoing
+syncs.</p>
+<p>Federation and client requests can be balanced via simple round robin.</p>
+<p>The inbound federation transaction request <code>^/_matrix/federation/v1/send/</code>
+should be balanced by source IP so that transactions from the same remote server
+go to the same process.</p>
+<p>Registration/login requests can be handled separately purely to help ensure that
+unexpected load doesn't affect new logins and sign ups.</p>
+<p>Finally, event sending requests can be balanced by the room ID in the URI (or
+the full URI, or even just round robin), the room ID is the path component after
+<code>/rooms/</code>. If there is a large bridge connected that is sending or may send lots
+of events, then a dedicated set of workers can be provisioned to limit the
+effects of bursts of events from that bridge on events sent by normal users.</p>
+<h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
+<p>Additionally, the writing of specific streams (such as events) can be moved off
+of the main process to a particular worker.</p>
+<p>To enable this, the worker must have a
+<a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
+have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
+can handle multiple streams, but unless otherwise documented, each stream can only
+have a single writer.</p>
+<p>For example, to move event persistence off to a dedicated worker, the shared
+configuration would include:</p>
+<pre><code class="language-yaml">instance_map:
+    event_persister1:
+        host: localhost
+        port: 8034
+
+stream_writers:
+    events: event_persister1
+</code></pre>
+<p>An example for a stream writer instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: event_persister1 
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 8034
+    resources:
+      - names: [replication]
+
+  # Enable listener if this stream writer handles endpoints for the `typing` or
+  # `to_device` streams. Uses a different port to the `replication` listener to
+  # avoid exposing the `replication` listener publicly.
+  #
+  #- type: http
+  #  port: 8035
+  #  resources:
+  #    - names: [client]
+
+worker_log_config: /etc/matrix-synapse/event-persister-log.yaml
+</code></pre>
+<p>Some of the streams have associated endpoints which, for maximum efficiency, should
+be routed to the workers handling that stream. See below for the currently supported
+streams and the endpoints associated with them:</p>
+<h5 id="the-events-stream"><a class="header" href="#the-events-stream">The <code>events</code> stream</a></h5>
+<p>The <code>events</code> stream experimentally supports having multiple writers, where work
+is sharded between them by room ID. Note that you <em>must</em> restart all worker
+instances when adding or removing event persisters. An example <code>stream_writers</code>
+configuration with multiple writers:</p>
+<pre><code class="language-yaml">stream_writers:
+    events:
+        - event_persister1
+        - event_persister2
+</code></pre>
+<h5 id="the-typing-stream"><a class="header" href="#the-typing-stream">The <code>typing</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>typing</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+</code></pre>
+<h5 id="the-to_device-stream"><a class="header" href="#the-to_device-stream">The <code>to_device</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>to_device</code> stream:</p>
+<pre><code>^/_matrix/client/(r0|v3|unstable)/sendToDevice/
+</code></pre>
+<h5 id="the-account_data-stream"><a class="header" href="#the-account_data-stream">The <code>account_data</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>account_data</code> stream:</p>
+<pre><code>^/_matrix/client/(r0|v3|unstable)/.*/tags
+^/_matrix/client/(r0|v3|unstable)/.*/account_data
+</code></pre>
+<h5 id="the-receipts-stream"><a class="header" href="#the-receipts-stream">The <code>receipts</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>receipts</code> stream:</p>
+<pre><code>^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+</code></pre>
+<h5 id="the-presence-stream"><a class="header" href="#the-presence-stream">The <code>presence</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>presence</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+</code></pre>
+<h4 id="background-tasks"><a class="header" href="#background-tasks">Background tasks</a></h4>
+<p>There is also support for moving background tasks to a separate
+worker. Background tasks are run periodically or started via replication. Exactly
+which tasks are configured to run depends on your Synapse configuration (e.g. if
+stats is enabled). This worker doesn't handle any REST endpoints itself.</p>
+<p>To enable this, the worker must have a <code>worker_name</code> and can be configured to run
+background tasks. For example, to move background tasks to a dedicated worker,
+the shared configuration would include:</p>
+<pre><code class="language-yaml">run_background_tasks_on: background_worker
+</code></pre>
+<p>You might also wish to investigate the <code>update_user_directory_from_worker</code> and
+<code>media_instance_running_background_jobs</code> settings.</p>
+<p>An example for a dedicated background worker instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: background_worker
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
+</code></pre>
+<h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
+<p>You can designate one generic worker to update the user directory.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">update_user_directory_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>User directory updates allow REST endpoints matching the following regular
+expressions to work:</p>
+<pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+</code></pre>
+<p>The above endpoints can be routed to any worker, though you may choose to route
+it to the chosen user directory worker.</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
+worker application type.</p>
+<h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
+<p>You can designate one generic worker to send output traffic to Application Services.
+Doesn't handle any REST endpoints itself, but you should specify its name in the
+shared configuration as follows:</p>
+<pre><code class="language-yaml">notify_appservices_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
+worker application type.</p>
+<h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
+<p>Handles sending push notifications to sygnal and email. Doesn't handle any
+REST endpoints itself, but you should set <code>start_pushers: False</code> in the
+shared configuration file to stop the main synapse sending push notifications.</p>
+<p>To run multiple instances at once the <code>pusher_instances</code> option should list all
+pusher instances by their worker name, e.g.:</p>
+<pre><code class="language-yaml">pusher_instances:
+    - pusher_worker1
+    - pusher_worker2
+</code></pre>
+<p>An example for a pusher instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.pusher
+worker_name: pusher_worker1
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/pusher-worker-log.yaml
+</code></pre>
+<h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
+<code>notify_appservices_from_worker</code> option instead.</a></p>
+<p>Handles sending output traffic to Application Services. Doesn't handle any
+REST endpoints itself, but you should set <code>notify_appservices: False</code> in the
+shared configuration file to stop the main synapse sending appservice notifications.</p>
+<p>Note this worker cannot be load-balanced: only one instance should be active.</p>
+<h3 id="synapseappfederation_sender"><a class="header" href="#synapseappfederation_sender"><code>synapse.app.federation_sender</code></a></h3>
+<p>Handles sending federation traffic to other servers. Doesn't handle any
+REST endpoints itself, but you should set <code>send_federation: False</code> in the
+shared configuration file to stop the main synapse sending this traffic.</p>
+<p>If running multiple federation senders then you must list each
+instance in the <code>federation_sender_instances</code> option by their <code>worker_name</code>.
+All instances must be stopped and started when adding or removing instances.
+For example:</p>
+<pre><code class="language-yaml">federation_sender_instances:
+    - federation_sender1
+    - federation_sender2
+</code></pre>
+<p>An example for a federation sender instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.federation_sender
+worker_name: federation_sender1
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
+</code></pre>
+<h3 id="synapseappmedia_repository"><a class="header" href="#synapseappmedia_repository"><code>synapse.app.media_repository</code></a></h3>
+<p>Handles the media repository. It can handle all endpoints starting with:</p>
+<pre><code>/_matrix/media/
+</code></pre>
+<p>... and the following regular expressions matching media-specific administration APIs:</p>
+<pre><code>^/_synapse/admin/v1/purge_media_cache$
+^/_synapse/admin/v1/room/.*/media.*$
+^/_synapse/admin/v1/user/.*/media.*$
+^/_synapse/admin/v1/media/.*$
+^/_synapse/admin/v1/quarantine_media/.*$
+^/_synapse/admin/v1/users/.*/media$
+</code></pre>
+<p>You should also set <code>enable_media_repo: False</code> in the shared configuration
+file to stop the main synapse running background jobs related to managing the
+media repository. Note that doing so will prevent the main process from being
+able to handle the above endpoints.</p>
+<p>In the <code>media_repository</code> worker configuration file, configure the
+<a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a> to
+expose the <code>media</code> resource. For example:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.media_repository
+worker_name: media_worker
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 8085
+    resources:
+      - names: [media]
+
+worker_log_config: /etc/matrix-synapse/media-worker-log.yaml
+</code></pre>
+<p>Note that if running multiple media repositories they must be on the same server
+and you must configure a single instance to run the background tasks, e.g.:</p>
+<pre><code class="language-yaml">media_instance_running_background_jobs: &quot;media-repository-1&quot;
+</code></pre>
+<p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
+<h3 id="synapseappuser_dir"><a class="header" href="#synapseappuser_dir"><code>synapse.app.user_dir</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="#updating-the-user-directory">Use <code>synapse.app.generic_worker</code> with the
+<code>update_user_directory_from_worker</code> option instead.</a></p>
+<p>Handles searches in the user directory. It can handle REST endpoints matching
+the following regular expressions:</p>
+<pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+</code></pre>
+<p>When using this worker you must also set <code>update_user_directory: false</code> in the
+shared configuration file to stop the main synapse running background
+jobs related to updating the user directory.</p>
+<p>Above endpoint is not <em>required</em> to be routed to this worker. By default,
+<code>update_user_directory</code> is set to <code>true</code>, which means the main process
+will handle updates. All workers configured with <code>client</code> can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.</p>
+<p>If <code>update_user_directory</code> is set to <code>false</code>, and this worker is not running,
+the above endpoint may give outdated results.</p>
+<h3 id="historical-apps"><a class="header" href="#historical-apps">Historical apps</a></h3>
+<p>The following used to be separate worker application types, but are now
+equivalent to <code>synapse.app.generic_worker</code>:</p>
+<ul>
+<li><code>synapse.app.client_reader</code></li>
+<li><code>synapse.app.event_creator</code></li>
+<li><code>synapse.app.federation_reader</code></li>
+<li><code>synapse.app.frontend_proxy</code></li>
+<li><code>synapse.app.synchrotron</code></li>
+</ul>
+<h2 id="migration-from-old-config"><a class="header" href="#migration-from-old-config">Migration from old config</a></h2>
+<p>A main change that has occurred is the merging of worker apps into
+<code>synapse.app.generic_worker</code>. This change is backwards compatible and so no
+changes to the config are required.</p>
+<p>To migrate apps to use <code>synapse.app.generic_worker</code> simply update the
+<code>worker_app</code> option in the worker configs, and where worker are started (e.g.
+in systemd service files, but not required for synctl).</p>
+<h2 id="architectural-diagram"><a class="header" href="#architectural-diagram">Architectural diagram</a></h2>
+<p>The following shows an example setup using Redis and a reverse proxy:</p>
+<pre><code>                     Clients &amp; Federation
+                              |
+                              v
+                        +-----------+
+                        |           |
+                        |  Reverse  |
+                        |  Proxy    |
+                        |           |
+                        +-----------+
+                            | | |
+                            | | | HTTP requests
+        +-------------------+ | +-----------+
+        |                 +---+             |
+        |                 |                 |
+        v                 v                 v
++--------------+  +--------------+  +--------------+  +--------------+
+|   Main       |  |   Generic    |  |   Generic    |  |  Event       |
+|   Process    |  |   Worker 1   |  |   Worker 2   |  |  Persister   |
++--------------+  +--------------+  +--------------+  +--------------+
+      ^    ^          |   ^   |         |   ^   |         |   ^   ^
+      |    |          |   |   |         |   |   |         |   |   |
+      |    |          |   |   |  HTTP   |   |   |         |   |   |
+      |    +----------+&lt;--|---|---------+&lt;--|---|---------+   |   |
+      |                   |   +-------------|--&gt;+-------------+   |
+      |                   |                 |                     |
+      |                   |                 |                     |
+      v                   v                 v                     v
+======================================================================
+                                                         Redis pub/sub channel
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="modules/porting_legacy_module.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="synctl_workers.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="modules/porting_legacy_module.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="synctl_workers.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

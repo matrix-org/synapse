@@ -1,0 +1,710 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>OpenID Connect - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html" class="active">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/openid.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="configuring-synapse-to-authenticate-against-an-openid-connect-provider"><a class="header" href="#configuring-synapse-to-authenticate-against-an-openid-connect-provider">Configuring Synapse to authenticate against an OpenID Connect provider</a></h1>
+<p>Synapse can be configured to use an OpenID Connect Provider (OP) for
+authentication, instead of its own local password database.</p>
+<p>Any OP should work with Synapse, as long as it supports the authorization code
+flow. There are a few options for that:</p>
+<ul>
+<li>
+<p>start a local OP. Synapse has been tested with <a href="https://www.ory.sh/docs/hydra/">Hydra</a> and
+<a href="https://github.com/dexidp/dex">Dex</a>.  Note that for an OP to work, it should be served under a
+secure (HTTPS) origin.  A certificate signed with a self-signed, locally
+trusted CA should work. In that case, start Synapse with a <code>SSL_CERT_FILE</code>
+environment variable set to the path of the CA.</p>
+</li>
+<li>
+<p>set up a SaaS OP, like <a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a>, <a href="https://auth0.com/">Auth0</a> or
+<a href="https://www.okta.com/">Okta</a>. Synapse has been tested with Auth0 and Google.</p>
+</li>
+</ul>
+<p>It may also be possible to use other OAuth2 providers which provide the
+<a href="https://tools.ietf.org/html/rfc6749#section-4.1">authorization code grant type</a>,
+such as <a href="https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps">Github</a>.</p>
+<h2 id="preparing-synapse"><a class="header" href="#preparing-synapse">Preparing Synapse</a></h2>
+<p>The OpenID integration in Synapse uses the
+<a href="https://pypi.org/project/Authlib/"><code>authlib</code></a> library, which must be installed
+as follows:</p>
+<ul>
+<li>
+<p>The relevant libraries are included in the Docker images and Debian packages
+provided by <code>matrix.org</code> so no further action is needed.</p>
+</li>
+<li>
+<p>If you installed Synapse into a virtualenv, run <code>/path/to/env/bin/pip install matrix-synapse[oidc]</code> to install the necessary dependencies.</p>
+</li>
+<li>
+<p>For other installation mechanisms, see the documentation provided by the
+maintainer.</p>
+</li>
+</ul>
+<p>To enable the OpenID integration, you should then add a section to the <code>oidc_providers</code>
+setting in your configuration file.
+See the <a href="usage/configuration/config_documentation.html#oidc_providers">configuration manual</a> for some sample settings, as well as
+the text below for example configurations for specific providers.</p>
+<h2 id="sample-configs"><a class="header" href="#sample-configs">Sample configs</a></h2>
+<p>Here are a few configs for providers that should work with Synapse.</p>
+<h3 id="microsoft-azure-active-directory"><a class="header" href="#microsoft-azure-active-directory">Microsoft Azure Active Directory</a></h3>
+<p>Azure AD can act as an OpenID Connect Provider. Register a new application under
+<em>App registrations</em> in the Azure AD management console. The RedirectURI for your
+application should point to your matrix server:
+<code>[synapse public baseurl]/_synapse/client/oidc/callback</code></p>
+<p>Go to <em>Certificates &amp; secrets</em> and register a new client secret. Make note of your
+Directory (tenant) ID as it will be used in the Azure links.
+Edit your Synapse config file and change the <code>oidc_config</code> section:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: microsoft
+    idp_name: Microsoft
+    issuer: &quot;https://login.microsoftonline.com/&lt;tenant id&gt;/v2.0&quot;
+    client_id: &quot;&lt;client id&gt;&quot;
+    client_secret: &quot;&lt;client secret&gt;&quot;
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    authorization_endpoint: &quot;https://login.microsoftonline.com/&lt;tenant id&gt;/oauth2/v2.0/authorize&quot;
+    token_endpoint: &quot;https://login.microsoftonline.com/&lt;tenant id&gt;/oauth2/v2.0/token&quot;
+    userinfo_endpoint: &quot;https://graph.microsoft.com/oidc/userinfo&quot;
+
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username.split('@')[0] }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="dex"><a class="header" href="#dex">Dex</a></h3>
+<p><a href="https://github.com/dexidp/dex">Dex</a> is a simple, open-source OpenID Connect Provider.
+Although it is designed to help building a full-blown provider with an
+external database, it can be configured with static passwords in a config file.</p>
+<p>Follow the <a href="https://dexidp.io/docs/getting-started/">Getting Started guide</a>
+to install Dex.</p>
+<p>Edit <code>examples/config-dev.yaml</code> config file from the Dex repo to add a client:</p>
+<pre><code class="language-yaml">staticClients:
+- id: synapse
+  secret: secret
+  redirectURIs:
+  - '[synapse public baseurl]/_synapse/client/oidc/callback'
+  name: 'Synapse'
+</code></pre>
+<p>Run with <code>dex serve examples/config-dev.yaml</code>.</p>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: dex
+    idp_name: &quot;My Dex server&quot;
+    skip_verification: true # This is needed as Dex is served on an insecure endpoint
+    issuer: &quot;http://127.0.0.1:5556/dex&quot;
+    client_id: &quot;synapse&quot;
+    client_secret: &quot;secret&quot;
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.name }}&quot;
+        display_name_template: &quot;{{ user.name|capitalize }}&quot;
+</code></pre>
+<h3 id="keycloak"><a class="header" href="#keycloak">Keycloak</a></h3>
+<p><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a> is an opensource IdP maintained by Red Hat.</p>
+<p>Follow the <a href="https://www.keycloak.org/getting-started">Getting Started Guide</a> to install Keycloak and set up a realm.</p>
+<ol>
+<li>
+<p>Click <code>Clients</code> in the sidebar and click <code>Create</code></p>
+</li>
+<li>
+<p>Fill in the fields as below:</p>
+</li>
+</ol>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Client ID</td><td><code>synapse</code></td></tr>
+<tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
+</tbody></table>
+<ol start="3">
+<li>Click <code>Save</code></li>
+<li>Fill in the fields as below:</li>
+</ol>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Client ID</td><td><code>synapse</code></td></tr>
+<tr><td>Enabled</td><td><code>On</code></td></tr>
+<tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
+<tr><td>Access Type</td><td><code>confidential</code></td></tr>
+<tr><td>Valid Redirect URIs</td><td><code>[synapse public baseurl]/_synapse/client/oidc/callback</code></td></tr>
+</tbody></table>
+<ol start="5">
+<li>Click <code>Save</code></li>
+<li>On the Credentials tab, update the fields:</li>
+</ol>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Client Authenticator</td><td><code>Client ID and Secret</code></td></tr>
+</tbody></table>
+<ol start="7">
+<li>Click <code>Regenerate Secret</code></li>
+<li>Copy Secret</li>
+</ol>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: keycloak
+    idp_name: &quot;My KeyCloak server&quot;
+    issuer: &quot;https://127.0.0.1:8443/realms/{realm_name}&quot;
+    client_id: &quot;synapse&quot;
+    client_secret: &quot;copy secret generated from above&quot;
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="auth0"><a class="header" href="#auth0">Auth0</a></h3>
+<p><a href="https://auth0.com/">Auth0</a> is a hosted SaaS IdP solution.</p>
+<ol>
+<li>
+<p>Create a regular web application for Synapse</p>
+</li>
+<li>
+<p>Set the Allowed Callback URLs to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></p>
+</li>
+<li>
+<p>Add a rule with any name to add the <code>preferred_username</code> claim. 
+(See https://auth0.com/docs/customize/rules/create-rules for more information on how to create rules.)</p>
+<details>
+ <summary>Code sample</summary>
+<pre><code class="language-js">function addPersistenceAttribute(user, context, callback) {
+  user.user_metadata = user.user_metadata || {};
+  user.user_metadata.preferred_username = user.user_metadata.preferred_username || user.user_id;
+  context.idToken.preferred_username = user.user_metadata.preferred_username;
+
+  auth0.users.updateUserMetadata(user.user_id, user.user_metadata)
+    .then(function(){
+        callback(null, user, context);
+    })
+    .catch(function(err){
+        callback(err);
+    });
+}
+</code></pre>
+</li>
+</ol>
+</details>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: auth0
+    idp_name: Auth0
+    issuer: &quot;https://your-tier.eu.auth0.com/&quot; # TO BE FILLED
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="authentik"><a class="header" href="#authentik">Authentik</a></h3>
+<p><a href="https://goauthentik.io/">Authentik</a> is an open-source IdP solution.</p>
+<ol>
+<li>Create a provider in Authentik, with type OAuth2/OpenID.</li>
+<li>The parameters are:</li>
+</ol>
+<ul>
+<li>Client Type: Confidential</li>
+<li>JWT Algorithm: RS256</li>
+<li>Scopes: OpenID, Email and Profile</li>
+<li>RSA Key: Select any available key</li>
+<li>Redirect URIs: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ul>
+<ol start="3">
+<li>Create an application for synapse in Authentik and link it to the provider.</li>
+<li>Note the slug of your application, Client ID and Client Secret.</li>
+</ol>
+<p>Note: RSA keys must be used for signing for Authentik, ECC keys do not work.</p>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: authentik
+    idp_name: authentik
+    discover: true
+    issuer: &quot;https://your.authentik.example.org/application/o/your-app-slug/&quot; # TO BE FILLED: domain and slug
+    client_id: &quot;your client id&quot; # TO BE FILLED
+    client_secret: &quot;your client secret&quot; # TO BE FILLED
+    scopes:
+      - &quot;openid&quot;
+      - &quot;profile&quot;
+      - &quot;email&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot; # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
+</code></pre>
+<h3 id="lemonldap"><a class="header" href="#lemonldap">LemonLDAP</a></h3>
+<p><a href="https://lemonldap-ng.org/">LemonLDAP::NG</a> is an open-source IdP solution.</p>
+<ol>
+<li>Create an OpenID Connect Relying Parties in LemonLDAP::NG</li>
+<li>The parameters are:</li>
+</ol>
+<ul>
+<li>Client ID under the basic menu of the new Relying Parties (<code>Options &gt; Basic &gt; Client ID</code>)</li>
+<li>Client secret (<code>Options &gt; Basic &gt; Client secret</code>)</li>
+<li>JWT Algorithm: RS256 within the security menu of the new Relying Parties
+(<code>Options &gt; Security &gt; ID Token signature algorithm</code> and <code>Options &gt; Security &gt; Access Token signature algorithm</code>)</li>
+<li>Scopes: OpenID, Email and Profile</li>
+<li>Allowed redirection addresses for login (<code>Options &gt; Basic &gt; Allowed redirection addresses for login</code> ) :
+<code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ul>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: lemonldap
+    idp_name: lemonldap
+    discover: true
+    issuer: &quot;https://auth.example.org/&quot; # TO BE FILLED: replace with your domain
+    client_id: &quot;your client id&quot; # TO BE FILLED
+    client_secret: &quot;your client secret&quot; # TO BE FILLED
+    scopes:
+      - &quot;openid&quot;
+      - &quot;profile&quot;
+      - &quot;email&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}}&quot;
+        # TO BE FILLED: If your users have names in LemonLDAP::NG and you want those in Synapse, this should be replaced with user.name|capitalize or any valid filter.
+        display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot;
+</code></pre>
+<h3 id="github"><a class="header" href="#github">GitHub</a></h3>
+<p><a href="https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps">GitHub</a> is a bit special as it is not an OpenID Connect compliant provider, but
+just a regular OAuth2 provider.</p>
+<p>The <a href="https://developer.github.com/v3/users/#get-the-authenticated-user"><code>/user</code> API endpoint</a>
+can be used to retrieve information on the authenticated user. As the Synapse
+login mechanism needs an attribute to uniquely identify users, and that endpoint
+does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
+<ol>
+<li>Create a new OAuth application: <a href="https://github.com/settings/applications/new">https://github.com/settings/applications/new</a>.</li>
+<li>Set the callback URL to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: github
+    idp_name: Github
+    idp_brand: &quot;github&quot;  # optional: styling hint for clients
+    discover: false
+    issuer: &quot;https://github.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    authorization_endpoint: &quot;https://github.com/login/oauth/authorize&quot;
+    token_endpoint: &quot;https://github.com/login/oauth/access_token&quot;
+    userinfo_endpoint: &quot;https://api.github.com/user&quot;
+    scopes: [&quot;read:user&quot;]
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;id&quot;
+        localpart_template: &quot;{{ user.login }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="google"><a class="header" href="#google">Google</a></h3>
+<p><a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a> is an OpenID certified authentication and authorisation provider.</p>
+<ol>
+<li>Set up a project in the Google API Console (see 
+<a href="https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup">documentation</a>).</li>
+<li>Add an &quot;OAuth Client ID&quot; for a Web Application under &quot;Credentials&quot;.</li>
+<li>Copy the Client ID and Client Secret, and add the following to your synapse config:
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: google
+    idp_name: Google
+    idp_brand: &quot;google&quot;  # optional: styling hint for clients
+    issuer: &quot;https://accounts.google.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    scopes: [&quot;openid&quot;, &quot;profile&quot;, &quot;email&quot;] # email is optional, read below
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.given_name|lower }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot; # needs &quot;email&quot; in scopes above
+</code></pre>
+</li>
+<li>Back in the Google console, add this Authorized redirect URI: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
+</ol>
+<h3 id="twitch"><a class="header" href="#twitch">Twitch</a></h3>
+<ol>
+<li>Setup a developer account on <a href="https://dev.twitch.tv/">Twitch</a></li>
+<li>Obtain the OAuth 2.0 credentials by <a href="https://dev.twitch.tv/console/apps/">creating an app</a></li>
+<li>Add this OAuth Redirect URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: twitch
+    idp_name: Twitch
+    issuer: &quot;https://id.twitch.tv/oauth2/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    client_auth_method: &quot;client_secret_post&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="gitlab"><a class="header" href="#gitlab">GitLab</a></h3>
+<ol>
+<li>Create a <a href="https://gitlab.com/profile/applications">new application</a>.</li>
+<li>Add the <code>read_user</code> and <code>openid</code> scopes.</li>
+<li>Add this Callback URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: gitlab
+    idp_name: Gitlab
+    idp_brand: &quot;gitlab&quot;  # optional: styling hint for clients
+    issuer: &quot;https://gitlab.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    client_auth_method: &quot;client_secret_post&quot;
+    scopes: [&quot;openid&quot;, &quot;read_user&quot;]
+    user_profile_method: &quot;userinfo_endpoint&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: '{{ user.nickname }}'
+        display_name_template: '{{ user.name }}'
+</code></pre>
+<h3 id="facebook"><a class="header" href="#facebook">Facebook</a></h3>
+<ol start="0">
+<li>You will need a Facebook developer account. You can register for one
+<a href="https://developers.facebook.com/async/registration/">here</a>.</li>
+<li>On the <a href="https://developers.facebook.com/apps/">apps</a> page of the developer
+console, &quot;Create App&quot;, and choose &quot;Build Connected Experiences&quot;.</li>
+<li>Once the app is created, add &quot;Facebook Login&quot; and choose &quot;Web&quot;. You don't
+need to go through the whole form here.</li>
+<li>In the left-hand menu, open &quot;Products&quot;/&quot;Facebook Login&quot;/&quot;Settings&quot;.
+<ul>
+<li>Add <code>[synapse public baseurl]/_synapse/client/oidc/callback</code> as an OAuth Redirect
+URL.</li>
+</ul>
+</li>
+<li>In the left-hand menu, open &quot;Settings/Basic&quot;. Here you can copy the &quot;App ID&quot;
+and &quot;App Secret&quot; for use below.</li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">  - idp_id: facebook
+    idp_name: Facebook
+    idp_brand: &quot;facebook&quot;  # optional: styling hint for clients
+    discover: false
+    issuer: &quot;https://www.facebook.com&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    scopes: [&quot;openid&quot;, &quot;email&quot;]
+    authorization_endpoint: &quot;https://facebook.com/dialog/oauth&quot;
+    token_endpoint: &quot;https://graph.facebook.com/v9.0/oauth/access_token&quot;
+    jwks_uri: &quot;https://www.facebook.com/.well-known/oauth/openid/jwks/&quot;
+    user_mapping_provider:
+      config:
+        display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
+<p>Relevant documents:</p>
+<ul>
+<li><a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow">Manually Build a Login Flow</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/using-graph-api/">Using Facebook's Graph API</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/reference/user">Reference to the User endpoint</a></li>
+</ul>
+<p>Facebook do have an <a href="https://www.facebook.com/.well-known/openid-configuration">OIDC discovery endpoint</a>,
+but it has a <code>response_types_supported</code> which excludes &quot;code&quot; (which we rely on, and
+is even mentioned in their <a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow#login">documentation</a>),
+so we have to disable discovery and configure the URIs manually.</p>
+<h3 id="gitea"><a class="header" href="#gitea">Gitea</a></h3>
+<p>Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.</p>
+<p>The <a href="https://try.gitea.io/api/swagger#/user/userGetCurrent"><code>/user</code> API endpoint</a>
+can be used to retrieve information on the authenticated user. As the Synapse
+login mechanism needs an attribute to uniquely identify users, and that endpoint
+does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
+<ol>
+<li>Create a new application.</li>
+<li>Add this Callback URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: gitea
+    idp_name: Gitea
+    discover: false
+    issuer: &quot;https://your-gitea.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    client_auth_method: client_secret_post
+    scopes: [] # Gitea doesn't support Scopes
+    authorization_endpoint: &quot;https://your-gitea.com/login/oauth/authorize&quot;
+    token_endpoint: &quot;https://your-gitea.com/login/oauth/access_token&quot;
+    userinfo_endpoint: &quot;https://your-gitea.com/api/v1/user&quot;
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;id&quot;
+        localpart_template: &quot;{{ user.login }}&quot;
+        display_name_template: &quot;{{ user.full_name }}&quot;
+</code></pre>
+<h3 id="xwiki"><a class="header" href="#xwiki">XWiki</a></h3>
+<p>Install <a href="https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/">OpenID Connect Provider</a> extension in your <a href="https://www.xwiki.org">XWiki</a> instance.</p>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: xwiki
+    idp_name: &quot;XWiki&quot;
+    issuer: &quot;https://myxwikihost/xwiki/oidc/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_auth_method: none
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    user_profile_method: &quot;userinfo_endpoint&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="apple"><a class="header" href="#apple">Apple</a></h3>
+<p>Configuring &quot;Sign in with Apple&quot; (SiWA) requires an Apple Developer account.</p>
+<p>You will need to create a new &quot;Services ID&quot; for SiWA, and create and download a
+private key with &quot;SiWA&quot; enabled.</p>
+<p>As well as the private key file, you will need:</p>
+<ul>
+<li>Client ID: the &quot;identifier&quot; you gave the &quot;Services ID&quot;</li>
+<li>Team ID: a 10-character ID associated with your developer account.</li>
+<li>Key ID: the 10-character identifier for the key.</li>
+</ul>
+<p><a href="https://help.apple.com/developer-account/?lang=en#/dev77c875b7e">Apple's developer documentation</a>
+has more information on setting up SiWA.</p>
+<p>The synapse config will look like this:</p>
+<pre><code class="language-yaml">  - idp_id: apple
+    idp_name: Apple
+    issuer: &quot;https://appleid.apple.com&quot;
+    client_id: &quot;your-client-id&quot; # Set to the &quot;identifier&quot; for your &quot;ServicesID&quot;
+    client_auth_method: &quot;client_secret_post&quot;
+    client_secret_jwt_key:
+      key_file: &quot;/path/to/AuthKey_KEYIDCODE.p8&quot;  # point to your key file
+      jwt_header:
+        alg: ES256
+        kid: &quot;KEYIDCODE&quot;   # Set to the 10-char Key ID
+      jwt_payload:
+        iss: TEAMIDCODE    # Set to the 10-char Team ID
+    scopes: [&quot;name&quot;, &quot;email&quot;, &quot;openid&quot;]
+    authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
+    user_mapping_provider:
+      config:
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
+<h3 id="django-oauth-toolkit"><a class="header" href="#django-oauth-toolkit">Django OAuth Toolkit</a></h3>
+<p><a href="https://github.com/jazzband/django-oauth-toolkit">django-oauth-toolkit</a> is a
+Django application providing out of the box all the endpoints, data and logic
+needed to add OAuth2 capabilities to your Django projects. It supports
+<a href="https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html">OpenID Connect too</a>.</p>
+<p>Configuration on Django's side:</p>
+<ol>
+<li>Add an application: <code>https://example.com/admin/oauth2_provider/application/add/</code> and choose parameters like this:</li>
+</ol>
+<ul>
+<li><code>Redirect uris</code>: <code>https://synapse.example.com/_synapse/client/oidc/callback</code></li>
+<li><code>Client type</code>: <code>Confidential</code></li>
+<li><code>Authorization grant type</code>: <code>Authorization code</code></li>
+<li><code>Algorithm</code>: <code>HMAC with SHA-2 256</code></li>
+</ul>
+<ol start="2">
+<li>
+<p>You can <a href="https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#customizing-the-oidc-responses">customize the claims</a> Django gives to synapse (optional):</p>
+<details>
+ <summary>Code sample</summary>
+<pre><code class="language-python">class CustomOAuth2Validator(OAuth2Validator):
+
+    def get_additional_claims(self, request):
+        return {
+            &quot;sub&quot;: request.user.email,
+            &quot;email&quot;: request.user.email,
+            &quot;first_name&quot;: request.user.first_name,
+            &quot;last_name&quot;: request.user.last_name,
+        }
+</code></pre>
+</details>
+</li>
+</ol>
+<p>Your synapse config is then:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: django_example
+    idp_name: &quot;Django Example&quot;
+    issuer: &quot;https://example.com/o/&quot;
+    client_id: &quot;your-client-id&quot;  # CHANGE ME
+    client_secret: &quot;your-client-secret&quot;  # CHANGE ME
+    scopes: [&quot;openid&quot;]
+    user_profile_method: &quot;userinfo_endpoint&quot;  # needed because oauth-toolkit does not include user information in the authorization response
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.email.split('@')[0] }}&quot;
+        display_name_template: &quot;{{ user.first_name }} {{ user.last_name }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="usage/configuration/user_authentication/single_sign_on/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="usage/configuration/user_authentication/single_sign_on/saml.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="usage/configuration/user_authentication/single_sign_on/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="usage/configuration/user_authentication/single_sign_on/saml.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

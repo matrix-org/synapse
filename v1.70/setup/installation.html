@@ -1,0 +1,605 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Installation - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html" class="active">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/setup/installation.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
+<h2 id="choosing-your-server-name"><a class="header" href="#choosing-your-server-name">Choosing your server name</a></h2>
+<p>It is important to choose the name for your server before you install Synapse,
+because it cannot be changed later.</p>
+<p>The server name determines the &quot;domain&quot; part of user-ids for users on your
+server: these will all be of the format <code>@user:my.domain.name</code>. It also
+determines how other matrix servers will reach yours for federation.</p>
+<p>For a test configuration, set this to the hostname of your server. For a more
+production-ready setup, you will probably want to specify your domain
+(<code>example.com</code>) rather than a matrix-specific hostname here (in the same way
+that your email address is probably <code>user@example.com</code> rather than
+<code>user@email.example.com</code>) - but doing so may require more advanced setup: see
+<a href="../federate.html">Setting up Federation</a>.</p>
+<h2 id="installing-synapse"><a class="header" href="#installing-synapse">Installing Synapse</a></h2>
+<h3 id="prebuilt-packages"><a class="header" href="#prebuilt-packages">Prebuilt packages</a></h3>
+<p>Prebuilt packages are available for a number of platforms. These are recommended
+for most users.</p>
+<h4 id="docker-images-and-ansible-playbooks"><a class="header" href="#docker-images-and-ansible-playbooks">Docker images and Ansible playbooks</a></h4>
+<p>There is an official synapse image available at
+<a href="https://hub.docker.com/r/matrixdotorg/synapse">https://hub.docker.com/r/matrixdotorg/synapse</a> which can be used with
+the docker-compose file available at
+<a href="https://github.com/matrix-org/synapse/tree/develop/contrib/docker">contrib/docker</a>.
+Further information on this including configuration options is available in the README
+on hub.docker.com.</p>
+<p>Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
+Dockerfile to automate a synapse server in a single Docker image, at
+<a href="https://hub.docker.com/r/avhost/docker-matrix/tags/">https://hub.docker.com/r/avhost/docker-matrix/tags/</a></p>
+<p>Slavi Pantaleev has created an Ansible playbook,
+which installs the offical Docker image of Matrix Synapse
+along with many other Matrix-related services (Postgres database, Element, coturn,
+ma1sd, SSL support, etc.).
+For more details, see
+<a href="https://github.com/spantaleev/matrix-docker-ansible-deploy">https://github.com/spantaleev/matrix-docker-ansible-deploy</a></p>
+<h4 id="debianubuntu"><a class="header" href="#debianubuntu">Debian/Ubuntu</a></h4>
+<h5 id="matrixorg-packages"><a class="header" href="#matrixorg-packages">Matrix.org packages</a></h5>
+<p>Matrix.org provides Debian/Ubuntu packages of Synapse, for the amd64
+architecture via <a href="https://packages.matrix.org/debian/">https://packages.matrix.org/debian/</a>.</p>
+<p>To install the latest release:</p>
+<pre><code class="language-sh">sudo apt install -y lsb-release wget apt-transport-https
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main&quot; |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+</code></pre>
+<p>Packages are also published for release candidates. To enable the prerelease
+channel, add <code>prerelease</code> to the <code>sources.list</code> line. For example:</p>
+<pre><code class="language-sh">sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main prerelease&quot; |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+</code></pre>
+<p>The fingerprint of the repository signing key (as shown by <code>gpg /usr/share/keyrings/matrix-org-archive-keyring.gpg</code>) is
+<code>AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058</code>.</p>
+<p>When installing with Debian packages, you might prefer to place files in
+<code>/etc/matrix-synapse/conf.d/</code> to override your configuration without editing
+the main configuration file at <code>/etc/matrix-synapse/homeserver.yaml</code>.
+By doing that, you won't be asked if you want to replace your configuration
+file when you upgrade the Debian package to a later version.</p>
+<h5 id="downstream-debian-packages"><a class="header" href="#downstream-debian-packages">Downstream Debian packages</a></h5>
+<p>Andrej Shadura maintains a <code>matrix-synapse</code> package in the Debian repositories.
+For <code>bookworm</code> and <code>sid</code>, it can be installed simply with:</p>
+<pre><code class="language-sh">sudo apt install matrix-synapse
+</code></pre>
+<p>Synapse is also avaliable in <code>bullseye-backports</code>.  Please
+see the <a href="https://backports.debian.org/Instructions/">Debian documentation</a>
+for information on how to use backports.</p>
+<p><code>matrix-synapse</code> is no longer maintained for <code>buster</code> and older.</p>
+<h5 id="downstream-ubuntu-packages"><a class="header" href="#downstream-ubuntu-packages">Downstream Ubuntu packages</a></h5>
+<p>We do not recommend using the packages in the default Ubuntu repository
+at this time, as they are old and suffer from known security vulnerabilities.
+The latest version of Synapse can be installed from <a href="#matrixorg-packages">our repository</a>.</p>
+<h4 id="fedora"><a class="header" href="#fedora">Fedora</a></h4>
+<p>Synapse is in the Fedora repositories as <code>matrix-synapse</code>:</p>
+<pre><code class="language-sh">sudo dnf install matrix-synapse
+</code></pre>
+<p>Oleg Girko provides Fedora RPMs at
+<a href="https://obs.infoserver.lv/project/monitor/matrix-synapse">https://obs.infoserver.lv/project/monitor/matrix-synapse</a></p>
+<h4 id="opensuse"><a class="header" href="#opensuse">OpenSUSE</a></h4>
+<p>Synapse is in the OpenSUSE repositories as <code>matrix-synapse</code>:</p>
+<pre><code class="language-sh">sudo zypper install matrix-synapse
+</code></pre>
+<h4 id="suse-linux-enterprise-server"><a class="header" href="#suse-linux-enterprise-server">SUSE Linux Enterprise Server</a></h4>
+<p>Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 repository at
+<a href="https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/">https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/</a></p>
+<h4 id="archlinux"><a class="header" href="#archlinux">ArchLinux</a></h4>
+<p>The quickest way to get up and running with ArchLinux is probably with the community package
+<a href="https://www.archlinux.org/packages/community/any/matrix-synapse/">https://www.archlinux.org/packages/community/any/matrix-synapse/</a>, which should pull in most of
+the necessary dependencies.</p>
+<p>pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):</p>
+<pre><code class="language-sh">sudo pip install --upgrade pip
+</code></pre>
+<p>If you encounter an error with lib bcrypt causing an Wrong ELF Class:
+ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
+compile it under the right architecture. (This should not be needed if
+installing under virtualenv):</p>
+<pre><code class="language-sh">sudo pip uninstall py-bcrypt
+sudo pip install py-bcrypt
+</code></pre>
+<h4 id="void-linux"><a class="header" href="#void-linux">Void Linux</a></h4>
+<p>Synapse can be found in the void repositories as 'synapse':</p>
+<pre><code class="language-sh">xbps-install -Su
+xbps-install -S synapse
+</code></pre>
+<h4 id="freebsd"><a class="header" href="#freebsd">FreeBSD</a></h4>
+<p>Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:</p>
+<ul>
+<li>Ports: <code>cd /usr/ports/net-im/py-matrix-synapse &amp;&amp; make install clean</code></li>
+<li>Packages: <code>pkg install py38-matrix-synapse</code></li>
+</ul>
+<h4 id="openbsd"><a class="header" href="#openbsd">OpenBSD</a></h4>
+<p>As of OpenBSD 6.7 Synapse is available as a pre-compiled binary. The filesystem
+underlying the homeserver directory (defaults to <code>/var/synapse</code>) has to be
+mounted with <code>wxallowed</code> (cf. <code>mount(8)</code>), so creating a separate filesystem
+and mounting it to <code>/var/synapse</code> should be taken into consideration.</p>
+<p>Installing Synapse:</p>
+<pre><code class="language-sh">doas pkg_add synapse
+</code></pre>
+<h4 id="nixos"><a class="header" href="#nixos">NixOS</a></h4>
+<p>Robin Lambertz has packaged Synapse for NixOS at:
+<a href="https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix">https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix</a></p>
+<h3 id="installing-as-a-python-module-from-pypi"><a class="header" href="#installing-as-a-python-module-from-pypi">Installing as a Python module from PyPI</a></h3>
+<p>It's also possible to install Synapse as a Python module from PyPI.</p>
+<p>When following this route please make sure that the <a href="#platform-specific-prerequisites">Platform-specific prerequisites</a> are already installed.</p>
+<p>System requirements:</p>
+<ul>
+<li>POSIX-compliant system (tested on Linux &amp; OS X)</li>
+<li>Python 3.7 or later, up to Python 3.10.</li>
+<li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
+</ul>
+<p>If building on an uncommon architecture for which pre-built wheels are
+unavailable, you will need to have a recent Rust compiler installed. The easiest
+way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
+<p>To install the Synapse homeserver run:</p>
+<pre><code class="language-sh">mkdir -p ~/synapse
+virtualenv -p python3 ~/synapse/env
+source ~/synapse/env/bin/activate
+pip install --upgrade pip
+pip install --upgrade setuptools
+pip install matrix-synapse
+</code></pre>
+<p>This will download Synapse from <a href="https://pypi.org/project/matrix-synapse">PyPI</a>
+and install it, along with the python libraries it uses, into a virtual environment
+under <code>~/synapse/env</code>.  Feel free to pick a different directory if you
+prefer.</p>
+<p>This Synapse installation can then be later upgraded by using pip again with the
+update flag:</p>
+<pre><code class="language-sh">source ~/synapse/env/bin/activate
+pip install -U matrix-synapse
+</code></pre>
+<p>Before you can start Synapse, you will need to generate a configuration
+file. To do this, run (in your virtualenv, as before):</p>
+<pre><code class="language-sh">cd ~/synapse
+python -m synapse.app.homeserver \
+    --server-name my.domain.name \
+    --config-path homeserver.yaml \
+    --generate-config \
+    --report-stats=[yes|no]
+</code></pre>
+<p>... substituting an appropriate value for <code>--server-name</code> and choosing whether
+or not to report usage statistics (hostname, Synapse version, uptime, total
+users, etc.) to the developers via the <code>--report-stats</code> argument.</p>
+<p>This command will generate you a config file that you can then customise, but it will
+also generate a set of keys for you. These keys will allow your homeserver to
+identify itself to other homeserver, so don't lose or delete them. It would be
+wise to back them up somewhere safe. (If, for whatever reason, you do need to
+change your homeserver's keys, you may find that other homeserver have the
+old key cached. If you update the signing key, you should change the name of the
+key in the <code>&lt;server name&gt;.signing.key</code> file (the second word) to something
+different. See the <a href="https://matrix.org/docs/spec/server_server/latest.html#retrieving-server-keys">spec</a> for more information on key management).</p>
+<p>To actually run your new homeserver, pick a working directory for Synapse to
+run (e.g. <code>~/synapse</code>), and:</p>
+<pre><code class="language-sh">cd ~/synapse
+source env/bin/activate
+synctl start
+</code></pre>
+<h4 id="platform-specific-prerequisites"><a class="header" href="#platform-specific-prerequisites">Platform-specific prerequisites</a></h4>
+<p>Synapse is written in Python but some of the libraries it uses are written in
+C. So before we can install Synapse itself we need a working C compiler and the
+header files for Python C extensions.</p>
+<h5 id="debianubunturaspbian"><a class="header" href="#debianubunturaspbian">Debian/Ubuntu/Raspbian</a></h5>
+<p>Installing prerequisites on Ubuntu or Debian:</p>
+<pre><code class="language-sh">sudo apt install build-essential python3-dev libffi-dev \
+                     python3-pip python3-setuptools sqlite3 \
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
+</code></pre>
+<h5 id="archlinux-1"><a class="header" href="#archlinux-1">ArchLinux</a></h5>
+<p>Installing prerequisites on ArchLinux:</p>
+<pre><code class="language-sh">sudo pacman -S base-devel python python-pip \
+               python-setuptools python-virtualenv sqlite3
+</code></pre>
+<h5 id="centosfedora"><a class="header" href="#centosfedora">CentOS/Fedora</a></h5>
+<p>Installing prerequisites on CentOS or Fedora Linux:</p>
+<pre><code class="language-sh">sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
+                 libwebp-devel libxml2-devel libxslt-devel libpq-devel \
+                 python3-virtualenv libffi-devel openssl-devel python3-devel
+sudo dnf groupinstall &quot;Development Tools&quot;
+</code></pre>
+<h5 id="macos"><a class="header" href="#macos">macOS</a></h5>
+<p>Installing prerequisites on macOS:</p>
+<p>You may need to install the latest Xcode developer tools:</p>
+<pre><code class="language-sh">xcode-select --install
+</code></pre>
+<p>On ARM-based Macs you may need to install libjpeg and libpq. 
+You can use Homebrew (https://brew.sh):</p>
+<pre><code class="language-sh"> brew install jpeg libpq
+</code></pre>
+<p>On macOS Catalina (10.15) you may need to explicitly install OpenSSL
+via brew and inform <code>pip</code> about it so that <code>psycopg2</code> builds:</p>
+<pre><code class="language-sh">brew install openssl@1.1
+export LDFLAGS=&quot;-L/usr/local/opt/openssl/lib&quot;
+export CPPFLAGS=&quot;-I/usr/local/opt/openssl/include&quot;
+</code></pre>
+<h5 id="opensuse-1"><a class="header" href="#opensuse-1">OpenSUSE</a></h5>
+<p>Installing prerequisites on openSUSE:</p>
+<pre><code class="language-sh">sudo zypper in -t pattern devel_basis
+sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
+               python-devel libffi-devel libopenssl-devel libjpeg62-devel
+</code></pre>
+<h5 id="openbsd-1"><a class="header" href="#openbsd-1">OpenBSD</a></h5>
+<p>A port of Synapse is available under <code>net/synapse</code>. The filesystem
+underlying the homeserver directory (defaults to <code>/var/synapse</code>) has to be
+mounted with <code>wxallowed</code> (cf. <code>mount(8)</code>), so creating a separate filesystem
+and mounting it to <code>/var/synapse</code> should be taken into consideration.</p>
+<p>To be able to build Synapse's dependency on python the <code>WRKOBJDIR</code>
+(cf. <code>bsd.port.mk(5)</code>) for building python, too, needs to be on a filesystem
+mounted with <code>wxallowed</code> (cf. <code>mount(8)</code>).</p>
+<p>Creating a <code>WRKOBJDIR</code> for building python under <code>/usr/local</code> (which on a
+default OpenBSD installation is mounted with <code>wxallowed</code>):</p>
+<pre><code class="language-sh">doas mkdir /usr/local/pobj_wxallowed
+</code></pre>
+<p>Assuming <code>PORTS_PRIVSEP=Yes</code> (cf. <code>bsd.port.mk(5)</code>) and <code>SUDO=doas</code> are
+configured in <code>/etc/mk.conf</code>:</p>
+<pre><code class="language-sh">doas chown _pbuild:_pbuild /usr/local/pobj_wxallowed
+</code></pre>
+<p>Setting the <code>WRKOBJDIR</code> for building python:</p>
+<pre><code class="language-sh">echo WRKOBJDIR_lang/python/3.7=/usr/local/pobj_wxallowed  \\nWRKOBJDIR_lang/python/2.7=/usr/local/pobj_wxallowed &gt;&gt; /etc/mk.conf
+</code></pre>
+<p>Building Synapse:</p>
+<pre><code class="language-sh">cd /usr/ports/net/synapse
+make install
+</code></pre>
+<h5 id="windows"><a class="header" href="#windows">Windows</a></h5>
+<p>Running Synapse natively on Windows is not officially supported.</p>
+<p>If you wish to run or develop Synapse on Windows, the Windows Subsystem for
+Linux provides a Linux environment which is capable of using the Debian, Fedora,
+or source installation methods. More information about WSL can be found at
+<a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a> for Windows 10/11 and
+<a href="https://docs.microsoft.com/en-us/windows/wsl/install-on-server">https://docs.microsoft.com/en-us/windows/wsl/install-on-server</a> for
+Windows Server.</p>
+<h2 id="setting-up-synapse"><a class="header" href="#setting-up-synapse">Setting up Synapse</a></h2>
+<p>Once you have installed synapse as above, you will need to configure it.</p>
+<h3 id="using-postgresql"><a class="header" href="#using-postgresql">Using PostgreSQL</a></h3>
+<p>By default Synapse uses an <a href="https://sqlite.org/">SQLite</a> database and in doing so trades
+performance for convenience. Almost all installations should opt to use <a href="https://www.postgresql.org">PostgreSQL</a>
+instead. Advantages include:</p>
+<ul>
+<li>significant performance improvements due to the superior threading and
+caching model, smarter query optimiser</li>
+<li>allowing the DB to be run on separate hardware</li>
+</ul>
+<p>For information on how to install and use PostgreSQL in Synapse, please see
+<a href="../postgres.html">Using Postgres</a></p>
+<p>SQLite is only acceptable for testing purposes. SQLite should not be used in
+a production server. Synapse will perform poorly when using
+SQLite, especially when participating in large rooms.</p>
+<h3 id="tls-certificates"><a class="header" href="#tls-certificates">TLS certificates</a></h3>
+<p>The default configuration exposes a single HTTP port on the local
+interface: <code>http://localhost:8008</code>. It is suitable for local testing,
+but for any practical use, you will need Synapse's APIs to be served
+over HTTPS.</p>
+<p>The recommended way to do so is to set up a reverse proxy on port
+<code>8448</code>. You can find documentation on doing so in
+<a href="../reverse_proxy.html">the reverse proxy documentation</a>.</p>
+<p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
+so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
+<ul>
+<li>First, under the <code>listeners</code> option, add the configuration for the
+TLS-enabled listener like so:</li>
+</ul>
+<pre><code class="language-yaml">listeners:
+  - port: 8448
+    type: http
+    tls: true
+    resources:
+      - names: [client, federation]
+</code></pre>
+<ul>
+<li>
+<p>You will also need to add the options <code>tls_certificate_path</code> and
+<code>tls_private_key_path</code>. to your configuration file. You will need to manage provisioning of 
+these certificates yourself.</p>
+</li>
+<li>
+<p>You can find more information about these options as well as how to configure synapse in the 
+<a href="../usage/configuration/config_documentation.html">configuration manual</a>.</p>
+<p>If you are using your own certificate, be sure to use a <code>.pem</code> file that
+includes the full certificate chain including any intermediate certificates
+(for instance, if using certbot, use <code>fullchain.pem</code> as your certificate, not
+<code>cert.pem</code>).</p>
+</li>
+</ul>
+<p>For a more detailed guide to configuring your server for federation, see
+<a href="../federate.html">Federation</a>.</p>
+<h3 id="client-well-known-uri"><a class="header" href="#client-well-known-uri">Client Well-Known URI</a></h3>
+<p>Setting up the client Well-Known URI is optional but if you set it up, it will
+allow users to enter their full username (e.g. <code>@user:&lt;server_name&gt;</code>) into clients
+which support well-known lookup to automatically configure the homeserver and
+identity server URLs. This is useful so that users don't have to memorize or think
+about the actual homeserver URL you are using.</p>
+<p>The URL <code>https://&lt;server_name&gt;/.well-known/matrix/client</code> should return JSON in
+the following format.</p>
+<pre><code class="language-json">{
+  &quot;m.homeserver&quot;: {
+    &quot;base_url&quot;: &quot;https://&lt;matrix.example.com&gt;&quot;
+  }
+}
+</code></pre>
+<p>It can optionally contain identity server information as well.</p>
+<pre><code class="language-json">{
+  &quot;m.homeserver&quot;: {
+    &quot;base_url&quot;: &quot;https://&lt;matrix.example.com&gt;&quot;
+  },
+  &quot;m.identity_server&quot;: {
+    &quot;base_url&quot;: &quot;https://&lt;identity.example.com&gt;&quot;
+  }
+}
+</code></pre>
+<p>To work in browser based clients, the file must be served with the appropriate
+Cross-Origin Resource Sharing (CORS) headers. A recommended value would be
+<code>Access-Control-Allow-Origin: *</code> which would allow all browser based clients to
+view it.</p>
+<p>In nginx this would be something like:</p>
+<pre><code class="language-nginx">location /.well-known/matrix/client {
+    return 200 '{&quot;m.homeserver&quot;: {&quot;base_url&quot;: &quot;https://&lt;matrix.example.com&gt;&quot;}}';
+    default_type application/json;
+    add_header Access-Control-Allow-Origin *;
+}
+</code></pre>
+<p>You should also ensure the <code>public_baseurl</code> option in <code>homeserver.yaml</code> is set
+correctly. <code>public_baseurl</code> should be set to the URL that clients will use to
+connect to your server. This is the same URL you put for the <code>m.homeserver</code>
+<code>base_url</code> above.</p>
+<pre><code class="language-yaml">public_baseurl: &quot;https://&lt;matrix.example.com&gt;&quot;
+</code></pre>
+<h3 id="email"><a class="header" href="#email">Email</a></h3>
+<p>It is desirable for Synapse to have the capability to send email. This allows
+Synapse to send password reset emails, send verifications when an email address
+is added to a user's account, and send email notifications to users when they
+receive new messages.</p>
+<p>To configure an SMTP server for Synapse, modify the configuration section
+headed <code>email</code>, and be sure to have at least the <code>smtp_host</code>, <code>smtp_port</code>
+and <code>notif_from</code> fields filled out.  You may also need to set <code>smtp_user</code>,
+<code>smtp_pass</code>, and <code>require_transport_security</code>.</p>
+<p>If email is not configured, password reset, registration and notifications via
+email will be disabled.</p>
+<h3 id="registering-a-user"><a class="header" href="#registering-a-user">Registering a user</a></h3>
+<p>One way to create a new user is to do so from a client like
+<a href="https://element.io/">Element</a>.  This requires registration to be enabled via
+the
+<a href="../usage/configuration/config_documentation.html#enable_registration"><code>enable_registration</code></a>
+setting.</p>
+<p>Alternatively, you can create new users from the command line. This can be done as follows:</p>
+<ol>
+<li>If synapse was installed via pip, activate the virtualenv as follows (if Synapse was
+installed via a prebuilt package, <code>register_new_matrix_user</code> should already be
+on the search path):
+<pre><code class="language-sh">cd ~/synapse
+source env/bin/activate
+synctl start # if not already running
+</code></pre>
+</li>
+<li>Run the following command:
+<pre><code class="language-sh">register_new_matrix_user -c homeserver.yaml
+</code></pre>
+</li>
+</ol>
+<p>This will prompt you to add details for the new user, and will then connect to
+the running Synapse to create the new user. For example:</p>
+<pre><code>New user localpart: erikj
+Password:
+Confirm password:
+Make admin [no]:
+Success!
+</code></pre>
+<p>This process uses a setting
+<a href="../usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>,
+which is shared between Synapse itself and the <code>register_new_matrix_user</code>
+script. It doesn't matter what it is (a random value is generated by
+<code>--generate-config</code>), but it should be kept secret, as anyone with knowledge of
+it can register users, including admin accounts, on your server even if
+<code>enable_registration</code> is <code>false</code>.</p>
+<h3 id="setting-up-a-turn-server"><a class="header" href="#setting-up-a-turn-server">Setting up a TURN server</a></h3>
+<p>For reliable VoIP calls to be routed via this homeserver, you MUST configure
+a TURN server. See <a href="../turn-howto.html">TURN setup</a> for details.</p>
+<h3 id="url-previews"><a class="header" href="#url-previews">URL previews</a></h3>
+<p>Synapse includes support for previewing URLs, which is disabled by default.  To
+turn it on you must enable the <code>url_preview_enabled: True</code> config parameter
+and explicitly specify the IP ranges that Synapse is not allowed to spider for
+previewing in the <code>url_preview_ip_range_blacklist</code> configuration parameter.
+This is critical from a security perspective to stop arbitrary Matrix users
+spidering 'internal' URLs on your network. At the very least we recommend that
+your loopback and RFC1918 IP addresses are blacklisted.</p>
+<p>This also requires the optional <code>lxml</code> python dependency to be  installed. This
+in turn requires the <code>libxml2</code> library to be available - on  Debian/Ubuntu this
+means <code>apt-get install libxml2-dev</code>, or equivalent for your OS.</p>
+<h3 id="troubleshooting-installation"><a class="header" href="#troubleshooting-installation">Troubleshooting Installation</a></h3>
+<p><code>pip</code> seems to leak <em>lots</em> of memory during installation. For instance, a Linux
+host with 512MB of RAM may run out of memory whilst installing Twisted. If this
+happens, you will have to individually install the dependencies which are
+failing, e.g.:</p>
+<pre><code class="language-sh">pip install twisted
+</code></pre>
+<p>If you have any other problems, feel free to ask in
+<a href="https://matrix.to/#/#synapse:matrix.org">#synapse:matrix.org</a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../welcome_and_overview.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../postgres.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../welcome_and_overview.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../postgres.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

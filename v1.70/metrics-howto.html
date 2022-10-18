@@ -1,0 +1,459 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Monitoring - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html" class="active">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/metrics-howto.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="how-to-monitor-synapse-metrics-using-prometheus"><a class="header" href="#how-to-monitor-synapse-metrics-using-prometheus">How to monitor Synapse metrics using Prometheus</a></h1>
+<ol>
+<li>
+<p>Install Prometheus:</p>
+<p>Follow instructions at
+<a href="http://prometheus.io/docs/introduction/install/">http://prometheus.io/docs/introduction/install/</a></p>
+</li>
+<li>
+<p>Enable Synapse metrics:</p>
+<p>In <code>homeserver.yaml</code>, make sure <code>enable_metrics</code> is
+set to <code>True</code>.</p>
+</li>
+<li>
+<p>Enable the <code>/_synapse/metrics</code> Synapse endpoint that Prometheus uses to
+collect data:</p>
+<p>There are two methods of enabling the metrics endpoint in Synapse.</p>
+<p>The first serves the metrics as a part of the usual web server and
+can be enabled by adding the <code>metrics</code> resource to the existing
+listener as such as in this example:</p>
+<pre><code class="language-yaml">listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::1', '127.0.0.1']
+
+    resources:
+      # added &quot;metrics&quot; in this line
+      - names: [client, federation, metrics]
+        compress: false
+</code></pre>
+<p>This provides a simple way of adding metrics to your Synapse
+installation, and serves under <code>/_synapse/metrics</code>. If you do not
+wish your metrics be publicly exposed, you will need to either
+filter it out at your load balancer, or use the second method.</p>
+<p>The second method runs the metrics server on a different port, in a
+different thread to Synapse. This can make it more resilient to
+heavy load meaning metrics cannot be retrieved, and can be exposed
+to just internal networks easier. The served metrics are available
+over HTTP only, and will be available at <code>/_synapse/metrics</code>.</p>
+<p>Add a new listener to homeserver.yaml as in this example:</p>
+<pre><code class="language-yaml">listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::1', '127.0.0.1']
+
+    resources:
+      - names: [client, federation]
+        compress: false
+
+  # beginning of the new metrics listener
+  - port: 9000
+    type: metrics
+    bind_addresses: ['::1', '127.0.0.1']
+</code></pre>
+</li>
+<li>
+<p>Restart Synapse.</p>
+</li>
+<li>
+<p>Add a Prometheus target for Synapse.</p>
+<p>It needs to set the <code>metrics_path</code> to a non-default value (under
+<code>scrape_configs</code>):</p>
+<pre><code class="language-yaml">  - job_name: &quot;synapse&quot;
+    scrape_interval: 15s
+    metrics_path: &quot;/_synapse/metrics&quot;
+    static_configs:
+      - targets: [&quot;my.server.here:port&quot;]
+</code></pre>
+<p>where <code>my.server.here</code> is the IP address of Synapse, and <code>port</code> is
+the listener port configured with the <code>metrics</code> resource.</p>
+<p>If your prometheus is older than 1.5.2, you will need to replace
+<code>static_configs</code> in the above with <code>target_groups</code>.</p>
+</li>
+<li>
+<p>Restart Prometheus.</p>
+</li>
+<li>
+<p>Consider using the <a href="https://github.com/matrix-org/synapse/tree/master/contrib/grafana/">grafana dashboard</a>
+and required <a href="https://github.com/matrix-org/synapse/tree/master/contrib/prometheus/">recording rules</a> </p>
+</li>
+</ol>
+<h2 id="monitoring-workers"><a class="header" href="#monitoring-workers">Monitoring workers</a></h2>
+<p>To monitor a Synapse installation using <a href="workers.html">workers</a>,
+every worker needs to be monitored independently, in addition to
+the main homeserver process. This is because workers don't send
+their metrics to the main homeserver process, but expose them
+directly (if they are configured to do so).</p>
+<p>To allow collecting metrics from a worker, you need to add a
+<code>metrics</code> listener to its configuration, by adding the following
+under <code>worker_listeners</code>:</p>
+<pre><code class="language-yaml">  - type: metrics
+    bind_address: ''
+    port: 9101
+</code></pre>
+<p>The <code>bind_address</code> and <code>port</code> parameters should be set so that
+the resulting listener can be reached by prometheus, and they
+don't clash with an existing worker.
+With this example, the worker's metrics would then be available
+on <code>http://127.0.0.1:9101</code>.</p>
+<p>Example Prometheus target for Synapse with workers:</p>
+<pre><code class="language-yaml">  - job_name: &quot;synapse&quot;
+    scrape_interval: 15s
+    metrics_path: &quot;/_synapse/metrics&quot;
+    static_configs:
+      - targets: [&quot;my.server.here:port&quot;]
+        labels:
+          instance: &quot;my.server&quot;
+          job: &quot;master&quot;
+          index: 1
+      - targets: [&quot;my.workerserver.here:port&quot;]
+        labels:
+          instance: &quot;my.server&quot;
+          job: &quot;generic_worker&quot;
+          index: 1
+      - targets: [&quot;my.workerserver.here:port&quot;]
+        labels:
+          instance: &quot;my.server&quot;
+          job: &quot;generic_worker&quot;
+          index: 2
+      - targets: [&quot;my.workerserver.here:port&quot;]
+        labels:
+          instance: &quot;my.server&quot;
+          job: &quot;media_repository&quot;
+          index: 1
+</code></pre>
+<p>Labels (<code>instance</code>, <code>job</code>, <code>index</code>) can be defined as anything.
+The labels are used to group graphs in grafana.</p>
+<h2 id="renaming-of-metrics--deprecation-of-old-names-in-12"><a class="header" href="#renaming-of-metrics--deprecation-of-old-names-in-12">Renaming of metrics &amp; deprecation of old names in 1.2</a></h2>
+<p>Synapse 1.2 updates the Prometheus metrics to match the naming
+convention of the upstream <code>prometheus_client</code>. The old names are
+considered deprecated and will be removed in a future version of
+Synapse.
+<strong>The old names will be disabled by default in Synapse v1.71.0 and removed
+altogether in Synapse v1.73.0.</strong></p>
+<table><thead><tr><th>New Name</th><th>Old Name</th></tr></thead><tbody>
+<tr><td>python_gc_objects_collected_total</td><td>python_gc_objects_collected</td></tr>
+<tr><td>python_gc_objects_uncollectable_total</td><td>python_gc_objects_uncollectable</td></tr>
+<tr><td>python_gc_collections_total</td><td>python_gc_collections</td></tr>
+<tr><td>process_cpu_seconds_total</td><td>process_cpu_seconds</td></tr>
+<tr><td>synapse_federation_client_sent_transactions_total</td><td>synapse_federation_client_sent_transactions</td></tr>
+<tr><td>synapse_federation_client_events_processed_total</td><td>synapse_federation_client_events_processed</td></tr>
+<tr><td>synapse_event_processing_loop_count_total</td><td>synapse_event_processing_loop_count</td></tr>
+<tr><td>synapse_event_processing_loop_room_count_total</td><td>synapse_event_processing_loop_room_count</td></tr>
+<tr><td>synapse_util_caches_cache_hits</td><td>synapse_util_caches_cache:hits</td></tr>
+<tr><td>synapse_util_caches_cache_size</td><td>synapse_util_caches_cache:size</td></tr>
+<tr><td>synapse_util_caches_cache_evicted_size</td><td>synapse_util_caches_cache:evicted_size</td></tr>
+<tr><td>synapse_util_caches_cache</td><td>synapse_util_caches_cache:total</td></tr>
+<tr><td>synapse_util_caches_response_cache_size</td><td>synapse_util_caches_response_cache:size</td></tr>
+<tr><td>synapse_util_caches_response_cache_hits</td><td>synapse_util_caches_response_cache:hits</td></tr>
+<tr><td>synapse_util_caches_response_cache_evicted_size</td><td>synapse_util_caches_response_cache:evicted_size</td></tr>
+<tr><td>synapse_util_metrics_block_count_total</td><td>synapse_util_metrics_block_count</td></tr>
+<tr><td>synapse_util_metrics_block_time_seconds_total</td><td>synapse_util_metrics_block_time_seconds</td></tr>
+<tr><td>synapse_util_metrics_block_ru_utime_seconds_total</td><td>synapse_util_metrics_block_ru_utime_seconds</td></tr>
+<tr><td>synapse_util_metrics_block_ru_stime_seconds_total</td><td>synapse_util_metrics_block_ru_stime_seconds</td></tr>
+<tr><td>synapse_util_metrics_block_db_txn_count_total</td><td>synapse_util_metrics_block_db_txn_count</td></tr>
+<tr><td>synapse_util_metrics_block_db_txn_duration_seconds_total</td><td>synapse_util_metrics_block_db_txn_duration_seconds</td></tr>
+<tr><td>synapse_util_metrics_block_db_sched_duration_seconds_total</td><td>synapse_util_metrics_block_db_sched_duration_seconds</td></tr>
+<tr><td>synapse_background_process_start_count_total</td><td>synapse_background_process_start_count</td></tr>
+<tr><td>synapse_background_process_ru_utime_seconds_total</td><td>synapse_background_process_ru_utime_seconds</td></tr>
+<tr><td>synapse_background_process_ru_stime_seconds_total</td><td>synapse_background_process_ru_stime_seconds</td></tr>
+<tr><td>synapse_background_process_db_txn_count_total</td><td>synapse_background_process_db_txn_count</td></tr>
+<tr><td>synapse_background_process_db_txn_duration_seconds_total</td><td>synapse_background_process_db_txn_duration_seconds</td></tr>
+<tr><td>synapse_background_process_db_sched_duration_seconds_total</td><td>synapse_background_process_db_sched_duration_seconds</td></tr>
+<tr><td>synapse_storage_events_persisted_events_total</td><td>synapse_storage_events_persisted_events</td></tr>
+<tr><td>synapse_storage_events_persisted_events_sep_total</td><td>synapse_storage_events_persisted_events_sep</td></tr>
+<tr><td>synapse_storage_events_state_delta_total</td><td>synapse_storage_events_state_delta</td></tr>
+<tr><td>synapse_storage_events_state_delta_single_event_total</td><td>synapse_storage_events_state_delta_single_event</td></tr>
+<tr><td>synapse_storage_events_state_delta_reuse_delta_total</td><td>synapse_storage_events_state_delta_reuse_delta</td></tr>
+<tr><td>synapse_federation_server_received_pdus_total</td><td>synapse_federation_server_received_pdus</td></tr>
+<tr><td>synapse_federation_server_received_edus_total</td><td>synapse_federation_server_received_edus</td></tr>
+<tr><td>synapse_handler_presence_notified_presence_total</td><td>synapse_handler_presence_notified_presence</td></tr>
+<tr><td>synapse_handler_presence_federation_presence_out_total</td><td>synapse_handler_presence_federation_presence_out</td></tr>
+<tr><td>synapse_handler_presence_presence_updates_total</td><td>synapse_handler_presence_presence_updates</td></tr>
+<tr><td>synapse_handler_presence_timers_fired_total</td><td>synapse_handler_presence_timers_fired</td></tr>
+<tr><td>synapse_handler_presence_federation_presence_total</td><td>synapse_handler_presence_federation_presence</td></tr>
+<tr><td>synapse_handler_presence_bump_active_time_total</td><td>synapse_handler_presence_bump_active_time</td></tr>
+<tr><td>synapse_federation_client_sent_edus_total</td><td>synapse_federation_client_sent_edus</td></tr>
+<tr><td>synapse_federation_client_sent_pdu_destinations_count_total</td><td>synapse_federation_client_sent_pdu_destinations:count</td></tr>
+<tr><td>synapse_federation_client_sent_pdu_destinations_total</td><td>synapse_federation_client_sent_pdu_destinations:total</td></tr>
+<tr><td>synapse_handlers_appservice_events_processed_total</td><td>synapse_handlers_appservice_events_processed</td></tr>
+<tr><td>synapse_notifier_notified_events_total</td><td>synapse_notifier_notified_events</td></tr>
+<tr><td>synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total</td><td>synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter</td></tr>
+<tr><td>synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter_total</td><td>synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter</td></tr>
+<tr><td>synapse_http_httppusher_http_pushes_processed_total</td><td>synapse_http_httppusher_http_pushes_processed</td></tr>
+<tr><td>synapse_http_httppusher_http_pushes_failed_total</td><td>synapse_http_httppusher_http_pushes_failed</td></tr>
+<tr><td>synapse_http_httppusher_badge_updates_processed_total</td><td>synapse_http_httppusher_badge_updates_processed</td></tr>
+<tr><td>synapse_http_httppusher_badge_updates_failed_total</td><td>synapse_http_httppusher_badge_updates_failed</td></tr>
+</tbody></table>
+<h2 id="removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310"><a class="header" href="#removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310">Removal of deprecated metrics &amp; time based counters becoming histograms in 0.31.0</a></h2>
+<p>The duplicated metrics deprecated in Synapse 0.27.0 have been removed.</p>
+<p>All time duration-based metrics have been changed to be seconds. This
+affects:</p>
+<table><thead><tr><th>msec -&gt; sec metrics</th></tr></thead><tbody>
+<tr><td>python_gc_time</td></tr>
+<tr><td>python_twisted_reactor_tick_time</td></tr>
+<tr><td>synapse_storage_query_time</td></tr>
+<tr><td>synapse_storage_schedule_time</td></tr>
+<tr><td>synapse_storage_transaction_time</td></tr>
+</tbody></table>
+<p>Several metrics have been changed to be histograms, which sort entries
+into buckets and allow better analysis. The following metrics are now
+histograms:</p>
+<table><thead><tr><th>Altered metrics</th></tr></thead><tbody>
+<tr><td>python_gc_time</td></tr>
+<tr><td>python_twisted_reactor_pending_calls</td></tr>
+<tr><td>python_twisted_reactor_tick_time</td></tr>
+<tr><td>synapse_http_server_response_time_seconds</td></tr>
+<tr><td>synapse_storage_query_time</td></tr>
+<tr><td>synapse_storage_schedule_time</td></tr>
+<tr><td>synapse_storage_transaction_time</td></tr>
+</tbody></table>
+<h2 id="block-and-response-metrics-renamed-for-0270"><a class="header" href="#block-and-response-metrics-renamed-for-0270">Block and response metrics renamed for 0.27.0</a></h2>
+<p>Synapse 0.27.0 begins the process of rationalising the duplicate
+<code>*:count</code> metrics reported for the resource tracking for code blocks and
+HTTP requests.</p>
+<p>At the same time, the corresponding <code>*:total</code> metrics are being renamed,
+as the <code>:total</code> suffix no longer makes sense in the absence of a
+corresponding <code>:count</code> metric.</p>
+<p>To enable a graceful migration path, this release just adds new names
+for the metrics being renamed. A future release will remove the old
+ones.</p>
+<p>The following table shows the new metrics, and the old metrics which
+they are replacing.</p>
+<table><thead><tr><th>New name</th><th>Old name</th></tr></thead><tbody>
+<tr><td>synapse_util_metrics_block_count</td><td>synapse_util_metrics_block_timer:count</td></tr>
+<tr><td>synapse_util_metrics_block_count</td><td>synapse_util_metrics_block_ru_utime:count</td></tr>
+<tr><td>synapse_util_metrics_block_count</td><td>synapse_util_metrics_block_ru_stime:count</td></tr>
+<tr><td>synapse_util_metrics_block_count</td><td>synapse_util_metrics_block_db_txn_count:count</td></tr>
+<tr><td>synapse_util_metrics_block_count</td><td>synapse_util_metrics_block_db_txn_duration:count</td></tr>
+<tr><td>synapse_util_metrics_block_time_seconds</td><td>synapse_util_metrics_block_timer:total</td></tr>
+<tr><td>synapse_util_metrics_block_ru_utime_seconds</td><td>synapse_util_metrics_block_ru_utime:total</td></tr>
+<tr><td>synapse_util_metrics_block_ru_stime_seconds</td><td>synapse_util_metrics_block_ru_stime:total</td></tr>
+<tr><td>synapse_util_metrics_block_db_txn_count</td><td>synapse_util_metrics_block_db_txn_count:total</td></tr>
+<tr><td>synapse_util_metrics_block_db_txn_duration_seconds</td><td>synapse_util_metrics_block_db_txn_duration:total</td></tr>
+<tr><td>synapse_http_server_response_count</td><td>synapse_http_server_requests</td></tr>
+<tr><td>synapse_http_server_response_count</td><td>synapse_http_server_response_time:count</td></tr>
+<tr><td>synapse_http_server_response_count</td><td>synapse_http_server_response_ru_utime:count</td></tr>
+<tr><td>synapse_http_server_response_count</td><td>synapse_http_server_response_ru_stime:count</td></tr>
+<tr><td>synapse_http_server_response_count</td><td>synapse_http_server_response_db_txn_count:count</td></tr>
+<tr><td>synapse_http_server_response_count</td><td>synapse_http_server_response_db_txn_duration:count</td></tr>
+<tr><td>synapse_http_server_response_time_seconds</td><td>synapse_http_server_response_time:total</td></tr>
+<tr><td>synapse_http_server_response_ru_utime_seconds</td><td>synapse_http_server_response_ru_utime:total</td></tr>
+<tr><td>synapse_http_server_response_ru_stime_seconds</td><td>synapse_http_server_response_ru_stime:total</td></tr>
+<tr><td>synapse_http_server_response_db_txn_count</td><td>synapse_http_server_response_db_txn_count:total</td></tr>
+<tr><td>synapse_http_server_response_db_txn_duration_seconds</td><td>synapse_http_server_response_db_txn_duration:total</td></tr>
+</tbody></table>
+<h2 id="standard-metric-names"><a class="header" href="#standard-metric-names">Standard Metric Names</a></h2>
+<p>As of synapse version 0.18.2, the format of the process-wide metrics has
+been changed to fit prometheus standard naming conventions. Additionally
+the units have been changed to seconds, from milliseconds.</p>
+<table><thead><tr><th>New name</th><th>Old name</th></tr></thead><tbody>
+<tr><td>process_cpu_user_seconds_total</td><td>process_resource_utime / 1000</td></tr>
+<tr><td>process_cpu_system_seconds_total</td><td>process_resource_stime / 1000</td></tr>
+<tr><td>process_open_fds (no 'type' label)</td><td>process_fds</td></tr>
+</tbody></table>
+<p>The python-specific counts of garbage collector performance have been
+renamed.</p>
+<table><thead><tr><th>New name</th><th>Old name</th></tr></thead><tbody>
+<tr><td>python_gc_time</td><td>reactor_gc_time</td></tr>
+<tr><td>python_gc_unreachable_total</td><td>reactor_gc_unreachable</td></tr>
+<tr><td>python_gc_counts</td><td>reactor_gc_counts</td></tr>
+</tbody></table>
+<p>The twisted-specific reactor metrics have been renamed.</p>
+<table><thead><tr><th>New name</th><th>Old name</th></tr></thead><tbody>
+<tr><td>python_twisted_reactor_pending_calls</td><td>reactor_pending_calls</td></tr>
+<tr><td>python_twisted_reactor_tick_time</td><td>reactor_tick_time</td></tr>
+</tbody></table>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="manhole.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="manhole.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="usage/administration/monitoring/reporting_homeserver_usage_statistics.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

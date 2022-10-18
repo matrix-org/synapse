@@ -1,0 +1,239 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Running Synapse on a Single-Board Computer - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html" class="active">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/other/running_synapse_on_single_board_computers.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h2 id="summary-of-performance-impact-of-running-on-resource-constrained-devices-such-as-sbcs"><a class="header" href="#summary-of-performance-impact-of-running-on-resource-constrained-devices-such-as-sbcs">Summary of performance impact of running on resource constrained devices such as SBCs</a></h2>
+<p>I've been running my homeserver on a cubietruck at home now for some time and am often replying to statements like &quot;you need loads of ram to join large rooms&quot; with &quot;it works fine for me&quot;. I thought it might be useful to curate a summary of the issues you're likely to run into to help as a scaling-down guide, maybe highlight these for development work or end up as documentation. It seems that once you get up to about 4x1.5GHz arm64 4GiB these issues are no longer a problem.</p>
+<ul>
+<li><strong>Platform</strong>: 2x1GHz armhf 2GiB ram <a href="https://wiki.debian.org/CheapServerBoxHardware">Single-board computers</a>, SSD, postgres.</li>
+</ul>
+<h3 id="presence"><a class="header" href="#presence">Presence</a></h3>
+<p>This is the main reason people have a poor matrix experience on resource constrained homeservers. Element web will frequently be saying the server is offline while the python process will be pegged at 100% cpu. This feature is used to tell when other users are active (have a client app in the foreground) and therefore more likely to respond, but requires a lot of network activity to maintain even when nobody is talking in a room.</p>
+<p><img src="https://user-images.githubusercontent.com/71895/94848963-a47a3580-041c-11eb-8b6e-acb772b4259e.png" alt="Screenshot_2020-10-01_19-29-46" /></p>
+<p>While synapse does have some performance issues with presence <a href="https://github.com/matrix-org/synapse/issues/3971">#3971</a>, the fundamental problem is that this is an easy feature to implement for a centralised service at nearly no overhead, but federation makes it combinatorial <a href="https://github.com/matrix-org/synapse/issues/8055">#8055</a>. There is also a client-side config option which disables the UI and idle tracking <a href="https://github.com/vector-im/element-web/blob/v1.7.8/config.sample.json#L45">enable_presence_by_hs_url</a> to blacklist the largest instances but I didn't notice much difference, so I recommend disabling the feature entirely at the server level as well.</p>
+<h3 id="joining"><a class="header" href="#joining">Joining</a></h3>
+<p>Joining a &quot;large&quot;, federated room will initially fail with the below message in Element web, but waiting a while (10-60mins) and trying again will succeed without any issue. What counts as &quot;large&quot; is not message history, user count, connections to homeservers or even a simple count of the state events, it is instead how long the state resolution algorithm takes. However, each of those numbers are reasonable proxies, so we can use them as estimates since user count is one of the few things you see before joining.</p>
+<p><img src="https://user-images.githubusercontent.com/71895/94945781-18771500-04d3-11eb-8419-83c2da73a341.png" alt="Screenshot_2020-10-02_17-15-06" /></p>
+<p>This is <a href="https://github.com/matrix-org/synapse/issues/1211">#1211</a> and will also hopefully be mitigated by peeking <a href="https://github.com/matrix-org/matrix-doc/pull/2753">matrix-org/matrix-doc#2753</a> so at least you don't need to wait for a join to complete before finding out if it's the kind of room you want. Note that you should first disable presence, otherwise it'll just make the situation worse <a href="https://github.com/matrix-org/synapse/issues/3120">#3120</a>. There is a lot of database interaction too, so make sure you've <a href="../postgres.html">migrated your data</a> from the default sqlite to postgresql. Personally, I recommend patience - once the initial join is complete there's rarely any issues with actually interacting with the room, but if you like you can just block &quot;large&quot; rooms entirely.</p>
+<h3 id="sessions"><a class="header" href="#sessions">Sessions</a></h3>
+<p>Anything that requires modifying the device list <a href="https://github.com/matrix-org/synapse/issues/7721">#7721</a> will take a while to propagate, again taking the client &quot;Offline&quot; until it's complete. This includes signing in and out, editing the public name and verifying e2ee. The main mitigation I recommend is to keep long-running sessions open e.g. by using Firefox SSB &quot;Use this site in App mode&quot; or Chromium PWA &quot;Install Element&quot;.</p>
+<h3 id="recommended-configuration"><a class="header" href="#recommended-configuration">Recommended configuration</a></h3>
+<p>Put the below in a new file at /etc/matrix-synapse/conf.d/sbc.yaml to override the defaults in homeserver.yaml.</p>
+<pre><code># Disable presence tracking, which is currently fairly resource intensive
+# More info: https://github.com/matrix-org/synapse/issues/9478
+use_presence: false
+
+# Set a small complexity limit, preventing users from joining large rooms
+# which may be resource-intensive to remain a part of.
+#
+# Note that this will not prevent users from joining smaller rooms that
+# eventually become complex.
+limit_remote_rooms:
+  enabled: true
+  complexity: 3.0
+
+# Database configuration
+database:
+  # Use postgres for the best performance
+  name: psycopg2
+  args:
+    user: matrix-synapse
+    # Generate a long, secure password using a password manager
+    password: hunter2
+    database: matrix-synapse
+    host: localhost
+</code></pre>
+<p>Currently the complexity is measured by <a href="https://github.com/matrix-org/synapse/blob/v1.20.1/synapse/storage/databases/main/events_worker.py#L986">current_state_events / 500</a>. You can find join times and your most complex rooms like this:</p>
+<pre><code>admin@homeserver:~$ zgrep '/client/r0/join/' /var/log/matrix-synapse/homeserver.log* | awk '{print $18, $25}' | sort --human-numeric-sort
+29.922sec/-0.002sec /_matrix/client/r0/join/%23debian-fasttrack%3Apoddery.com
+182.088sec/0.003sec /_matrix/client/r0/join/%23decentralizedweb-general%3Amatrix.org
+911.625sec/-570.847sec /_matrix/client/r0/join/%23synapse%3Amatrix.org
+
+admin@homeserver:~$ sudo --user postgres psql matrix-synapse --command 'select canonical_alias, joined_members, current_state_events from room_stats_state natural join room_stats_current where canonical_alias is not null order by current_state_events desc fetch first 5 rows only'
+        canonical_alias        | joined_members | current_state_events 
+-------------------------------+----------------+----------------------
+ #_oftc_#debian:matrix.org             |  871   |  52355
+ #matrix:matrix.org                    |  6379  |  10684
+ #irc:matrix.org                       |  461   |  3751
+ #decentralizedweb-general:matrix.org  |  997   |  1509
+ #whatsapp:maunium.net                 |  554   |  854
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../deprecation_policy.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../deprecation_policy.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>
