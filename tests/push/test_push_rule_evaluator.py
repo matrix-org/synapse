@@ -64,7 +64,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             room_member_count,
             sender_power_level,
             power_levels.get("notifications", {}),
-            related_event,
+            _flatten_dict(related_event or {}),
             relations or {},
             relations_match_enabled,
         )
