@@ -388,7 +388,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         #
         # As a result, backfill should not rely on the event cache to check whether
         # we already have an event in the DB.
-        # TODO: Remove this test when the event cache is properly invalidated.
+        # TODO: Remove this bit when the event cache is properly invalidated.
         cache_entry = EventCacheEntry(
             event=event,
             redacted_event=None,
