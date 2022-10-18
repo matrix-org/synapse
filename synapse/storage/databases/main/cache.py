@@ -253,9 +253,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache(
                 "get_rooms_for_user_with_stream_ordering", (state_key,)
             )
-            self._attempt_to_invalidate_cache(
-                "get_rooms_for_user", (state_key,)
-            )
+            self._attempt_to_invalidate_cache("get_rooms_for_user", (state_key,))
 
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
