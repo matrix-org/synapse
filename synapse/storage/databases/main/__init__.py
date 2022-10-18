@@ -261,7 +261,7 @@ class DataStore(
             sql_base = f"""
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
-                LEFT JOIN erased_users AS eu USING(user_id)
+                LEFT JOIN erased_users AS eu ON u.name = eu.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
