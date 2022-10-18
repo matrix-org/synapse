@@ -49,6 +49,9 @@ pub struct PushRuleEvaluator {
     /// The `notifications` section of the current power levels in the room.
     notification_power_levels: BTreeMap<String, i64>,
 
+    /// A mapping of "flattened" keys to string values in the related_event.
+    related_flattened_keys: BTreeMap<String, String>,
+
     /// The relations related to the event as a mapping from relation type to
     /// set of sender/event type 2-tuples.
     relations: BTreeMap<String, BTreeSet<(String, String)>>,
@@ -70,6 +73,7 @@ impl PushRuleEvaluator {
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
+        related_flattened_keys: BTreeMap<String, String>,
         relations: BTreeMap<String, BTreeSet<(String, String)>>,
         relation_match_enabled: bool,
     ) -> Result<Self, Error> {
@@ -83,6 +87,7 @@ impl PushRuleEvaluator {
             body,
             room_member_count,
             notification_power_levels,
+            related_flattened_keys,
             relations,
             relation_match_enabled,
             sender_power_level,
@@ -168,7 +173,13 @@ impl PushRuleEvaluator {
 
         let result = match known_condition {
             KnownCondition::EventMatch(event_match) => {
-                self.match_event_match(event_match, user_id)?
+                self.match_event_match(&self.flattened_keys, event_match, user_id)?
+            }
+            KnownCondition::RelatedEventMatch(event_match) => {
+                self.match_event_match(&self.related_flattened_keys, event_match, user_id)?
+            }
+            KnownCondition::InverseRelatedEventMatch(event_match) => {
+                !self.match_event_match(&self.related_flattened_keys, event_match, user_id)?
             }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
@@ -289,6 +300,7 @@ impl PushRuleEvaluator {
     /// Evaluates a `event_match` condition.
     fn match_event_match(
         &self,
+        flattened_keys: &BTreeMap<String, String>,
         event_match: &EventMatchCondition,
         user_id: Option<&str>,
     ) -> Result<bool, Error> {
@@ -313,7 +325,7 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        let haystack = if let Some(haystack) = self.flattened_keys.get(&*event_match.key) {
+        let haystack = if let Some(haystack) = flattened_keys.get(&*event_match.key) {
             haystack
         } else {
             return Ok(false);

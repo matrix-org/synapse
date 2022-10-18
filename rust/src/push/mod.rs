@@ -285,6 +285,9 @@ pub enum KnownCondition {
         #[serde(skip_serializing_if = "Option::is_none")]
         sender_type: Option<Cow<'static, str>>,
     },
+    // Beeper additions: match/no-match against the related event
+    RelatedEventMatch(EventMatchCondition),
+    InverseRelatedEventMatch(EventMatchCondition),
 }
 
 impl IntoPy<PyObject> for Condition {
