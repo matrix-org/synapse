@@ -62,16 +62,79 @@ pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
 }];
 
 pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
+    // Disable notifications for auto-accepted room invites
+    // NOTE: this rule must be a higher prio than .m.rule.invite_for_me because
+    // that will also match the same events.
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
+        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_auto_invite"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
-            EventMatchCondition {
-                key: Cow::Borrowed("content.msgtype"),
-                pattern: Some(Cow::Borrowed("m.notice")),
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("m.room.member")),
                 pattern_type: None,
-            },
-        ))]),
+            })),
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("content.membership"),
+                pattern: Some(Cow::Borrowed("invite")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("state_key"),
+                pattern: None,
+                pattern_type: Some(Cow::Borrowed("user_id")),
+            })),
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("content.fi.mau.will_auto_accept"),
+                pattern: Some(Cow::Borrowed("true")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::DontNotify]),
+        default: true,
+        default_enabled: true,
+    },
+    // We don't want to notify on edits in Beeper land. Not only can this be confusing
+    // in real time (2 notifications, one message) but it's also especially confusing
+    // when a bridge needs to edit a previously backfilled message.
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_edits"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("content.m.relates_to.rel_type"),
+                pattern: Some(Cow::Borrowed("m.replace")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::DontNotify]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_send_message_status"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("com.beeper.message_send_status")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::DontNotify]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_power_levels"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("cm.room.power_levels")),
+                pattern_type: None,
+            })),
+        ]),
         actions: Cow::Borrowed(&[Action::DontNotify]),
         default: true,
         default_enabled: true,
@@ -158,16 +221,25 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default: true,
         default_enabled: true,
     },
+    // NOTE: upstream has a blanket rule that blocks all notifications for reactions,
+    // this is a modified rule that blocks reactions to *other users* events. This means
+    // any user supplied "noisy" rules don't accidentally trigger notifications for reactions
+    // to other users messages.
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.reaction"),
+        rule_id: Cow::Borrowed("global/override/.com.beeper.reaction"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
-            EventMatchCondition {
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
                 key: Cow::Borrowed("type"),
                 pattern: Some(Cow::Borrowed("m.reaction")),
                 pattern_type: None,
-            },
-        ))]),
+            })),
+            Condition::Known(KnownCondition::InverseRelatedEventMatch(EventMatchCondition {
+                key: Cow::Borrowed("sender"),
+                pattern: None,
+                pattern_type: Some(Cow::Borrowed("user_id")),
+            })),
+        ]),
         actions: Cow::Borrowed(&[Action::DontNotify]),
         default: true,
         default_enabled: true,
@@ -209,6 +281,23 @@ pub const BASE_APPEND_CONTENT_RULES: &[PushRule] = &[PushRule {
 }];
 
 pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
+    // Beeper change: this rule is moved down from override. This means room
+    // rules take precedence, so if you enable bot notifications (by modifying
+    // this rule) notifications will not be sent for muted rooms.
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
+            EventMatchCondition {
+                key: Cow::Borrowed("content.msgtype"),
+                pattern: Some(Cow::Borrowed("m.notice")),
+                pattern_type: None,
+            },
+        ))]),
+        actions: Cow::Borrowed(&[Action::DontNotify]),
+        default: true,
+        default_enabled: true,
+    },
     PushRule {
         rule_id: Cow::Borrowed("global/underride/.m.rule.call"),
         priority_class: 1,
@@ -319,6 +408,31 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
             })),
         ]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    // Enable notifications for reactions to your own messages *in rooms with less
+    // than 20 members*.
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.com.beeper.reaction"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("m.reaction")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("<20")),
+            }),
+            Condition::Known(KnownCondition::RelatedEventMatch(EventMatchCondition {
+                key: Cow::Borrowed("sender"),
+                pattern: None,
+                pattern_type: Some(Cow::Borrowed("user_id")),
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::DontNotify]),
         default: true,
         default_enabled: true,
     },
