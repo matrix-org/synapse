@@ -2153,7 +2153,7 @@ class EventsWorkerStore(SQLBaseStore):
                  * and `event_backward_extremities` tables to check against
                  * (used by `is_event_next_to_backward_gap` and `is_event_next_to_forward_gap`).
                  */
-                AND outlier = ? /* False */
+                AND NOT outlier
                 /* Make sure event is not rejected */
                 AND rejections.event_id IS NULL
             /**
@@ -2170,7 +2170,7 @@ class EventsWorkerStore(SQLBaseStore):
         def get_event_id_for_timestamp_txn(txn: LoggingTransaction) -> Optional[str]:
             txn.execute(
                 sql_template,
-                (room_id, timestamp, False),
+                (room_id, timestamp),
             )
             row = txn.fetchone()
             if row:
