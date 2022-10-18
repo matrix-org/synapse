@@ -823,7 +823,7 @@ def _tokenize_query(query: str) -> TokenList:
             phrase = []
             while True:
                 # If the phrase word is blank, then a bare double quote was found.
-                if phrase_word and phrase_word[-1] == '"':
+                if phrase_word.endswith('"'):
                     phrase.append(phrase_word[:-1])
                     break
                 else:
@@ -834,8 +834,11 @@ def _tokenize_query(query: str) -> TokenList:
                 phrase_word = words.popleft()
             tokens.append(Phrase(phrase))
         elif word.startswith("-"):
-            tokens.append(SearchToken.Not)
-            tokens.append(word[1:])
+            word = word[1:]
+            # If there's no word after the hyphen, ignore.
+            if word:
+                tokens.append(SearchToken.Not)
+                tokens.append(word)
         elif word.lower() == "or":
             tokens.append(SearchToken.Or)
         elif word.lower() == "and":

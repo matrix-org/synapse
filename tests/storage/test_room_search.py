@@ -224,6 +224,7 @@ class MessageSearchTest(HomeserverTestCase):
         ("furphy OR fox", True),
         ("fox -nope", True),
         ("fox -brown", False),
+        ("- fox", True),
         ("fox AND ( brown OR nope )", True),
         ("fox AND ( nope OR doublenope )", False),
         ("fox AND (brown OR nope)", True),
@@ -233,6 +234,7 @@ class MessageSearchTest(HomeserverTestCase):
         ('"quick brown', True),
         ('" quick"', True),
         ('" nope"', False),
+        ("'nope", False),
     ]
 
     def prepare(
@@ -255,6 +257,7 @@ class MessageSearchTest(HomeserverTestCase):
             ('"brown quick"', [Phrase(["brown", "quick"])]),
             ("furphy OR fox", ["furphy", SearchToken.Or, "fox"]),
             ("fox -brown", ["fox", SearchToken.Not, "brown"]),
+            ("- fox", ["fox"]),
             (
                 "fox AND ( brown OR nope )",
                 [
