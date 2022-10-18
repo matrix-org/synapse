@@ -485,9 +485,11 @@ class FederationServer(FederationBase):
             with nested_logging_context(event_id):
                 try:
                     await self._handle_received_pdu(origin, pdu)
+                    # Construct a "PDU Processing Result"
                     return {}
                 except FederationError as e:
                     logger.warning("Error handling PDU %s: %s", event_id, e)
+                    # Construct a "PDU Processing Result"
                     return {"error": str(e)}
                 except Exception as e:
                     f = failure.Failure()
@@ -496,6 +498,7 @@ class FederationServer(FederationBase):
                         event_id,
                         exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                     )
+                    # Construct a "PDU Processing Result"
                     return {"error": str(e)}
 
         await concurrently_execute(
