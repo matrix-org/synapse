@@ -1,0 +1,1 @@
+Refactor `/key/` endpoints to use `RestServlet` classes.
