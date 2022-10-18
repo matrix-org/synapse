@@ -225,18 +225,22 @@ class MessageSearchTest(HomeserverTestCase):
         ("furphy OR fox", True),
         ("fox -nope", True),
         ("fox -brown", False),
-        ("- fox", True),
         ("fox AND ( brown OR nope )", True),
         ("fox AND ( nope OR doublenope )", False),
         ("fox AND (brown OR nope)", True),
         ("fox AND (nope OR doublenope)", False),
         ('"fox" quick', True),
         ('"fox quick', True),
-        ('"-fox quick', False),
         ('"quick brown', True),
         ('" quick "', True),
         ('" nope"', False),
-        ("'nope", False),
+    ]
+
+    # Case that fail on sqlite.
+    POSTGRES_CASES = [
+        ("- fox", False),
+        ("- nope", True),
+        ('"-fox quick', False),
     ]
 
     def prepare(
@@ -252,7 +256,7 @@ class MessageSearchTest(HomeserverTestCase):
         self.assertIn("event_id", response)
 
     def test_tokenize_query(self) -> None:
-        """Test the custom logic to token a user's query."""
+        """Test the custom logic to tokenize a user's query."""
         cases = (
             ("brown", ["brown"]),
             ("quick brown", ["quick", "brown"]),
@@ -260,7 +264,7 @@ class MessageSearchTest(HomeserverTestCase):
             ('"brown quick"', [Phrase(["brown", "quick"])]),
             ("furphy OR fox", ["furphy", SearchToken.Or, "fox"]),
             ("fox -brown", ["fox", SearchToken.Not, "brown"]),
-            ("- fox", ["fox"]),
+            ("- fox", [SearchToken.Not, "fox"]),
             (
                 "fox AND ( brown OR nope )",
                 [
@@ -352,7 +356,7 @@ class MessageSearchTest(HomeserverTestCase):
                 "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
             )
 
-        self._check_test_cases(store, self.COMMON_CASES)
+        self._check_test_cases(store, self.COMMON_CASES + self.POSTGRES_CASES)
 
     def test_postgres_non_web_search_for_phrase(self):
         """
@@ -370,7 +374,7 @@ class MessageSearchTest(HomeserverTestCase):
             new_callable=PropertyMock,
         ) as supports_websearch_to_tsquery:
             supports_websearch_to_tsquery.return_value = False
-            self._check_test_cases(store, self.COMMON_CASES)
+            self._check_test_cases(store, self.COMMON_CASES + self.POSTGRES_CASES)
 
     def test_sqlite_search(self):
         """

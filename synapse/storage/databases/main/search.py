@@ -857,10 +857,11 @@ def _tokenize_query(query: str) -> TokenList:
             if found_end_quote:
                 tokens.append(Phrase(phrase))
         elif word.startswith("-"):
-            word = word[1:]
+            tokens.append(SearchToken.Not)
+
             # If there's no word after the hyphen, ignore.
+            word = word[1:]
             if word:
-                tokens.append(SearchToken.Not)
                 tokens.append(word)
         elif word.lower() == "or":
             tokens.append(SearchToken.Or)
@@ -932,6 +933,8 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
         elif isinstance(token, Phrase):
             match_query.append(' "' + " ".join(token.phrase) + '" ')
         elif token == SearchToken.Not:
+            # TODO: SQLite treats NOT as a *binary* operator. Hopefully a search
+            # term has already been added before this.
             match_query.append("NOT ")
         elif token == SearchToken.Or:
             match_query.append("OR ")
