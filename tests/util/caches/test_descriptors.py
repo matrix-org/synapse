@@ -446,10 +446,10 @@ class DescriptorTestCase(unittest.TestCase):
 
             @cached(cache_context=True)
             async def func2(self, key, cache_context):
-                return self.func3(key, on_invalidate=cache_context.invalidate)
+                return await self.func3(key, on_invalidate=cache_context.invalidate)
 
             @cached(cache_context=True)
-            def func3(self, key, cache_context):
+            async def func3(self, key, cache_context):
                 self.invalidate = cache_context.invalidate
                 return 42
 
