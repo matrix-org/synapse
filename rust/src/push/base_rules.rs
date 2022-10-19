@@ -120,7 +120,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::RelatedEventMatch(RelatedEventMatchCondition {
-                key: Some(Cow::Borrowed("state_key")),
+                key: Some(Cow::Borrowed("sender")),
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
                 rel_type: Cow::Borrowed("m.in_reply_to"),
