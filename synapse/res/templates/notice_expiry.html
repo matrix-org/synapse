@@ -1,6 +1,14 @@
 {% extends "_base.html" %}
 {% block title %}Notice of expiry{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {% include 'mail.css' without context %}
+    {% include "mail-%s.css" % app_name ignore missing without context %}
+    {% include 'mail-expiry.css' without context %}
+</style>
+{% endblock %}
+
 {% block body %}
 <table id="page">
     <tr>
@@ -35,9 +43,4 @@
         <td> </td>
     </tr>
 </table>
-<style type="text/css">
-    {% include 'mail.css' without context %}
-    {% include "mail-%s.css" % app_name ignore missing without context %}
-    {% include 'mail-expiry.css' without context %}
-</style>
 {% endblock %}

@@ -1,5 +1,12 @@
 {% block title %}New activity in room{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {%- include 'mail.css' without context %}
+    {%- include "mail-%s.css" % app_name ignore missing without context %}
+</style>
+{% endblock %}
+
 {% block body %}
 <table id="page">
     <tr>
@@ -47,8 +54,4 @@
         <td> </td>
     </tr>
 </table>
-<style type="text/css">
-    {%- include 'mail.css' without context %}
-    {%- include "mail-%s.css" % app_name ignore missing without context %}
-</style>
 {% endblock %}

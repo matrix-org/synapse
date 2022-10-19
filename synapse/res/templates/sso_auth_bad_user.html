@@ -1,5 +1,11 @@
 {% block title %}Authentication failed{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="error_page">
     <header>
@@ -15,8 +21,5 @@
         </p>
     </header>
 </div>
-<style type="text/css">
-    {% include "sso.css" without context %}
-</style>
 {% include "sso_footer.html" without context %}
 {% endblock %}

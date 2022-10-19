@@ -1,5 +1,11 @@
 {% block title %}Confirm it's you{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+</style>
+{% endblock %}
+
 {% block body %}
 <header>
     <h1>Confirm it's you to continue</h1>
@@ -16,8 +22,5 @@
         Continue with {{ idp.idp_name }}
     </a>
 </main>
-<style type="text/css">
-    {% include "sso.css" without context %}
-</style>
 {% include "sso_footer.html" without context %}
 {% endblock %}

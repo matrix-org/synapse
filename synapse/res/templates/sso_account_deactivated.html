@@ -1,5 +1,11 @@
 {% block title %}SSO account deactivated{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="error_page">
     <header>
@@ -14,9 +20,5 @@
         </p>
     </header>
 </div>
-
 {% include "sso_footer.html" without context %}
-<style type="text/css">
-    {% include "sso.css" without context %}
-</style>
 {% endblock %}

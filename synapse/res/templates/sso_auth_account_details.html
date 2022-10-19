@@ -1,58 +1,6 @@
 {% block title %}Create your account{% endblock %}
 
-{% block body %}
-<header>
-  <h1>Create your account</h1>
-  <p>This is required. Continue to create your account on {{ server_name }}. You can't change this later.</p>
-</header>
-<main>
-  <form method="post" class="form__input" id="form">
-    <div class="username_input" id="username_input">
-      <label for="field-username">Username (required)</label>
-      <div class="prefix">@</div>
-      <input type="text" name="username" id="field-username" value="{{ user_attributes.localpart }}" autofocus autocorrect="off" autocapitalize="none">
-      <div class="postfix">:{{ server_name }}</div>
-    </div>
-    <output for="username_input" id="field-username-output"></output>
-    <input type="submit" value="Continue" class="primary-button">
-    {% if user_attributes.avatar_url or user_attributes.display_name or user_attributes.emails %}
-    <section class="idp-pick-details">
-      <h2>{% if idp.idp_icon %}<img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>{% endif %}Optional data from {{ idp.idp_name }}</h2>
-      {% if user_attributes.avatar_url %}
-      <label class="idp-detail idp-avatar" for="idp-avatar">
-        <div class="check-row">
-          <span class="name">Avatar</span>
-          <span class="use">Use</span>
-          <input type="checkbox" name="use_avatar" id="idp-avatar" value="true" checked>
-        </div>
-        <img src="{{ user_attributes.avatar_url }}" class="avatar" />
-      </label>
-      {% endif %}
-      {% if user_attributes.display_name %}
-      <label class="idp-detail" for="idp-displayname">
-        <div class="check-row">
-          <span class="name">Display name</span>
-          <span class="use">Use</span>
-          <input type="checkbox" name="use_display_name" id="idp-displayname" value="true" checked>
-        </div>
-        <p class="idp-value">{{ user_attributes.display_name }}</p>
-      </label>
-      {% endif %}
-      {% for email in user_attributes.emails %}
-      <label class="idp-detail" for="idp-email{{ loop.index }}">
-        <div class="check-row">
-          <span class="name">E-mail</span>
-          <span class="use">Use</span>
-          <input type="checkbox" name="use_email" id="idp-email{{ loop.index }}" value="{{ email }}" checked>
-        </div>
-        <p class="idp-value">{{ email }}</p>
-      </label>
-      {% endfor %}
-    </section>
-    {% endif %}
-  </form>
-</main>
-{% include "sso_footer.html" %}
+{% block header %}
 <script type="text/javascript">
   let wasKeyboard = false;
   document.addEventListener("mousedown", function() { wasKeyboard = false; });
@@ -176,7 +124,61 @@
     color: #FE2928;
   }
 </style>
+{% endblock %}
 
+{% block body %}
+<header>
+  <h1>Create your account</h1>
+  <p>This is required. Continue to create your account on {{ server_name }}. You can't change this later.</p>
+</header>
+<main>
+  <form method="post" class="form__input" id="form">
+    <div class="username_input" id="username_input">
+      <label for="field-username">Username (required)</label>
+      <div class="prefix">@</div>
+      <input type="text" name="username" id="field-username" value="{{ user_attributes.localpart }}" autofocus autocorrect="off" autocapitalize="none">
+      <div class="postfix">:{{ server_name }}</div>
+    </div>
+    <output for="username_input" id="field-username-output"></output>
+    <input type="submit" value="Continue" class="primary-button">
+    {% if user_attributes.avatar_url or user_attributes.display_name or user_attributes.emails %}
+    <section class="idp-pick-details">
+      <h2>{% if idp.idp_icon %}<img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>{% endif %}Optional data from {{ idp.idp_name }}</h2>
+      {% if user_attributes.avatar_url %}
+      <label class="idp-detail idp-avatar" for="idp-avatar">
+        <div class="check-row">
+          <span class="name">Avatar</span>
+          <span class="use">Use</span>
+          <input type="checkbox" name="use_avatar" id="idp-avatar" value="true" checked>
+        </div>
+        <img src="{{ user_attributes.avatar_url }}" class="avatar" />
+      </label>
+      {% endif %}
+      {% if user_attributes.display_name %}
+      <label class="idp-detail" for="idp-displayname">
+        <div class="check-row">
+          <span class="name">Display name</span>
+          <span class="use">Use</span>
+          <input type="checkbox" name="use_display_name" id="idp-displayname" value="true" checked>
+        </div>
+        <p class="idp-value">{{ user_attributes.display_name }}</p>
+      </label>
+      {% endif %}
+      {% for email in user_attributes.emails %}
+      <label class="idp-detail" for="idp-email{{ loop.index }}">
+        <div class="check-row">
+          <span class="name">E-mail</span>
+          <span class="use">Use</span>
+          <input type="checkbox" name="use_email" id="idp-email{{ loop.index }}" value="{{ email }}" checked>
+        </div>
+        <p class="idp-value">{{ email }}</p>
+      </label>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </form>
+</main>
+{% include "sso_footer.html" without context %}
 <script type="text/javascript">
   {% include "sso_auth_account_details.js" without context %}
 </script>

@@ -1,5 +1,15 @@
 {% block title %}Agree to terms and conditions{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+
+    #consent_form {
+      margin-top: 56px;
+    }
+</style>
+{% endblock %}
+
 {% block body %}
 <header>
     <h1>Your account is nearly ready</h1>
@@ -16,11 +26,4 @@
     </form>
 </main>
 {% include "sso_footer.html" without context %}
-<style type="text/css">
-    {% include "sso.css" without context %}
-
-    #consent_form {
-    margin-top: 56px;
-    }
-</style>
 {% endblock %}

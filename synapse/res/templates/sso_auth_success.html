@@ -1,5 +1,18 @@
 {% block title %}Authentication successful{% endblock %}
 
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+</style>
+<script>
+    if (window.onAuthDone) {
+        window.onAuthDone();
+    } else if (window.opener && window.opener.postMessage) {
+        window.opener.postMessage("authDone", "*");
+    }
+</script>
+{% endblock %}
+
 {% block body %}
 <header>
     <h1>Thank you</h1>
@@ -8,15 +21,5 @@
         application.
     </p>
 </header>
-<script>
-    if (window.onAuthDone) {
-        window.onAuthDone();
-    } else if (window.opener && window.opener.postMessage) {
-        window.opener.postMessage("authDone", "*");
-    }
-</script>
-<style type="text/css">
-    {% include "sso.css" without context %}
-</style>
 {% include "sso_footer.html" without context %}
 {% endblock %}

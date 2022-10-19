@@ -1,5 +1,17 @@
 {% block title %}Authentication failed{% endblock %}
 
+{% block header %}
+{% if error == "unauthorised" %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+
+    #error_code {
+        margin-top: 56px;
+    }
+</style>
+{% endif %}
+{% endblock %}
+
 {% block body %}
 <div class="error_page">
 {# If an error of unauthorised is returned it means we have actively rejected their login #}
@@ -28,15 +40,7 @@
             </div>
         </header>
         {% include "sso_footer.html" without context %}
-   
 
-        <style type="text/css">
-            {% include "sso.css" without context %}
-
-            #error_code {
-                margin-top: 56px;
-            }
-        </style>
         <script type="text/javascript">
             // Error handling to support Auth0 errors that we might get through a GET request
             // to the validation endpoint. If an error is provided, it's either going to be
@@ -53,14 +57,14 @@
                 // doesn't parse the first parameter incorrectly.
                 searchStr = window.location.hash.replace("#", "?");
             }
-            
+
             // We might end up with no error in the URL, so we need to check if we have one
             // to print one.
             let errorDesc = new URLSearchParams(searchStr).get("error_description")
             if (errorDesc) {
                 document.getElementById("errormsg").innerText = errorDesc;
             }
-            </script>
+        </script>
 {% endif %}
 </div>
 {% endblock %}
