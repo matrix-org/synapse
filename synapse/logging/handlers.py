@@ -49,7 +49,7 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         )
         self._flushing_thread.start()
 
-        def on_reactor_running():
+        def on_reactor_running() -> None:
             self._reactor_started = True
 
         reactor_to_use: IReactorCore
@@ -74,7 +74,7 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         else:
             return True
 
-    def _flush_periodically(self):
+    def _flush_periodically(self) -> None:
         """
         Whilst this handler is active, flush the handler periodically.
         """

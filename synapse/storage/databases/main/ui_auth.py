@@ -131,7 +131,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         session_id: str,
         stage_type: str,
         result: Union[str, bool, JsonDict],
-    ):
+    ) -> None:
         """
         Mark a session stage as completed.
 
@@ -200,7 +200,9 @@ class UIAuthWorkerStore(SQLBaseStore):
             desc="set_ui_auth_client_dict",
         )
 
-    async def set_ui_auth_session_data(self, session_id: str, key: str, value: Any):
+    async def set_ui_auth_session_data(
+        self, session_id: str, key: str, value: Any
+    ) -> None:
         """
         Store a key-value pair into the sessions data associated with this
         request. This data is stored server-side and cannot be modified by
@@ -223,7 +225,7 @@ class UIAuthWorkerStore(SQLBaseStore):
 
     def _set_ui_auth_session_data_txn(
         self, txn: LoggingTransaction, session_id: str, key: str, value: Any
-    ):
+    ) -> None:
         # Get the current value.
         result = cast(
             Dict[str, Any],
@@ -275,7 +277,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         session_id: str,
         user_agent: str,
         ip: str,
-    ):
+    ) -> None:
         """Add the given user agent / IP to the tracking table"""
         await self.db_pool.simple_upsert(
             table="ui_auth_sessions_ips",
@@ -318,7 +320,7 @@ class UIAuthWorkerStore(SQLBaseStore):
 
     def _delete_old_ui_auth_sessions_txn(
         self, txn: LoggingTransaction, expiration_time: int
-    ):
+    ) -> None:
         # Get the expired sessions.
         sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
         txn.execute(sql, [expiration_time])

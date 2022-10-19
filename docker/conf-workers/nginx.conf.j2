@@ -9,6 +9,22 @@ server {
     listen 8008;
     listen [::]:8008;
 
+    {% if tls_cert_path is not none and tls_key_path is not none %}
+        listen 8448 ssl;
+        listen [::]:8448 ssl;
+
+        ssl_certificate {{ tls_cert_path }};
+        ssl_certificate_key {{ tls_key_path }};
+
+        # Some directives from cipherlist.eu (fka cipherli.st):
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+        ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
+        ssl_ecdh_curve secp384r1; # Requires nginx >= 1.1.0
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_tickets off; # Requires nginx >= 1.5.9
+    {% endif %}
+
     server_name localhost;
 
     # Nginx by default only allows file uploads up to 1M in size

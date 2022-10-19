@@ -24,6 +24,7 @@ from synapse.storage.prepare_database import prepare_database
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class Databases(Generic[DataStoreT]):
     """
 
     databases: List[DatabasePool]
-    main: DataStoreT
+    main: "DataStore"  # FIXME: #11165: actually an instance of `main_store_class`
     state: StateGroupDataStore
     persist_events: Optional[PersistEventsStore]
 

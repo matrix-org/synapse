@@ -33,13 +33,15 @@ class InitialSyncRestServlet(RestServlet):
         super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         args: Dict[bytes, List[bytes]] = request.args  # type: ignore
         as_client_event = b"raw" not in args
-        pagination_config = await PaginationConfig.from_request(self.store, request)
+        pagination_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         include_archived = parse_boolean(request, "archived", default=False)
         content = await self.initial_sync_handler.snapshot_all_rooms(
             user_id=requester.user.to_string(),

@@ -16,8 +16,7 @@ import itertools
 import re
 import secrets
 import string
-from collections.abc import Iterable
-from typing import Optional, Tuple
+from typing import Any, Iterable, Optional, Tuple
 
 from netaddr import valid_ipv6
 
@@ -87,7 +86,7 @@ def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
         ValueError if the server name could not be parsed.
     """
     try:
-        if server_name[-1] == "]":
+        if server_name and server_name[-1] == "]":
             # ipv6 literal, hopefully
             return server_name, None
 
@@ -124,7 +123,7 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     # that nobody is sneaking IP literals in that look like hostnames, etc.
 
     # look for ipv6 literals
-    if host[0] == "[":
+    if host and host[0] == "[":
         if host[-1] != "]":
             raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
 
@@ -197,7 +196,7 @@ def shortstr(iterable: Iterable, maxitems: int = 5) -> str:
     """If iterable has maxitems or fewer, return the stringification of a list
     containing those items.
 
-    Otherwise, return the stringification of a a list with the first maxitems items,
+    Otherwise, return the stringification of a list with the first maxitems items,
     followed by "...".
 
     Args:
@@ -248,3 +247,11 @@ def base62_encode(num: int, minwidth: int = 1) -> str:
     # pad to minimum width
     pad = "0" * (minwidth - len(res))
     return pad + res
+
+
+def non_null_str_or_none(val: Any) -> Optional[str]:
+    """Check that the arg is a string containing no null (U+0000) codepoints.
+
+    If so, returns the given string unmodified; otherwise, returns None.
+    """
+    return val if isinstance(val, str) and "\u0000" not in val else None

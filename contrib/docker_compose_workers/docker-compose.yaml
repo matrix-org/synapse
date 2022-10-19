@@ -1,0 +1,77 @@
+networks:
+  backend:
+
+services:
+  postgres:
+    image: postgres:latest
+    restart: unless-stopped
+    volumes:
+      - ${VOLUME_PATH}/var/lib/postgresql/data:/var/lib/postgresql/data:rw
+    networks:
+      - backend
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse_user
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    networks:
+      - backend
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse
+    restart: unless-stopped
+    volumes:
+      - ${VOLUME_PATH}/data:/data:rw
+    ports:
+      - 8008:8008
+    networks:
+      - backend
+    environment:
+      SYNAPSE_CONFIG_DIR: /data
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+    depends_on:
+      - postgres
+
+  synapse-generic-worker-1:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse-generic-worker-1
+    restart: unless-stopped
+    entrypoint: ["/start.py", "run", "--config-path=/data/homeserver.yaml", "--config-path=/data/workers/synapse-generic-worker-1.yaml"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fSs http://localhost:8081/health || exit 1"]
+      start_period: "5s"
+      interval: "15s"
+      timeout: "5s"
+    networks:
+      - backend
+    volumes:
+      - ${VOLUME_PATH}/data:/data:rw # Replace VOLUME_PATH with the path to your Synapse volume
+    environment:
+      SYNAPSE_WORKER: synapse.app.generic_worker
+    # Expose port if required so your reverse proxy can send requests to this worker
+    # Port configuration will depend on how the http listener is defined in the worker configuration file
+    ports:
+      - 8081:8081
+    depends_on:
+      - synapse
+
+  synapse-federation-sender-1:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse-federation-sender-1
+    restart: unless-stopped
+    entrypoint: ["/start.py", "run", "--config-path=/data/homeserver.yaml", "--config-path=/data/workers/synapse-federation-sender-1.yaml"]
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+    volumes:
+      - ${VOLUME_PATH}/data:/data:rw # Replace VOLUME_PATH with the path to your Synapse volume
+    environment:
+      SYNAPSE_WORKER: synapse.app.federation_sender
+    depends_on:
+      - synapse

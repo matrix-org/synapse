@@ -11,9 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
+
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest import admin
 from synapse.rest.client import room
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -27,7 +34,7 @@ class EphemeralMessageTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
 
         config["enable_ephemeral_messages"] = True
@@ -35,10 +42,10 @@ class EphemeralMessageTestCase(unittest.HomeserverTestCase):
         self.hs = self.setup_test_homeserver(config=config)
         return self.hs
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.room_id = self.helper.create_room_as(self.user_id)
 
-    def test_message_expiry_no_delay(self):
+    def test_message_expiry_no_delay(self) -> None:
         """Tests that sending a message sent with a m.self_destruct_after field set to the
         past results in that event being deleted right away.
         """
@@ -61,7 +68,7 @@ class EphemeralMessageTestCase(unittest.HomeserverTestCase):
         event_content = self.get_event(self.room_id, event_id)["content"]
         self.assertFalse(bool(event_content), event_content)
 
-    def test_message_expiry_delay(self):
+    def test_message_expiry_delay(self) -> None:
         """Tests that sending a message with a m.self_destruct_after field set to the
         future results in that event not being deleted right away, but advancing the
         clock to after that expiry timestamp causes the event to be deleted.
@@ -89,7 +96,9 @@ class EphemeralMessageTestCase(unittest.HomeserverTestCase):
         event_content = self.get_event(self.room_id, event_id)["content"]
         self.assertFalse(bool(event_content), event_content)
 
-    def get_event(self, room_id, event_id, expected_code=200):
+    def get_event(
+        self, room_id: str, event_id: str, expected_code: int = HTTPStatus.OK
+    ) -> JsonDict:
         url = "/_matrix/client/r0/rooms/%s/event/%s" % (room_id, event_id)
 
         channel = self.make_request("GET", url)

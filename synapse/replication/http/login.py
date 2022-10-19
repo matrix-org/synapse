@@ -13,10 +13,14 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Tuple, cast
 
+from twisted.web.server import Request
+
+from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -39,25 +43,24 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    async def _serialize_payload(
-        user_id,
-        device_id,
-        initial_display_name,
-        is_guest,
-        is_appservice_ghost,
-        should_issue_refresh_token,
-        auth_provider_id,
-        auth_provider_session_id,
-    ):
+    async def _serialize_payload(  # type: ignore[override]
+        user_id: str,
+        device_id: Optional[str],
+        initial_display_name: Optional[str],
+        is_guest: bool,
+        is_appservice_ghost: bool,
+        should_issue_refresh_token: bool,
+        auth_provider_id: Optional[str],
+        auth_provider_session_id: Optional[str],
+    ) -> JsonDict:
         """
         Args:
-            user_id (int)
-            device_id (str|None): Device ID to use, if None a new one is
-                generated.
-            initial_display_name (str|None)
-            is_guest (bool)
-            is_appservice_ghost (bool)
-            should_issue_refresh_token (bool)
+            user_id
+            device_id: Device ID to use, if None a new one is generated.
+            initial_display_name
+            is_guest
+            is_appservice_ghost
+            should_issue_refresh_token
         """
         return {
             "device_id": device_id,
@@ -69,7 +72,9 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             "auth_provider_session_id": auth_provider_session_id,
         }
 
-    async def _handle_request(self, request, user_id):
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, user_id: str
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         device_id = content["device_id"]
@@ -91,8 +96,8 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             auth_provider_session_id=auth_provider_session_id,
         )
 
-        return 200, res
+        return 200, cast(JsonDict, res)
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RegisterDeviceReplicationServlet(hs).register(http_server)

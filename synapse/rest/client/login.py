@@ -28,7 +28,14 @@ from typing import (
 
 from typing_extensions import TypedDict
 
-from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.constants import ApprovalNoticeMedium
+from synapse.api.errors import (
+    Codes,
+    InvalidClientTokenError,
+    LoginError,
+    NotApprovedError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
@@ -55,11 +62,11 @@ logger = logging.getLogger(__name__)
 
 class LoginResponse(TypedDict, total=False):
     user_id: str
-    access_token: str
+    access_token: Optional[str]
     home_server: str
     expires_in_ms: Optional[int]
     refresh_token: Optional[str]
-    device_id: str
+    device_id: Optional[str]
     well_known: Optional[Dict[str, Any]]
 
 
@@ -69,9 +76,7 @@ class LoginRestServlet(RestServlet):
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
-    JWT_TYPE_DEPRECATED = "m.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
-    APPSERVICE_TYPE_UNSTABLE = "uk.half-shot.msc2778.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
 
     def __init__(self, hs: "HomeServer"):
@@ -94,6 +99,12 @@ class LoginRestServlet(RestServlet):
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
+        # Whether we need to check if the user has been approved or not.
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        )
+
         self.auth = hs.get_auth()
 
         self.clock = hs.get_clock()
@@ -104,13 +115,13 @@ class LoginRestServlet(RestServlet):
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
-            store=hs.get_datastore(),
+            store=hs.get_datastores().main,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
-            store=hs.get_datastore(),
+            store=hs.get_datastores().main,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
@@ -126,7 +137,6 @@ class LoginRestServlet(RestServlet):
         flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-            flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
 
         if self.cas_enabled:
             # we advertise CAS for backwards compat, though MSC1721 renamed it
@@ -156,7 +166,6 @@ class LoginRestServlet(RestServlet):
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
-        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
 
         return 200, {"flows": flows}
 
@@ -175,15 +184,18 @@ class LoginRestServlet(RestServlet):
         )
 
         try:
-            if login_submission["type"] in (
-                LoginRestServlet.APPSERVICE_TYPE,
-                LoginRestServlet.APPSERVICE_TYPE_UNSTABLE,
-            ):
-                appservice = self.auth.get_appservice_by_req(request)
+            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+                requester = await self.auth.get_user_by_req(request)
+                appservice = requester.app_service
+
+                if appservice is None:
+                    raise InvalidClientTokenError(
+                        "This login method is only valid for application services"
+                    )
 
                 if appservice.is_rate_limited():
                     await self._address_ratelimiter.ratelimit(
-                        None, request.getClientIP()
+                        None, request.getClientAddress().host
                     )
 
                 result = await self._do_appservice_login(
@@ -191,29 +203,43 @@ class LoginRestServlet(RestServlet):
                     appservice,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
-            elif self.jwt_enabled and (
-                login_submission["type"] == LoginRestServlet.JWT_TYPE
-                or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
+            elif (
+                self.jwt_enabled
+                and login_submission["type"] == LoginRestServlet.JWT_TYPE
             ):
-                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
                 result = await self._do_jwt_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
-                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
                 result = await self._do_token_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
             else:
-                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
                 result = await self._do_other_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(result["user_id"])
+            if not approved:
+                raise NotApprovedError(
+                    msg="This account is pending approval by a server administrator.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
+                )
 
         well_known_data = self._well_known_builder.get_well_known()
         if well_known_data:
@@ -342,6 +368,25 @@ class LoginRestServlet(RestServlet):
             user_id = canonical_uid
 
         device_id = login_submission.get("device_id")
+
+        # If device_id is present, check that device_id is not longer than a reasonable 512 characters
+        if device_id and len(device_id) > 512:
+            raise LoginError(
+                400,
+                "device_id cannot be longer than 512 characters.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(user_id)
+            if not approved:
+                # If the user isn't approved (and needs to be) we won't allow them to
+                # actually log in, so we don't want to create a device/access token.
+                return LoginResponse(
+                    user_id=user_id,
+                    home_server=self.hs.hostname,
+                )
+
         initial_display_name = login_submission.get("initial_device_display_name")
         (
             device_id,
@@ -412,17 +457,31 @@ class LoginRestServlet(RestServlet):
                 403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
             )
 
-        import jwt
+        from authlib.jose import JsonWebToken, JWTClaims
+        from authlib.jose.errors import BadSignatureError, InvalidClaimError, JoseError
+
+        jwt = JsonWebToken([self.jwt_algorithm])
+        claim_options = {}
+        if self.jwt_issuer is not None:
+            claim_options["iss"] = {"value": self.jwt_issuer, "essential": True}
+        if self.jwt_audiences is not None:
+            claim_options["aud"] = {"values": self.jwt_audiences, "essential": True}
 
         try:
-            payload = jwt.decode(
+            claims = jwt.decode(
                 token,
-                self.jwt_secret,
-                algorithms=[self.jwt_algorithm],
-                issuer=self.jwt_issuer,
-                audience=self.jwt_audiences,
+                key=self.jwt_secret,
+                claims_cls=JWTClaims,
+                claims_options=claim_options,
             )
-        except jwt.PyJWTError as e:
+        except BadSignatureError:
+            # We handle this case separately to provide a better error message
+            raise LoginError(
+                403,
+                "JWT validation failed: Signature verification failed",
+                errcode=Codes.FORBIDDEN,
+            )
+        except JoseError as e:
             # A JWT error occurred, return some info back to the client.
             raise LoginError(
                 403,
@@ -430,7 +489,23 @@ class LoginRestServlet(RestServlet):
                 errcode=Codes.FORBIDDEN,
             )
 
-        user = payload.get(self.jwt_subject_claim, None)
+        try:
+            claims.validate(leeway=120)  # allows 2 min of clock skew
+
+            # Enforce the old behavior which is rolled out in productive
+            # servers: if the JWT contains an 'aud' claim but none is
+            # configured, the login attempt will fail
+            if claims.get("aud") is not None:
+                if self.jwt_audiences is None or len(self.jwt_audiences) == 0:
+                    raise InvalidClaimError("aud")
+        except JoseError as e:
+            raise LoginError(
+                403,
+                "JWT validation failed: %s" % (str(e),),
+                errcode=Codes.FORBIDDEN,
+            )
+
+        user = claims.get(self.jwt_subject_claim, None)
         if user is None:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 

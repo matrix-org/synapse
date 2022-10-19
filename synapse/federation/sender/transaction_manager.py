@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, List
 
 from prometheus_client import Gauge
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
@@ -53,7 +54,7 @@ class TransactionManager:
     def __init__(self, hs: "synapse.server.HomeServer"):
         self._server_name = hs.hostname
         self.clock = hs.get_clock()  # nb must be called this for @measure_func
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._transaction_actions = TransactionActions(self._store)
         self._transport_layer = hs.get_federation_transport_client()
 
@@ -126,7 +127,10 @@ class TransactionManager:
                 len(edus),
             )
             if issue_8631_logger.isEnabledFor(logging.DEBUG):
-                DEVICE_UPDATE_EDUS = {"m.device_list_update", "m.signing_key_update"}
+                DEVICE_UPDATE_EDUS = {
+                    EduTypes.DEVICE_LIST_UPDATE,
+                    EduTypes.SIGNING_KEY_UPDATE,
+                }
                 device_list_updates = [
                     edu.content for edu in edus if edu.edu_type in DEVICE_UPDATE_EDUS
                 ]

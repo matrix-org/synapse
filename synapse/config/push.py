@@ -13,13 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
+from synapse.types import JsonDict
+
 from ._base import Config
 
 
 class PushConfig(Config):
     section = "push"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         push_config = config.get("push") or {}
         self.push_include_content = push_config.get("include_content", True)
         self.push_group_unread_count_by_room = push_config.get(
@@ -45,36 +49,3 @@ class PushConfig(Config):
                 "please set push.include_content instead"
             )
             self.push_include_content = not redact_content
-
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """
-        ## Push ##
-
-        push:
-          # Clients requesting push notifications can either have the body of
-          # the message sent in the notification poke along with other details
-          # like the sender, or just the event ID and room ID (`event_id_only`).
-          # If clients choose the former, this option controls whether the
-          # notification request includes the content of the event (other details
-          # like the sender are still included). For `event_id_only` push, it
-          # has no effect.
-          #
-          # For modern android devices the notification content will still appear
-          # because it is loaded by the app. iPhone, however will send a
-          # notification saying only that a message arrived and who it came from.
-          #
-          # The default value is "true" to include message details. Uncomment to only
-          # include the event ID and room ID in push notification payloads.
-          #
-          #include_content: false
-
-          # When a push notification is received, an unread count is also sent.
-          # This number can either be calculated as the number of unread messages
-          # for the user, or the number of *rooms* the user has unread messages in.
-          #
-          # The default value is "true", meaning push clients will see the number of
-          # rooms with unread messages in them. Uncomment to instead send the number
-          # of unread messages.
-          #
-          #group_unread_count_by_room: false
-        """

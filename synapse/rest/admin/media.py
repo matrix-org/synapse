@@ -47,14 +47,14 @@ class QuarantineMediaInRoom(RestServlet):
     ]
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         logging.info("Quarantining room: %s", room_id)
 
@@ -74,16 +74,16 @@ class QuarantineMediaByUser(RestServlet):
     PATTERNS = admin_patterns("/user/(?P<user_id>[^/]*)/media/quarantine$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
-        logging.info("Quarantining local media by user: %s", user_id)
+        logging.info("Quarantining media by user: %s", user_id)
 
         # Quarantine all media this user has uploaded
         num_quarantined = await self.store.quarantine_media_ids_by_user(
@@ -103,16 +103,16 @@ class QuarantineMediaByID(RestServlet):
     )
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
-        logging.info("Quarantining local media by ID: %s/%s", server_name, media_id)
+        logging.info("Quarantining media by ID: %s/%s", server_name, media_id)
 
         # Quarantine this media id
         await self.store.quarantine_media_by_id(
@@ -132,7 +132,7 @@ class UnquarantineMediaByID(RestServlet):
     )
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -140,9 +140,7 @@ class UnquarantineMediaByID(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        logging.info(
-            "Remove from quarantine local media by ID: %s/%s", server_name, media_id
-        )
+        logging.info("Remove from quarantine media by ID: %s/%s", server_name, media_id)
 
         # Remove from quarantine this media id
         await self.store.quarantine_media_by_id(server_name, media_id, None)
@@ -156,7 +154,7 @@ class ProtectMediaByID(RestServlet):
     PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -178,7 +176,7 @@ class UnprotectMediaByID(RestServlet):
     PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -200,7 +198,7 @@ class ListMediaInRoom(RestServlet):
     PATTERNS = admin_patterns("/room/(?P<room_id>[^/]*)/media$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_GET(
@@ -251,7 +249,7 @@ class DeleteMediaByID(RestServlet):
     PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.server_name = hs.hostname
         self.media_repository = hs.get_media_repository()
@@ -283,7 +281,7 @@ class DeleteMediaByDateSize(RestServlet):
     PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/delete$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.server_name = hs.hostname
         self.media_repository = hs.get_media_repository()
@@ -352,7 +350,7 @@ class UserMediaRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repository = hs.get_media_repository()
 
     async def on_GET(

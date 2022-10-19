@@ -21,19 +21,23 @@ from twisted.web.server import Request
 import synapse
 import synapse.api.auth
 import synapse.types
-from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
+from synapse.api.constants import (
+    APP_SERVICE_REGISTRATION_TYPE,
+    ApprovalNoticeMedium,
+    LoginType,
+)
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
+    NotApprovedError,
     SynapseError,
     ThreepidValidationError,
     UnrecognizedRequestError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.config import ConfigError
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.auth import AuthHandler
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
@@ -74,7 +78,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
-        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.hs.config.email.can_verify_email:
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email.email_app_name,
@@ -83,13 +87,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if (
-                self.hs.config.email.local_threepid_handling_disabled_due_to_email_config
-            ):
-                logger.warning(
-                    "Email registration has been disabled due to lack of email config"
-                )
+        if not self.hs.config.email.can_verify_email:
+            logger.warning(
+                "Email registration has been disabled due to lack of email config"
+            )
             raise SynapseError(
                 400, "Email-based registration has been disabled on this server"
             )
@@ -112,7 +113,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", email):
+        if not await check_3pid_allowed(self.hs, "email", email, registration=True):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
@@ -123,7 +124,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             request, "email", email
         )
 
-        existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = await self.hs.get_datastores().main.get_user_id_by_threepid(
             "email", email
         )
 
@@ -138,35 +139,21 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            assert self.hs.config.registration.account_threepid_delegate_email
-
-            # Have the configured identity server handle the request
-            ret = await self.identity_handler.requestEmailToken(
-                self.hs.config.registration.account_threepid_delegate_email,
-                email,
-                client_secret,
-                send_attempt,
-                next_link,
-            )
-        else:
-            # Send registration emails from Synapse
-            sid = await self.identity_handler.send_threepid_validation(
-                email,
-                client_secret,
-                send_attempt,
-                self.mailer.send_registration_mail,
-                next_link,
-            )
-
-            # Wrap the session id in a JSON object
-            ret = {"sid": sid}
+        # Send registration emails from Synapse
+        sid = await self.identity_handler.send_threepid_validation(
+            email,
+            client_secret,
+            send_attempt,
+            self.mailer.send_registration_mail,
+            next_link,
+        )
 
         threepid_send_requests.labels(type="email", reason="register").observe(
             send_attempt
         )
 
-        return 200, ret
+        # Wrap the session id in a JSON object
+        return 200, {"sid": sid}
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -192,7 +179,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(country, phone_number)
 
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+        if not await check_3pid_allowed(self.hs, "msisdn", msisdn, registration=True):
             raise SynapseError(
                 403,
                 "Phone numbers are not authorized to register on this server",
@@ -203,7 +190,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             request, "msisdn", msisdn
         )
 
-        existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = await self.hs.get_datastores().main.get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
@@ -258,9 +245,9 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.auth = hs.get_auth()
         self.config = hs.config
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.config.email.can_verify_email:
             self._failure_email_template = (
                 self.config.email.email_registration_template_failure_html
             )
@@ -270,11 +257,10 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "User registration via email has been disabled due to lack of email config"
-                )
+        if not self.config.email.can_verify_email:
+            logger.warning(
+                "User registration via email has been disabled due to lack of email config"
+            )
             raise SynapseError(
                 400, "Email-based registration is disabled on this server"
             )
@@ -325,7 +311,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            FederationRateLimitConfig(
+            FederationRatelimitSettings(
                 # Time window of 2s
                 window_size=2000,
                 # Artificially delay requests if rate > sleep_limit/window_size
@@ -352,7 +338,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         if self.inhibit_user_in_use_error:
             return 200, {"available": True}
 
-        ip = request.getClientIP()
+        ip = request.getClientAddress().host
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             await wait_deferred
 
@@ -368,7 +354,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
 
     Example:
 
-        GET /_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity?token=abcd
+        GET /_matrix/client/v1/register/m.login.registration_token/validity?token=abcd
 
         200 OK
 
@@ -378,15 +364,14 @@ class RegistrationTokenValidityRestServlet(RestServlet):
     """
 
     PATTERNS = client_patterns(
-        f"/org.matrix.msc3231/register/{LoginType.REGISTRATION_TOKEN}/validity",
-        releases=(),
-        unstable=True,
+        f"/register/{LoginType.REGISTRATION_TOKEN}/validity",
+        releases=("v1",),
     )
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
@@ -395,7 +380,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         )
 
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
-        await self.ratelimiter.ratelimit(None, (request.getClientIP(),))
+        await self.ratelimiter.ratelimit(None, (request.getClientAddress().host,))
 
         if not self.hs.config.registration.enable_registration:
             raise SynapseError(
@@ -416,7 +401,7 @@ class RegisterRestServlet(RestServlet):
 
         self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self.identity_handler = hs.get_identity_handler()
@@ -425,12 +410,18 @@ class RegisterRestServlet(RestServlet):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
+        self.password_auth_provider = hs.get_password_auth_provider()
         self._registration_enabled = self.hs.config.registration.enable_registration
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
         self._inhibit_user_in_use_error = (
             hs.config.registration.inhibit_user_in_use_error
+        )
+
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
         self._registration_flows = _calculate_registration_flows(
@@ -441,7 +432,7 @@ class RegisterRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         body = parse_json_object_from_request(request)
 
-        client_addr = request.getClientIP()
+        client_addr = request.getClientAddress().host
 
         await self.ratelimiter.ratelimit(None, client_addr, update=False)
 
@@ -483,9 +474,6 @@ class RegisterRestServlet(RestServlet):
                     400,
                     "Appservice token must be provided when using a type of m.login.application_service",
                 )
-
-            # Verify the AS
-            self.auth.get_appservice_by_req(request)
 
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
@@ -616,7 +604,9 @@ class RegisterRestServlet(RestServlet):
                     medium = auth_result[login_type]["medium"]
                     address = auth_result[login_type]["address"]
 
-                    if not check_3pid_allowed(self.hs, medium, address):
+                    if not await check_3pid_allowed(
+                        self.hs, medium, address, registration=True
+                    ):
                         raise SynapseError(
                             403,
                             "Third party identifiers (email/phone numbers)"
@@ -638,7 +628,16 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = params.get("username", None)
+            desired_username = await (
+                self.password_auth_provider.get_username_for_registration(
+                    auth_result,
+                    params,
+                )
+            )
+
+            if desired_username is None:
+                desired_username = params.get("username", None)
+
             guest_access_token = params.get("guest_access_token", None)
 
             if desired_username is not None:
@@ -683,11 +682,18 @@ class RegisterRestServlet(RestServlet):
                 session_id
             )
 
+            display_name = await (
+                self.password_auth_provider.get_displayname_for_registration(
+                    auth_result, params
+                )
+            )
+
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
                 password_hash=password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
+                default_display_name=display_name,
                 address=client_addr,
                 user_agent_ips=entries,
             )
@@ -738,6 +744,12 @@ class RegisterRestServlet(RestServlet):
                 access_token=return_dict.get("access_token"),
             )
 
+            if self._require_approval:
+                raise NotApprovedError(
+                    msg="This account needs to be approved by an administrator before it can be used.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
+                )
+
         return 200, return_dict
 
     async def _do_appservice_registration(
@@ -782,7 +794,9 @@ class RegisterRestServlet(RestServlet):
             "user_id": user_id,
             "home_server": self.hs.hostname,
         }
-        if not params.get("inhibit_login", False):
+        # We don't want to log the user in if we're going to deny them access because
+        # they need to be approved first.
+        if not params.get("inhibit_login", False) and not self._require_approval:
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             (
@@ -911,6 +925,10 @@ def _calculate_registration_flows(
         # always let users provide both MSISDN & email
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
+    # Add a flow that doesn't require any 3pids, if the config requests it.
+    if config.registration.enable_registration_token_3pid_bypass:
+        flows.append([LoginType.REGISTRATION_TOKEN])
+
     # Prepend m.login.terms to all flows if we're requiring consent
     if config.consent.user_consent_at_registration:
         for flow in flows:
@@ -924,7 +942,8 @@ def _calculate_registration_flows(
     # Prepend registration token to all flows if we're requiring a token
     if config.registration.registration_requires_token:
         for flow in flows:
-            flow.insert(0, LoginType.REGISTRATION_TOKEN)
+            if LoginType.REGISTRATION_TOKEN not in flow:
+                flow.insert(0, LoginType.REGISTRATION_TOKEN)
 
     return flows
 

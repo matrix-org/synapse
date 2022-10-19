@@ -19,6 +19,7 @@ from synapse.rest import admin
 from synapse.rest.client import keys, login
 
 from tests import unittest
+from tests.http.server._base import make_request_with_cancellation_test
 
 
 class KeyQueryTestCase(unittest.HomeserverTestCase):
@@ -28,7 +29,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def test_rejects_device_id_ice_key_outside_of_list(self):
+    def test_rejects_device_id_ice_key_outside_of_list(self) -> None:
         self.register_user("alice", "wonderland")
         alice_token = self.login("alice", "wonderland")
         bob = self.register_user("bob", "uncle")
@@ -49,7 +50,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
             channel.result,
         )
 
-    def test_rejects_device_key_given_as_map_to_bool(self):
+    def test_rejects_device_key_given_as_map_to_bool(self) -> None:
         self.register_user("alice", "wonderland")
         alice_token = self.login("alice", "wonderland")
         bob = self.register_user("bob", "uncle")
@@ -73,7 +74,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
             channel.result,
         )
 
-    def test_requires_device_key(self):
+    def test_requires_device_key(self) -> None:
         """`device_keys` is required. We should complain if it's missing."""
         self.register_user("alice", "wonderland")
         alice_token = self.login("alice", "wonderland")
@@ -89,3 +90,31 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
             Codes.BAD_JSON,
             channel.result,
         )
+
+    def test_key_query_cancellation(self) -> None:
+        """
+        Tests that /keys/query is cancellable and does not swallow the
+        CancelledError.
+        """
+        self.register_user("alice", "wonderland")
+        alice_token = self.login("alice", "wonderland")
+
+        bob = self.register_user("bob", "uncle")
+
+        channel = make_request_with_cancellation_test(
+            "test_key_query_cancellation",
+            self.reactor,
+            self.site,
+            "POST",
+            "/_matrix/client/r0/keys/query",
+            {
+                "device_keys": {
+                    # Empty list means we request keys for all bob's devices
+                    bob: [],
+                },
+            },
+            token=alice_token,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertIn(bob, channel.json_body["device_keys"])

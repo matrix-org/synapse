@@ -17,11 +17,12 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from prometheus_client import Counter, Histogram
 
+from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
-    from txredisapi import RedisProtocol
+    from txredisapi import ConnectionHandler
 
     from synapse.server import HomeServer
 
@@ -63,7 +64,7 @@ class ExternalCache:
     def __init__(self, hs: "HomeServer"):
         if hs.config.redis.redis_enabled:
             self._redis_connection: Optional[
-                "RedisProtocol"
+                "ConnectionHandler"
             ] = hs.get_outbound_redis_connection()
         else:
             self._redis_connection = None
@@ -93,14 +94,18 @@ class ExternalCache:
 
         logger.debug("Caching %s %s: %r", cache_name, key, encoded_value)
 
-        with response_timer.labels("set").time():
-            return await make_deferred_yieldable(
-                self._redis_connection.set(
-                    self._get_redis_key(cache_name, key),
-                    encoded_value,
-                    pexpire=expiry_ms,
+        with opentracing.start_active_span(
+            "ExternalCache.set",
+            tags={opentracing.SynapseTags.CACHE_NAME: cache_name},
+        ):
+            with response_timer.labels("set").time():
+                return await make_deferred_yieldable(
+                    self._redis_connection.set(
+                        self._get_redis_key(cache_name, key),
+                        encoded_value,
+                        pexpire=expiry_ms,
+                    )
                 )
-            )
 
     async def get(self, cache_name: str, key: str) -> Optional[Any]:
         """Look up a key/value in the named cache."""
@@ -108,10 +113,14 @@ class ExternalCache:
         if self._redis_connection is None:
             return None
 
-        with response_timer.labels("get").time():
-            result = await make_deferred_yieldable(
-                self._redis_connection.get(self._get_redis_key(cache_name, key))
-            )
+        with opentracing.start_active_span(
+            "ExternalCache.get",
+            tags={opentracing.SynapseTags.CACHE_NAME: cache_name},
+        ):
+            with response_timer.labels("get").time():
+                result = await make_deferred_yieldable(
+                    self._redis_connection.get(self._get_redis_key(cache_name, key))
+                )
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
 

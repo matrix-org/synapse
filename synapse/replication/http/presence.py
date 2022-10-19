@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
+from twisted.web.server import Request
+
+from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -49,18 +52,17 @@ class ReplicationBumpPresenceActiveTime(ReplicationEndpoint):
         self._presence_handler = hs.get_presence_handler()
 
     @staticmethod
-    async def _serialize_payload(user_id):
+    async def _serialize_payload(user_id: str) -> JsonDict:  # type: ignore[override]
         return {}
 
-    async def _handle_request(self, request, user_id):
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, user_id: str
+    ) -> Tuple[int, JsonDict]:
         await self._presence_handler.bump_presence_active_time(
             UserID.from_string(user_id)
         )
 
-        return (
-            200,
-            {},
-        )
+        return (200, {})
 
 
 class ReplicationPresenceSetState(ReplicationEndpoint):
@@ -92,16 +94,21 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
         self._presence_handler = hs.get_presence_handler()
 
     @staticmethod
-    async def _serialize_payload(
-        user_id, state, ignore_status_msg=False, force_notify=False
-    ):
+    async def _serialize_payload(  # type: ignore[override]
+        user_id: str,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
+    ) -> JsonDict:
         return {
             "state": state,
             "ignore_status_msg": ignore_status_msg,
             "force_notify": force_notify,
         }
 
-    async def _handle_request(self, request, user_id):
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, user_id: str
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         await self._presence_handler.set_state(
@@ -111,12 +118,9 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
             content["force_notify"],
         )
 
-        return (
-            200,
-            {},
-        )
+        return (200, {})
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationBumpPresenceActiveTime(hs).register(http_server)
     ReplicationPresenceSetState(hs).register(http_server)

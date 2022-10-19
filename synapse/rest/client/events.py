@@ -39,7 +39,7 @@ class EventStreamRestServlet(RestServlet):
         super().__init__()
         self.event_stream_handler = hs.get_event_stream_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -50,7 +50,9 @@ class EventStreamRestServlet(RestServlet):
                 raise SynapseError(400, "Guest users must specify room_id param")
         room_id = parse_string(request, "room_id")
 
-        pagin_config = await PaginationConfig.from_request(self.store, request)
+        pagin_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
         if b"timeout" in args:
             try:

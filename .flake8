@@ -1,0 +1,11 @@
+# TODO: incorporate this into pyproject.toml if flake8 supports it in the future.
+# See https://github.com/PyCQA/flake8/issues/234
+[flake8]
+# see https://pycodestyle.readthedocs.io/en/latest/intro.html#error-codes
+# for error codes. The ones we ignore are:
+#  W503: line break before binary operator
+#  W504: line break after binary operator
+#  E203: whitespace before ':' (which is contrary to pep8?)
+#  E731: do not assign a lambda expression, use a def
+#  E501: Line too long (black enforces this for us)
+ignore=W503,W504,E203,E731,E501

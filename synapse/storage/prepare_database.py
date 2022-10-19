@@ -23,8 +23,7 @@ from typing_extensions import Counter as CounterType
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.schema import SCHEMA_COMPAT_VERSION, SCHEMA_VERSION
 from synapse.storage.types import Cursor
 
@@ -85,7 +84,7 @@ def prepare_database(
     database_engine: BaseDatabaseEngine,
     config: Optional[HomeServerConfig],
     databases: Collection[str] = ("main", "state"),
-):
+) -> None:
     """Prepares a physical database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
 
@@ -267,7 +266,7 @@ def _setup_new_database(
             ".sql." + specific
         ):
             logger.debug("Applying schema %s", entry.absolute_path)
-            executescript(cur, entry.absolute_path)
+            database_engine.execute_script_file(cur, entry.absolute_path)
 
     cur.execute(
         "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
@@ -501,11 +500,11 @@ def _upgrade_existing_database(
 
                 if hasattr(module, "run_create"):
                     logger.info("Running %s:run_create", relative_path)
-                    module.run_create(cur, database_engine)  # type: ignore
+                    module.run_create(cur, database_engine)
 
                 if not is_empty and hasattr(module, "run_upgrade"):
                     logger.info("Running %s:run_upgrade", relative_path)
-                    module.run_upgrade(cur, database_engine, config=config)  # type: ignore
+                    module.run_upgrade(cur, database_engine, config=config)
             elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
@@ -518,7 +517,7 @@ def _upgrade_existing_database(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying schema %s", relative_path)
-                executescript(cur, absolute_path)
+                database_engine.execute_script_file(cur, absolute_path)
             elif ext == specific_engine_extension and root_name.endswith(".sql"):
                 # A .sql file specific to our engine; just read and execute it
                 if is_worker:
@@ -526,7 +525,7 @@ def _upgrade_existing_database(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying engine-specific schema %s", relative_path)
-                executescript(cur, absolute_path)
+                database_engine.execute_script_file(cur, absolute_path)
             elif ext in specific_engine_extensions and root_name.endswith(".sql"):
                 # A .sql file for a different engine; skip it.
                 continue
@@ -667,7 +666,7 @@ def _get_or_create_schema_state(
 ) -> Optional[_SchemaState]:
     # Bluntly try creating the schema_version tables.
     sql_path = os.path.join(schema_path, "common", "schema_version.sql")
-    executescript(txn, sql_path)
+    database_engine.execute_script_file(txn, sql_path)
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()

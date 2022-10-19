@@ -16,7 +16,7 @@ import abc
 import logging
 import os
 import shutil
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from synapse.config._base import Config
 from synapse.logging.context import defer_to_thread, run_in_background
@@ -150,8 +150,13 @@ class FileStorageProviderBackend(StorageProvider):
         dirname = os.path.dirname(backup_fname)
         os.makedirs(dirname, exist_ok=True)
 
+        # mypy needs help inferring the type of the second parameter, which is generic
+        shutil_copyfile: Callable[[str, str], str] = shutil.copyfile
         await defer_to_thread(
-            self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
+            self.hs.get_reactor(),
+            shutil_copyfile,
+            primary_fname,
+            backup_fname,
         )
 
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:

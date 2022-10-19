@@ -22,7 +22,7 @@ from tests import unittest
 
 class ProfileStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.u_frank = UserID.from_string("@frank:test")
 
@@ -33,7 +33,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
         )
 
-        self.assertEquals(
+        self.assertEqual(
             "Frank",
             (
                 self.get_success(
@@ -60,7 +60,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             "http://my.site/here",
             (
                 self.get_success(

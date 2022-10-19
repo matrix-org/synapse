@@ -44,7 +44,7 @@ class DeviceRestServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_GET(
@@ -80,7 +80,7 @@ class DeviceRestServlet(RestServlet):
         if u is None:
             raise NotFoundError("Unknown user")
 
-        await self.device_handler.delete_device(target_user.to_string(), device_id)
+        await self.device_handler.delete_devices(target_user.to_string(), [device_id])
         return HTTPStatus.OK, {}
 
     async def on_PUT(
@@ -113,7 +113,7 @@ class DevicesRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_GET(
@@ -144,7 +144,7 @@ class DeleteDevicesRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_POST(

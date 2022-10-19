@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import TYPE_CHECKING, Optional
 
@@ -19,6 +18,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import Request
 
 from synapse.http.server import set_cors_headers
+from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.stringutils import parse_server_name
@@ -44,6 +44,14 @@ class WellKnownBuilder:
                 "base_url": self._config.registration.default_identity_server
             }
 
+        if self._config.server.extra_well_known_client_content:
+            for (
+                key,
+                value,
+            ) in self._config.server.extra_well_known_client_content.items():
+                if key not in result:
+                    result[key] = value
+
         return result
 
 
@@ -56,7 +64,7 @@ class ClientWellKnownResource(Resource):
         Resource.__init__(self)
         self._well_known_builder = WellKnownBuilder(hs)
 
-    def render_GET(self, request: Request) -> bytes:
+    def render_GET(self, request: SynapseRequest) -> bytes:
         set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:

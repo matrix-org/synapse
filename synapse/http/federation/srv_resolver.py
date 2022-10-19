@@ -16,7 +16,7 @@
 import logging
 import random
 import time
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 import attr
 
@@ -109,7 +109,7 @@ class SrvResolver:
 
     def __init__(
         self,
-        dns_client=client,
+        dns_client: Any = client,
         cache: Dict[bytes, List[Server]] = SERVER_CACHE,
         get_time: Callable[[], float] = time.time,
     ):

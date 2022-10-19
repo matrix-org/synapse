@@ -45,8 +45,8 @@ as follows:
    maintainer.
 
 To enable the OpenID integration, you should then add a section to the `oidc_providers`
-setting in your configuration file (or uncomment one of the existing examples).
-See [sample_config.yaml](./sample_config.yaml) for some sample settings, as well as
+setting in your configuration file.
+See the [configuration manual](usage/configuration/config_documentation.md#oidc_providers) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
 ## Sample configs
@@ -159,7 +159,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 oidc_providers:
   - idp_id: keycloak
     idp_name: "My KeyCloak server"
-    issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
+    issuer: "https://127.0.0.1:8443/realms/{realm_name}"
     client_id: "synapse"
     client_secret: "copy secret generated from above"
     scopes: ["openid", "profile"]
@@ -174,7 +174,9 @@ oidc_providers:
 
 1. Create a regular web application for Synapse
 2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/client/oidc/callback`
-3. Add a rule to add the `preferred_username` claim.
+3. Add a rule with any name to add the `preferred_username` claim. 
+(See https://auth0.com/docs/customize/rules/create-rules for more information on how to create rules.)
+   
    <details>
     <summary>Code sample</summary>
 
@@ -225,6 +227,8 @@ oidc_providers:
 3. Create an application for synapse in Authentik and link it to the provider.
 4. Note the slug of your application, Client ID and Client Secret.
 
+Note: RSA keys must be used for signing for Authentik, ECC keys do not work.
+
 Synapse config:
 ```yaml
 oidc_providers:
@@ -240,7 +244,7 @@ oidc_providers:
       - "email"
     user_mapping_provider:
       config:
-        localpart_template: "{{ user.preferred_username }}}"
+        localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 ```
 
@@ -291,7 +295,7 @@ can be used to retrieve information on the authenticated user. As the Synapse
 login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
-1. Create a new OAuth application: https://github.com/settings/applications/new.
+1. Create a new OAuth application: [https://github.com/settings/applications/new](https://github.com/settings/applications/new).
 2. Set the callback URL to `[synapse public baseurl]/_synapse/client/oidc/callback`.
 
 Synapse config:
@@ -320,10 +324,10 @@ oidc_providers:
 
 [Google][google-idp] is an OpenID certified authentication and authorisation provider.
 
-1. Set up a project in the Google API Console (see
-   https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).
-2. Add an "OAuth Client ID" for a Web Application under "Credentials".
-3. Copy the Client ID and Client Secret, and add the following to your synapse config:
+1. Set up a project in the Google API Console (see 
+   [documentation](https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup)).
+3. Add an "OAuth Client ID" for a Web Application under "Credentials".
+4. Copy the Client ID and Client Secret, and add the following to your synapse config:
    ```yaml
    oidc_providers:
      - idp_id: google
@@ -332,11 +336,12 @@ oidc_providers:
        issuer: "https://accounts.google.com/"
        client_id: "your-client-id" # TO BE FILLED
        client_secret: "your-client-secret" # TO BE FILLED
-       scopes: ["openid", "profile"]
+       scopes: ["openid", "profile", "email"] # email is optional, read below
        user_mapping_provider:
          config:
            localpart_template: "{{ user.given_name|lower }}"
            display_name_template: "{{ user.name }}"
+           email_template: "{{ user.email }}" # needs "email" in scopes above
    ```
 4. Back in the Google console, add this Authorized redirect URI: `[synapse
    public baseurl]/_synapse/client/oidc/callback`.
@@ -419,7 +424,7 @@ Synapse config:
     user_mapping_provider:
       config:
         display_name_template: "{{ user.name }}"
-        email_template: "{{ '{{ user.email }}' }}"
+        email_template: "{{ user.email }}"
 ```
 
 Relevant documents:
@@ -499,8 +504,8 @@ As well as the private key file, you will need:
  * Team ID: a 10-character ID associated with your developer account.
  * Key ID: the 10-character identifier for the key.
 
-https://help.apple.com/developer-account/?lang=en#/dev77c875b7e has more
-documentation on setting up SiWA.
+[Apple's developer documentation](https://help.apple.com/developer-account/?lang=en#/dev77c875b7e)
+has more information on setting up SiWA.
 
 The synapse config will look like this:
 
@@ -533,8 +538,8 @@ needed to add OAuth2 capabilities to your Django projects. It supports
 
 Configuration on Django's side:
 
-1. Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:
-* `Redirect uris`: https://synapse.example.com/_synapse/client/oidc/callback
+1. Add an application: `https://example.com/admin/oauth2_provider/application/add/` and choose parameters like this:
+* `Redirect uris`: `https://synapse.example.com/_synapse/client/oidc/callback`
 * `Client type`: `Confidential`
 * `Authorization grant type`: `Authorization code`
 * `Algorithm`: `HMAC with SHA-2 256`

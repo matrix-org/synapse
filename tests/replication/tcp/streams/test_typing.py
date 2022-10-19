@@ -118,7 +118,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         # Reset the typing handler
         self.hs.get_replication_streams()["typing"].last_token = 0
-        self.hs.get_tcp_replication()._streams["typing"].last_token = 0
+        self.hs.get_replication_command_handler()._streams["typing"].last_token = 0
         typing._latest_room_serial = 0
         typing._typing_stream_change_cache = StreamChangeCache(
             "TypingStreamChangeCache", typing._latest_room_serial

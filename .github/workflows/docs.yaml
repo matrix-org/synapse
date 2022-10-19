@@ -17,12 +17,12 @@ jobs:
     name: GitHub Pages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup mdbook
         uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
         with:
-          mdbook-version: '0.4.9'
+          mdbook-version: '0.4.17'
 
       - name: Build the documentation
         # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
@@ -54,7 +54,7 @@ jobs:
           esac
 
           # finally, set the 'branch-version' var.
-          echo "::set-output name=branch-version::$branch"
+          echo "branch-version=$branch" >> "$GITHUB_OUTPUT"
           
       # Deploy to the target directory.
       - name: Deploy to gh pages

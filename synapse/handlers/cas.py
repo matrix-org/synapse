@@ -61,7 +61,7 @@ class CasHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self._hostname = hs.hostname
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
@@ -130,6 +130,9 @@ class CasHandler:
         except PartialDownloadError as pde:
             # Twisted raises this error if the connection is closed,
             # even if that's being used old-http style to signal end-of-data
+            # Assertion is for mypy's benefit. Error.response is Optional[bytes],
+            # but a PartialDownloadError should always have a non-None response.
+            assert pde.response is not None
             body = pde.response
         except HttpResponseException as e:
             description = (

@@ -1,1 +1,0 @@
-Workaround a type annotation problem in `prometheus_client` 0.13.0.

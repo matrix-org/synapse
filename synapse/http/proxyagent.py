@@ -36,12 +36,13 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS
 
+from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
 from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
-_VALID_URI = re.compile(br"\A[\x21-\x7e]+\Z")
+_VALID_URI = re.compile(rb"\A[\x21-\x7e]+\Z")
 
 
 @implementer(IAgent)
@@ -220,7 +221,11 @@ class ProxyAgent(_AgentBase):
                 self._reactor, parsed_uri.host, parsed_uri.port, **self._endpoint_kwargs
             )
 
-        logger.debug("Requesting %s via %s", uri, endpoint)
+        logger.debug(
+            "Requesting %s via %s",
+            redact_uri(uri.decode("ascii", errors="replace")),
+            endpoint,
+        )
 
         if parsed_uri.scheme == b"https":
             tls_connection_creator = self._policy_for_https.creatorForNetloc(
@@ -245,7 +250,7 @@ def http_proxy_endpoint(
     proxy: Optional[bytes],
     reactor: IReactorCore,
     tls_options_factory: Optional[IPolicyForHTTPS],
-    **kwargs,
+    **kwargs: object,
 ) -> Tuple[Optional[IStreamClientEndpoint], Optional[ProxyCredentials]]:
     """Parses an http proxy setting and returns an endpoint for the proxy
 

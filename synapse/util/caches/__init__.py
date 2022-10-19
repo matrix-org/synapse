@@ -17,12 +17,14 @@ import logging
 import typing
 from enum import Enum, auto
 from sys import intern
-from typing import Any, Callable, Dict, List, Optional, Sized
+from typing import Any, Callable, Dict, List, Optional, Sized, TypeVar
 
 import attr
+from prometheus_client import REGISTRY
 from prometheus_client.core import Gauge
 
 from synapse.config.cache import add_resizable_cache
+from synapse.util.metrics import DynamicCollectorRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -30,32 +32,68 @@ logger = logging.getLogger(__name__)
 # Whether to track estimated memory usage of the LruCaches.
 TRACK_MEMORY_USAGE = False
 
+# We track cache metrics in a special registry that lets us update the metrics
+# just before they are returned from the scrape endpoint.
+CACHE_METRIC_REGISTRY = DynamicCollectorRegistry()
 
 caches_by_name: Dict[str, Sized] = {}
-collectors_by_name: Dict[str, "CacheMetric"] = {}
 
-cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
-cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
-cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name", "reason"])
-cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
-cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
+cache_size = Gauge(
+    "synapse_util_caches_cache_size", "", ["name"], registry=CACHE_METRIC_REGISTRY
+)
+cache_hits = Gauge(
+    "synapse_util_caches_cache_hits", "", ["name"], registry=CACHE_METRIC_REGISTRY
+)
+cache_evicted = Gauge(
+    "synapse_util_caches_cache_evicted_size",
+    "",
+    ["name", "reason"],
+    registry=CACHE_METRIC_REGISTRY,
+)
+cache_total = Gauge(
+    "synapse_util_caches_cache", "", ["name"], registry=CACHE_METRIC_REGISTRY
+)
+cache_max_size = Gauge(
+    "synapse_util_caches_cache_max_size", "", ["name"], registry=CACHE_METRIC_REGISTRY
+)
 cache_memory_usage = Gauge(
     "synapse_util_caches_cache_size_bytes",
     "Estimated memory usage of the caches",
     ["name"],
+    registry=CACHE_METRIC_REGISTRY,
 )
 
-response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
-response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
-response_cache_evicted = Gauge(
-    "synapse_util_caches_response_cache:evicted_size", "", ["name", "reason"]
+response_cache_size = Gauge(
+    "synapse_util_caches_response_cache_size",
+    "",
+    ["name"],
+    registry=CACHE_METRIC_REGISTRY,
 )
-response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
+response_cache_hits = Gauge(
+    "synapse_util_caches_response_cache_hits",
+    "",
+    ["name"],
+    registry=CACHE_METRIC_REGISTRY,
+)
+response_cache_evicted = Gauge(
+    "synapse_util_caches_response_cache_evicted_size",
+    "",
+    ["name", "reason"],
+    registry=CACHE_METRIC_REGISTRY,
+)
+response_cache_total = Gauge(
+    "synapse_util_caches_response_cache", "", ["name"], registry=CACHE_METRIC_REGISTRY
+)
+
+
+# Register our custom cache metrics registry with the global registry
+REGISTRY.register(CACHE_METRIC_REGISTRY)
 
 
 class EvictionReason(Enum):
     size = auto()
     time = auto()
+    invalidation = auto()
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -169,7 +207,7 @@ def register_cache(
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
     metric_name = "cache_%s_%s" % (cache_type, cache_name)
     caches_by_name[cache_name] = cache
-    collectors_by_name[metric_name] = metric
+    CACHE_METRIC_REGISTRY.register_hook(metric_name, metric.collect)
     return metric
 
 
@@ -194,8 +232,10 @@ KNOWN_KEYS = {
     )
 }
 
+T = TypeVar("T", Optional[str], str)
 
-def intern_string(string: Optional[str]) -> Optional[str]:
+
+def intern_string(string: T) -> T:
     """Takes a (potentially) unicode string and interns it if it's ascii"""
     if string is None:
         return None

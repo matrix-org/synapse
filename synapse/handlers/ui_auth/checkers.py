@@ -19,7 +19,6 @@ from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -107,6 +106,8 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
+            assert self._secret is not None
+
             resp_body = await self._http_client.post_urlencoded_get_json(
                 self._url,
                 args={
@@ -118,6 +119,9 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
+            # For mypy's benefit. A general Error.response is Optional[bytes], but
+            # a PartialDownloadError.response should be bytes AFAICS.
+            assert data is not None
             resp_body = json_decoder.decode(data.decode("utf-8"))
 
         if "success" in resp_body:
@@ -139,7 +143,7 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 class _BaseThreepidAuthChecker:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def _check_threepid(self, medium: str, authdict: dict) -> dict:
         if "threepid_creds" not in authdict:
@@ -151,7 +155,7 @@ class _BaseThreepidAuthChecker:
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
 
-        # msisdns are currently always ThreepidBehaviour.REMOTE
+        # msisdns are currently always verified via the IS
         if medium == "msisdn":
             if not self.hs.config.registration.account_threepid_delegate_msisdn:
                 raise SynapseError(
@@ -162,18 +166,7 @@ class _BaseThreepidAuthChecker:
                 threepid_creds,
             )
         elif medium == "email":
-            if (
-                self.hs.config.email.threepid_behaviour_email
-                == ThreepidBehaviour.REMOTE
-            ):
-                assert self.hs.config.registration.account_threepid_delegate_email
-                threepid = await identity_handler.threepid_from_creds(
-                    self.hs.config.registration.account_threepid_delegate_email,
-                    threepid_creds,
-                )
-            elif (
-                self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            ):
+            if self.hs.config.email.can_verify_email:
                 threepid = None
                 row = await self.store.get_threepid_validation_session(
                     medium,
@@ -225,10 +218,7 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return self.hs.config.email.threepid_behaviour_email in (
-            ThreepidBehaviour.REMOTE,
-            ThreepidBehaviour.LOCAL,
-        )
+        return self.hs.config.email.can_verify_email
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("email", authdict)
@@ -254,8 +244,10 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
-        self._enabled = bool(hs.config.registration.registration_requires_token)
-        self.store = hs.get_datastore()
+        self._enabled = bool(
+            hs.config.registration.registration_requires_token
+        ) or bool(hs.config.registration.enable_registration_token_3pid_bypass)
+        self.store = hs.get_datastores().main
 
     def is_enabled(self) -> bool:
         return self._enabled

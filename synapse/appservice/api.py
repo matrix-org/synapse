@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,20 +14,25 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from prometheus_client import Counter
+from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
+from synapse.appservice import (
+    ApplicationService,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.events import EventBase
-from synapse.events.utils import serialize_event
+from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
-    from synapse.appservice import ApplicationService
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -47,6 +53,18 @@ sent_events_counter = Counter(
     "synapse_appservice_api_sent_events", "Number of events sent to the AS", ["service"]
 )
 
+sent_ephemeral_counter = Counter(
+    "synapse_appservice_api_sent_ephemeral",
+    "Number of ephemeral events sent to the AS",
+    ["service"],
+)
+
+sent_todevice_counter = Counter(
+    "synapse_appservice_api_sent_todevice",
+    "Number of todevice messages sent to the AS",
+    ["service"],
+)
+
 HOUR_IN_MS = 60 * 60 * 1000
 
 
@@ -61,7 +79,7 @@ def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     return True
 
 
-def _is_valid_3pe_result(r: JsonDict, field: str) -> bool:
+def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     if not isinstance(r, dict):
         return False
 
@@ -102,7 +120,11 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self.get_json(
+                uri,
+                {"access_token": service.hs_token},
+                headers={"Authorization": f"Bearer {service.hs_token}"},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -122,7 +144,11 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self.get_json(
+                uri,
+                {"access_token": service.hs_token},
+                headers={"Authorization": f"Bearer {service.hs_token}"},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -149,6 +175,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
             APP_SERVICE_PREFIX,
@@ -156,7 +185,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             urllib.parse.quote(protocol),
         )
         try:
-            response = await self.get_json(uri, fields)
+            args: Mapping[Any, Any] = {
+                **fields,
+                b"access_token": service.hs_token,
+            }
+            response = await self.get_json(
+                uri, args=args, headers={"Authorization": f"Bearer {service.hs_token}"}
+            )
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
@@ -184,13 +219,19 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
+            # This is required by the configuration.
+            assert service.hs_token is not None
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri)
+                info = await self.get_json(
+                    uri,
+                    {"access_token": service.hs_token},
+                    headers={"Authorization": f"Bearer {service.hs_token}"},
+                )
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -218,8 +259,26 @@ class ApplicationServiceApi(SimpleHttpClient):
         service: "ApplicationService",
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
     ) -> bool:
+        """
+        Push data to an application service.
+
+        Args:
+            service: The application service to send to.
+            events: The persistent events to send.
+            ephemeral: The ephemeral events to send.
+            to_device_messages: The to-device messages to send.
+            txn_id: An unique ID to assign to this transaction. Application services should
+                deduplicate transactions received with identitical IDs.
+
+        Returns:
+            True if the task succeeded, False if it failed.
+        """
         if service.url is None:
             return True
 
@@ -237,19 +296,38 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
         # Never send ephemeral events to appservices that do not support it
+        body: JsonDict = {"events": serialized_events}
         if service.supports_ephemeral:
-            body = {
-                "events": serialized_events,
-                "de.sorunome.msc2409.ephemeral": ephemeral,
-            }
-        else:
-            body = {"events": serialized_events}
+            body.update(
+                {
+                    # TODO: Update to stable prefixes once MSC2409 completes FCP merge.
+                    "de.sorunome.msc2409.ephemeral": ephemeral,
+                    "de.sorunome.msc2409.to_device": to_device_messages,
+                }
+            )
+
+        # TODO: Update to stable prefixes once MSC3202 completes FCP merge
+        if service.msc3202_transaction_extensions:
+            if one_time_key_counts:
+                body[
+                    "org.matrix.msc3202.device_one_time_key_counts"
+                ] = one_time_key_counts
+            if unused_fallback_keys:
+                body[
+                    "org.matrix.msc3202.device_unused_fallback_key_types"
+                ] = unused_fallback_keys
+            if device_list_summary:
+                body["org.matrix.msc3202.device_lists"] = {
+                    "changed": list(device_list_summary.changed),
+                    "left": list(device_list_summary.left),
+                }
 
         try:
             await self.put_json(
                 uri=uri,
                 json_body=body,
                 args={"access_token": service.hs_token},
+                headers={"Authorization": f"Bearer {service.hs_token}"},
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -259,6 +337,8 @@ class ApplicationServiceApi(SimpleHttpClient):
                 )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(serialized_events))
+            sent_ephemeral_counter.labels(service.id).inc(len(ephemeral))
+            sent_todevice_counter.labels(service.id).inc(len(to_device_messages))
             return True
         except CodeMessageException as e:
             logger.warning(
@@ -288,16 +368,18 @@ class ApplicationServiceApi(SimpleHttpClient):
             serialize_event(
                 e,
                 time_now,
-                as_client_event=True,
-                # If this is an invite or a knock membership event, and we're interested
-                # in this user, then include any stripped state alongside the event.
-                include_stripped_room_state=(
-                    e.type == EventTypes.Member
-                    and (
-                        e.membership == Membership.INVITE
-                        or e.membership == Membership.KNOCK
-                    )
-                    and service.is_interested_in_user(e.state_key)
+                config=SerializeEventConfig(
+                    as_client_event=True,
+                    # If this is an invite or a knock membership event, and we're interested
+                    # in this user, then include any stripped state alongside the event.
+                    include_stripped_room_state=(
+                        e.type == EventTypes.Member
+                        and (
+                            e.membership == Membership.INVITE
+                            or e.membership == Membership.KNOCK
+                        )
+                        and service.is_interested_in_user(e.state_key)
+                    ),
                 ),
             )
             for e in events

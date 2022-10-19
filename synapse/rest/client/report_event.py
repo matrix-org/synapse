@@ -38,7 +38,7 @@ class ReportEventRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, event_id: str

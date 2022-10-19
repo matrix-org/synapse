@@ -19,6 +19,7 @@ import logging
 import types
 import urllib
 from http import HTTPStatus
+from http.client import FOUND
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
@@ -43,6 +44,7 @@ from typing_extensions import Protocol
 from zope.interface import implementer
 
 from twisted.internet import defer, interfaces
+from twisted.internet.defer import CancelledError
 from twisted.python import failure
 from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET, Request
@@ -56,11 +58,13 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.config.homeserver import HomeServerConfig
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
 from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
@@ -82,17 +86,37 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+# A fictional HTTP status code for requests where the client has disconnected and we
+# successfully cancelled the request. Used only for logging purposes. Clients will never
+# observe this code unless cancellations leak across requests or we raise a
+# `CancelledError` ourselves.
+# Analogous to nginx's 499 status code:
+# https://github.com/nginx/nginx/blob/release-1.21.6/src/http/ngx_http_request.h#L128-L134
+HTTP_STATUS_REQUEST_CANCELLED = 499
 
-def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
+
+def return_json_error(
+    f: failure.Failure, request: SynapseRequest, config: Optional[HomeServerConfig]
+) -> None:
     """Sends a JSON error response to clients."""
 
     if f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
         exc: SynapseError = f.value  # type: ignore
         error_code = exc.code
-        error_dict = exc.error_dict()
-
+        error_dict = exc.error_dict(config)
         logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
+    elif f.check(CancelledError):
+        error_code = HTTP_STATUS_REQUEST_CANCELLED
+        error_dict = {"error": "Request cancelled", "errcode": Codes.UNKNOWN}
+
+        if not request._disconnected:
+            logger.error(
+                "Got cancellation before client disconnection from %r: %r",
+                request.request_metrics.name,
+                request,
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            )
     else:
         error_code = 500
         error_dict = {"error": "Internal server error", "errcode": Codes.UNKNOWN}
@@ -152,6 +176,16 @@ def return_html_error(
         else:
             logger.error(
                 "Failed handle request %r",
+                request,
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            )
+    elif f.check(CancelledError):
+        code = HTTP_STATUS_REQUEST_CANCELLED
+        msg = "Request cancelled"
+
+        if not request._disconnected:
+            logger.error(
+                "Got cancellation before client disconnection when handling request %r",
                 request,
                 exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
             )
@@ -223,6 +257,9 @@ class HttpServer(Protocol):
         If the regex contains groups these gets passed to the callback via
         an unpacked tuple.
 
+        The callback may be marked with the `@cancellable` decorator, which will
+        cause request processing to be cancelled when clients disconnect early.
+
         Args:
             method: The HTTP method to listen to.
             path_patterns: The regex used to match requests.
@@ -233,7 +270,6 @@ class HttpServer(Protocol):
             servlet_classname (str): The name of the handler to be used in prometheus
                 and opentracing logs.
         """
-        pass
 
 
 class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
@@ -254,7 +290,9 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
     def render(self, request: SynapseRequest) -> int:
         """This gets called by twisted every time someone sends us a request."""
-        defer.ensureDeferred(self._async_render_wrapper(request))
+        request.render_deferred = defer.ensureDeferred(
+            self._async_render_wrapper(request)
+        )
         return NOT_DONE_YET
 
     @wrap_async_request_handler
@@ -290,17 +328,19 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
         method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
+            request.is_render_cancellable = is_function_cancellable(method_handler)
+
             raw_callback_return = method_handler(request)
 
             # Is it synchronous? We'll allow this for now.
             if isawaitable(raw_callback_return):
                 callback_return = await raw_callback_return
             else:
-                callback_return = raw_callback_return  # type: ignore
+                callback_return = raw_callback_return
 
             return callback_return
 
-        _unrecognised_request_handler(request)
+        return _unrecognised_request_handler(request)
 
     @abc.abstractmethod
     def _send_response(
@@ -351,7 +391,7 @@ class DirectServeJsonResource(_AsyncResource):
         request: SynapseRequest,
     ) -> None:
         """Implements _AsyncResource._send_error_response"""
-        return_json_error(f, request)
+        return_json_error(f, request, None)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -450,6 +490,8 @@ class JsonResource(DirectServeJsonResource):
     async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
+        request.is_render_cancellable = is_function_cancellable(callback)
+
         # Make sure we have an appropriate name for this handler in prometheus
         # (rather than the default of JsonResource).
         request.request_metrics.name = servlet_classname
@@ -470,9 +512,17 @@ class JsonResource(DirectServeJsonResource):
         if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
             callback_return = await raw_callback_return
         else:
-            callback_return = raw_callback_return  # type: ignore
+            callback_return = raw_callback_return
 
         return callback_return
+
+    def _send_error_response(
+        self,
+        f: failure.Failure,
+        request: SynapseRequest,
+    ) -> None:
+        """Implements _AsyncResource._send_error_response"""
+        return_json_error(f, request, self.hs.config)
 
 
 class DirectServeHtmlResource(_AsyncResource):
@@ -549,7 +599,7 @@ class RootRedirect(resource.Resource):
 class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
-    def render_OPTIONS(self, request: Request) -> bytes:
+    def render_OPTIONS(self, request: SynapseRequest) -> bytes:
         request.setResponseCode(204)
         request.setHeader(b"Content-Length", b"0")
 
@@ -656,7 +706,7 @@ class _ByteProducer:
         self._request = None
 
 
-def _encode_json_bytes(json_object: Any) -> bytes:
+def _encode_json_bytes(json_object: object) -> bytes:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
@@ -684,6 +734,9 @@ def respond_with_json(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -694,11 +747,10 @@ def respond_with_json(
         return None
 
     if canonical_json:
-        encoder = encode_canonical_json
+        encoder: Callable[[object], bytes] = encode_canonical_json
     else:
         encoder = _encode_json_bytes
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
@@ -712,7 +764,7 @@ def respond_with_json(
 
 
 def respond_with_json_bytes(
-    request: Request,
+    request: SynapseRequest,
     code: int,
     json_bytes: bytes,
     send_cors: bool = False,
@@ -729,13 +781,15 @@ def respond_with_json_bytes(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     if request._disconnected:
         logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return None
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
@@ -806,7 +860,7 @@ def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
     _ByteProducer(request, bytes_generator)
 
 
-def set_cors_headers(request: Request) -> None:
+def set_cors_headers(request: SynapseRequest) -> None:
     """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
@@ -817,10 +871,31 @@ def set_cors_headers(request: Request) -> None:
     request.setHeader(
         b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
-    request.setHeader(
-        b"Access-Control-Allow-Headers",
-        b"X-Requested-With, Content-Type, Authorization, Date",
-    )
+    if request.experimental_cors_msc3886:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"ETag, Location, X-Max-Bytes",
+        )
+    else:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date",
+        )
+
+
+def set_corp_headers(request: Request) -> None:
+    """Set the CORP headers so that javascript running in a web browsers can
+    embed the resource returned from this request when their client requires
+    the `Cross-Origin-Embedder-Policy: require-corp` header.
+
+    Args:
+        request: The http request to add the CORP header to.
+    """
+    request.setHeader(b"Cross-Origin-Resource-Policy", b"cross-origin")
 
 
 def respond_with_html(request: Request, code: int, html: str) -> None:
@@ -841,6 +916,9 @@ def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes) -> N
         code: The HTTP response code.
         html_bytes: The HTML bytes to use as the response body.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -850,7 +928,6 @@ def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes) -> N
         )
         return None
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
     request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
@@ -876,10 +953,25 @@ def set_clickjacking_protection_headers(request: Request) -> None:
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def respond_with_redirect(request: Request, url: bytes) -> None:
-    """Write a 302 response to the request, if it is still alive."""
+def respond_with_redirect(
+    request: SynapseRequest, url: bytes, statusCode: int = FOUND, cors: bool = False
+) -> None:
+    """
+    Write a 302 (or other specified status code) response to the request, if it is still alive.
+
+    Args:
+        request: The http request to respond to.
+        url: The URL to redirect to.
+        statusCode: The HTTP status code to use for the redirect (defaults to 302).
+        cors: Whether to set CORS headers on the response.
+    """
     logger.debug("Redirect to %s", url.decode("utf-8"))
-    request.redirect(url)
+
+    if cors:
+        set_cors_headers(request)
+
+    request.setResponseCode(statusCode)
+    request.setHeader(b"location", url)
     finish_request(request)
 
 

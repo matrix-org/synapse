@@ -4,6 +4,9 @@ This API allows a server administrator to manage the validity of an account. To
 use it, you must enable the account validity feature (under
 `account_validity`) in Synapse's configuration.
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 ## Renew account
 
 This API extends the validity of an account by as much time as configured in the

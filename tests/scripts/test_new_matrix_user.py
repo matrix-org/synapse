@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from typing import List
+from unittest.mock import Mock, patch
 
 from synapse._scripts.register_new_matrix_user import request_registration
 
@@ -49,19 +50,19 @@ class RegisterTestCase(TestCase):
         requests.post = post
 
         # The fake stdout will be written here
-        out = []
-        err_code = []
+        out: List[str] = []
+        err_code: List[int] = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # We should get the success message making sure everything is OK.
         self.assertIn("Success!", out)
@@ -85,19 +86,19 @@ class RegisterTestCase(TestCase):
         requests.get = get
 
         # The fake stdout will be written here
-        out = []
-        err_code = []
+        out: List[str] = []
+        err_code: List[int] = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # Exit was called
         self.assertEqual(err_code, [1])
@@ -137,19 +138,19 @@ class RegisterTestCase(TestCase):
         requests.post = post
 
         # The fake stdout will be written here
-        out = []
-        err_code = []
+        out: List[str] = []
+        err_code: List[int] = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # Exit was called
         self.assertEqual(err_code, [1])

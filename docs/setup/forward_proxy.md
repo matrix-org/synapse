@@ -66,8 +66,8 @@ in Synapse can be deactivated.
 
 **NOTE**: This has an impact on security and is for testing purposes only!
 
-To deactivate the certificate validation, the following setting must be made in
-[homserver.yaml](../usage/configuration/homeserver_sample_config.md).
+To deactivate the certificate validation, the following setting must be added to
+your [homserver.yaml](../usage/configuration/homeserver_sample_config.md).
 
 ```yaml
 use_insecure_ssl_client_just_for_testing_do_not_use: true

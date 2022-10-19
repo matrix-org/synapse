@@ -13,14 +13,14 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.user_directory import SearchResult
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import JsonDict
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -55,12 +55,13 @@ class UserDirectoryHandler(StateDeltasHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.update_user_directory = hs.config.server.update_user_directory
+        self.update_user_directory = hs.config.worker.should_update_user_directory
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
@@ -78,7 +79,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     async def search_users(
         self, user_id: str, search_term: str, limit: int
-    ) -> JsonDict:
+    ) -> SearchResult:
         """Searches for users in directory
 
         Returns:
@@ -174,7 +175,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 logger.debug(
                     "Processing user stats %s->%s", self.pos, room_max_stream_ordering
                 )
-                max_pos, deltas = await self.store.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self.pos, room_max_stream_ordering
                 )
 
@@ -375,7 +379,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             user_id, event.content.get("displayname"), event.content.get("avatar_url")
         )
 
-    async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
+    async def _track_user_joined_room(self, room_id: str, joining_user_id: str) -> None:
         """Someone's just joined a room. Update `users_in_public_rooms` or
         `users_who_share_private_rooms` as appropriate.
 
@@ -386,32 +390,44 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
         if is_public:
-            await self.store.add_users_in_public_rooms(room_id, (user_id,))
+            await self.store.add_users_in_public_rooms(room_id, (joining_user_id,))
         else:
             users_in_room = await self.store.get_users_in_room(room_id)
             other_users_in_room = [
                 other
                 for other in users_in_room
-                if other != user_id
+                if other != joining_user_id
                 and (
+                    # We can't apply any special rules to remote users so
+                    # they're always included
                     not self.is_mine_id(other)
+                    # Check the special rules whether the local user should be
+                    # included in the user directory
                     or await self.store.should_include_local_user_in_dir(other)
                 )
             ]
-            to_insert = set()
+            updates_to_users_who_share_rooms: Set[Tuple[str, str]] = set()
 
-            # First, if they're our user then we need to update for every user
-            if self.is_mine_id(user_id):
+            # First, if the joining user is our local user then we need an
+            # update for every other user in the room.
+            if self.is_mine_id(joining_user_id):
                 for other_user_id in other_users_in_room:
-                    to_insert.add((user_id, other_user_id))
+                    updates_to_users_who_share_rooms.add(
+                        (joining_user_id, other_user_id)
+                    )
 
-            # Next we need to update for every local user in the room
+            # Next, we need an update for every other local user in the room
+            # that they now share a room with the joining user.
             for other_user_id in other_users_in_room:
                 if self.is_mine_id(other_user_id):
-                    to_insert.add((other_user_id, user_id))
+                    updates_to_users_who_share_rooms.add(
+                        (other_user_id, joining_user_id)
+                    )
 
-            if to_insert:
-                await self.store.add_users_who_share_private_room(room_id, to_insert)
+            if updates_to_users_who_share_rooms:
+                await self.store.add_users_who_share_private_room(
+                    room_id, updates_to_users_who_share_rooms
+                )
 
     async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
         """Called when when someone leaves a room. The user may be local or remote.

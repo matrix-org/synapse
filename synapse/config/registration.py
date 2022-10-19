@@ -13,18 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from synapse.api.constants import RoomCreationPreset
-from synapse.config._base import Config, ConfigError
-from synapse.types import RoomAlias, UserID
+from synapse.config._base import Config, ConfigError, read_file
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols, strtobool
+
+NO_EMAIL_DELEGATE_ERROR = """\
+Delegation of email verification to an identity server is no longer supported. To
+continue to allow users to add email addresses to their accounts, and use them for
+password resets, configure Synapse with an SMTP server via the `email` setting, and
+remove `account_threepid_delegates.email`.
+"""
+
+CONFLICTING_SHARED_SECRET_OPTS_ERROR = """\
+You have configured both `registration_shared_secret` and
+`registration_shared_secret_path`. These are mutually incompatible.
+"""
 
 
 class RegistrationConfig(Config):
     section = "registration"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_registration = strtobool(
             str(config.get("enable_registration", False))
         )
@@ -33,18 +45,35 @@ class RegistrationConfig(Config):
                 str(config["disable_registration"])
             )
 
+        self.enable_registration_without_verification = strtobool(
+            str(config.get("enable_registration_without_verification", False))
+        )
+
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
         self.registration_requires_token = config.get(
             "registration_requires_token", False
         )
+        self.enable_registration_token_3pid_bypass = config.get(
+            "enable_registration_token_3pid_bypass", False
+        )
+
+        # read the shared secret, either inline or from an external file
         self.registration_shared_secret = config.get("registration_shared_secret")
+        registration_shared_secret_path = config.get("registration_shared_secret_path")
+        if registration_shared_secret_path:
+            if self.registration_shared_secret:
+                raise ConfigError(CONFLICTING_SHARED_SECRET_OPTS_ERROR)
+            self.registration_shared_secret = read_file(
+                registration_shared_secret_path, ("registration_shared_secret_path",)
+            ).strip()
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
 
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
-        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        if "email" in account_threepid_delegates:
+            raise ConfigError(NO_EMAIL_DELEGATE_ERROR)
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
@@ -192,275 +221,31 @@ class RegistrationConfig(Config):
 
         self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
 
-    def generate_config_section(self, generate_secrets=False, **kwargs):
+    def generate_config_section(
+        self, generate_secrets: bool = False, **kwargs: Any
+    ) -> str:
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
                 random_string_with_symbols(50),
             )
+            return registration_shared_secret
         else:
-            registration_shared_secret = "#registration_shared_secret: <PRIVATE STRING>"
+            return ""
 
-        return (
-            """\
-        ## Registration ##
-        #
-        # Registration can be rate-limited using the parameters in the "Ratelimiting"
-        # section of this file.
-
-        # Enable registration for new users.
-        #
-        #enable_registration: false
-
-        # Time that a user's session remains valid for, after they log in.
-        #
-        # Note that this is not currently compatible with guest logins.
-        #
-        # Note also that this is calculated at login time: changes are not applied
-        # retrospectively to users who have already logged in.
-        #
-        # By default, this is infinite.
-        #
-        #session_lifetime: 24h
-
-        # Time that an access token remains valid for, if the session is
-        # using refresh tokens.
-        # For more information about refresh tokens, please see the manual.
-        # Note that this only applies to clients which advertise support for
-        # refresh tokens.
-        #
-        # Note also that this is calculated at login time and refresh time:
-        # changes are not applied to existing sessions until they are refreshed.
-        #
-        # By default, this is 5 minutes.
-        #
-        #refreshable_access_token_lifetime: 5m
-
-        # Time that a refresh token remains valid for (provided that it is not
-        # exchanged for another one first).
-        # This option can be used to automatically log-out inactive sessions.
-        # Please see the manual for more information.
-        #
-        # Note also that this is calculated at login time and refresh time:
-        # changes are not applied to existing sessions until they are refreshed.
-        #
-        # By default, this is infinite.
-        #
-        #refresh_token_lifetime: 24h
-
-        # Time that an access token remains valid for, if the session is NOT
-        # using refresh tokens.
-        # Please note that not all clients support refresh tokens, so setting
-        # this to a short value may be inconvenient for some users who will
-        # then be logged out frequently.
-        #
-        # Note also that this is calculated at login time: changes are not applied
-        # retrospectively to existing sessions for users that have already logged in.
-        #
-        # By default, this is infinite.
-        #
-        #nonrefreshable_access_token_lifetime: 24h
-
-        # The user must provide all of the below types of 3PID when registering.
-        #
-        #registrations_require_3pid:
-        #  - email
-        #  - msisdn
-
-        # Explicitly disable asking for MSISDNs from the registration
-        # flow (overrides registrations_require_3pid if MSISDNs are set as required)
-        #
-        #disable_msisdn_registration: true
-
-        # Mandate that users are only allowed to associate certain formats of
-        # 3PIDs with accounts on this server.
-        #
-        #allowed_local_3pids:
-        #  - medium: email
-        #    pattern: '^[^@]+@matrix\\.org$'
-        #  - medium: email
-        #    pattern: '^[^@]+@vector\\.im$'
-        #  - medium: msisdn
-        #    pattern: '\\+44'
-
-        # Enable 3PIDs lookup requests to identity servers from this server.
-        #
-        #enable_3pid_lookup: true
-
-        # Require users to submit a token during registration.
-        # Tokens can be managed using the admin API:
-        # https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
-        # Note that `enable_registration` must be set to `true`.
-        # Disabling this option will not delete any tokens previously generated.
-        # Defaults to false. Uncomment the following to require tokens:
-        #
-        #registration_requires_token: true
-
-        # If set, allows registration of standard or admin accounts by anyone who
-        # has the shared secret, even if registration is otherwise disabled.
-        #
-        %(registration_shared_secret)s
-
-        # Set the number of bcrypt rounds used to generate password hash.
-        # Larger numbers increase the work factor needed to generate the hash.
-        # The default number is 12 (which equates to 2^12 rounds).
-        # N.B. that increasing this will exponentially increase the time required
-        # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
-        #
-        #bcrypt_rounds: 12
-
-        # Allows users to register as guests without a password/email/etc, and
-        # participate in rooms hosted on this server which have been made
-        # accessible to anonymous users.
-        #
-        #allow_guest_access: false
-
-        # The identity server which we suggest that clients should use when users log
-        # in on this server.
-        #
-        # (By default, no suggestion is made, so it is left up to the client.
-        # This setting is ignored unless public_baseurl is also explicitly set.)
-        #
-        #default_identity_server: https://matrix.org
-
-        # Handle threepid (email/phone etc) registration and password resets through a set of
-        # *trusted* identity servers. Note that this allows the configured identity server to
-        # reset passwords for accounts!
-        #
-        # Be aware that if `email` is not set, and SMTP options have not been
-        # configured in the email config block, registration and user password resets via
-        # email will be globally disabled.
-        #
-        # Additionally, if `msisdn` is not set, registration and password resets via msisdn
-        # will be disabled regardless, and users will not be able to associate an msisdn
-        # identifier to their account. This is due to Synapse currently not supporting
-        # any method of sending SMS messages on its own.
-        #
-        # To enable using an identity server for operations regarding a particular third-party
-        # identifier type, set the value to the URL of that identity server as shown in the
-        # examples below.
-        #
-        # Servers handling the these requests must answer the `/requestToken` endpoints defined
-        # by the Matrix Identity Service API specification:
-        # https://matrix.org/docs/spec/identity_service/latest
-        #
-        account_threepid_delegates:
-            #email: https://example.com     # Delegate email sending to example.com
-            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
-
-        # Whether users are allowed to change their displayname after it has
-        # been initially set. Useful when provisioning users based on the
-        # contents of a third-party directory.
-        #
-        # Does not apply to server administrators. Defaults to 'true'
-        #
-        #enable_set_displayname: false
-
-        # Whether users are allowed to change their avatar after it has been
-        # initially set. Useful when provisioning users based on the contents
-        # of a third-party directory.
-        #
-        # Does not apply to server administrators. Defaults to 'true'
-        #
-        #enable_set_avatar_url: false
-
-        # Whether users can change the 3PIDs associated with their accounts
-        # (email address and msisdn).
-        #
-        # Defaults to 'true'
-        #
-        #enable_3pid_changes: false
-
-        # Users who register on this homeserver will automatically be joined
-        # to these rooms.
-        #
-        # By default, any room aliases included in this list will be created
-        # as a publicly joinable room when the first user registers for the
-        # homeserver. This behaviour can be customised with the settings below.
-        # If the room already exists, make certain it is a publicly joinable
-        # room. The join rule of the room must be set to 'public'.
-        #
-        #auto_join_rooms:
-        #  - "#example:example.com"
-
-        # Where auto_join_rooms are specified, setting this flag ensures that the
-        # the rooms exist by creating them when the first user on the
-        # homeserver registers.
-        #
-        # By default the auto-created rooms are publicly joinable from any federated
-        # server. Use the autocreate_auto_join_rooms_federated and
-        # autocreate_auto_join_room_preset settings below to customise this behaviour.
-        #
-        # Setting to false means that if the rooms are not manually created,
-        # users cannot be auto-joined since they do not exist.
-        #
-        # Defaults to true. Uncomment the following line to disable automatically
-        # creating auto-join rooms.
-        #
-        #autocreate_auto_join_rooms: false
-
-        # Whether the auto_join_rooms that are auto-created are available via
-        # federation. Only has an effect if autocreate_auto_join_rooms is true.
-        #
-        # Note that whether a room is federated cannot be modified after
-        # creation.
-        #
-        # Defaults to true: the room will be joinable from other servers.
-        # Uncomment the following to prevent users from other homeservers from
-        # joining these rooms.
-        #
-        #autocreate_auto_join_rooms_federated: false
-
-        # The room preset to use when auto-creating one of auto_join_rooms. Only has an
-        # effect if autocreate_auto_join_rooms is true.
-        #
-        # This can be one of "public_chat", "private_chat", or "trusted_private_chat".
-        # If a value of "private_chat" or "trusted_private_chat" is used then
-        # auto_join_mxid_localpart must also be configured.
-        #
-        # Defaults to "public_chat", meaning that the room is joinable by anyone, including
-        # federated servers if autocreate_auto_join_rooms_federated is true (the default).
-        # Uncomment the following to require an invitation to join these rooms.
-        #
-        #autocreate_auto_join_room_preset: private_chat
-
-        # The local part of the user id which is used to create auto_join_rooms if
-        # autocreate_auto_join_rooms is true. If this is not provided then the
-        # initial user account that registers will be used to create the rooms.
-        #
-        # The user id is also used to invite new users to any auto-join rooms which
-        # are set to invite-only.
-        #
-        # It *must* be configured if autocreate_auto_join_room_preset is set to
-        # "private_chat" or "trusted_private_chat".
-        #
-        # Note that this must be specified in order for new users to be correctly
-        # invited to any auto-join rooms which have been set to invite-only (either
-        # at the time of creation or subsequently).
-        #
-        # Note that, if the room already exists, this user must be joined and
-        # have the appropriate permissions to invite new members.
-        #
-        #auto_join_mxid_localpart: system
-
-        # When auto_join_rooms is specified, setting this flag to false prevents
-        # guest accounts from being automatically joined to the rooms.
-        #
-        # Defaults to true.
-        #
-        #auto_join_rooms_for_guests: false
-
-        # Whether to inhibit errors raised when registering a new account if the user ID
-        # already exists. If turned on, that requests to /register/available will always
-        # show a user ID as available, and Synapse won't raise an error when starting
-        # a registration with a user ID that already exists. However, Synapse will still
-        # raise an error if the registration completes and the username conflicts.
-        #
-        # Defaults to false.
-        #
-        #inhibit_user_in_use_error: true
-        """
-            % locals()
-        )
+    def generate_files(self, config: Dict[str, Any], config_dir_path: str) -> None:
+        # if 'registration_shared_secret_path' is specified, and the target file
+        # does not exist, generate it.
+        registration_shared_secret_path = config.get("registration_shared_secret_path")
+        if registration_shared_secret_path and not self.path_exists(
+            registration_shared_secret_path
+        ):
+            print(
+                "Generating registration shared secret file "
+                + registration_shared_secret_path
+            )
+            secret = random_string_with_symbols(50)
+            with open(registration_shared_secret_path, "w") as f:
+                f.write(f"{secret}\n")
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:
