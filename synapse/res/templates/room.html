@@ -27,7 +27,7 @@
         </tr>
     {%- else %}
         {%- for notif in room.notifs %}
-            {%- include 'fragments/notif.html' with context %}
+            {%- include 'notif.html' with context %}
         {%- endfor %}
     {%- endif %}
 </table>
