@@ -112,7 +112,7 @@ jobs:
 
           docker buildx build \
             --push \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --tag ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }} \
             $extraTag \
             -f docker/Dockerfile \
