@@ -481,15 +481,21 @@ class FederationServer(FederationBase):
                     pdu_results[pdu.event_id] = await process_pdu(pdu)
 
         async def process_pdu(pdu: EventBase) -> JsonDict:
+            """
+            Processes a pushed PDU sent to us via a `/send` transaction
+
+            Returns:
+                JsonDict representing a "PDU Processing Result" that will be bundled up
+                with the other processed PDU's in the `/send` transaction and sent back
+                to remote homeserver.
+            """
             event_id = pdu.event_id
             with nested_logging_context(event_id):
                 try:
                     await self._handle_received_pdu(origin, pdu)
-                    # Construct a "PDU Processing Result"
                     return {}
                 except FederationError as e:
                     logger.warning("Error handling PDU %s: %s", event_id, e)
-                    # Construct a "PDU Processing Result"
                     return {"error": str(e)}
                 except Exception as e:
                     f = failure.Failure()
@@ -498,7 +504,6 @@ class FederationServer(FederationBase):
                         event_id,
                         exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                     )
-                    # Construct a "PDU Processing Result"
                     return {"error": str(e)}
 
         await concurrently_execute(
