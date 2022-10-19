@@ -135,7 +135,6 @@ def default_config(
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
         "password_providers": [],
-        "worker_replication_url": "",
         "worker_app": None,
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
@@ -271,9 +270,7 @@ class MockClock:
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        # This type-ignore should be redundant once we use a mypy release with
-        # https://github.com/python/mypy/pull/12668.
-        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))  # type: ignore[arg-type]
+        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))
 
     def cancel_call_later(self, timer: Timer, ignore_errs: bool = False) -> None:
         if timer.expired:

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -23,6 +23,7 @@ from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
+from synapse.logging.opentracing import log_kv, trace
 from synapse.types import JsonDict, get_domain_from_id
 
 if TYPE_CHECKING:
@@ -55,8 +56,14 @@ class FederationBase:
         self._clock = hs.get_clock()
         self._storage_controllers = hs.get_storage_controllers()
 
+    @trace
     async def _check_sigs_and_hash(
-        self, room_version: RoomVersion, pdu: EventBase
+        self,
+        room_version: RoomVersion,
+        pdu: EventBase,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> EventBase:
         """Checks that event is correctly signed by the sending server.
 
@@ -68,6 +75,11 @@ class FederationBase:
         Args:
             room_version: The room version of the PDU
             pdu: the event to be checked
+            record_failure_callback: A callback to run whenever the given event
+                fails signature or hash checks. This includes exceptions
+                that would be normally be thrown/raised but also things like
+                checking for event tampering where we just return the redacted
+                event.
 
         Returns:
               * the original event if the checks pass
@@ -78,7 +90,12 @@ class FederationBase:
           InvalidEventSignatureError if the signature check failed. Nothing
              will be logged in this case.
         """
-        await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        try:
+            await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        except InvalidEventSignatureError as exc:
+            if record_failure_callback:
+                await record_failure_callback(pdu, str(exc))
+            raise exc
 
         if not check_event_content_hash(pdu):
             # let's try to distinguish between failures because the event was
@@ -97,17 +114,40 @@ class FederationBase:
                     "Event %s seems to have been redacted; using our redacted copy",
                     pdu.event_id,
                 )
+                log_kv(
+                    {
+                        "message": "Event seems to have been redacted; using our redacted copy",
+                        "event_id": pdu.event_id,
+                    }
+                )
             else:
                 logger.warning(
                     "Event %s content has been tampered, redacting",
                     pdu.event_id,
                 )
+                log_kv(
+                    {
+                        "message": "Event content has been tampered, redacting",
+                        "event_id": pdu.event_id,
+                    }
+                )
+                if record_failure_callback:
+                    await record_failure_callback(
+                        pdu, "Event content has been tampered with"
+                    )
             return redacted_event
 
         spam_check = await self.spam_checker.check_event_for_spam(pdu)
 
         if spam_check != self.spam_checker.NOT_SPAM:
             logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
+            log_kv(
+                {
+                    "message": "Event contains spam, redacting (to save disk space) "
+                    "as well as soft-failing (to stop using the event in prev_events)",
+                    "event_id": pdu.event_id,
+                }
+            )
             # we redact (to save disk space) as well as soft-failing (to stop
             # using the event in prev_events).
             redacted_event = prune_event(pdu)
@@ -117,6 +157,7 @@ class FederationBase:
         return pdu
 
 
+@trace
 async def _check_sigs_on_pdu(
     keyring: Keyring, room_version: RoomVersion, pdu: EventBase
 ) -> None:
@@ -172,7 +213,7 @@ async def _check_sigs_on_pdu(
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     # (ie, the room version uses old-style non-hash event IDs).
-    if room_version.event_format == EventFormatVersions.V1:
+    if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
         event_domain = get_domain_from_id(pdu.event_id)
         if event_domain != sender_domain:
             try:

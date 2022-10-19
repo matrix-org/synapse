@@ -69,10 +69,14 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
 
         self.request_url = None
 
-        async def get_json(url: str, args: Mapping[Any, Any]) -> List[JsonDict]:
-            if not args.get(b"access_token"):
+        async def get_json(
+            url: str, args: Mapping[Any, Any], headers: Mapping[Any, Any]
+        ) -> List[JsonDict]:
+            # Ensure the access token is passed as both a header and query arg.
+            if not headers.get("Authorization") or not args.get(b"access_token"):
                 raise RuntimeError("Access token not provided")
 
+            self.assertEqual(headers.get("Authorization"), f"Bearer {TOKEN}")
             self.assertEqual(args.get(b"access_token"), TOKEN)
             self.request_url = url
             if url == URL_USER:

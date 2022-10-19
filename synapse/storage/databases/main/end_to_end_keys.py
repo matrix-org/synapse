@@ -43,6 +43,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
     make_in_list_sql_clause,
+    make_tuple_in_list_sql_clause,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.engines import PostgresEngine
@@ -50,6 +51,7 @@ from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -135,6 +137,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         return now_stream_id, []
 
     @trace
+    @cancellable
     async def get_e2e_device_keys_for_cs_api(
         self, query_list: List[Tuple[str, Optional[str]]]
     ) -> Dict[str, Dict[str, JsonDict]]:
@@ -197,6 +200,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         ...
 
     @trace
+    @cancellable
     async def get_e2e_device_keys_and_signatures(
         self,
         query_list: Collection[Tuple[str, Optional[str]]],
@@ -275,7 +279,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     def _get_e2e_device_keys_txn(
         self,
         txn: LoggingTransaction,
-        query_list: Collection[Tuple[str, str]],
+        query_list: Collection[Tuple[str, Optional[str]]],
         include_all_devices: bool = False,
         include_deleted_devices: bool = False,
     ) -> Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]:
@@ -285,8 +289,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         cross-signing signatures which have been added subsequently (for which, see
         get_e2e_device_keys_and_signatures)
         """
-        query_clauses = []
-        query_params = []
+        query_clauses: List[str] = []
+        query_params_list: List[List[object]] = []
 
         if include_all_devices is False:
             include_deleted_devices = False
@@ -294,40 +298,64 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         if include_deleted_devices:
             deleted_devices = set(query_list)
 
+        # Split the query list into queries for users and queries for particular
+        # devices.
+        user_list = []
+        user_device_list = []
         for (user_id, device_id) in query_list:
-            query_clause = "user_id = ?"
-            query_params.append(user_id)
+            if device_id is None:
+                user_list.append(user_id)
+            else:
+                user_device_list.append((user_id, device_id))
 
-            if device_id is not None:
-                query_clause += " AND device_id = ?"
-                query_params.append(device_id)
+        if user_list:
+            user_id_in_list_clause, user_args = make_in_list_sql_clause(
+                txn.database_engine, "user_id", user_list
+            )
+            query_clauses.append(user_id_in_list_clause)
+            query_params_list.append(user_args)
 
-            query_clauses.append(query_clause)
-
-        sql = (
-            "SELECT user_id, device_id, "
-            "    d.display_name, "
-            "    k.key_json"
-            " FROM devices d"
-            "    %s JOIN e2e_device_keys_json k USING (user_id, device_id)"
-            " WHERE %s AND NOT d.hidden"
-        ) % (
-            "LEFT" if include_all_devices else "INNER",
-            " OR ".join("(" + q + ")" for q in query_clauses),
-        )
-
-        txn.execute(sql, query_params)
+        if user_device_list:
+            # Divide the device queries into batches, to avoid excessively large
+            # queries.
+            for user_device_batch in batch_iter(user_device_list, 1024):
+                (
+                    user_device_id_in_list_clause,
+                    user_device_args,
+                ) = make_tuple_in_list_sql_clause(
+                    txn.database_engine, ("user_id", "device_id"), user_device_batch
+                )
+                query_clauses.append(user_device_id_in_list_clause)
+                query_params_list.append(user_device_args)
 
         result: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]] = {}
-        for (user_id, device_id, display_name, key_json) in txn:
-            if include_deleted_devices:
-                deleted_devices.remove((user_id, device_id))
-            result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
-                display_name, db_to_json(key_json) if key_json else None
+        for query_clause, query_params in zip(query_clauses, query_params_list):
+            sql = (
+                "SELECT user_id, device_id, "
+                "    d.display_name, "
+                "    k.key_json"
+                " FROM devices d"
+                "    %s JOIN e2e_device_keys_json k USING (user_id, device_id)"
+                " WHERE %s AND NOT d.hidden"
+            ) % (
+                "LEFT" if include_all_devices else "INNER",
+                query_clause,
             )
+
+            txn.execute(sql, query_params)
+
+            for (user_id, device_id, display_name, key_json) in txn:
+                assert device_id is not None
+                if include_deleted_devices:
+                    deleted_devices.remove((user_id, device_id))
+                result.setdefault(user_id, {})[device_id] = DeviceKeyLookupResult(
+                    display_name, db_to_json(key_json) if key_json else None
+                )
 
         if include_deleted_devices:
             for user_id, device_id in deleted_devices:
+                if device_id is None:
+                    continue
                 result.setdefault(user_id, {})[device_id] = None
 
         return result
@@ -887,6 +915,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         return keys
 
+    @cancellable
     async def get_e2e_cross_signing_keys_bulk(
         self, user_ids: List[str], from_user_id: Optional[str] = None
     ) -> Dict[str, Optional[Dict[str, JsonDict]]]:
@@ -902,7 +931,6 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             keys were not found, either their user ID will not be in the dict,
             or their user ID will map to None.
         """
-
         result = await self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
 
         if from_user_id:

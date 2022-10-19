@@ -61,9 +61,11 @@ from synapse.rest.admin.rooms import (
     MakeRoomAdminRestServlet,
     RoomEventContextServlet,
     RoomMembersRestServlet,
+    RoomMessagesRestServlet,
     RoomRestServlet,
     RoomRestV2Servlet,
     RoomStateRestServlet,
+    RoomTimestampToEventRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
@@ -78,6 +80,7 @@ from synapse.rest.admin.users import (
     SearchUsersRestServlet,
     ShadowBanRestServlet,
     UserAdminServlet,
+    UserByExternalId,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
@@ -271,6 +274,9 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     DestinationResetConnectionRestServlet(hs).register(http_server)
     DestinationRestServlet(hs).register(http_server)
     ListDestinationsRestServlet(hs).register(http_server)
+    RoomMessagesRestServlet(hs).register(http_server)
+    RoomTimestampToEventRestServlet(hs).register(http_server)
+    UserByExternalId(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if hs.config.worker.worker_app is None:

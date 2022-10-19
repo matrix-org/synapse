@@ -140,7 +140,7 @@ class RestHelper:
             custom_headers=custom_headers,
         )
 
-        assert channel.result["code"] == b"%d" % expect_code, channel.result
+        assert channel.code == expect_code, channel.result
         self.auth_user_id = temp_id
 
         if expect_code == HTTPStatus.OK:
@@ -213,11 +213,9 @@ class RestHelper:
             data,
         )
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -312,11 +310,9 @@ class RestHelper:
             data,
         )
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -396,11 +392,9 @@ class RestHelper:
             custom_headers=custom_headers,
         )
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -449,11 +443,9 @@ class RestHelper:
 
         channel = make_request(self.hs.get_reactor(), self.site, method, path, content)
 
-        assert (
-            int(channel.result["code"]) == expect_code
-        ), "Expected: %d, got: %d, resp: %r" % (
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
@@ -545,14 +537,18 @@ class RestHelper:
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
             expect_code,
-            int(channel.result["code"]),
+            channel.code,
             channel.result["body"],
         )
 
         return channel.json_body
 
-    def login_via_oidc(self, remote_user_id: str) -> JsonDict:
-        """Log in (as a new user) via OIDC
+    def login_via_oidc(
+        self,
+        remote_user_id: str,
+        expected_status: int = 200,
+    ) -> JsonDict:
+        """Log in via OIDC
 
         Returns the result of the final token login.
 
@@ -586,7 +582,9 @@ class RestHelper:
             "/login",
             content={"type": "m.login.token", "token": login_token},
         )
-        assert channel.code == HTTPStatus.OK
+        assert (
+            channel.code == expected_status
+        ), f"unexpected status in response: {channel.code}"
         return channel.json_body
 
     def auth_via_oidc(

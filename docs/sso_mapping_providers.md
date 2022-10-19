@@ -22,7 +22,7 @@ choose their own username.
 In the first case - where users are automatically allocated a Matrix ID - it is
 the responsibility of the mapping provider to normalise the SSO attributes and
 map them to a valid Matrix ID. The [specification for Matrix
-IDs](https://matrix.org/docs/spec/appendices#user-identifiers) has some
+IDs](https://spec.matrix.org/latest/appendices/#user-identifiers) has some
 information about what is considered valid.
 
 If the mapping provider does not assign a Matrix ID, then Synapse will
@@ -37,9 +37,10 @@ as Synapse). The Synapse config is then modified to point to the mapping provide
 ## OpenID Mapping Providers
 
 The OpenID mapping provider can be customized by editing the
-`oidc_config.user_mapping_provider.module` config option.
+[`oidc_providers.user_mapping_provider.module`](usage/configuration/config_documentation.md#oidc_providers)
+config option.
 
-`oidc_config.user_mapping_provider.config` allows you to provide custom
+`oidc_providers.user_mapping_provider.config` allows you to provide custom
 configuration options to the module. Check with the module's documentation for
 what options it provides (if any). The options listed by default are for the
 user mapping provider built in to Synapse. If using a custom module, you should
@@ -58,7 +59,7 @@ A custom mapping provider must specify the following methods:
     - This method should have the `@staticmethod` decoration.
     - Arguments:
         - `config` - A `dict` representing the parsed content of the
-          `oidc_config.user_mapping_provider.config` homeserver config option.
+          `oidc_providers.user_mapping_provider.config` homeserver config option.
            Runs on homeserver startup. Providers should extract and validate
            any option values they need here.
     - Whatever is returned will be passed back to the user mapping provider module's
@@ -72,8 +73,8 @@ A custom mapping provider must specify the following methods:
 * `async def map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
-      - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
-                     information from.
+      - `userinfo` - An [`authlib.oidc.core.claims.UserInfo`](https://docs.authlib.org/en/latest/specs/oidc.html#authlib.oidc.core.UserInfo)
+                     object to extract user information from.
       - `token` - A dictionary which includes information necessary to make
                   further requests to the OpenID provider.
       - `failures` - An `int` that represents the amount of times the returned
@@ -90,7 +91,13 @@ A custom mapping provider must specify the following methods:
         `None`, the user is prompted to pick their own username. This is only used
         during a user's first login. Once a localpart has been associated with a
         remote user ID (see `get_remote_user_id`) it cannot be updated.
-      - `displayname`: An optional string, the display name for the user.
+      - `confirm_localpart`: A boolean. If set to `True`, when a `localpart`
+        string is returned from this method, Synapse will prompt the user to
+        either accept this localpart or pick their own username. Otherwise this
+        option has no effect. If omitted, defaults to `False`.
+      - `display_name`: An optional string, the display name for the user.
+      - `emails`: A list of strings, the email address(es) to associate with
+        this user. If omitted, defaults to an empty list.
 * `async def get_extra_attributes(self, userinfo, token)`
     - This method must be async.
     - Arguments:
@@ -102,7 +109,7 @@ A custom mapping provider must specify the following methods:
       will be returned as part of the response during a successful login.
 
       Note that care should be taken to not overwrite any of the parameters
-      usually returned as part of the [login response](https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-login).
+      usually returned as part of the [login response](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login).
 
 ### Default OpenID Mapping Provider
 
@@ -113,7 +120,8 @@ specified in the config. It is located at
 ## SAML Mapping Providers
 
 The SAML mapping provider can be customized by editing the
-`saml2_config.user_mapping_provider.module` config option.
+[`saml2_config.user_mapping_provider.module`](docs/usage/configuration/config_documentation.md#saml2_config)
+config option.
 
 `saml2_config.user_mapping_provider.config` allows you to provide custom
 configuration options to the module. Check with the module's documentation for

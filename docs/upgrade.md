@@ -15,9 +15,8 @@ this document.
     The website <https://endoflife.date> also offers convenient
     summaries.
 
--   If Synapse was installed using [prebuilt
-    packages](setup/installation.md#prebuilt-packages), you will need to follow the
-    normal process for upgrading those packages.
+-   If Synapse was installed using [prebuilt packages](setup/installation.md#prebuilt-packages),
+    you will need to follow the normal process for upgrading those packages.
 
 -   If Synapse was installed using pip then upgrade to the latest
     version by running:
@@ -89,7 +88,187 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.69.0
+
+## Changes to the receipts replication streams
+
+Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.
+
+
+## Deprecation of legacy Prometheus metric names
+
+In current versions of Synapse, some Prometheus metrics are emitted under two different names,
+with one of the names being older but non-compliant with OpenMetrics and Prometheus conventions
+and one of the names being newer but compliant.
+
+Synapse v1.71.0 will turn the old metric names off *by default*.
+For administrators that still rely on them and have not had chance to update their
+uses of the metrics, it's possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and it will no longer
+be possible to re-enable them.
+
+The Grafana dashboard, Prometheus recording rules and Prometheus Consoles included
+in the `contrib` directory in the Synapse repository have been updated to no longer
+rely on the legacy names. These can be used on a current version of Synapse
+because current versions of Synapse emit both old and new names.
+
+You may need to update your alerting rules or any other rules that depend on
+the names of Prometheus metrics.
+If you want to test your changes before legacy names are disabled by default,
+you may specify `enable_legacy_metrics: false` in your homeserver configuration.
+
+A list of affected metrics is available on the [Metrics How-to page](https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12).
+
+
+## Deprecation of the `generate_short_term_login_token` module API method
+
+The following method of the module API has been deprecated, and is scheduled to
+be remove in v1.71.0:
+
+```python
+def generate_short_term_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: str = "",
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+It has been replaced by an asynchronous equivalent:
+
+```python
+async def create_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: Optional[str] = None,
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+Synapse will log a warning when a module uses the deprecated method, to help
+administrators find modules using it.
+
+
+# Upgrading to v1.68.0
+
+Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
+
+## SQLite version requirement
+
+Synapse now requires a SQLite version of 3.27.0 or higher if SQLite is configured as
+Synapse's database.
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- a PostgreSQL database
+
+are not affected.
+
+## Rust requirement when building from source.
+
+Building from a source checkout of Synapse now requires a recent Rust compiler
+(currently Rust 1.58.1, but see also the
+[Platform Dependency Policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html)).
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- PyPI wheels via `pip install matrix-synapse` (on supported platforms and architectures)
+
+will not be affected.
+
+# Upgrading to v1.67.0
+
+## Direct TCP replication is no longer supported: migrate to Redis
+
+Redis support was added in v1.13.0 with it becoming the recommended method in
+v1.18.0. It replaced the old direct TCP connections (which was deprecated as of
+v1.18.0) to the main process. With Redis, rather than all the workers connecting
+to the main process, all the workers and the main process connect to Redis,
+which relays replication commands between processes. This can give a significant
+CPU saving on the main process and is a prerequisite for upcoming
+performance improvements.
+
+To migrate to Redis add the [`redis` config](./workers.md#shared-configuration),
+and remove the TCP `replication` listener from config of the master and
+`worker_replication_port` from worker config. Note that a HTTP listener with a
+`replication` resource is still required.
+
+## Minimum version of Poetry is now v1.2.0
+
+The minimum supported version of poetry is now 1.2. This should only affect
+those installing from a source checkout.
+
+## Rust requirement in the next release
+
+From the next major release (v1.68.0) installing Synapse from a source checkout
+will require a recent Rust compiler. Those using packages or
+`pip install matrix-synapse` will not be affected.
+
+The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
+
+## SQLite version requirement in the next release
+
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
+higher. Synapse v1.67.0 will be the last major release supporting SQLite
+versions 3.22 to 3.26.
+
+Those using Docker images or Debian packages from Matrix.org will not be
+affected. If you have installed from source, you should check the version of
+SQLite used by Python with:
+
+```shell
+python -c "import sqlite3; print(sqlite3.sqlite_version)"
+```
+
+If this is too old, refer to your distribution for advice on upgrading.
+
+
+# Upgrading to v1.66.0
+
+## Delegation of email validation no longer supported
+
+As of this version, Synapse no longer allows the tasks of verifying email address
+ownership, and password reset confirmation, to be delegated to an identity server.
+This removal was previously planned for Synapse 1.64.0, but was
+[delayed](https://github.com/matrix-org/synapse/issues/13421) until now to give
+homeserver administrators more notice of the change.
+
+To continue to allow users to add email addresses to their homeserver accounts,
+and perform password resets, make sure that Synapse is configured with a working
+email server in the [`email` configuration
+section](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
+(including, at a minimum, a `notif_from` setting.)
+
+Specifying an `email` setting under `account_threepid_delegates` will now cause
+an error at startup.
+
 # Upgrading to v1.64.0
+
+## Deprecation of the ability to delegate e-mail verification to identity servers
+
+Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
+
+If you require your homeserver to verify e-mail addresses or to support password resets via e-mail, please configure your homeserver with SMTP access so that it can send e-mails on its own behalf.
+[Consult the configuration documentation for more information.](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
+
+The option that will be removed is `account_threepid_delegates.email`.
+
 
 ## Changes to the event replication streams
 
@@ -1171,7 +1350,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](workers.md) for more details.
+the [worker documentation](https://matrix-org.github.io/synapse/v1.66/workers.html) for more details.
 
 # Upgrading to v1.14.0
 

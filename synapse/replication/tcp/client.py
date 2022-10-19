@@ -189,7 +189,9 @@ class ReplicationDataHandler:
                 if row.deleted:
                     self.stop_pusher(row.user_id, row.app_id, row.pushkey)
                 else:
-                    await self.start_pusher(row.user_id, row.app_id, row.pushkey)
+                    await self.process_pusher_change(
+                        row.user_id, row.app_id, row.pushkey
+                    )
         elif stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so
             # we don't need to optimise this for multiple rows.
@@ -208,15 +210,16 @@ class ReplicationDataHandler:
 
                 max_token = self.store.get_room_max_token()
                 event_pos = PersistedEventPosition(instance_name, token)
-                await self.notifier.on_new_room_event_args(
-                    event_pos=event_pos,
-                    max_room_stream_token=max_token,
-                    extra_users=extra_users,
-                    room_id=row.data.room_id,
-                    event_id=row.data.event_id,
-                    event_type=row.data.type,
-                    state_key=row.data.state_key,
-                    membership=row.data.membership,
+                event_entry = self.notifier.create_pending_room_event_entry(
+                    event_pos,
+                    extra_users,
+                    row.data.room_id,
+                    row.data.type,
+                    row.data.state_key,
+                    row.data.membership,
+                )
+                await self.notifier.notify_new_room_events(
+                    [(event_entry, row.data.event_id)], max_token
                 )
 
                 # If this event is a join, make a note of it so we have an accurate
@@ -334,13 +337,15 @@ class ReplicationDataHandler:
         logger.info("Stopping pusher %r / %r", user_id, key)
         pusher.on_stop()
 
-    async def start_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:
+    async def process_pusher_change(
+        self, user_id: str, app_id: str, pushkey: str
+    ) -> None:
         if not self._notify_pushers:
             return
 
         key = "%s:%s" % (app_id, pushkey)
         logger.info("Starting pusher %r / %r", user_id, key)
-        await self._pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
+        await self._pusher_pool.process_pusher_change_by_id(app_id, pushkey, user_id)
 
 
 class FederationSenderHandler:
@@ -423,7 +428,8 @@ class FederationSenderHandler:
                 receipt.receipt_type,
                 receipt.user_id,
                 [receipt.event_id],
-                receipt.data,
+                thread_id=receipt.thread_id,
+                data=receipt.data,
             )
             await self.federation_sender.send_read_receipt(receipt_info)
 
