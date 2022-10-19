@@ -22,7 +22,8 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, EventMatchCondition, RelatedEventMatchCondition, FilteredPushRules, KnownCondition,
+    Action, Condition, EventMatchCondition, FilteredPushRules, KnownCondition,
+    RelatedEventMatchCondition,
 };
 
 lazy_static! {
@@ -346,8 +347,14 @@ impl PushRuleEvaluator {
 fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
-    let evaluator =
-        PushRuleEvaluator::py_new(flattened_keys, 10, Some(0), BTreeMap::new(), BTreeMap::new()).unwrap();
+    let evaluator = PushRuleEvaluator::py_new(
+        flattened_keys,
+        10,
+        Some(0),
+        BTreeMap::new(),
+        BTreeMap::new(),
+    )
+    .unwrap();
 
     let result = evaluator.run(&FilteredPushRules::default(), None, Some("bob"));
     assert_eq!(result.len(), 3);

@@ -24,8 +24,8 @@ use super::KnownCondition;
 use crate::push::Action;
 use crate::push::Condition;
 use crate::push::EventMatchCondition;
-use crate::push::RelatedEventMatchCondition;
 use crate::push::PushRule;
+use crate::push::RelatedEventMatchCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 
@@ -118,14 +118,14 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed("global/override/.im.nheko.msc3664.reply"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::RelatedEventMatch(RelatedEventMatchCondition {
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatch(
+            RelatedEventMatchCondition {
                 key: Some(Cow::Borrowed("sender")),
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
                 rel_type: Cow::Borrowed("m.in_reply_to"),
-            })),
-        ]),
+            },
+        ))]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
         default: true,
         default_enabled: true,

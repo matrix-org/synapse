@@ -411,11 +411,15 @@ pub struct FilteredPushRules {
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    pub fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>, msc3664_enabled: bool) -> Self {
+    pub fn py_new(
+        push_rules: PushRules,
+        enabled_map: BTreeMap<String, bool>,
+        msc3664_enabled: bool,
+    ) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3664_enabled
+            msc3664_enabled,
         }
     }
 
@@ -429,7 +433,7 @@ impl FilteredPushRules {
 impl FilteredPushRules {
     /// Iterates over all the rules and their enabled state, including base
     /// rules, in the order they should be executed in.
-    fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {        
+    fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {
         self.push_rules
             .iter()
             .filter(|rule| {
@@ -443,12 +447,12 @@ impl FilteredPushRules {
                 true
             })
             .map(|r| {
-            let enabled = *self
-                .enabled_map
-                .get(&*r.rule_id)
-                .unwrap_or(&r.default_enabled);
-            (r, enabled)
-        })
+                let enabled = *self
+                    .enabled_map
+                    .get(&*r.rule_id)
+                    .unwrap_or(&r.default_enabled);
+                (r, enabled)
+            })
     }
 }
 
@@ -479,7 +483,10 @@ fn test_deserialize_unstable_condition() {
     let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern":"coffee","rel_type":"m.in_reply_to"}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
-    assert!(matches!(condition, Condition::Known(KnownCondition::RelatedEventMatch(_))));
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RelatedEventMatch(_))
+    ));
 }
 
 #[test]
