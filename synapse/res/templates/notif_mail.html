@@ -1,6 +1,6 @@
-{% set title = 'New activity in room' %}
-{% include "fragments/header.html" with context %}
+{% block title %}New activity in room{% endblock %}
 
+{% block body %}
 <table id="page">
     <tr>
         <td> </td>
@@ -51,5 +51,4 @@
     {%- include 'static/css/mail.css' without context %}
     {%- include "static/css/mail-%s.css" % app_name ignore missing without context %}
 </style>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

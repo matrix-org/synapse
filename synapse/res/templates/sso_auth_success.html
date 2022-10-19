@@ -1,6 +1,6 @@
-{% set title = 'Authentication successful' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Authentication successful{% endblock %}
 
+{% block body %}
 <header>
     <h1>Thank you</h1>
     <p>
@@ -19,5 +19,4 @@
     {% include "static/css/sso.css" without context %}
 </style>
 {% include "fragments/sso_footer.html" without context %}
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

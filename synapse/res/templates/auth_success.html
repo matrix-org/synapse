@@ -1,6 +1,7 @@
-{% set title = 'Success!' %}
-{% include "fragments/header.html" with context %}
+{% extends "_base.html" %}
+{% block title %}Success!{% endblock %}
 
+{% block body %}
 <div>
     <p>Thank you</p>
     <p>You may now close this window and return to the application</p>
@@ -14,5 +15,4 @@ if (window.onAuthDone) {
         window.opener.postMessage("authDone", "*");
 }
 </script>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

@@ -1,6 +1,6 @@
-{% set title = 'Choose identity provider' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Choose identity provider{% endblock %}
 
+{% block body %}
 <header>
     <h1>Log in to {{ server_name }} </h1>
     <p>Choose an identity provider to log in</p>
@@ -53,5 +53,4 @@
     flex: 1;
   }
 </style>
-
-  {% include "fragments/footer.html" without context %}
+{% endblock %}

@@ -1,6 +1,6 @@
-{% set title = 'Authentication' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Authentication{% endblock %}
 
+{% block body %}
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
         {% if error is defined %}
@@ -32,5 +32,4 @@
         $('#registrationForm').submit();
     }
 </script>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

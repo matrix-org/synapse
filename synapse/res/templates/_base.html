@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
+    <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="./static/css/style.css">
 </head>
 <body>
@@ -19,3 +19,8 @@
         <img src="http://matrix.org/img/matrix-120x51.png" width="120" height="51" alt="[matrix]"/>
     {% endif %}
 </header>
+
+{% block body %}{% endblock %}
+
+</body>
+</html>

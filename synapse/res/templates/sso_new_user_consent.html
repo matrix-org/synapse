@@ -1,6 +1,6 @@
-{% set title = 'Agree to terms and conditions' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Agree to terms and conditions{% endblock %}
 
+{% block body %}
 <header>
     <h1>Your account is nearly ready</h1>
     <p>Agree to the terms to create your account.</p>
@@ -23,5 +23,4 @@
     margin-top: 56px;
     }
 </style>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

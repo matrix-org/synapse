@@ -1,6 +1,7 @@
-{% set title = 'Notice of expiry' %}
-{% include "fragments/header.html" with context %}
+{% extends "_base.html" %}
+{% block title %}Notice of expiry{% endblock %}
 
+{% block body %}
 <table id="page">
     <tr>
         <td> </td>
@@ -39,5 +40,4 @@
     {% include "static/css/mail-%s.css" % app_name ignore missing without context %}
     {% include 'static/css/mail-expiry.css' without context %}
 </style>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

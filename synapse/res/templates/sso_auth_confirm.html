@@ -1,6 +1,6 @@
-{% set title = 'Confirm it\'s you' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Confirm it's you{% endblock %}
 
+{% block body %}
 <header>
     <h1>Confirm it's you to continue</h1>
     <p>
@@ -20,5 +20,4 @@
     {% include "static/css/sso.css" without context %}
 </style>
 {% include "fragments/sso_footer.html" without context %}
-
-{% include "includes/footer.html" without context %}
+{% endblock %}

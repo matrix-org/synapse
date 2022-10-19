@@ -1,6 +1,6 @@
-{% set title = 'SSO account deactivated' %}
-{% include "fragments/header.html" with context %}
+{% block title %}SSO account deactivated{% endblock %}
 
+{% block body %}
 <div class="error_page">
     <header>
         <h1>Your account has been deactivated</h1>
@@ -19,5 +19,4 @@
 <style type="text/css">
     {% include "static/css/sso.css" without context %}
 </style>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

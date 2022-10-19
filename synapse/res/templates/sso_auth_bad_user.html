@@ -1,6 +1,6 @@
-{% set title = 'Authentication failed' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Authentication failed{% endblock %}
 
+{% block body %}
 <div class="error_page">
     <header>
         <h1>That doesn't look right</h1>
@@ -19,5 +19,4 @@
     {% include "static/css/sso.css" without context %}
 </style>
 {% include "fragments/sso_footer.html" without context %}
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}

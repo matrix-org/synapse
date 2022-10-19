@@ -1,6 +1,6 @@
-{% set title = 'Create your account' %}
-{% include "fragments/header.html" with context %}
+{% block title %}Create your account{% endblock %}
 
+{% block body %}
 <header>
   <h1>Create your account</h1>
   <p>This is required. Continue to create your account on {{ server_name }}. You can't change this later.</p>
@@ -52,7 +52,7 @@
     {% endif %}
   </form>
 </main>
-{% include "fragments/sso_footer.html" without context %}
+{% include "fragments/sso_footer.html" %}
 <script type="text/javascript">
   let wasKeyboard = false;
   document.addEventListener("mousedown", function() { wasKeyboard = false; });
@@ -180,5 +180,4 @@
 <script type="text/javascript">
   {% include "static/js/sso_auth_account_details.js" without context %}
 </script>
-
-{% include "fragments/footer.html" without context %}
+{% endblock %}
