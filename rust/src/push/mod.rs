@@ -405,15 +405,17 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
+    msc3664_enabled: bool,
 }
 
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    pub fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>) -> Self {
+    pub fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>, msc3664_enabled: bool) -> Self {
         Self {
             push_rules,
             enabled_map,
+            msc3664_enabled
         }
     }
 
@@ -427,8 +429,20 @@ impl FilteredPushRules {
 impl FilteredPushRules {
     /// Iterates over all the rules and their enabled state, including base
     /// rules, in the order they should be executed in.
-    fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {
-        self.push_rules.iter().map(|r| {
+    fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {        
+        self.push_rules
+            .iter()
+            .filter(|rule| {
+                // Ignore disabled experimental push rules
+                if !self.msc3664_enabled
+                    && rule.rule_id == "global/override/.im.nheko.msc3664.reply"
+                {
+                    return false;
+                }
+
+                true
+            })
+            .map(|r| {
             let enabled = *self
                 .enabled_map
                 .get(&*r.rule_id)

@@ -38,7 +38,9 @@ from tests.test_utils.event_injection import create_event, inject_member_event
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
-    def _get_evaluator(self, content: JsonDict, related_events=None) -> PushRuleEvaluator:
+    def _get_evaluator(
+        self, content: JsonDict, related_events=None
+    ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -59,6 +61,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             sender_power_level,
             power_levels.get("notifications", {}),
             {} if related_events is None else related_events,
+            True,
         )
 
     def test_display_name(self) -> None:
@@ -307,21 +310,21 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             },
             {
                 "m.in_reply_to": {
-                        "event_id": "$parent_event_id",
-                        "type": "m.room.message",
-                        "sender": "@other_user:test",
-                        "room_id": "!room:test",
-                        "content.msgtype": "m.text",
-                        "content.body": "Original message",
-                    },
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                },
                 "m.annotation": {
-                        "event_id": "$parent_event_id",
-                        "type": "m.room.message",
-                        "sender": "@other_user:test",
-                        "room_id": "!room:test",
-                        "content.msgtype": "m.text",
-                        "content.body": "Original message",
-                    },
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                },
             },
         )
         self.assertTrue(
@@ -429,6 +432,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "display_name",
             )
         )
+
 
 class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
     """Tests for the bulk push rule evaluator"""

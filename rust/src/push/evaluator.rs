@@ -53,6 +53,9 @@ pub struct PushRuleEvaluator {
     /// The related events, indexed by relation type. Flattened in the same manner as
     /// `flattened_keys`.
     related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
+
+    /// If msc3664, push rules for related events, is enabled.
+    related_event_match_enabled: bool,
 }
 
 #[pymethods]
@@ -65,6 +68,7 @@ impl PushRuleEvaluator {
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
         related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
+        related_event_match_enabled: bool,
     ) -> Result<Self, Error> {
         let body = flattened_keys
             .get("content.body")
@@ -78,6 +82,7 @@ impl PushRuleEvaluator {
             notification_power_levels,
             sender_power_level,
             related_events_flattened,
+            related_event_match_enabled,
         })
     }
 
@@ -248,12 +253,18 @@ impl PushRuleEvaluator {
         compiled_pattern.is_match(haystack)
     }
 
-    /// Evaluates a `related_event_match` condition.
+    /// Evaluates a `related_event_match` condition. (MSC3664)
     fn match_related_event_match(
         &self,
         event_match: &RelatedEventMatchCondition,
         user_id: Option<&str>,
     ) -> Result<bool, Error> {
+        // First check if related event matching is enabled...
+        if !self.related_event_match_enabled {
+            return Ok(false);
+        }
+
+        // get the related event, fail if there is none.
         let event = if let Some(event) = self.related_events_flattened.get(&*event_match.rel_type) {
             event
         } else {

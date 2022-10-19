@@ -106,6 +106,8 @@ class BulkPushRuleEvaluator:
         self.clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
 
+        self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
+
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
             "room_push_rule_cache",
@@ -225,24 +227,32 @@ class BulkPushRuleEvaluator:
         ) = await self._get_power_levels_and_sender_level(event, context)
 
         related_events: Dict[str, Dict[str, str]] = {}
-        related_event_id = event.content.get("m.relates_to", {}).get("event_id")
-        relation_type = event.content.get("m.relates_to", {}).get("rel_type")
-        if related_event_id is not None and relation_type is not None:
-            related_event = await self.store.get_event(
-                related_event_id, allow_none=True
-            )
-            if related_event is not None:
-                related_events[relation_type] = _flatten_dict(related_event)
+        if self._related_event_match_enabled:
+            related_event_id = event.content.get("m.relates_to", {}).get("event_id")
+            relation_type = event.content.get("m.relates_to", {}).get("rel_type")
+            if related_event_id is not None and relation_type is not None:
+                related_event = await self.store.get_event(
+                    related_event_id, allow_none=True
+                )
+                if related_event is not None:
+                    related_events[relation_type] = _flatten_dict(related_event)
 
-        reply_event_id = (
-            event.content.get("m.relates_to", {})
-            .get("m.in_reply_to", {})
-            .get("event_id")
-        )
-        if reply_event_id is not None and (relation_type is not "m.thread" or not event.content.get("m.relates_to", {}).get("is_falling_back", False)):
-            related_event = await self.store.get_event(reply_event_id, allow_none=True)
-            if related_event is not None:
-                related_events["m.in_reply_to"] = _flatten_dict(related_event)
+            reply_event_id = (
+                event.content.get("m.relates_to", {})
+                .get("m.in_reply_to", {})
+                .get("event_id")
+            )
+            if reply_event_id is not None and (
+                relation_type != "m.thread"
+                or not event.content.get("m.relates_to", {}).get(
+                    "is_falling_back", False
+                )
+            ):
+                related_event = await self.store.get_event(
+                    reply_event_id, allow_none=True
+                )
+                if related_event is not None:
+                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
 
         # Find the event's thread ID.
         relation = relation_from_event(event)
@@ -270,6 +280,7 @@ class BulkPushRuleEvaluator:
             sender_power_level,
             notification_levels,
             related_events,
+            self._related_event_match_enabled,
         )
 
         users = rules_by_user.keys()
