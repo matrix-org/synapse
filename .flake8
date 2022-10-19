@@ -9,7 +9,8 @@
 #  E731: do not assign a lambda expression, use a def
 #  E501: Line too long (black enforces this for us)
 #
-# for bugbear error codes:
+# flake8-bugbear runs extra checks. Its error codes are described at
+# https://github.com/PyCQA/flake8-bugbear#list-of-warnings
 #  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
 #  B023: Functions defined inside a loop must not use variables redefined in the loop
 #  B024: Abstract base class with no abstract method.
