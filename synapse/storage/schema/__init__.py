@@ -90,9 +90,9 @@ Changes in SCHEMA_VERSION = 73;
 
 
 SCHEMA_COMPAT_VERSION = (
-    # The groups tables are no longer accessible, so synapses with SCHEMA_VERSION < 72
-    # could break.
-    72
+    # The threads_id column must exist for event_push_actions, event_push_summary,
+    # receipts_linearized, and receipts_graph.
+    73
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

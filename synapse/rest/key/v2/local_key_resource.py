@@ -20,9 +20,9 @@ from signedjson.sign import sign_json
 from unpaddedbase64 import encode_base64
 
 from twisted.web.resource import Resource
-from twisted.web.server import Request
 
 from synapse.http.server import respond_with_json_bytes
+from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -99,7 +99,7 @@ class LocalKey(Resource):
             json_object = sign_json(json_object, self.config.server.server_name, key)
         return json_object
 
-    def render_GET(self, request: Request) -> Optional[int]:
+    def render_GET(self, request: SynapseRequest) -> Optional[int]:
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key.key_refresh_interval / 2 > self.valid_until_ts:
