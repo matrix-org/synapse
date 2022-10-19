@@ -1360,8 +1360,16 @@ class EventCreationHandler:
             else:
                 try:
                     validate_event_for_room_version(event)
+                    # If we are persisting a batch of events the event(s) needed to auth the
+                    # current event may be part of the batch and will not be in the DB yet
+                    event_id_to_event = {e.event_id: e for e, _ in events_and_context}
+                    batched_auth_events = {}
+                    for event_id in event.auth_event_ids():
+                        auth_event = event_id_to_event.get(event_id)
+                        if auth_event:
+                            batched_auth_events[event_id] = auth_event
                     await self._event_auth_handler.check_auth_rules_from_context(
-                        event, context
+                        event, batched_auth_events
                     )
                 except AuthError as err:
                     logger.warning("Denying new event %r because %s", event, err)

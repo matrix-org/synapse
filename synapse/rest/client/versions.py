@@ -116,6 +116,9 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
                     # Adds support for filtering /messages by event relation.
                     "org.matrix.msc3874": self.config.experimental.msc3874_enabled,
+                    # Adds support for simple HTTP rendezvous as per MSC3886
+                    "org.matrix.msc3886": self.config.experimental.msc3886_endpoint
+                    is not None,
                 },
             },
         )
