@@ -372,7 +372,10 @@ class HttpPusher(Pusher):
                 "notification": {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
-                    "counts": {"unread": badge},
+                    "counts": {
+                        "unread": badge,
+                        "com.beeper.server_type": "synapse",
+                    },
                     "prio": priority,
                     "devices": [
                         {
@@ -401,6 +404,7 @@ class HttpPusher(Pusher):
                 "prio": priority,
                 "counts": {
                     "unread": badge,
+                    "com.beeper.server_type": "synapse",
                     # 'missed_calls': 2
                 },
                 "devices": [
@@ -467,7 +471,10 @@ class HttpPusher(Pusher):
                 "id": "",
                 "type": None,
                 "sender": "",
-                "counts": {"unread": badge},
+                "counts": {
+                    "unread": badge,
+                    "com.beeper.server_type": "synapse",
+                },
                 "devices": [
                     {
                         "app_id": self.app_id,
