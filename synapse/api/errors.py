@@ -609,7 +609,7 @@ class FederationError(RuntimeError):
     """
     Raised when we process an erroneous PDU.
 
-    There are two kinds scenarios where this exception can be raised:
+    There are two kinds of scenarios where this exception can be raised:
 
     1. We may pull an invalid PDU from a remote homeserver (e.g. during backfill). We
        raise this exception to signal an error to the rest of the application.
