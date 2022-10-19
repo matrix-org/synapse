@@ -1,47 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "9.0.4"
-    },
-    {
-      "type": "panel",
-      "id": "graph",
-      "name": "Graph (old)",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "heatmap",
-      "name": "Heatmap",
-      "version": ""
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -62,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 1,
   "links": [
     {
       "asDropdown": false,
@@ -772,7 +729,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 27
+            "y": 3
           },
           "hiddenSeries": false,
           "id": 5,
@@ -910,7 +867,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "Shows the time in which the given percentage of reactor ticks completed, over the sampled timespan",
           "fieldConfig": {
@@ -968,7 +925,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 27
+            "y": 3
           },
           "id": 105,
           "interval": "",
@@ -989,7 +946,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "exemplar": true,
               "expr": "histogram_quantile(0.999, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
@@ -1001,7 +958,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "exemplar": true,
               "expr": "histogram_quantile(0.99, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
@@ -1015,7 +972,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "exemplar": true,
               "expr": "histogram_quantile(0.95, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
@@ -1028,7 +985,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "histogram_quantile(0.90, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
               "format": "time_series",
@@ -1039,7 +996,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "rate(python_twisted_reactor_tick_time_sum{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]) / rate(python_twisted_reactor_tick_time_count{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size])",
               "format": "time_series",
@@ -1074,7 +1031,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 34
+            "y": 10
           },
           "hiddenSeries": false,
           "id": 34,
@@ -1180,7 +1137,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 34
+            "y": 10
           },
           "hiddenSeries": false,
           "id": 49,
@@ -1285,7 +1242,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 41
+            "y": 17
           },
           "hiddenSeries": false,
           "id": 53,
@@ -1377,7 +1334,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 41
+            "y": 17
           },
           "hiddenSeries": false,
           "id": 120,
@@ -1494,7 +1451,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 24
           },
           "hiddenSeries": false,
           "id": 136,
@@ -1629,7 +1586,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 24
           },
           "id": 207,
           "options": {
@@ -2496,6 +2453,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -2551,7 +2509,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2562,6 +2520,7 @@
           ],
           "thresholds": [
             {
+              "$$hashKey": "object:234",
               "colorMode": "custom",
               "fill": true,
               "fillColor": "rgba(216, 200, 27, 0.27)",
@@ -2570,6 +2529,7 @@
               "yaxis": "left"
             },
             {
+              "$$hashKey": "object:235",
               "colorMode": "custom",
               "fill": true,
               "fillColor": "rgba(234, 112, 112, 0.22)",
@@ -2593,11 +2553,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:206",
               "format": "hertz",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:207",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -2613,6 +2575,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -2664,7 +2627,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",index=~\"$index\",method!=\"OPTIONS\"}[$bucket_size]) and topk(10,synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",method!=\"OPTIONS\"})",
+              "expr": "rate(synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\",method!=\"OPTIONS\"}[$bucket_size]) and topk(10,synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",method!=\"OPTIONS\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{method}} {{servlet}} {{job}}-{{index}}",
@@ -2689,11 +2652,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:305",
               "format": "hertz",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:306",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -2709,6 +2674,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -2764,7 +2730,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_http_server_in_flight_requests_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_in_flight_requests_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2775,6 +2741,7 @@
           ],
           "thresholds": [
             {
+              "$$hashKey": "object:135",
               "colorMode": "custom",
               "fill": true,
               "fillColor": "rgba(216, 200, 27, 0.27)",
@@ -2783,6 +2750,7 @@
               "yaxis": "left"
             },
             {
+              "$$hashKey": "object:136",
               "colorMode": "custom",
               "fill": true,
               "fillColor": "rgba(234, 112, 112, 0.22)",
@@ -2806,11 +2774,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:107",
               "format": "percentunit",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:108",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -2826,6 +2796,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -2881,7 +2852,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "(rate(synapse_http_server_in_flight_requests_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "(rate(synapse_http_server_in_flight_requests_ru_utime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_requests_received_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2892,6 +2863,7 @@
           ],
           "thresholds": [
             {
+              "$$hashKey": "object:417",
               "colorMode": "custom",
               "fill": true,
               "fillColor": "rgba(216, 200, 27, 0.27)",
@@ -2900,6 +2872,7 @@
               "yaxis": "left"
             },
             {
+              "$$hashKey": "object:418",
               "colorMode": "custom",
               "fill": true,
               "fillColor": "rgba(234, 112, 112, 0.22)",
@@ -2923,11 +2896,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:389",
               "format": "s",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:390",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -2943,6 +2918,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -2997,7 +2973,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_http_server_in_flight_requests_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_in_flight_requests_db_txn_duration_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3022,11 +2998,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:488",
               "format": "percentunit",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:489",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -3691,7 +3669,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 6
+            "y": 34
           },
           "hiddenSeries": false,
           "id": 79,
@@ -3713,7 +3691,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3791,7 +3769,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 6
+            "y": 34
           },
           "hiddenSeries": false,
           "id": 83,
@@ -3813,7 +3791,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3893,7 +3871,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 15
+            "y": 43
           },
           "hiddenSeries": false,
           "id": 109,
@@ -3915,7 +3893,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3996,7 +3974,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 15
+            "y": 43
           },
           "hiddenSeries": false,
           "id": 111,
@@ -4018,7 +3996,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4091,7 +4069,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 24
+            "y": 52
           },
           "hiddenSeries": false,
           "id": 142,
@@ -4111,7 +4089,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -4195,7 +4173,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 24
+            "y": 52
           },
           "hiddenSeries": false,
           "id": 140,
@@ -4217,7 +4195,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4349,7 +4327,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 32
+            "y": 60
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4412,7 +4390,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 33
+            "y": 61
           },
           "hiddenSeries": false,
           "id": 162,
@@ -4435,7 +4413,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4628,7 +4606,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 41
+            "y": 69
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4694,7 +4672,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 70
           },
           "hiddenSeries": false,
           "id": 203,
@@ -4716,7 +4694,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4795,7 +4773,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 78
           },
           "hiddenSeries": false,
           "id": 202,
@@ -4817,7 +4795,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4888,7 +4866,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 51
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 205,
@@ -4908,7 +4886,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -4975,6 +4953,724 @@
     },
     {
       "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 227,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "000000001"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 1
+          },
+          "id": 239,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "000000001"
+              },
+              "expr": "sum(increase(synapse_rate_limit_reject_total{instance=\"$instance\"}[$bucket_size]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Number of rate limit rejected requests",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "000000001"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 1
+          },
+          "id": 235,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "000000001"
+              },
+              "expr": "sum(increase(synapse_rate_limit_sleep_total{instance=\"$instance\"}[$bucket_size]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Number of requests being slept by the rate limiter",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "000000001"
+          },
+          "description": "Why is the data zero (0)? https://github.com/matrix-org/synapse/pull/13541#discussion_r951926322",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
+          "id": 237,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.0.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "000000001"
+              },
+              "expr": "sum(increase(synapse_rate_limit_reject_affected_hosts{instance=\"$instance\"}[$bucket_size]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Number of hosts being rejected by the rate limiter",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "000000001"
+          },
+          "description": "https://github.com/matrix-org/synapse/pull/13541",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
+          "id": 233,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.0.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "000000001"
+              },
+              "expr": "sum(increase(synapse_rate_limit_sleep_affected_hosts{instance=\"$instance\"}[$bucket_size]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Number of hosts being slept by the rate limiter",
+          "type": "timeseries"
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "links": []
+            },
+            "overrides": []
+          },
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 17
+          },
+          "hiddenSeries": false,
+          "id": 229,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "rightSide": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 0,
+          "links": [],
+          "nullPointMode": "connected",
+          "options": {
+            "alertThreshold": true
+          },
+          "paceLength": 10,
+          "percentage": false,
+          "pluginVersion": "9.0.4",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "$$hashKey": "object:276",
+              "alias": "Avg",
+              "fill": 0,
+              "linewidth": 3
+            },
+            {
+              "$$hashKey": "object:277",
+              "alias": "99%",
+              "color": "#C4162A",
+              "fillBelowTo": "90%"
+            },
+            {
+              "$$hashKey": "object:278",
+              "alias": "90%",
+              "color": "#FF7383",
+              "fillBelowTo": "75%"
+            },
+            {
+              "$$hashKey": "object:279",
+              "alias": "75%",
+              "color": "#FFEE52",
+              "fillBelowTo": "50%"
+            },
+            {
+              "$$hashKey": "object:280",
+              "alias": "50%",
+              "color": "#73BF69",
+              "fillBelowTo": "25%"
+            },
+            {
+              "$$hashKey": "object:281",
+              "alias": "25%",
+              "color": "#1F60C4",
+              "fillBelowTo": "5%"
+            },
+            {
+              "$$hashKey": "object:282",
+              "alias": "5%",
+              "lines": false
+            },
+            {
+              "$$hashKey": "object:283",
+              "alias": "Average",
+              "color": "rgb(255, 255, 255)",
+              "lines": true,
+              "linewidth": 3
+            },
+            {
+              "$$hashKey": "object:284",
+              "alias": ">99%",
+              "color": "#B877D9",
+              "fill": 3,
+              "lines": true
+            }
+          ],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.9995, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "hide": false,
+              "intervalFactor": 1,
+              "legendFormat": ">99%",
+              "range": true,
+              "refId": "E"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "range": true,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "histogram_quantile(0.9, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "histogram_quantile(0.75, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "histogram_quantile(0.5, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "histogram_quantile(0.25, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "legendFormat": "25%",
+              "refId": "F"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "histogram_quantile(0.05, sum(rate(synapse_rate_limit_queue_wait_time_seconds_bucket{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) by (le))",
+              "legendFormat": "5%",
+              "refId": "G"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(rate(synapse_rate_limit_queue_wait_time_seconds_sum{index=~\"$index\",instance=\"$instance\"}[$bucket_size])) / sum(rate(synapse_rate_limit_queue_wait_time_seconds_count{index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
+              "legendFormat": "Average",
+              "refId": "H"
+            }
+          ],
+          "thresholds": [
+            {
+              "$$hashKey": "object:283",
+              "colorMode": "warning",
+              "fill": false,
+              "line": true,
+              "op": "gt",
+              "value": 1,
+              "yaxis": "left"
+            },
+            {
+              "$$hashKey": "object:284",
+              "colorMode": "critical",
+              "fill": false,
+              "line": true,
+              "op": "gt",
+              "value": 2,
+              "yaxis": "left"
+            }
+          ],
+          "timeRegions": [],
+          "title": "Rate limit queue wait time Quantiles (all workers)",
+          "tooltip": {
+            "shared": true,
+            "sort": 2,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "$$hashKey": "object:255",
+              "format": "s",
+              "label": "",
+              "logBase": 1,
+              "min": "0",
+              "show": true
+            },
+            {
+              "$$hashKey": "object:256",
+              "format": "hertz",
+              "label": "",
+              "logBase": 1,
+              "min": "0",
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "000000001"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "hertz"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Default reject threshold (50 requests within a second)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 2
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 17
+          },
+          "id": 231,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "000000001"
+              },
+              "expr": "sum(rate(synapse_rate_limit_sleep_total{instance=\"$instance\"}[$bucket_size]))",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "000000001"
+              },
+              "editorMode": "code",
+              "expr": "50",
+              "hide": false,
+              "legendFormat": "Default reject threshold (50 requests within a second)",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Rate of requests being slept by the rate limiter",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Federation rate limiter",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
       "datasource": {
         "type": "prometheus",
         "uid": "$datasource"
@@ -4983,7 +5679,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 32
       },
       "id": 60,
       "panels": [
@@ -5205,7 +5901,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 33
       },
       "id": 219,
       "panels": [
@@ -5799,60 +6495,86 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 34
       },
       "id": 58,
       "panels": [
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
           "datasource": {
             "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
-              "links": []
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
             },
             "overrides": []
           },
-          "fill": 1,
-          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 9
+            "y": 35
           },
-          "hiddenSeries": false,
           "id": 48,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
           "options": {
-            "alertThreshold": true
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
           },
-          "paceLength": 10,
-          "percentage": false,
           "pluginVersion": "9.0.4",
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
           "targets": [
             {
               "datasource": {
@@ -5866,37 +6588,8 @@
               "step": 20
             }
           ],
-          "thresholds": [],
-          "timeRegions": [],
           "title": "Avg time waiting for db conn",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "s",
-              "label": "",
-              "logBase": 1,
-              "min": "0",
-              "show": true
-            },
-            {
-              "format": "short",
-              "logBase": 1,
-              "show": false
-            }
-          ],
-          "yaxis": {
-            "align": false
-          }
+          "type": "timeseries"
         },
         {
           "aliasColors": {},
@@ -5919,7 +6612,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 9
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 104,
@@ -6050,7 +6743,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 16
+            "y": 42
           },
           "hiddenSeries": false,
           "id": 10,
@@ -6150,7 +6843,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 16
+            "y": 42
           },
           "hiddenSeries": false,
           "id": 11,
@@ -6250,7 +6943,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 23
+            "y": 49
           },
           "hiddenSeries": false,
           "id": 180,
@@ -6347,7 +7040,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 49
           },
           "hiddenSeries": false,
           "id": 200,
@@ -6475,7 +7168,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 35
       },
       "id": 59,
       "panels": [
@@ -7181,7 +7874,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 36
       },
       "id": 61,
       "panels": [
@@ -7209,7 +7902,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 69
+            "y": 36
           },
           "hiddenSeries": false,
           "id": 1,
@@ -7311,7 +8004,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 69
+            "y": 36
           },
           "hiddenSeries": false,
           "id": 8,
@@ -7411,7 +8104,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 79
+            "y": 46
           },
           "hiddenSeries": false,
           "id": 38,
@@ -7507,7 +8200,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 79
+            "y": 46
           },
           "hiddenSeries": false,
           "id": 39,
@@ -7608,7 +8301,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 89
+            "y": 56
           },
           "hiddenSeries": false,
           "id": 65,
@@ -7705,7 +8398,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 37
       },
       "id": 148,
       "panels": [
@@ -7923,7 +8616,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 38
       },
       "id": 62,
       "panels": [
@@ -8496,7 +9189,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 39
       },
       "id": 63,
       "panels": [
@@ -8506,6 +9199,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "fieldConfig": {
@@ -8520,7 +9214,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 14
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 43,
@@ -8542,7 +9236,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -8555,7 +9249,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum (rate(synapse_replication_tcp_protocol_outbound_commands{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
+              "expr": "sum (rate(synapse_replication_tcp_protocol_outbound_commands_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}} {{command}}",
@@ -8579,11 +9273,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:89",
               "format": "hertz",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:90",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -8653,7 +9349,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 14
+            "y": 40
           },
           "id": 41,
           "links": [],
@@ -8676,7 +9372,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "rate(synapse_replication_tcp_resource_stream_updates{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_stream_updates_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -8749,7 +9445,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 21
+            "y": 47
           },
           "id": 42,
           "links": [],
@@ -8772,7 +9468,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "sum (rate(synapse_replication_tcp_protocol_inbound_commands{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
+              "expr": "sum (rate(synapse_replication_tcp_protocol_inbound_commands_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -8846,7 +9542,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 21
+            "y": 47
           },
           "id": 220,
           "links": [],
@@ -8869,7 +9565,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "exemplar": true,
-              "expr": "rate(synapse_replication_tcp_protocol_inbound_rdata_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_protocol_inbound_rdata_count_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -8888,7 +9584,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "000000001"
           },
           "description": "",
           "fieldConfig": {
@@ -8903,7 +9599,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 28
+            "y": 54
           },
           "hiddenSeries": false,
           "id": 144,
@@ -8923,7 +9619,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -8981,6 +9677,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "fieldConfig": {
@@ -8995,7 +9692,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 28
+            "y": 54
           },
           "hiddenSeries": false,
           "id": 115,
@@ -9017,7 +9714,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9030,7 +9727,7 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "rate(synapse_replication_tcp_protocol_close_reason{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_protocol_close_reason_total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{reason_type}}",
@@ -9053,11 +9750,13 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:260",
               "format": "hertz",
               "logBase": 1,
               "show": true
             },
             {
+              "$$hashKey": "object:261",
               "format": "short",
               "logBase": 1,
               "show": true
@@ -9087,7 +9786,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 61
           },
           "hiddenSeries": false,
           "id": 113,
@@ -9109,7 +9808,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.0.4",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9193,7 +9892,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 40
       },
       "id": 69,
       "panels": [
@@ -9509,7 +10208,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 41
       },
       "id": 126,
       "panels": [
@@ -10374,7 +11073,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 42
       },
       "id": 158,
       "panels": [
@@ -10604,7 +11303,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 43
       },
       "id": 177,
       "panels": [
@@ -10815,7 +11514,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 44
       },
       "id": 170,
       "panels": [
@@ -11012,7 +11711,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 45
       },
       "id": 188,
       "panels": [
@@ -11344,7 +12043,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 46
       },
       "id": 197,
       "panels": [
@@ -11778,7 +12477,11 @@
         "type": "interval"
       },
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "matrix.org",
+          "value": "matrix.org"
+        },
         "datasource": {
           "uid": "$datasource"
         },
@@ -11804,7 +12507,15 @@
       {
         "allFormat": "regex wildcard",
         "allValue": "",
-        "current": {},
+        "current": {
+          "selected": true,
+          "text": [
+            "synapse"
+          ],
+          "value": [
+            "synapse"
+          ]
+        },
         "datasource": {
           "uid": "$datasource"
         },
@@ -11834,7 +12545,11 @@
       {
         "allFormat": "regex wildcard",
         "allValue": ".*",
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": {
           "uid": "$datasource"
         },
@@ -11896,6 +12611,6 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 133,
+  "version": 145,
   "weekStart": ""
 }
