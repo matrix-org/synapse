@@ -22,7 +22,7 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, EventMatchCondition, FilteredPushRules, KnownCondition,
+    Action, Condition, EventMatchCondition, RelatedEventMatchCondition, FilteredPushRules, KnownCondition,
 };
 
 lazy_static! {
@@ -254,6 +254,20 @@ impl PushRuleEvaluator {
         event_match: &RelatedEventMatchCondition,
         user_id: Option<&str>,
     ) -> Result<bool, Error> {
+        let event = if let Some(event) = self.related_events_flattened.get(&*event_match.rel_type) {
+            event
+        } else {
+            return Ok(false);
+        };
+
+        // if we have no key, accept the event as matching, if it existed without matching any
+        // fields.
+        let key = if let Some(key) = &event_match.key {
+            key
+        } else {
+            return Ok(true);
+        };
+
         let pattern = if let Some(pattern) = &event_match.pattern {
             pattern
         } else if let Some(pattern_type) = &event_match.pattern_type {
@@ -275,27 +289,7 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        //let relation_type = if let Some(relation_type) = &event_match.rel_type {
-        //    relation_type
-        //} else {
-        //    return Ok(false);
-        //}
-
-        let event = if let Some(event) = self.related_events_flattened.get(&*event_match.rel_type) {
-            event
-        } else {
-            return Ok(false);
-        };
-
-        // if we have no key, accept the event as matching, if it existed without matching any
-        // fields.
-        let key = if let Some(key) = &event_match.key {
-            key
-        } else {
-            return Ok(true);
-        }
-
-        let haystack = if let Some(haystack) = event.get(&*event_match.key) {
+        let haystack = if let Some(haystack) = event.get(&**key) {
             haystack
         } else {
             return Ok(false);
@@ -303,7 +297,7 @@ impl PushRuleEvaluator {
 
         // For the content.body we match against "words", but for everything
         // else we match against the entire value.
-        let match_type = if event_match.key == "content.body" {
+        let match_type = if key == "content.body" {
             GlobMatchType::Word
         } else {
             GlobMatchType::Whole
@@ -342,7 +336,7 @@ fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
     let evaluator =
-        PushRuleEvaluator::py_new(flattened_keys, 10, Some(0), BTreeMap::new()).unwrap();
+        PushRuleEvaluator::py_new(flattened_keys, 10, Some(0), BTreeMap::new(), BTreeMap::new()).unwrap();
 
     let result = evaluator.run(&FilteredPushRules::default(), None, Some("bob"));
     assert_eq!(result.len(), 3);
