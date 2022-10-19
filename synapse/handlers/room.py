@@ -1524,8 +1524,6 @@ class TimestampLookupHandler:
                     await self.store.is_event_next_to_forward_gap(local_event)
                 )
 
-        likely_domains = None
-
         # If we found a gap, we should probably ask another homeserver first
         # about more history in between
         if (
@@ -1602,20 +1600,6 @@ class TimestampLookupHandler:
                 404,
                 "Unable to find event from %s in direction %s" % (timestamp, direction),
                 errcode=Codes.NOT_FOUND,
-            )
-
-        if local_event.internal_metadata.outlier:
-            # We might already have these on hand from asking a remote server before
-            if likely_domains is None:
-                likely_domains = await self._storage_controllers.state.get_current_hosts_in_room_ordered(
-                    room_id
-                )
-
-            # Backfill this event so we can get a pagination token for
-            # it with `/context` and paginate `/messages` from this
-            # point.
-            await self.federation_event_handler.backfill_event_id(
-                likely_domains, room_id, local_event.event_id
             )
 
         return local_event_id, local_event.origin_server_ts
