@@ -154,7 +154,67 @@ class RoomAccountDataServlet(RestServlet):
 
         return 200, event
 
+class RoomBeeperInboxStateServlet(RestServlet):
+    """
+    PUT /user/{user_id}/rooms/{room_id}/beeper_inbox_state HTTP/1.1
+    """
+
+    PATTERNS = client_patterns(
+        "/user/(?P<user_id>[^/]*)"
+        "/rooms/(?P<room_id>[^/]*)"
+        "/beeper_inbox_state"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastores().main
+        self.handler = hs.get_account_data_handler()
+
+    async def on_PUT(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot add beeper inbox state for other users.")
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                400,
+                f"{room_id} is not a valid room ID",
+                Codes.INVALID_PARAM,
+            )
+
+        ts = self.clock.time_msec()
+
+        body = parse_json_object_from_request(request)
+
+        if body['marked_unread']:
+            marked_unread = {
+                'unread': body['marked_unread'],
+                'ts': ts
+            }
+            await self.handler.add_account_data_to_room(
+                user_id, room_id, 'm.marked_unread', marked_unread
+            )
+
+        if body['done']:
+            done = {
+                'updated_ts': ts,
+                'at_ts': ts + body['done'].get('atDelta', 0)
+            }
+            await self.handler.add_account_data_to_room(
+                user_id, room_id, 'com.beeper.inbox.done', done
+            )
+
+        return 200, {}
+
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AccountDataServlet(hs).register(http_server)
     RoomAccountDataServlet(hs).register(http_server)
+    RoomBeeperInboxStateServlet(hs).register(http_server)
