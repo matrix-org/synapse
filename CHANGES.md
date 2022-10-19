@@ -1,11 +1,65 @@
-Synapse 1.69.0rc1 (2022-10-04)
-==============================
-
+Synapse 1.69.0 (2022-10-17)
+===========================
 
 Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
 Server administrators should update their dashboards and alerting rules to avoid using the deprecated metric names.
 See the [upgrade notes](https://matrix-org.github.io/synapse/v1.69/upgrade.html#upgrading-to-v1690) for more details.
 
+
+No significant changes since 1.69.0rc4.
+
+
+Synapse 1.69.0rc4 (2022-10-14)
+==============================
+
+Bugfixes
+--------
+
+- Fix poor performance of the `event_push_backfill_thread_id` background update, which was introduced in Synapse 1.68.0rc1. ([\#14172](https://github.com/matrix-org/synapse/issues/14172), [\#14181](https://github.com/matrix-org/synapse/issues/14181))
+
+
+Updates to the Docker image
+---------------------------
+
+- Fix docker build OOMing in CI for arm64 builds. ([\#14173](https://github.com/matrix-org/synapse/issues/14173))
+
+
+Synapse 1.69.0rc3 (2022-10-12)
+==============================
+
+Bugfixes
+--------
+
+- Fix an issue with Docker images causing the Rust dependencies to not be pinned correctly. Introduced in v1.68.0 ([\#14129](https://github.com/matrix-org/synapse/issues/14129))
+- Fix a bug introduced in Synapse 1.69.0rc1 which would cause registration replication requests to fail if the worker sending the request is not running Synapse 1.69. ([\#14135](https://github.com/matrix-org/synapse/issues/14135))
+- Fix error in background update when rotating existing notifications. Introduced in v1.69.0rc2. ([\#14138](https://github.com/matrix-org/synapse/issues/14138))
+
+
+Internal Changes
+----------------
+
+- Rename the `url_preview` extra to `url-preview`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14085](https://github.com/matrix-org/synapse/issues/14085))
+
+
+Synapse 1.69.0rc2 (2022-10-06)
+==============================
+
+Deprecations and Removals
+-------------------------
+
+- Deprecate the `generate_short_term_login_token` method in favor of an async `create_login_token` method in the Module API. ([\#13842](https://github.com/matrix-org/synapse/issues/13842))
+
+
+Internal Changes
+----------------
+
+- Ensure Synapse v1.69 works with upcoming database changes in v1.70. ([\#14045](https://github.com/matrix-org/synapse/issues/14045))
+- Fix a bug introduced in Synapse v1.68.0 where messages could not be sent in rooms with non-integer `notifications` power level. ([\#14073](https://github.com/matrix-org/synapse/issues/14073))
+- Temporarily pin build-system requirements to workaround an incompatibility with poetry-core 1.3.0. This will be reverted before the v1.69.0 release proper, see [\#14079](https://github.com/matrix-org/synapse/issues/14079). ([\#14080](https://github.com/matrix-org/synapse/issues/14080))
+
+
+Synapse 1.69.0rc1 (2022-10-04)
+==============================
 
 Features
 --------

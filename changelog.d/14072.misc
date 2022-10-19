@@ -1,0 +1,1 @@
+Don't create noisy Sentry events when a requester drops connection to the metrics server mid-request.

@@ -1,0 +1,1 @@
+Prevent device names from appearing in device list updates when `allow_device_name_lookup_over_federation` is `false`.
