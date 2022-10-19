@@ -1,1 +1,0 @@
-Allow use of both `@trace` and `@tag_args` stacked on the same function (tracing).

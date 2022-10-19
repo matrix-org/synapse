@@ -26,7 +26,7 @@ from synapse.rest.client import (
     room_upgrade_rest_servlet,
 )
 from synapse.server import HomeServer
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -97,7 +97,12 @@ class RoomTestCase(_ShadowBannedBase):
         channel = self.make_request(
             "POST",
             "/rooms/%s/invite" % (room_id,),
-            {"id_server": "test", "medium": "email", "address": "test@test.test"},
+            {
+                "id_server": "test",
+                "medium": "email",
+                "address": "test@test.test",
+                "id_access_token": "anytoken",
+            },
             access_token=self.banned_access_token,
         )
         self.assertEqual(200, channel.code, channel.result)
@@ -275,7 +280,7 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id,
+                create_requester(self.banned_user_id),
                 room_id,
                 "m.room.member",
                 self.banned_user_id,
@@ -310,7 +315,7 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id,
+                create_requester(self.banned_user_id),
                 room_id,
                 "m.room.member",
                 self.banned_user_id,

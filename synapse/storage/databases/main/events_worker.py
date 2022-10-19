@@ -81,6 +81,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred, delay_cancellation
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import AsyncLruCache
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -339,6 +340,7 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> Optional[EventBase]:
         ...
 
+    @cancellable
     async def get_event(
         self,
         event_id: str,
@@ -372,7 +374,7 @@ class EventsWorkerStore(SQLBaseStore):
                 If there is a mismatch, behave as per allow_none.
 
         Returns:
-            The event, or None if the event was not found.
+            The event, or None if the event was not found and allow_none is `True`.
         """
         if not isinstance(event_id, str):
             raise TypeError("Invalid event event_id %r" % (event_id,))
@@ -433,6 +435,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     @trace
     @tag_args
+    @cancellable
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
@@ -471,7 +474,7 @@ class EventsWorkerStore(SQLBaseStore):
             return []
 
         # there may be duplicates so we cast the list to a set
-        event_entry_map = await self._get_events_from_cache_or_db(
+        event_entry_map = await self.get_unredacted_events_from_cache_or_db(
             set(event_ids), allow_rejected=allow_rejected
         )
 
@@ -506,7 +509,9 @@ class EventsWorkerStore(SQLBaseStore):
                     continue
 
                 redacted_event_id = entry.event.redacts
-                event_map = await self._get_events_from_cache_or_db([redacted_event_id])
+                event_map = await self.get_unredacted_events_from_cache_or_db(
+                    [redacted_event_id]
+                )
                 original_event_entry = event_map.get(redacted_event_id)
                 if not original_event_entry:
                     # we don't have the redacted event (or it was rejected).
@@ -584,10 +589,16 @@ class EventsWorkerStore(SQLBaseStore):
 
         return events
 
-    async def _get_events_from_cache_or_db(
-        self, event_ids: Iterable[str], allow_rejected: bool = False
+    @cancellable
+    async def get_unredacted_events_from_cache_or_db(
+        self,
+        event_ids: Iterable[str],
+        allow_rejected: bool = False,
     ) -> Dict[str, EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
+
+        Note that the events pulled by this function will not have any redactions
+        applied, and no guarantee is made about the ordering of the events returned.
 
         If events are pulled from the database, they will be cached for future lookups.
 
@@ -1156,7 +1167,7 @@ class EventsWorkerStore(SQLBaseStore):
             if format_version is None:
                 # This means that we stored the event before we had the concept
                 # of a event format version, so it must be a V1 event.
-                format_version = EventFormatVersions.V1
+                format_version = EventFormatVersions.ROOM_V1_V2
 
             room_version_id = row.room_version_id
 
@@ -1186,10 +1197,10 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 # So, the following approximations should be adequate.
 
-                if format_version == EventFormatVersions.V1:
+                if format_version == EventFormatVersions.ROOM_V1_V2:
                     # if it's event format v1 then it must be room v1 or v2
                     room_version = RoomVersions.V1
-                elif format_version == EventFormatVersions.V2:
+                elif format_version == EventFormatVersions.ROOM_V3:
                     # if it's event format v2 then it must be room v3
                     room_version = RoomVersions.V3
                 else:
@@ -1470,36 +1481,36 @@ class EventsWorkerStore(SQLBaseStore):
         # the batches as big as possible.
 
         results: Set[str] = set()
-        for chunk in batch_iter(event_ids, 500):
-            r = await self._have_seen_events_dict(
-                [(room_id, event_id) for event_id in chunk]
+        for event_ids_chunk in batch_iter(event_ids, 500):
+            events_seen_dict = await self._have_seen_events_dict(
+                room_id, event_ids_chunk
             )
-            results.update(eid for ((_rid, eid), have_event) in r.items() if have_event)
+            results.update(
+                eid for (eid, have_event) in events_seen_dict.items() if have_event
+            )
 
         return results
 
-    @cachedList(cached_method_name="have_seen_event", list_name="keys")
+    @cachedList(cached_method_name="have_seen_event", list_name="event_ids")
     async def _have_seen_events_dict(
-        self, keys: Collection[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], bool]:
+        self,
+        room_id: str,
+        event_ids: Collection[str],
+    ) -> Dict[str, bool]:
         """Helper for have_seen_events
 
         Returns:
-             a dict {(room_id, event_id)-> bool}
+             a dict {event_id -> bool}
         """
-        # if the event cache contains the event, obviously we've seen it.
+        # TODO: We used to query the _get_event_cache here as a fast-path before
+        #  hitting the database. For if an event were in the cache, we've presumably
+        #  seen it before.
+        #
+        #  But this is currently an invalid assumption due to the _get_event_cache
+        #  not being invalidated when purging events from a room. The optimisation can
+        #  be re-added after https://github.com/matrix-org/synapse/issues/13476
 
-        cache_results = {
-            (rid, eid)
-            for (rid, eid) in keys
-            if await self._get_event_cache.contains((eid,))
-        }
-        results = dict.fromkeys(cache_results, True)
-        remaining = [k for k in keys if k not in cache_results]
-        if not remaining:
-            return results
-
-        def have_seen_events_txn(txn: LoggingTransaction) -> None:
+        def have_seen_events_txn(txn: LoggingTransaction) -> Dict[str, bool]:
             # we deliberately do *not* query the database for room_id, to make the
             # query an index-only lookup on `events_event_id_key`.
             #
@@ -1507,23 +1518,22 @@ class EventsWorkerStore(SQLBaseStore):
 
             sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", [eid for (_rid, eid) in remaining]
+                txn.database_engine, "e.event_id", event_ids
             )
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
             # ... and then we can update the results for each key
-            results.update(
-                {(rid, eid): (eid in found_events) for (rid, eid) in remaining}
-            )
+            return {eid: (eid in found_events) for eid in event_ids}
 
-        await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
-        return results
+        return await self.db_pool.runInteraction(
+            "have_seen_events", have_seen_events_txn
+        )
 
     @cached(max_entries=100000, tree=True)
     async def have_seen_event(self, room_id: str, event_id: str) -> bool:
-        res = await self._have_seen_events_dict(((room_id, event_id),))
-        return res[(room_id, event_id)]
+        res = await self._have_seen_events_dict(room_id, [event_id])
+        return res[event_id]
 
     def _get_current_state_event_counts_txn(
         self, txn: LoggingTransaction, room_id: str
@@ -2111,7 +2121,14 @@ class EventsWorkerStore(SQLBaseStore):
                 AND room_id = ?
                 /* Make sure event is not rejected */
                 AND rejections.event_id IS NULL
-            ORDER BY origin_server_ts %s
+            /**
+             * First sort by the message timestamp. If the message timestamps are the
+             * same, we want the message that logically comes "next" (before/after
+             * the given timestamp) based on the DAG and its topological order (`depth`).
+             * Finally, we can tie-break based on when it was received on the server
+             * (`stream_ordering`).
+             */
+            ORDER BY origin_server_ts %s, depth %s, stream_ordering %s
             LIMIT 1;
         """
 
@@ -2130,7 +2147,8 @@ class EventsWorkerStore(SQLBaseStore):
                 order = "ASC"
 
             txn.execute(
-                sql_template % (comparison_operator, order), (timestamp, room_id)
+                sql_template % (comparison_operator, order, order, order),
+                (timestamp, room_id),
             )
             row = txn.fetchone()
             if row:

@@ -1,1 +1,0 @@
-Document that the `DOCKER_BUILDKIT=1` flag is needed to build the docker image.

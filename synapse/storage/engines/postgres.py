@@ -31,7 +31,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
+class PostgresEngine(
+    BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
+):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -159,13 +161,6 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         db_conn.commit()
 
     @property
-    def can_native_upsert(self) -> bool:
-        """
-        Can we use native UPSERTs?
-        """
-        return True
-
-    @property
     def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return True
@@ -219,3 +214,11 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)
+
+    @staticmethod
+    def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+        """
+        cursor.execute(script)

@@ -15,7 +15,18 @@
 
 import logging
 import typing
-from typing import Any, Collection, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -109,7 +120,7 @@ def validate_event_for_room_version(event: "EventBase") -> None:
         if not is_invite_via_3pid:
             raise AuthError(403, "Event not signed by sender's server")
 
-    if event.format_version in (EventFormatVersions.V1,):
+    if event.format_version in (EventFormatVersions.ROOM_V1_V2,):
         # Only older room versions have event IDs to check.
         event_id_domain = get_domain_from_id(event.event_id)
 
@@ -134,6 +145,7 @@ def validate_event_for_room_version(event: "EventBase") -> None:
 async def check_state_independent_auth_rules(
     store: _EventSourceStore,
     event: "EventBase",
+    batched_auth_events: Optional[Mapping[str, "EventBase"]] = None,
 ) -> None:
     """Check that an event complies with auth rules that are independent of room state
 
@@ -143,6 +155,8 @@ async def check_state_independent_auth_rules(
     Args:
         store: the datastore; used to fetch the auth events for validation
         event: the event being checked.
+        batched_auth_events: if the event being authed is part of a batch, any events
+            from the same batch that may be necessary to auth the current event
 
     Raises:
         AuthError if the checks fail
@@ -162,6 +176,9 @@ async def check_state_independent_auth_rules(
         redact_behaviour=EventRedactBehaviour.as_is,
         allow_rejected=True,
     )
+    if batched_auth_events:
+        auth_events.update(batched_auth_events)
+
     room_id = event.room_id
     auth_dict: MutableStateMap[str] = {}
     expected_auth_types = auth_types_for_event(event.room_version, event)
@@ -716,7 +733,7 @@ def check_redaction(
     if user_level >= redact_level:
         return False
 
-    if room_version_obj.event_format == EventFormatVersions.V1:
+    if room_version_obj.event_format == EventFormatVersions.ROOM_V1_V2:
         redacter_domain = get_domain_from_id(event.event_id)
         if not isinstance(event.redacts, str):
             return False

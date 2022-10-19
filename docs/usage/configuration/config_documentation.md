@@ -179,7 +179,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-See https://matrix-org.github.io/synapse/latest/delegate.html for more
+See [Delegation of incoming federation traffic](../../delegate.md) for more
 information.
 
 Example configuration:
@@ -431,12 +431,19 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see the docs [here](../../workers.md)).
-
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-   behind a reverse-proxy.
+   behind a [reverse-proxy](../../reverse_proxy.md).
+
+* `request_id_header`: The header extracted from each incoming request that is
+   used as the basis for the request ID. The request ID is used in
+   [logs](../administration/request_log.md#request-log-format) and tracing to
+   correlate and match up requests. When unset, Synapse will automatically
+   generate sequential request IDs. This option is useful when Synapse is behind
+   a [reverse-proxy](../../reverse_proxy.md).
+
+   _Added in Synapse 1.68.0._
 
 * `resources`: Only valid for an 'http' listener. A list of resources to host
    on this port. Sub-options for each resource are:
@@ -594,6 +601,8 @@ This option disables/enables monthly active user blocking. Used in cases where t
 server owner wants to limit to the number of monthly active users. When enabled and a limit is
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
+
+See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
 
 Example configuration:
 ```yaml
@@ -1069,8 +1078,10 @@ Options related to caching.
 ---
 ### `event_cache_size`
 
-The number of events to cache in memory. Not affected by
-`caches.global_factor` and is not part of the `caches` section. Defaults to 10K.
+The number of events to cache in memory. Defaults to 10K. Like other caches,
+this is affected by `caches.global_factor` (see below).
+
+Note that this option is not part of the `caches` section.
 
 Example configuration:
 ```yaml
@@ -1128,7 +1139,7 @@ number of entries that can be stored.
 
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory
-   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu)
+   usage and cache entry availability. You must be using [jemalloc](../administration/admin_faq.md#help-synapse-is-slow-and-eats-all-my-ramcpu)
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
@@ -1391,7 +1402,7 @@ This option specifies several limits for login:
   client is attempting to log into. Defaults to `per_second: 0.17`,
   `burst_count: 3`.
 
-* `failted_attempts` ratelimits login requests based on the account the
+* `failed_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
   attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
 
@@ -1873,8 +1884,8 @@ See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 ---
 ### `recaptcha_public_key`
 
-This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is
-enabled.
+This homeserver's ReCAPTCHA public key. Must be specified if
+[`enable_registration_captcha`](#enable_registration_captcha) is enabled.
 
 Example configuration:
 ```yaml
@@ -1883,7 +1894,8 @@ recaptcha_public_key: "YOUR_PUBLIC_KEY"
 ---
 ### `recaptcha_private_key`
 
-This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is
+This homeserver's ReCAPTCHA private key. Must be specified if
+[`enable_registration_captcha`](#enable_registration_captcha) is
 enabled.
 
 Example configuration:
@@ -1893,9 +1905,11 @@ recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ---
 ### `enable_registration_captcha`
 
-Set to true to enable ReCaptcha checks when registering, preventing signup
-unless a captcha is answered. Requires a valid ReCaptcha public/private key.
-Defaults to false.
+Set to `true` to require users to complete a CAPTCHA test when registering an account.
+Requires a valid ReCaptcha public/private key.
+Defaults to `false`.
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -1971,9 +1985,21 @@ Registration can be rate-limited using the parameters in the [Ratelimiting](#rat
 ---
 ### `enable_registration`
 
-Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
-you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
-without any verification, you must also set `enable_registration_without_verification` to true.
+Enable registration for new users. Defaults to `false`.
+
+It is highly recommended that if you enable registration, you set one or more
+or the following options, to avoid abuse of your server by "bots":
+
+ * [`enable_registration_captcha`](#enable_registration_captcha)
+ * [`registrations_require_3pid`](#registrations_require_3pid)
+ * [`registration_requires_token`](#registration_requires_token)
+
+(In order to enable registration without any verification, you must also set
+[`enable_registration_without_verification`](#enable_registration_without_verification).)
+
+Note that even if this setting is disabled, new accounts can still be created
+via the admin API if
+[`registration_shared_secret`](#registration_shared_secret) is set.
 
 Example configuration:
 ```yaml
@@ -1981,88 +2007,21 @@ enable_registration: true
 ```
 ---
 ### `enable_registration_without_verification`
+
 Enable registration without email or captcha verification. Note: this option is *not* recommended,
-as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
-unless `enable_registration` is also enabled.
+as registration without verification is a known vector for spam and abuse. Defaults to `false`. Has no effect
+unless [`enable_registration`](#enable_registration) is also enabled.
 
 Example configuration:
 ```yaml
 enable_registration_without_verification: true
 ```
 ---
-### `session_lifetime`
-
-Time that a user's session remains valid for, after they log in.
-
-Note that this is not currently compatible with guest logins.
-
-Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
-logged in.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-session_lifetime: 24h
-```
-----
-### `refresh_access_token_lifetime`
-
-Time that an access token remains valid for, if the session is using refresh tokens.
-
-For more information about refresh tokens, please see the [manual](user_authentication/refresh_tokens.md).
-
-Note that this only applies to clients which advertise support for refresh tokens.
-
-Note also that this is calculated at login time and refresh time: changes are not applied to
-existing sessions until they are refreshed.
-
-By default, this is 5 minutes.
-
-Example configuration:
-```yaml
-refreshable_access_token_lifetime: 10m
-```
----
-### `refresh_token_lifetime: 24h`
-
-Time that a refresh token remains valid for (provided that it is not
-exchanged for another one first).
-This option can be used to automatically log-out inactive sessions.
-Please see the manual for more information.
-
-Note also that this is calculated at login time and refresh time:
-changes are not applied to existing sessions until they are refreshed.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-refresh_token_lifetime: 24h
-```
----
-### `nonrefreshable_access_token_lifetime`
-
-Time that an access token remains valid for, if the session is NOT
-using refresh tokens.
-
-Please note that not all clients support refresh tokens, so setting
-this to a short value may be inconvenient for some users who will
-then be logged out frequently.
-
-Note also that this is calculated at login time: changes are not applied
-retrospectively to existing sessions for users that have already logged in.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-nonrefreshable_access_token_lifetime: 24h
-```
----
 ### `registrations_require_3pid`
 
-If this is set, the user must provide all of the specified types of 3PID when registering.
+If this is set, users must provide all of the specified types of 3PID when registering an account.
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -2110,9 +2069,11 @@ enable_3pid_lookup: false
 
 Require users to submit a token during registration.
 Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
-Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
-Defaults to false. Set to true to enable.
+Defaults to `false`. Set to `true` to enable.
+
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -2121,13 +2082,39 @@ registration_requires_token: true
 ---
 ### `registration_shared_secret`
 
-If set, allows registration of standard or admin accounts by anyone who
-has the shared secret, even if registration is otherwise disabled.
+If set, allows registration of standard or admin accounts by anyone who has the
+shared secret, even if [`enable_registration`](#enable_registration) is not
+set.
+
+This is primarily intended for use with the `register_new_matrix_user` script
+(see [Registering a user](../../setup/installation.md#registering-a-user));
+however, the interface is [documented](../../admin_api/register_api.html).
+
+See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
 Example configuration:
 ```yaml
 registration_shared_secret: <PRIVATE STRING>
 ```
+
+---
+### `registration_shared_secret_path`
+
+An alternative to [`registration_shared_secret`](#registration_shared_secret):
+allows the shared secret to be specified in an external file.
+
+The file should be a plain text file, containing only the shared secret.
+
+If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
+
+Example configuration:
+```yaml
+registration_shared_secret_file: /path/to/secrets/file
+```
+
+_Added in Synapse 1.67.0._
+
 ---
 ### `bcrypt_rounds`
 
@@ -2182,7 +2169,10 @@ their account.
 by the Matrix Identity Service API
 [specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-*Updated in Synapse 1.64.0*: The `email` option is deprecated.
+*Deprecated in Synapse 1.64.0*: The `email` option is deprecated.
+
+*Removed in Synapse 1.66.0*: The `email` option has been removed.
+If present, Synapse will report a configuration error on startup.
 
 Example configuration:
 ```yaml
@@ -2239,6 +2229,9 @@ homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.
 
+As Spaces are just rooms under the hood, Space aliases may also be
+used.
+
 Example configuration:
 ```yaml
 auto_join_rooms:
@@ -2250,7 +2243,7 @@ auto_join_rooms:
 
 Where `auto_join_rooms` are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.
+homeserver registers. This option will not create Spaces.
 
 By default the auto-created rooms are publicly joinable from any federated
 server. Use the `autocreate_auto_join_rooms_federated` and
@@ -2268,7 +2261,7 @@ autocreate_auto_join_rooms: false
 ---
 ### `autocreate_auto_join_rooms_federated`
 
-Whether the rooms listen in `auto_join_rooms` that are auto-created are available
+Whether the rooms listed in `auto_join_rooms` that are auto-created are available
 via federation. Only has an effect if `autocreate_auto_join_rooms` is true.
 
 Note that whether a room is federated cannot be modified after
@@ -2356,6 +2349,79 @@ Example configuration:
 inhibit_user_in_use_error: true
 ```
 ---
+## User session management
+---
+### `session_lifetime`
+
+Time that a user's session remains valid for, after they log in.
+
+Note that this is not currently compatible with guest logins.
+
+Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
+logged in.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+session_lifetime: 24h
+```
+----
+### `refresh_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is using refresh tokens.
+
+For more information about refresh tokens, please see the [manual](user_authentication/refresh_tokens.md).
+
+Note that this only applies to clients which advertise support for refresh tokens.
+
+Note also that this is calculated at login time and refresh time: changes are not applied to
+existing sessions until they are refreshed.
+
+By default, this is 5 minutes.
+
+Example configuration:
+```yaml
+refreshable_access_token_lifetime: 10m
+```
+---
+### `refresh_token_lifetime: 24h`
+
+Time that a refresh token remains valid for (provided that it is not
+exchanged for another one first).
+This option can be used to automatically log-out inactive sessions.
+Please see the manual for more information.
+
+Note also that this is calculated at login time and refresh time:
+changes are not applied to existing sessions until they are refreshed.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+refresh_token_lifetime: 24h
+```
+---
+### `nonrefreshable_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is NOT
+using refresh tokens.
+
+Please note that not all clients support refresh tokens, so setting
+this to a short value may be inconvenient for some users who will
+then be logged out frequently.
+
+Note also that this is calculated at login time: changes are not applied
+retrospectively to existing sessions for users that have already logged in.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+nonrefreshable_access_token_lifetime: 24h
+```
+
+---
 ## Metrics ###
 Config options related to metrics.
 
@@ -2369,6 +2435,31 @@ Example configuration:
 ```yaml
 enable_metrics: true
 ```
+---
+### `enable_legacy_metrics`
+
+Set to `true` to publish both legacy and non-legacy Prometheus metric names,
+or to `false` to only publish non-legacy Prometheus metric names.
+Defaults to `true`. Has no effect if `enable_metrics` is `false`.
+**In Synapse v1.71.0, this will default to `false` before being removed in Synapse v1.73.0.**
+
+Legacy metric names include:
+- metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
+- counters that don't end with the `_total` suffix, such as `synapse_federation_client_sent_edus`, therefore not adhering to the OpenMetrics standard.
+
+These legacy metric names are unconventional and not compliant with OpenMetrics standards.
+They are included for backwards compatibility.
+
+Example configuration:
+```yaml
+enable_legacy_metrics: false
+```
+
+See https://github.com/matrix-org/synapse/issues/11106 for context.
+
+*Since v1.67.0.*
+
+**Will be removed in v1.73.0.**
 ---
 ### `sentry`
 
@@ -2432,7 +2523,7 @@ report_stats_endpoint: https://example.com/report-usage-stats/push
 Config settings related to the client/server API
 
 ---
-### `room_prejoin_state:`
+### `room_prejoin_state`
 
 Controls for the state that is shared with users who receive an invite
 to a room. By default, the following state event types are shared with users who
@@ -2534,7 +2625,10 @@ Config options relating to signing keys
 ---
 ### `signing_key_path`
 
-Path to the signing key to sign messages with.
+Path to the signing key to sign events and federation requests with.
+
+*New in Synapse 1.67*: If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
 
 Example configuration:
 ```yaml
@@ -2569,7 +2663,7 @@ Example configuration:
 key_refresh_interval: 2d
 ```
 ---
-### `trusted_key_servers:`
+### `trusted_key_servers`
 
 The trusted servers to download signing keys from.
 
@@ -2639,13 +2733,10 @@ key_server_signing_keys_path: "key_server_signing_keys.key"
 The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.
 
-You will probably also want to set the following options to false to
+You will probably also want to set the following options to `false` to
 disable the regular login/registration flows:
-   * `enable_registration`
-   * `password_config.enabled`
-
-You will also want to investigate the settings under the "sso" configuration
-section below.
+   * [`enable_registration`](#enable_registration)
+   * [`password_config.enabled`](#password_config)
 
 ---
 ### `saml2_config`
@@ -2886,7 +2977,7 @@ Options for each entry include:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
+        See [OpenID Mapping Providers](../../sso_mapping_providers.md#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
@@ -3327,13 +3418,15 @@ This option has the following sub-options:
    the user directory. If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
+
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
+    
     These indexes are built the first time Synapse starts; admins can
-    manually trigger a rebuild via API following the instructions at
-         https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
-    Set to true to return search results containing all known users, even if that
+    manually trigger a rebuild via the API following the instructions
+    [for running background updates](../administration/admin_api/background_updates.md#run),
+    set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
@@ -3448,9 +3541,9 @@ Example configuration:
 enable_room_list_search: false
 ```
 ---
-### `alias_creation`
+### `alias_creation_rules`
 
-The `alias_creation` option controls who is allowed to create aliases
+The `alias_creation_rules` option controls who is allowed to create aliases
 on this server.
 
 The format of this option is a list of rules that contain globs that

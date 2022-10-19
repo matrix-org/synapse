@@ -179,7 +179,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """Try and join a room that this server is not in
 
         Args:
-            requester
+            requester: The user making the request, according to the access token.
             remote_room_hosts: List of servers that can be used to join via.
             room_id: Room that we are trying to join
             user: User who is trying to join
@@ -322,6 +322,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -361,6 +362,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -399,6 +402,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 "state_key": user_id,
                 # For backwards compatibility:
                 "membership": membership,
+                "origin_server_ts": origin_server_ts,
             },
             txn_id=txn_id,
             allow_no_prev_events=allow_no_prev_events,
@@ -432,8 +436,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         with opentracing.start_active_span("handle_new_client_event"):
             result_event = await self.event_creation_handler.handle_new_client_event(
                 requester,
-                event,
-                context,
+                events_and_context=[(event, context)],
                 extra_users=[target],
                 ratelimit=ratelimit,
             )
@@ -505,6 +508,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -543,6 +547,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -584,6 +590,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         prev_event_ids=prev_event_ids,
                         state_event_ids=state_event_ids,
                         depth=depth,
+                        origin_server_ts=origin_server_ts,
                     )
 
         return result
@@ -607,6 +614,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -647,6 +655,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -689,7 +699,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 errcode=Codes.BAD_JSON,
             )
 
-        if "avatar_url" in content:
+        if "avatar_url" in content and content.get("avatar_url") is not None:
             if not await self.profile_handler.check_avatar_size_and_mime_type(
                 content["avatar_url"],
             ):
@@ -744,7 +754,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 is_requester_admin = True
 
             else:
-                is_requester_admin = await self.auth.is_server_admin(requester.user)
+                is_requester_admin = await self.auth.is_server_admin(requester)
 
             if not is_requester_admin:
                 if self.config.server.block_non_admin_invites:
@@ -786,6 +796,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 require_consent=require_consent,
                 outlier=outlier,
                 historical=historical,
+                origin_server_ts=origin_server_ts,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
@@ -837,7 +848,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 old_membership == Membership.INVITE
                 and effective_membership_state == Membership.LEAVE
             ):
-                is_blocked = await self._is_server_notice_room(room_id)
+                is_blocked = await self.store.is_server_notice_room(room_id)
                 if is_blocked:
                     raise SynapseError(
                         HTTPStatus.FORBIDDEN,
@@ -868,7 +879,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 bypass_spam_checker = True
 
             else:
-                bypass_spam_checker = await self.auth.is_server_admin(requester.user)
+                bypass_spam_checker = await self.auth.is_server_admin(requester)
 
             inviter = await self._get_inviter(target.to_string(), room_id)
             if (
@@ -1031,6 +1042,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             content=content,
             require_consent=require_consent,
             outlier=outlier,
+            origin_server_ts=origin_server_ts,
         )
 
     async def _should_perform_remote_join(
@@ -1151,8 +1163,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         logger.info("Transferring room state from %s to %s", old_room_id, room_id)
 
         # Find all local users that were in the old room and copy over each user's state
-        users = await self.store.get_users_in_room(old_room_id)
-        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
+        local_users = await self.store.get_local_users_in_room(old_room_id)
+        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, local_users)
 
         # Add new room to the room directory if the old room was there
         # Remove old room from the room directory
@@ -1252,7 +1264,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 raise SynapseError(403, "This room has been blocked on this server")
 
         event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[target_user], ratelimit=ratelimit
+            requester,
+            events_and_context=[(event, context)],
+            extra_users=[target_user],
+            ratelimit=ratelimit,
         )
 
         prev_member_event_id = prev_state_ids.get(
@@ -1382,7 +1397,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_server: str,
         requester: Requester,
         txn_id: Optional[str],
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
         prev_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[str, int]:
@@ -1397,7 +1412,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             requester: The user making the request.
             txn_id: The transaction ID this is part of, or None if this is not
                 part of a transaction.
-            id_access_token: The optional identity server access token.
+            id_access_token: Identity server access token.
             depth: Override the depth used to order the event in the DAG.
             prev_event_ids: The event IDs to use as the prev events
                 Should normally be set to None, which will cause the depth to be calculated
@@ -1410,7 +1425,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ShadowBanError if the requester has been shadow-banned.
         """
         if self.config.server.block_non_admin_invites:
-            is_requester_admin = await self.auth.is_server_admin(requester.user)
+            is_requester_admin = await self.auth.is_server_admin(requester)
             if not is_requester_admin:
                 raise SynapseError(
                     403, "Invites have been disabled on this server", Codes.FORBIDDEN
@@ -1494,7 +1509,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         user: UserID,
         txn_id: Optional[str],
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
         prev_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
@@ -1617,12 +1632,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         return False
 
-    async def _is_server_notice_room(self, room_id: str) -> bool:
-        if self._server_notices_mxid is None:
-            return False
-        user_ids = await self.store.get_users_in_room(room_id)
-        return self._server_notices_mxid in user_ids
-
 
 class RoomMemberMasterHandler(RoomMemberHandler):
     def __init__(self, hs: "HomeServer"):
@@ -1693,7 +1702,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             check_complexity
             and self.hs.config.server.limit_remote_rooms.admins_can_join
         ):
-            check_complexity = not await self.auth.is_server_admin(user)
+            check_complexity = not await self.store.is_server_admin(user)
 
         if check_complexity:
             # Fetch the room complexity
@@ -1866,8 +1875,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         result_event = await self.event_creation_handler.handle_new_client_event(
             requester,
-            event,
-            context,
+            events_and_context=[(event, context)],
             extra_users=[UserID.from_string(target_user)],
         )
         # we know it was persisted, so must have a stream ordering
@@ -1923,8 +1931,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         ]:
             raise SynapseError(400, "User %s in room %s" % (user_id, room_id))
 
-        if membership:
-            await self.store.forget(user_id, room_id)
+        # In normal case this call is only required if `membership` is not `None`.
+        # But: After the last member had left the room, the background update
+        # `_background_remove_left_rooms` is deleting rows related to this room from
+        # the table `current_state_events` and `get_current_state_events` is `None`.
+        await self.store.forget(user_id, room_id)
 
 
 def get_users_which_can_issue_invite(auth_events: StateMap[EventBase]) -> List[str]:

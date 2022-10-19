@@ -17,6 +17,7 @@
 import logging
 import re
 from enum import Enum
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
 
@@ -37,7 +38,7 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
-from synapse.http.server import HttpServer, cancellable
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -57,6 +58,7 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
+from synapse.util.cancellation import cancellable
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
 if TYPE_CHECKING:
@@ -116,9 +118,13 @@ messsages_response_timer = Histogram(
         2.5,
         5.0,
         10.0,
+        20.0,
         30.0,
         60.0,
+        80.0,
+        100.0,
         120.0,
+        150.0,
         180.0,
         "+Inf",
     ),
@@ -229,7 +235,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         msg_handler = self.message_handler
         data = await msg_handler.get_room_data(
-            user_id=requester.user.to_string(),
+            requester=requester,
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
@@ -262,15 +268,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         content = parse_json_object_from_request(request)
 
-        event_dict = {
-            "type": event_type,
-            "content": content,
-            "room_id": room_id,
-            "sender": requester.user.to_string(),
-        }
-
-        if state_key is not None:
-            event_dict["state_key"] = state_key
+        origin_server_ts = None
+        if requester.app_service:
+            origin_server_ts = parse_integer(request, "ts")
 
         try:
             if event_type == EventTypes.Member:
@@ -281,8 +281,22 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     room_id=room_id,
                     action=membership,
                     content=content,
+                    origin_server_ts=origin_server_ts,
                 )
             else:
+                event_dict: JsonDict = {
+                    "type": event_type,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+
+                if state_key is not None:
+                    event_dict["state_key"] = state_key
+
+                if origin_server_ts is not None:
+                    event_dict["origin_server_ts"] = origin_server_ts
+
                 (
                     event,
                     _,
@@ -327,10 +341,10 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
         }
 
-        # Twisted will have processed the args by now.
-        assert request.args is not None
-        if b"ts" in request.args and requester.app_service:
-            event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
+        if requester.app_service:
+            origin_server_ts = parse_integer(request, "ts")
+            if origin_server_ts is not None:
+                event_dict["origin_server_ts"] = origin_server_ts
 
         try:
             (
@@ -574,7 +588,7 @@ class RoomMemberListRestServlet(RestServlet):
 
         events = await handler.get_state_events(
             room_id=room_id,
-            user_id=requester.user.to_string(),
+            requester=requester,
             at_token=at_token,
             state_filter=StateFilter.from_types([(EventTypes.Member, None)]),
         )
@@ -674,7 +688,7 @@ class RoomMessageListRestServlet(RestServlet):
         room_member_count = await make_deferred_yieldable(room_member_count_deferred)
         messsages_response_timer.labels(
             room_size=_RoomSize.from_member_count(room_member_count)
-        ).observe((processing_start_time - processing_end_time) / 1000)
+        ).observe((processing_end_time - processing_start_time) / 1000)
 
         return 200, msgs
 
@@ -696,8 +710,7 @@ class RoomStateRestServlet(RestServlet):
         # Get all the current state for this room
         events = await self.message_handler.get_state_events(
             room_id=room_id,
-            user_id=requester.user.to_string(),
-            is_guest=requester.is_guest,
+            requester=requester,
         )
         return 200, events
 
@@ -716,7 +729,9 @@ class RoomInitialSyncRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        pagination_config = await PaginationConfig.from_request(self.store, request)
+        pagination_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
         )
@@ -755,7 +770,7 @@ class RoomEventServlet(RestServlet):
             == "true"
         )
         if include_unredacted_content and not await self.auth.is_server_admin(
-            requester.user
+            requester
         ):
             power_level_event = (
                 await self._storage_controllers.state.get_current_state_event(
@@ -943,7 +958,16 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if membership_action == "invite" and self._has_3pid_invite_keys(content):
+        if membership_action == "invite" and all(
+            key in content for key in ("medium", "address")
+        ):
+            if not all(key in content for key in ("id_server", "id_access_token")):
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "`id_server` and `id_access_token` are required when doing 3pid invite",
+                    Codes.MISSING_PARAM,
+                )
+
             try:
                 await self.room_member_handler.do_3pid_invite(
                     room_id,
@@ -953,7 +977,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                     content["id_server"],
                     requester,
                     txn_id,
-                    content.get("id_access_token"),
+                    content["id_access_token"],
                 )
             except ShadowBanError:
                 # Pretend the request succeeded.
@@ -989,12 +1013,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             return_value["room_id"] = room_id
 
         return 200, return_value
-
-    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
-        for key in {"id_server", "medium", "address"}:
-            if key not in content:
-                return False
-        return True
 
     def on_PUT(
         self, request: SynapseRequest, room_id: str, membership_action: str, txn_id: str
@@ -1260,9 +1278,7 @@ class TimestampLookupRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
-        await self._auth.check_user_in_room_or_world_readable(
-            room_id, requester.user.to_string()
-        )
+        await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
         timestamp = parse_integer(request, "ts", required=True)
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])

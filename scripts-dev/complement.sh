@@ -126,7 +126,7 @@ export COMPLEMENT_BASE_IMAGE=complement-synapse
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
+test_tags="synapse_blacklist,msc3787"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -158,7 +158,10 @@ else
 
   # We only test faster room joins on monoliths, because they are purposefully
   # being developed without worker support to start with.
-  test_tags="$test_tags,faster_joins"
+  #
+  # The tests for importing historical messages (MSC2716) and jump to date (MSC3030)
+  # also only pass with monoliths, currently.
+  test_tags="$test_tags,faster_joins,msc2716,msc3030"
 fi
 
 

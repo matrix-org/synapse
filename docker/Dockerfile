@@ -31,7 +31,9 @@ ARG PYTHON_VERSION=3.9
 ###
 ### Stage 0: generate requirements.txt
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
+# We hardcode the use of Debian bullseye here because this could change upstream
+# and other Dockerfiles used for testing are expecting bullseye.
+FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye as requirements
 
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
@@ -46,17 +48,8 @@ RUN \
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
-# We use a specific commit from poetry's master branch instead of our usual 1.1.14,
-# to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
-#    https://github.com/python-poetry/poetry/pull/5156 and
-#    https://github.com/python-poetry/poetry/issues/5141 ;
-# without it, we generate a requirements.txt with incorrect environment markers,
-# which causes necessary packages to be omitted when we `pip install`.
-#
-# NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
-# pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
+  pip install --user "poetry==1.2.0"
 
 WORKDIR /synapse
 
@@ -85,7 +78,7 @@ RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
 ###
 ### Stage 1: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as builder
+FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye as builder
 
 # install the OS build deps
 RUN \
@@ -101,10 +94,25 @@ RUN \
     libxml++2.6-dev \
     libxslt1-dev \
     openssl \
-    rustc \
     zlib1g-dev \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+
+# Install rust and ensure its in the PATH
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+RUN mkdir /rust /cargo
+
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable --profile minimal
+
+
+# arm64 builds consume a lot of memory if `CARGO_NET_GIT_FETCH_WITH_CLI` is not
+# set to true, so we expose it as a build-arg.
+ARG CARGO_NET_GIT_FETCH_WITH_CLI=false
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=$CARGO_NET_GIT_FETCH_WITH_CLI
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
@@ -117,8 +125,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
+COPY rust /synapse/rust/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst /synapse/
+COPY pyproject.toml README.rst build_rust.py Cargo.toml Cargo.lock /synapse/
 
 # Repeat of earlier build argument declaration, as this is a new build stage.
 ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
@@ -126,7 +135,9 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 # Install the synapse package itself.
 # If we have populated requirements.txt, we don't install any dependencies
 # as we should already have those from the previous `pip install` step.
-RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+RUN --mount=type=cache,target=/synapse/target,sharing=locked \
+  --mount=type=cache,target=${CARGO_HOME}/registry,sharing=locked \
+  if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
     pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
   else \
     pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
@@ -136,7 +147,7 @@ RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
 ### Stage 2: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-slim
+FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye
 
 LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
 LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'

@@ -32,6 +32,7 @@ from typing_extensions import Literal
 
 import synapse
 from synapse.api.errors import Codes
+from synapse.logging.opentracing import trace
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
@@ -378,6 +379,7 @@ class SpamChecker:
         if check_media_file_for_spam is not None:
             self._check_media_file_for_spam_callbacks.append(check_media_file_for_spam)
 
+    @trace
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
     ) -> Union[Tuple[Codes, JsonDict], str]:

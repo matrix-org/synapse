@@ -76,9 +76,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         event = Mock(
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
-        self.mock_store.get_all_new_events_stream.side_effect = [
-            make_awaitable((0, [], {})),
-            make_awaitable((1, [event], {event.event_id: 0})),
+        self.mock_store.get_all_new_event_ids_stream.side_effect = [
+            make_awaitable((0, {})),
+            make_awaitable((1, {event.event_id: 0})),
+        ]
+        self.mock_store.get_events_as_list.side_effect = [
+            make_awaitable([]),
+            make_awaitable([event]),
         ]
         self.handler.notify_interested_services(RoomStreamToken(None, 1))
 
@@ -95,10 +99,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_all_new_events_stream.side_effect = [
-            make_awaitable((0, [event], {event.event_id: 0})),
+        self.mock_store.get_all_new_event_ids_stream.side_effect = [
+            make_awaitable((0, {event.event_id: 0})),
         ]
-
+        self.mock_store.get_events_as_list.side_effect = [make_awaitable([event])]
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
 
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
@@ -112,7 +116,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_all_new_events_stream.side_effect = [
+        self.mock_store.get_all_new_event_ids_stream.side_effect = [
             make_awaitable((0, [event], {event.event_id: 0})),
         ]
 
@@ -447,6 +451,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                     receipt_type="m.read",
                     user_id=self.local_user,
                     event_ids=[f"$eventid_{i}"],
+                    thread_id=None,
                     data={},
                 )
             )

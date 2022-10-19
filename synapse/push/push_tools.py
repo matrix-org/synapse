@@ -17,6 +17,7 @@ from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
+from synapse.util.async_helpers import concurrently_execute
 
 
 async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -> int:
@@ -25,14 +26,25 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
 
     badge = len(invites)
 
-    for room_id in joins:
-        notifs = await (
-            store.get_unread_event_push_actions_by_room_for_user(
+    room_notifs = []
+
+    async def get_room_unread_count(room_id: str) -> None:
+        room_notifs.append(
+            await store.get_unread_event_push_actions_by_room_for_user(
                 room_id,
                 user_id,
             )
         )
-        if notifs.notify_count == 0:
+
+    await concurrently_execute(get_room_unread_count, joins, 10)
+
+    for notifs in room_notifs:
+        # Combine the counts from all the threads.
+        notify_count = notifs.main_timeline.notify_count + sum(
+            n.notify_count for n in notifs.threads.values()
+        )
+
+        if notify_count == 0:
             continue
 
         if group_by_room:
@@ -40,7 +52,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
             badge += 1
         else:
             # increment the badge count by the number of unread messages in the room
-            badge += notifs.notify_count
+            badge += notify_count
     return badge
 
 

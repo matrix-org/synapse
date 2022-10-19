@@ -16,9 +16,8 @@ import copy
 from typing import Any, Dict, List, Optional
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.types import UserID
-
-from .baserules import FilteredPushRules, PushRule
 
 
 def format_push_rules_for_user(
@@ -34,7 +33,7 @@ def format_push_rules_for_user(
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
-    for r, enabled in ruleslist:
+    for r, enabled in ruleslist.rules():
         template_name = _priority_class_to_template_name(r.priority_class)
 
         rulearray = rules["global"][template_name]
@@ -103,10 +102,8 @@ def _rule_to_template(rule: PushRule) -> Optional[Dict[str, Any]]:
         # with PRIORITY_CLASS_INVERSE_MAP.
         raise ValueError("Unexpected template_name: %s" % (template_name,))
 
-    if unscoped_rule_id:
-        templaterule["rule_id"] = unscoped_rule_id
-    if rule.default:
-        templaterule["default"] = True
+    templaterule["rule_id"] = unscoped_rule_id
+    templaterule["default"] = rule.default
     return templaterule
 
 

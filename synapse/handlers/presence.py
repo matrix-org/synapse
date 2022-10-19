@@ -1596,7 +1596,9 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         self,
         user: UserID,
         from_key: Optional[int],
-        limit: Optional[int] = None,
+        # Having a default limit doesn't match the EventSource API, but some
+        # callers do not provide it. It is unused in this class.
+        limit: int = 0,
         room_ids: Optional[Collection[str]] = None,
         is_guest: bool = False,
         explicit_room_id: Optional[str] = None,
@@ -2051,8 +2053,7 @@ async def get_interested_remotes(
     )
 
     for room_id, states in room_ids_to_states.items():
-        user_ids = await store.get_users_in_room(room_id)
-        hosts = {get_domain_from_id(user_id) for user_id in user_ids}
+        hosts = await store.get_current_hosts_in_room(room_id)
         for host in hosts:
             hosts_and_states.setdefault(host, set()).update(states)
 
