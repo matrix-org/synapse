@@ -257,7 +257,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self,
         user: UserID,
         from_key: int,
-        limit: Optional[int],
+        limit: int,
         room_ids: Iterable[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
