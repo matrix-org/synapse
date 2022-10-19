@@ -65,6 +65,7 @@ from synapse.rest.client import (
     push_rule,
     read_marker,
     receipts,
+    relations,
     room,
     room_batch,
     room_keys,
@@ -308,6 +309,7 @@ class GenericWorkerServer(HomeServer):
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
                     room.register_servlets(self, resource, is_worker=True)
+                    relations.register_servlets(self, resource)
                     room.register_deprecated_servlets(self, resource)
                     initial_sync.register_servlets(self, resource)
                     room_batch.register_servlets(self, resource)
@@ -412,7 +414,11 @@ class GenericWorkerServer(HomeServer):
                         "enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(listener.bind_addresses, listener.port)
+                    _base.listen_metrics(
+                        listener.bind_addresses,
+                        listener.port,
+                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
+                    )
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 

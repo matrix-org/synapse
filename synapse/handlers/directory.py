@@ -16,6 +16,8 @@ import logging
 import string
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
+from typing_extensions import Literal
+
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
@@ -30,7 +32,7 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.module_api import NOT_SPAM
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import JsonDict, Requester, RoomAlias, get_domain_from_id
+from synapse.types import JsonDict, Requester, RoomAlias
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -83,8 +85,9 @@ class DirectoryHandler:
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            users = await self.store.get_users_in_room(room_id)
-            servers = {get_domain_from_id(u) for u in users}
+            servers = await self._storage_controllers.state.get_current_hosts_in_room(
+                room_id
+            )
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -287,8 +290,9 @@ class DirectoryHandler:
                 Codes.NOT_FOUND,
             )
 
-        users = await self.store.get_users_in_room(room_id)
-        extra_servers = {get_domain_from_id(u) for u in users}
+        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room(
+            room_id
+        )
         servers_set = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
@@ -427,7 +431,10 @@ class DirectoryHandler:
         return await self.auth.check_can_change_room_list(room_id, requester)
 
     async def edit_published_room_list(
-        self, requester: Requester, room_id: str, visibility: str
+        self,
+        requester: Requester,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Edit the entry of the room in the published room list.
 
@@ -448,9 +455,6 @@ class DirectoryHandler:
 
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
-
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
 
         if visibility == "public" and not self.enable_room_list_search:
             # The room list has been disabled.
@@ -503,7 +507,11 @@ class DirectoryHandler:
         await self.store.set_room_is_public(room_id, making_public)
 
     async def edit_published_appservice_room_list(
-        self, appservice_id: str, network_id: str, room_id: str, visibility: str
+        self,
+        appservice_id: str,
+        network_id: str,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Add or remove a room from the appservice/network specific public
         room list.
@@ -514,9 +522,6 @@ class DirectoryHandler:
             room_id
             visibility: either "public" or "private"
         """
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
-
         await self.store.set_room_is_public_appservice(
             room_id, appservice_id, network_id, visibility == "public"
         )

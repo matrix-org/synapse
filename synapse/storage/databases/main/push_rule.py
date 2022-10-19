@@ -29,10 +29,8 @@ from typing import (
 )
 
 from synapse.api.errors import StoreError
-from synapse.config.homeserver import ExperimentalConfig
-from synapse.push.baserules import FilteredPushRules, PushRule, compile_push_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -51,6 +49,7 @@ from synapse.storage.util.id_generators import (
     IdGenerator,
     StreamIdGenerator,
 )
+from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRules
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -63,27 +62,25 @@ logger = logging.getLogger(__name__)
 
 
 def _load_rules(
-    rawrules: List[JsonDict],
-    enabled_map: Dict[str, bool],
-    experimental_config: ExperimentalConfig,
+    rawrules: List[JsonDict], enabled_map: Dict[str, bool]
 ) -> FilteredPushRules:
     """Take the DB rows returned from the DB and convert them into a full
     `FilteredPushRules` object.
     """
 
     ruleslist = [
-        PushRule(
+        PushRule.from_db(
             rule_id=rawrule["rule_id"],
             priority_class=rawrule["priority_class"],
-            conditions=db_to_json(rawrule["conditions"]),
-            actions=db_to_json(rawrule["actions"]),
+            conditions=rawrule["conditions"],
+            actions=rawrule["actions"],
         )
         for rawrule in rawrules
     ]
 
-    push_rules = compile_push_rules(ruleslist)
+    push_rules = PushRules(ruleslist)
 
-    filtered_rules = FilteredPushRules(push_rules, enabled_map, experimental_config)
+    filtered_rules = FilteredPushRules(push_rules, enabled_map)
 
     return filtered_rules
 
@@ -163,9 +160,8 @@ class PushRulesWorkerStore(
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
-        return _load_rules(rows, enabled_map, self.hs.config.experimental)
+        return _load_rules(rows, enabled_map)
 
-    @cached(max_entries=5000)
     async def get_push_rules_enabled_for_user(self, user_id: str) -> Dict[str, bool]:
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
@@ -223,15 +219,10 @@ class PushRulesWorkerStore(
         results: Dict[str, FilteredPushRules] = {}
 
         for user_id, rules in raw_rules.items():
-            results[user_id] = _load_rules(
-                rules, enabled_map_by_user.get(user_id, {}), self.hs.config.experimental
-            )
+            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
 
         return results
 
-    @cachedList(
-        cached_method_name="get_push_rules_enabled_for_user", list_name="user_ids"
-    )
     async def bulk_get_push_rules_enabled(
         self, user_ids: Collection[str]
     ) -> Dict[str, Dict[str, bool]]:
@@ -246,6 +237,7 @@ class PushRulesWorkerStore(
             iterable=user_ids,
             retcols=("user_name", "rule_id", "enabled"),
             desc="bulk_get_push_rules_enabled",
+            batch_size=1000,
         )
         for row in rows:
             enabled = bool(row["enabled"])
@@ -792,7 +784,6 @@ class PushRuleStore(PushRulesWorkerStore):
         self.db_pool.simple_insert_txn(txn, "push_rules_stream", values=values)
 
         txn.call_after(self.get_push_rules_for_user.invalidate, (user_id,))
-        txn.call_after(self.get_push_rules_enabled_for_user.invalidate, (user_id,))
         txn.call_after(
             self.push_rules_stream_cache.entity_has_changed, user_id, stream_id
         )
@@ -849,7 +840,7 @@ class PushRuleStore(PushRulesWorkerStore):
         user_push_rules = await self.get_push_rules_for_user(user_id)
 
         # Get rules relating to the old room and copy them to the new room
-        for rule, enabled in user_push_rules:
+        for rule, enabled in user_push_rules.rules():
             if not enabled:
                 continue
 

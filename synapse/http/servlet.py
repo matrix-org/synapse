@@ -28,12 +28,14 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, MissingError, PydanticValueError, ValidationError
+from pydantic.error_wrappers import ErrorWrapper
 from typing_extensions import Literal
 
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http import redact_uri
 from synapse.http.server import HttpServer
 from synapse.types import JsonDict, RoomAlias, RoomID
 from synapse.util import json_decoder
@@ -663,7 +665,13 @@ def parse_json_value_from_request(
     try:
         content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warning("Unable to parse JSON: %s (%s)", e, content_bytes)
+        logger.warning(
+            "Unable to parse JSON from %s %s response: %s (%s)",
+            request.method.decode("ascii", errors="replace"),
+            redact_uri(request.uri.decode("ascii", errors="replace")),
+            e,
+            content_bytes,
+        )
         raise SynapseError(
             HTTPStatus.BAD_REQUEST, "Content not JSON.", errcode=Codes.NOT_JSON
         )
@@ -714,7 +722,21 @@ def parse_and_validate_json_object_from_request(
     try:
         instance = model_type.parse_obj(content)
     except ValidationError as e:
-        raise SynapseError(HTTPStatus.BAD_REQUEST, str(e), errcode=Codes.BAD_JSON)
+        # Choose a matrix error code. The catch-all is BAD_JSON, but we try to find a
+        # more specific error if possible (which occasionally helps us to be spec-
+        # compliant) This is a bit awkward because the spec's error codes aren't very
+        # clear-cut: BAD_JSON arguably overlaps with MISSING_PARAM and INVALID_PARAM.
+        errcode = Codes.BAD_JSON
+
+        raw_errors = e.raw_errors
+        if len(raw_errors) == 1 and isinstance(raw_errors[0], ErrorWrapper):
+            raw_error = raw_errors[0].exc
+            if isinstance(raw_error, MissingError):
+                errcode = Codes.MISSING_PARAM
+            elif isinstance(raw_error, PydanticValueError):
+                errcode = Codes.INVALID_PARAM
+
+        raise SynapseError(HTTPStatus.BAD_REQUEST, str(e), errcode=errcode)
 
     return instance
 

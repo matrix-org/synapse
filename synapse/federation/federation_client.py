@@ -61,7 +61,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.types import QueryParams
-from synapse.logging.opentracing import SynapseTags, set_tag, tag_args, trace
+from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -278,7 +278,7 @@ class FederationClient(FederationBase):
         pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
-        pdus[:] = await self._check_sigs_and_hash_and_fetch(
+        pdus[:] = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             dest, pdus, room_version=room_version
         )
 
@@ -328,7 +328,17 @@ class FederationClient(FederationBase):
 
             # Check signatures are correct.
             try:
-                signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+                async def _record_failure_callback(
+                    event: EventBase, cause: str
+                ) -> None:
+                    await self.store.record_event_failed_pull_attempt(
+                        event.room_id, event.event_id, cause
+                    )
+
+                signed_pdu = await self._check_sigs_and_hash(
+                    room_version, pdu, _record_failure_callback
+                )
             except InvalidEventSignatureError as e:
                 errmsg = f"event id {pdu.event_id}: {e}"
                 logger.warning("%s", errmsg)
@@ -547,24 +557,28 @@ class FederationClient(FederationBase):
             len(auth_event_map),
         )
 
-        valid_auth_events = await self._check_sigs_and_hash_and_fetch(
+        valid_auth_events = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             destination, auth_event_map.values(), room_version
         )
 
-        valid_state_events = await self._check_sigs_and_hash_and_fetch(
-            destination, state_event_map.values(), room_version
+        valid_state_events = (
+            await self._check_sigs_and_hash_for_pulled_events_and_fetch(
+                destination, state_event_map.values(), room_version
+            )
         )
 
         return valid_state_events, valid_auth_events
 
     @trace
-    async def _check_sigs_and_hash_and_fetch(
+    async def _check_sigs_and_hash_for_pulled_events_and_fetch(
         self,
         origin: str,
         pdus: Collection[EventBase],
         room_version: RoomVersion,
     ) -> List[EventBase]:
-        """Checks the signatures and hashes of a list of events.
+        """
+        Checks the signatures and hashes of a list of pulled events we got from
+        federation and records any signature failures as failed pull attempts.
 
         If a PDU fails its signature check then we check if we have it in
         the database, and if not then request it from the sender's server (if that
@@ -587,17 +601,27 @@ class FederationClient(FederationBase):
         Returns:
             A list of PDUs that have valid signatures and hashes.
         """
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "pdus.length",
+            str(len(pdus)),
+        )
 
         # We limit how many PDUs we check at once, as if we try to do hundreds
         # of thousands of PDUs at once we see large memory spikes.
 
-        valid_pdus = []
+        valid_pdus: List[EventBase] = []
+
+        async def _record_failure_callback(event: EventBase, cause: str) -> None:
+            await self.store.record_event_failed_pull_attempt(
+                event.room_id, event.event_id, cause
+            )
 
         async def _execute(pdu: EventBase) -> None:
             valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                 pdu=pdu,
                 origin=origin,
                 room_version=room_version,
+                record_failure_callback=_record_failure_callback,
             )
 
             if valid_pdu:
@@ -607,11 +631,16 @@ class FederationClient(FederationBase):
 
         return valid_pdus
 
+    @trace
+    @tag_args
     async def _check_sigs_and_hash_and_fetch_one(
         self,
         pdu: EventBase,
         origin: str,
         room_version: RoomVersion,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> Optional[EventBase]:
         """Takes a PDU and checks its signatures and hashes.
 
@@ -628,6 +657,11 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
+            record_failure_callback: A callback to run whenever the given event
+                fails signature or hash checks. This includes exceptions
+                that would be normally be thrown/raised but also things like
+                checking for event tampering where we just return the redacted
+                event.
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
@@ -635,13 +669,23 @@ class FederationClient(FederationBase):
         """
 
         try:
-            return await self._check_sigs_and_hash(room_version, pdu)
+            return await self._check_sigs_and_hash(
+                room_version, pdu, record_failure_callback
+            )
         except InvalidEventSignatureError as e:
             logger.warning(
                 "Signature on retrieved event %s was invalid (%s). "
-                "Checking local store/orgin server",
+                "Checking local store/origin server",
                 pdu.event_id,
                 e,
+            )
+            log_kv(
+                {
+                    "message": "Signature on retrieved event was invalid. "
+                    "Checking local store/origin server",
+                    "event_id": pdu.event_id,
+                    "InvalidEventSignatureError": e,
+                }
             )
 
         # Check local db.
@@ -649,6 +693,9 @@ class FederationClient(FederationBase):
             pdu.event_id, allow_rejected=True, allow_none=True
         )
 
+        # If the PDU fails its signature check and we don't have it in our
+        # database, we then request it from sender's server (if that is not the
+        # same as `origin`).
         pdu_origin = get_domain_from_id(pdu.sender)
         if not res and pdu_origin != origin:
             try:
@@ -677,7 +724,7 @@ class FederationClient(FederationBase):
 
         auth_chain = [event_from_pdu_json(p, room_version) for p in res["auth_chain"]]
 
-        signed_auth = await self._check_sigs_and_hash_and_fetch(
+        signed_auth = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             destination, auth_chain, room_version=room_version
         )
 
@@ -889,9 +936,6 @@ class FederationClient(FederationBase):
             # The protoevent received over the JSON wire may not have all
             # the required fields. Lets just gloss over that because
             # there's some we never care about
-            if "prev_state" not in pdu_dict:
-                pdu_dict["prev_state"] = []
-
             ev = builder.create_local_event_from_event_dict(
                 self._clock,
                 self.hostname,
@@ -1173,7 +1217,7 @@ class FederationClient(FederationBase):
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
             if self._is_unknown_endpoint(e, err):
-                if room_version.event_format != EventFormatVersions.V1:
+                if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",
@@ -1250,7 +1294,7 @@ class FederationClient(FederationBase):
         return resp[1]
 
     async def send_knock(self, destinations: List[str], pdu: EventBase) -> JsonDict:
-        """Attempts to send a knock event to given a list of servers. Iterates
+        """Attempts to send a knock event to a given list of servers. Iterates
         through the list until one attempt succeeds.
 
         Doing so will cause the remote server to add the event to the graph,
@@ -1387,7 +1431,7 @@ class FederationClient(FederationBase):
                 event_from_pdu_json(e, room_version) for e in content.get("events", [])
             ]
 
-            signed_events = await self._check_sigs_and_hash_and_fetch(
+            signed_events = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
                 destination, events, room_version=room_version
             )
         except HttpResponseException as e:

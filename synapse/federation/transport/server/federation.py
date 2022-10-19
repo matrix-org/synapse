@@ -489,7 +489,7 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
         room_version = content["room_version"]
         event = content["event"]
-        invite_room_state = content["invite_room_state"]
+        invite_room_state = content.get("invite_room_state", [])
 
         # Synapse expects invite_room_state to be in unsigned, as it is in v1
         # API
@@ -549,8 +549,7 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
 
 
 class FederationGetMissingEventsServlet(BaseFederationServerServlet):
-    # TODO(paul): Why does this path alone end with "/?" optional?
-    PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
+    PATH = "/get_missing_events/(?P<room_id>[^/]*)"
 
     async def on_POST(
         self,

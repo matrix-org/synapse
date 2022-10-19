@@ -1,0 +1,1 @@
+Make `parse_server_name` consistent in handling invalid server names.

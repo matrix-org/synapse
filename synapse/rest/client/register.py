@@ -21,17 +21,21 @@ from twisted.web.server import Request
 import synapse
 import synapse.api.auth
 import synapse.types
-from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
+from synapse.api.constants import (
+    APP_SERVICE_REGISTRATION_TYPE,
+    ApprovalNoticeMedium,
+    LoginType,
+)
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
+    NotApprovedError,
     SynapseError,
     ThreepidValidationError,
     UnrecognizedRequestError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.config import ConfigError
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.config.server import is_threepid_reserved
@@ -74,7 +78,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
-        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.hs.config.email.can_verify_email:
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email.email_app_name,
@@ -83,13 +87,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if (
-                self.hs.config.email.local_threepid_handling_disabled_due_to_email_config
-            ):
-                logger.warning(
-                    "Email registration has been disabled due to lack of email config"
-                )
+        if not self.hs.config.email.can_verify_email:
+            logger.warning(
+                "Email registration has been disabled due to lack of email config"
+            )
             raise SynapseError(
                 400, "Email-based registration has been disabled on this server"
             )
@@ -138,35 +139,21 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            assert self.hs.config.registration.account_threepid_delegate_email
-
-            # Have the configured identity server handle the request
-            ret = await self.identity_handler.request_email_token(
-                self.hs.config.registration.account_threepid_delegate_email,
-                email,
-                client_secret,
-                send_attempt,
-                next_link,
-            )
-        else:
-            # Send registration emails from Synapse,
-            # wrapping the session id in a JSON object.
-            ret = {
-                "sid": await self.identity_handler.send_threepid_validation(
-                    email,
-                    client_secret,
-                    send_attempt,
-                    self.mailer.send_registration_mail,
-                    next_link,
-                )
-            }
+        # Send registration emails from Synapse
+        sid = await self.identity_handler.send_threepid_validation(
+            email,
+            client_secret,
+            send_attempt,
+            self.mailer.send_registration_mail,
+            next_link,
+        )
 
         threepid_send_requests.labels(type="email", reason="register").observe(
             send_attempt
         )
 
-        return 200, ret
+        # Wrap the session id in a JSON object
+        return 200, {"sid": sid}
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -260,7 +247,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
 
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.config.email.can_verify_email:
             self._failure_email_template = (
                 self.config.email.email_registration_template_failure_html
             )
@@ -270,11 +257,10 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "User registration via email has been disabled due to lack of email config"
-                )
+        if not self.config.email.can_verify_email:
+            logger.warning(
+                "User registration via email has been disabled due to lack of email config"
+            )
             raise SynapseError(
                 400, "Email-based registration is disabled on this server"
             )
@@ -431,6 +417,11 @@ class RegisterRestServlet(RestServlet):
         )
         self._inhibit_user_in_use_error = (
             hs.config.registration.inhibit_user_in_use_error
+        )
+
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
         self._registration_flows = _calculate_registration_flows(
@@ -753,6 +744,12 @@ class RegisterRestServlet(RestServlet):
                 access_token=return_dict.get("access_token"),
             )
 
+            if self._require_approval:
+                raise NotApprovedError(
+                    msg="This account needs to be approved by an administrator before it can be used.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
+                )
+
         return 200, return_dict
 
     async def _do_appservice_registration(
@@ -797,7 +794,9 @@ class RegisterRestServlet(RestServlet):
             "user_id": user_id,
             "home_server": self.hs.hostname,
         }
-        if not params.get("inhibit_login", False):
+        # We don't want to log the user in if we're going to deny them access because
+        # they need to be approved first.
+        if not params.get("inhibit_login", False) and not self._require_approval:
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             (

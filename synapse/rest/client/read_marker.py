@@ -45,8 +45,6 @@ class ReadMarkerRestServlet(RestServlet):
             ReceiptTypes.FULLY_READ,
             ReceiptTypes.READ_PRIVATE,
         }
-        if hs.config.experimental.msc2285_enabled:
-            self._known_receipt_types.add(ReceiptTypes.UNSTABLE_READ_PRIVATE)
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
@@ -85,6 +83,8 @@ class ReadMarkerRestServlet(RestServlet):
                     receipt_type,
                     user_id=requester.user.to_string(),
                     event_id=event_id,
+                    # Setting the thread ID is not possible with the /read_markers endpoint.
+                    thread_id=None,
                 )
 
         return 200, {}

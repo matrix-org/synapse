@@ -1,0 +1,1 @@
+Invalidate rooms for user caches on replicated event, fix sync cache race in synapse workers. Contributed by Nick @ Beeper (@fizzadar).

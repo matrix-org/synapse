@@ -98,9 +98,7 @@ def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) 
         func: Function to be called when sent a SIGHUP signal.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    # This type-ignore should be redundant once we use a mypy release with
-    # https://github.com/python/mypy/pull/12668.
-    _sighup_callbacks.append((func, args, kwargs))  # type: ignore[arg-type]
+    _sighup_callbacks.append((func, args, kwargs))
 
 
 def start_worker_reactor(
@@ -266,15 +264,48 @@ def register_start(
     reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))
 
 
-def listen_metrics(bind_addresses: Iterable[str], port: int) -> None:
+def listen_metrics(
+    bind_addresses: Iterable[str], port: int, enable_legacy_metric_names: bool
+) -> None:
     """
     Start Prometheus metrics server.
     """
-    from synapse.metrics import RegistryProxy, start_http_server
+    from prometheus_client import start_http_server as start_http_server_prometheus
+
+    from synapse.metrics import (
+        RegistryProxy,
+        start_http_server as start_http_server_legacy,
+    )
 
     for host in bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
-        start_http_server(port, addr=host, registry=RegistryProxy)
+        if enable_legacy_metric_names:
+            start_http_server_legacy(port, addr=host, registry=RegistryProxy)
+        else:
+            _set_prometheus_client_use_created_metrics(False)
+            start_http_server_prometheus(port, addr=host, registry=RegistryProxy)
+
+
+def _set_prometheus_client_use_created_metrics(new_value: bool) -> None:
+    """
+    Sets whether prometheus_client should expose `_created`-suffixed metrics for
+    all gauges, histograms and summaries.
+    There is no programmatic way to disable this without poking at internals;
+    the proper way is to use an environment variable which prometheus_client
+    loads at import time.
+
+    The motivation for disabling these `_created` metrics is that they're
+    a waste of space as they're not useful but they take up space in Prometheus.
+    """
+
+    import prometheus_client.metrics
+
+    if hasattr(prometheus_client.metrics, "_use_created"):
+        prometheus_client.metrics._use_created = new_value
+    else:
+        logger.error(
+            "Can't disable `_created` metrics in prometheus_client (brittle hack broken?)"
+        )
 
 
 def listen_manhole(
@@ -478,9 +509,10 @@ async def start(hs: "HomeServer") -> None:
     setup_sentry(hs)
     setup_sdnotify(hs)
 
-    # If background tasks are running on the main process, start collecting the
-    # phone home stats.
+    # If background tasks are running on the main process or this is the worker in
+    # charge of them, start collecting the phone home stats and shared usage metrics.
     if hs.config.worker.run_background_tasks:
+        await hs.get_common_usage_metrics_manager().setup()
         start_phone_stats_home(hs)
 
     # We now freeze all allocated objects in the hopes that (almost)

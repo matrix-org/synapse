@@ -19,6 +19,8 @@ import shutil
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
+from matrix_common.types.mxc_uri import MXCUri
+
 import twisted.internet.error
 import twisted.web.http
 from twisted.internet.defer import Deferred
@@ -63,7 +65,6 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
-
 
 # How often to run the background job to update the "recently accessed"
 # attribute of local and remote media.
@@ -187,7 +188,7 @@ class MediaRepository:
         content: IO,
         content_length: int,
         auth_user: UserID,
-    ) -> str:
+    ) -> MXCUri:
         """Store uploaded content for a local user and return the mxc URL
 
         Args:
@@ -220,7 +221,7 @@ class MediaRepository:
 
         await self._generate_thumbnails(None, media_id, media_id, media_type)
 
-        return "mxc://%s/%s" % (self.server_name, media_id)
+        return MXCUri(self.server_name, media_id)
 
     async def get_local_media(
         self, request: SynapseRequest, media_id: str, name: Optional[str]
