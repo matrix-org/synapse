@@ -128,6 +128,39 @@ you may specify `enable_legacy_metrics: false` in your homeserver configuration.
 A list of affected metrics is available on the [Metrics How-to page](https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12).
 
 
+## Deprecation of the `generate_short_term_login_token` module API method
+
+The following method of the module API has been deprecated, and is scheduled to
+be remove in v1.71.0:
+
+```python
+def generate_short_term_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: str = "",
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+It has been replaced by an asynchronous equivalent:
+
+```python
+async def create_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: Optional[str] = None,
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+Synapse will log a warning when a module uses the deprecated method, to help
+administrators find modules using it.
+
+
 # Upgrading to v1.68.0
 
 Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
