@@ -83,6 +83,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
         requester: Requester,
         ratelimit: bool,
         extra_users: List[UserID],
+        dont_notify: bool,
     ) -> JsonDict:
         """
         Args:
@@ -106,6 +107,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
                 "requester": requester.serialize(),
                 "ratelimit": ratelimit,
                 "extra_users": [u.to_string() for u in extra_users],
+                "dont_notify": dont_notify,
             }
             serialized_events.append(serialized_event)
 
@@ -145,6 +147,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
                 extra_users = [
                     UserID.from_string(u) for u in event_payload["extra_users"]
                 ]
+                dont_notify = event_payload["dont_notify"]
 
                 logger.info(
                     "Got batch of events to send, last ID of batch is: %s, sending into room: %s",
@@ -154,7 +157,7 @@ class ReplicationSendEventsRestServlet(ReplicationEndpoint):
 
             last_event = (
                 await self.event_creation_handler.persist_and_notify_client_events(
-                    requester, events_and_context, ratelimit, extra_users
+                    requester, events_and_context, ratelimit, extra_users, dont_notify=dont_notify,
                 )
             )
 
