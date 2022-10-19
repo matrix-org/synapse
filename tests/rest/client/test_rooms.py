@@ -39,6 +39,8 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.appservice import ApplicationService
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, register, room, sync
@@ -51,6 +53,7 @@ from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
 from tests.storage.test_stream import PaginationTestCase
 from tests.test_utils import make_awaitable
+from tests.test_utils.event_injection import create_event
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -3486,3 +3489,65 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_MISSING_PARAM")
+
+
+class TimestampLookupTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["experimental_features"] = {"msc3030_enabled": True}
+        return config
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self._storage_controllers = self.hs.get_storage_controllers()
+
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+    def _inject_outlier(self, room_id: str) -> EventBase:
+        event, _context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                type="m.test",
+                sender="@test_remote_user:remote",
+            )
+        )
+
+        event.internal_metadata.outlier = True
+        self.get_success(
+            self._storage_controllers.persistence.persist_event(
+                event, EventContext.for_outlier(self._storage_controllers)
+            )
+        )
+        return event
+
+    def test_no_outliers(self) -> None:
+        """
+        Test to make sure `/timestamp_to_event` does not return `outlier` events.
+        We're unable to determine whether an `outlier` is next to a gap so we
+        don't know whether it's actually the closest event. Instead, let's just
+        ignore `outliers` with this endpoint.
+
+        This test is really seeing that we choose the non-`outlier` event behind the
+        `outlier`. Since the gap checking logic considers the latest message in the room
+        as *not* next to a gap, asking over federation does not come into play here.
+        """
+        room_id = self.helper.create_room_as(self.room_owner, tok=self.room_owner_tok)
+
+        outlier_event = self._inject_outlier(room_id)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/org.matrix.msc3030/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
+            access_token=self.room_owner_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+
+        # Make sure the outlier event is not returned
+        self.assertNotEqual(channel.json_body["event_id"], outlier_event.event_id)

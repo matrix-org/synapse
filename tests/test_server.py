@@ -222,13 +222,22 @@ class OptionsResourceTests(unittest.TestCase):
         self.resource = OptionsResource()
         self.resource.putChild(b"res", DummyResource())
 
-    def _make_request(self, method: bytes, path: bytes) -> FakeChannel:
+    def _make_request(
+        self, method: bytes, path: bytes, experimental_cors_msc3886: bool = False
+    ) -> FakeChannel:
         """Create a request from the method/path and return a channel with the response."""
         # Create a site and query for the resource.
         site = SynapseSite(
             "test",
             "site_tag",
-            parse_listener_def(0, {"type": "http", "port": 0}),
+            parse_listener_def(
+                0,
+                {
+                    "type": "http",
+                    "port": 0,
+                    "experimental_cors_msc3886": experimental_cors_msc3886,
+                },
+            ),
             self.resource,
             "1.0",
             max_request_body_size=4096,
@@ -239,25 +248,58 @@ class OptionsResourceTests(unittest.TestCase):
         channel = make_request(self.reactor, site, method, path, shorthand=False)
         return channel
 
+    def _check_cors_standard_headers(self, channel: FakeChannel) -> None:
+        # Ensure the correct CORS headers have been added
+        # as per https://spec.matrix.org/v1.4/client-server-api/#web-browser-clients
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Origin"),
+            [b"*"],
+            "has correct CORS Origin header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Methods"),
+            [b"GET, HEAD, POST, PUT, DELETE, OPTIONS"],  # HEAD isn't in the spec
+            "has correct CORS Methods header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
+            [b"X-Requested-With, Content-Type, Authorization, Date"],
+            "has correct CORS Headers header",
+        )
+
+    def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:
+        # Ensure the correct CORS headers have been added
+        # as per https://github.com/matrix-org/matrix-spec-proposals/blob/hughns/simple-rendezvous-capability/proposals/3886-simple-rendezvous-capability.md#cors
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Origin"),
+            [b"*"],
+            "has correct CORS Origin header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Methods"),
+            [b"GET, HEAD, POST, PUT, DELETE, OPTIONS"],  # HEAD isn't in the spec
+            "has correct CORS Methods header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
+            [
+                b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match"
+            ],
+            "has correct CORS Headers header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
+            [b"ETag, Location, X-Max-Bytes"],
+            "has correct CORS Expose Headers header",
+        )
+
     def test_unknown_options_request(self) -> None:
         """An OPTIONS requests to an unknown URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/foo/")
         self.assertEqual(channel.code, 204)
         self.assertNotIn("body", channel.result)
 
-        # Ensure the correct CORS headers have been added
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Origin"),
-            "has CORS Origin header",
-        )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Methods"),
-            "has CORS Methods header",
-        )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Headers"),
-            "has CORS Headers header",
-        )
+        self._check_cors_standard_headers(channel)
 
     def test_known_options_request(self) -> None:
         """An OPTIONS requests to an known URL still returns 204 No Content."""
@@ -265,19 +307,17 @@ class OptionsResourceTests(unittest.TestCase):
         self.assertEqual(channel.code, 204)
         self.assertNotIn("body", channel.result)
 
-        # Ensure the correct CORS headers have been added
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Origin"),
-            "has CORS Origin header",
+        self._check_cors_standard_headers(channel)
+
+    def test_known_options_request_msc3886(self) -> None:
+        """An OPTIONS requests to an known URL still returns 204 No Content."""
+        channel = self._make_request(
+            b"OPTIONS", b"/res/", experimental_cors_msc3886=True
         )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Methods"),
-            "has CORS Methods header",
-        )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Headers"),
-            "has CORS Headers header",
-        )
+        self.assertEqual(channel.code, 204)
+        self.assertNotIn("body", channel.result)
+
+        self._check_cors_msc3886_headers(channel)
 
     def test_unknown_request(self) -> None:
         """A non-OPTIONS request to an unknown URL should 404."""
