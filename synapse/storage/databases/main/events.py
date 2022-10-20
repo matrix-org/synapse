@@ -2040,9 +2040,13 @@ class PersistEventsStore:
         if row is None:
             return
 
-        # Any relation information for the related event must be cleared.
         redacted_relates_to = row["relates_to_id"]
         rel_type = row["relation_type"]
+        self.db_pool.simple_delete_txn(
+            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
+        )
+
+        # Any relation information for the related event must be cleared.
         self.store._invalidate_cache_and_stream(
             txn, self.store.get_relations_for_event, (redacted_relates_to,)
         )
@@ -2064,10 +2068,6 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_threads, (room_id,)
             )
-
-        self.db_pool.simple_delete_txn(
-            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
-        )
 
     def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase) -> None:
         if isinstance(event.content.get("topic"), str):
