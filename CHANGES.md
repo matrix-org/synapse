@@ -21,7 +21,7 @@ Features
 Bugfixes
 --------
 
-- Prevent device names from appearing in device list updates when `allow_device_name_lookup_over_federation` is `false`. ([\#10015](https://github.com/matrix-org/synapse/issues/10015))
+- Prevent device names from appearing in device list updates in some situations when `allow_device_name_lookup_over_federation` is `false`. (This is not comprehensive: see [\#13114](https://github.com/matrix-org/synapse/issues/13114).) ([\#10015](https://github.com/matrix-org/synapse/issues/10015))
 - Fix a long-standing bug where redactions were not being sent over federation if we did not have the original event. ([\#13813](https://github.com/matrix-org/synapse/issues/13813))
 - Fix a long-standing bug where edits of non-`m.room.message` events would not be correctly bundled or have their new content applied. ([\#14034](https://github.com/matrix-org/synapse/issues/14034))
 - Fix a bug introduced in Synapse 1.53.0 when querying `/publicRooms` with both a `room_type` filter and a `third_party_instance_id`. ([\#14053](https://github.com/matrix-org/synapse/issues/14053))
