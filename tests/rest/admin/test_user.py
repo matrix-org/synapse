@@ -1221,6 +1221,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User1", channel.json_body["displayname"])
+        self.assertFalse(channel.json_body["erased"])
 
         # Deactivate and erase user
         channel = self.make_request(
@@ -1245,6 +1246,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertIsNone(channel.json_body["avatar_url"])
         self.assertIsNone(channel.json_body["displayname"])
+        self.assertTrue(channel.json_body["erased"])
 
         self._is_erased("@user:test", True)
 
@@ -2783,6 +2785,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("avatar_url", content)
         self.assertIn("admin", content)
         self.assertIn("deactivated", content)
+        self.assertIn("erased", content)
         self.assertIn("shadow_banned", content)
         self.assertIn("creation_ts", content)
         self.assertIn("appservice_id", content)
