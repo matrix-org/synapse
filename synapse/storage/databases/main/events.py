@@ -2046,21 +2046,24 @@ class PersistEventsStore:
         self.store._invalidate_cache_and_stream(
             txn, self.store.get_relations_for_event, (redacted_relates_to,)
         )
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
-        )
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_applicable_edit, (redacted_relates_to,)
-        )
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_thread_summary, (redacted_relates_to,)
-        )
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_thread_participated, (redacted_relates_to,)
-        )
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_threads, (room_id,)
-        )
+        if rel_type == RelationTypes.ANNOTATION:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
+            )
+        if rel_type == RelationTypes.REPLACE:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_applicable_edit, (redacted_relates_to,)
+            )
+        if rel_type == RelationTypes.THREAD:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_summary, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_threads, (room_id,)
+            )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
