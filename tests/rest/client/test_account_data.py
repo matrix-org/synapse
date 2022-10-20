@@ -73,3 +73,62 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         mocked_callback.assert_called_with(
             user_id, room_id, account_data_type, account_data_content
         )
+
+    def test_beeper_inbox_state_endpoint(self) -> None:
+        store = self.hs.get_datastores().main
+
+        user_id = self.register_user("user", "password")
+        tok = self.login("user", "password")
+
+        room_id = self.helper.create_room_as(user_id, tok=tok)
+        channel = self.make_request(
+            "PUT",
+            f"/user/{user_id}/rooms/{room_id}/beeper_inbox_state",
+            {},
+            access_token=tok,
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertIsNone(
+            self.get_success(
+                store.get_account_data_for_room_and_type(
+                    user_id, room_id, "com.beeper.inbox.done"
+                )
+            )
+        )
+        self.assertIsNone(
+            self.get_success(
+                store.get_account_data_for_room_and_type(
+                    user_id, room_id, "m.marked_unread"
+                )
+            )
+        )
+
+        channel = self.make_request(
+            "PUT",
+            f"/user/{user_id}/rooms/{room_id}/beeper_inbox_state",
+            {"done": {"at_delta": 1000 * 60 * 5}, "marked_unread": True},
+            access_token=tok,
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
+
+        # FIXME: I give up, I don't know how to mock time in tests
+        # ts = self.clock.time_msec()
+        ts = 500
+
+        done = self.get_success(
+            store.get_account_data_for_room_and_type(
+                user_id, room_id, "com.beeper.inbox.done"
+            )
+        )
+        self.assertEqual(done["updated_ts"], ts)
+        self.assertEqual(done["at_ts"], ts + (1000 * 60 * 5))
+
+        marked_unread = self.get_success(
+            store.get_account_data_for_room_and_type(
+                user_id, room_id, "m.marked_unread"
+            )
+        )
+        self.assertEqual(marked_unread["unread"], True)
+        self.assertEqual(marked_unread["ts"], ts)
