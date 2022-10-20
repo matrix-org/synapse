@@ -510,7 +510,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         # If there have been no events in the room since the stream ordering,
         # there can't be any push actions either.
-        if not self._events_stream_cache.has_entity_changed(room_id, stream_ordering):
+        if not self._events_stream_cache.has_entity_changed(
+            room_id, stream_ordering, max_stream_ordering
+        ):
             return 0, 0
 
         clause = ""

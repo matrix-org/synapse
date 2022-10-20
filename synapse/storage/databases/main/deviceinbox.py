@@ -309,7 +309,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         # Determine which users have devices with pending messages
         for user_id in user_ids:
             if self._device_inbox_stream_cache.has_entity_changed(
-                user_id, from_stream_id
+                user_id, from_stream_id, to_stream_id
             ):
                 # This user has new messages sent to them. Query messages for them
                 user_ids_to_query.add(user_id)
@@ -440,7 +440,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         if last_deleted_stream_id:
             has_changed = self._device_inbox_stream_cache.has_entity_changed(
-                user_id, last_deleted_stream_id
+                user_id, last_deleted_stream_id, up_to_stream_id
             )
             if not has_changed:
                 log_kv({"message": "No changes in cache since last check"})
@@ -491,7 +491,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         set_tag("limit", limit)
 
         has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
-            destination, last_stream_id
+            destination, last_stream_id, current_stream_id
         )
         if not has_changed or last_stream_id == current_stream_id:
             log_kv({"message": "No new messages in stream"})

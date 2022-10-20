@@ -270,7 +270,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
         now_stream_id = self.get_device_stream_token()
 
         has_changed = self._device_list_federation_stream_cache.has_entity_changed(
-            destination, int(from_stream_id)
+            destination, int(from_stream_id), now_stream_id
         )
         if not has_changed:
             return now_stream_id, []
@@ -773,12 +773,12 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
         if user_ids is None:
             # Get set of all users that have had device list changes since 'from_key'
             user_ids_to_check = self._device_list_stream_cache.get_all_entities_changed(
-                from_key
+                from_key, to_key
             )
         else:
             # The same as above, but filter results to only those users in 'user_ids'
             user_ids_to_check = self._device_list_stream_cache.get_entities_changed(
-                user_ids, from_key
+                user_ids, from_key, to_key
             )
 
         if not user_ids_to_check:
