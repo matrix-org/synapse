@@ -2088,7 +2088,7 @@ set.
 
 This is primarily intended for use with the `register_new_matrix_user` script
 (see [Registering a user](../../setup/installation.md#registering-a-user));
-however, the interface is [documented](../admin_api/register_api.html).
+however, the interface is [documented](../../admin_api/register_api.html).
 
 See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
@@ -3385,7 +3385,7 @@ push:
 Config options relating to rooms.
 
 ---
-### `encryption_enabled_by_default`
+### `encryption_enabled_by_default_for_room_type`
 
 Controls whether locally-created rooms should be end-to-end encrypted by
 default.
@@ -3541,9 +3541,9 @@ Example configuration:
 enable_room_list_search: false
 ```
 ---
-### `alias_creation`
+### `alias_creation_rules`
 
-The `alias_creation` option controls who is allowed to create aliases
+The `alias_creation_rules` option controls who is allowed to create aliases
 on this server.
 
 The format of this option is a list of rules that contain globs that

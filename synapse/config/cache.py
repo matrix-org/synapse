@@ -159,7 +159,7 @@ class CacheConfig(Config):
 
         self.track_memory_usage = cache_config.get("track_memory_usage", False)
         if self.track_memory_usage:
-            check_requirements("cache_memory")
+            check_requirements("cache-memory")
 
         expire_caches = cache_config.get("expire_caches", True)
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")

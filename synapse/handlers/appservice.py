@@ -109,10 +109,13 @@ class ApplicationServicesHandler:
                     last_token = await self.store.get_appservice_last_pos()
                     (
                         upper_bound,
-                        events,
                         event_to_received_ts,
-                    ) = await self.store.get_all_new_events_stream(
-                        last_token, self.current_max, limit=100, get_prev_content=True
+                    ) = await self.store.get_all_new_event_ids_stream(
+                        last_token, self.current_max, limit=100
+                    )
+
+                    events = await self.store.get_events_as_list(
+                        event_to_received_ts.keys(), get_prev_content=True
                     )
 
                     events_by_room: Dict[str, List[EventBase]] = {}
