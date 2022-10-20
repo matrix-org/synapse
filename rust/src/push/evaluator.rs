@@ -353,6 +353,7 @@ fn push_rule_evaluator() {
         Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
+        true,
     )
     .unwrap();
 
