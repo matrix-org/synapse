@@ -88,13 +88,103 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.69.0
+
+## Changes to the receipts replication streams
+
+Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.
+
+
+## Deprecation of legacy Prometheus metric names
+
+In current versions of Synapse, some Prometheus metrics are emitted under two different names,
+with one of the names being older but non-compliant with OpenMetrics and Prometheus conventions
+and one of the names being newer but compliant.
+
+Synapse v1.71.0 will turn the old metric names off *by default*.
+For administrators that still rely on them and have not had chance to update their
+uses of the metrics, it's possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and it will no longer
+be possible to re-enable them.
+
+The Grafana dashboard, Prometheus recording rules and Prometheus Consoles included
+in the `contrib` directory in the Synapse repository have been updated to no longer
+rely on the legacy names. These can be used on a current version of Synapse
+because current versions of Synapse emit both old and new names.
+
+You may need to update your alerting rules or any other rules that depend on
+the names of Prometheus metrics.
+If you want to test your changes before legacy names are disabled by default,
+you may specify `enable_legacy_metrics: false` in your homeserver configuration.
+
+A list of affected metrics is available on the [Metrics How-to page](https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12).
+
+
+## Deprecation of the `generate_short_term_login_token` module API method
+
+The following method of the module API has been deprecated, and is scheduled to
+be remove in v1.71.0:
+
+```python
+def generate_short_term_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: str = "",
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+It has been replaced by an asynchronous equivalent:
+
+```python
+async def create_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: Optional[str] = None,
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+Synapse will log a warning when a module uses the deprecated method, to help
+administrators find modules using it.
+
+
 # Upgrading to v1.68.0
 
-As announced in the upgrade notes for v1.67.0, Synapse now requires a SQLite
-version of 3.27.0 or higher if SQLite is in use and source checkouts of Synapse
-now require a recent Rust compiler.
+Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
 
-Installations using 
+## SQLite version requirement
+
+Synapse now requires a SQLite version of 3.27.0 or higher if SQLite is configured as
+Synapse's database.
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- a PostgreSQL database
+
+are not affected.
+
+## Rust requirement when building from source.
+
+Building from a source checkout of Synapse now requires a recent Rust compiler
+(currently Rust 1.58.1, but see also the
+[Platform Dependency Policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html)).
+
+Installations using
 
 - Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
 - Debian packages [from Matrix.org](https://packages.matrix.org/), or
@@ -134,12 +224,12 @@ The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
 
 ## SQLite version requirement in the next release
 
-From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or 
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
 higher. Synapse v1.67.0 will be the last major release supporting SQLite
 versions 3.22 to 3.26.
 
 Those using Docker images or Debian packages from Matrix.org will not be
-affected. If you have installed from source, you should check the version of 
+affected. If you have installed from source, you should check the version of
 SQLite used by Python with:
 
 ```shell

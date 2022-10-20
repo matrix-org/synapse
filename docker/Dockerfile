@@ -109,6 +109,11 @@ RUN mkdir /rust /cargo
 
 RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable
 
+# arm64 builds consume a lot of memory if `CARGO_NET_GIT_FETCH_WITH_CLI` is not
+# set to true, so we expose it as a build-arg.
+ARG CARGO_NET_GIT_FETCH_WITH_CLI=false
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=$CARGO_NET_GIT_FETCH_WITH_CLI
+
 # Beeper: install shared secret authenticator
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location \
    'git+https://github.com/devture/matrix-synapse-shared-secret-auth@e178353ec87c56e0169dd04466d4769da5ed9c46#egg=shared_secret_authenticator'
@@ -135,7 +140,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY synapse /synapse/synapse/
 COPY rust /synapse/rust/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst build_rust.py /synapse/
+COPY pyproject.toml README.rst build_rust.py Cargo.toml Cargo.lock /synapse/
 
 # Repeat of earlier build argument declaration, as this is a new build stage.
 ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE

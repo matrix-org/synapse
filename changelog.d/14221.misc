@@ -1,0 +1,1 @@
+Rename the `cache_memory` extra to `cache-memory`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name.

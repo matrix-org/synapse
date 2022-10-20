@@ -145,10 +145,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
-        event = await self.event_creation_handler.persist_and_notify_client_event(
+        event = await self.event_creation_handler.persist_and_notify_client_events(
             requester,
-            event,
-            context,
+            [(event, context)],
             ratelimit=ratelimit,
             extra_users=extra_users,
             dont_notify=dont_notify,

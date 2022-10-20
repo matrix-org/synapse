@@ -137,34 +137,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
 
-    async def get_last_receipt_event_id_for_user(
-        self, user_id: str, room_id: str, receipt_types: Collection[str]
-    ) -> Optional[str]:
-        """
-        Fetch the event ID for the latest receipt in a room with one of the given receipt types.
-
-        Args:
-            user_id: The user to fetch receipts for.
-            room_id: The room ID to fetch the receipt for.
-            receipt_type: The receipt types to fetch.
-
-        Returns:
-            The latest receipt, if one exists.
-        """
-        result = await self.db_pool.runInteraction(
-            "get_last_receipt_event_id_for_user",
-            self.get_last_receipt_for_user_txn,
-            user_id,
-            room_id,
-            receipt_types,
-        )
-        if not result:
-            return None
-
-        event_id, _ = result
-        return event_id
-
-    def get_last_receipt_for_user_txn(
+    def get_last_unthreaded_receipt_for_user_txn(
         self,
         txn: LoggingTransaction,
         user_id: str,
@@ -172,13 +145,13 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         receipt_types: Collection[str],
     ) -> Optional[Tuple[str, int]]:
         """
-        Fetch the event ID and stream_ordering for the latest receipt in a room
-        with one of the given receipt types.
+        Fetch the event ID and stream_ordering for the latest unthreaded receipt
+        in a room with one of the given receipt types.
 
         Args:
             user_id: The user to fetch receipts for.
             room_id: The room ID to fetch the receipt for.
-            receipt_type: The receipt types to fetch.
+            receipt_types: The receipt types to fetch.
 
         Returns:
             The event ID and stream ordering of the latest receipt, if one exists.
@@ -194,6 +167,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             WHERE {clause}
             AND user_id = ?
             AND room_id = ?
+            AND thread_id IS NULL
             ORDER BY event_stream_ordering DESC
             LIMIT 1
         """
@@ -556,7 +530,9 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
 
     async def get_all_updated_receipts(
         self, instance_name: str, last_id: int, current_id: int, limit: int
-    ) -> Tuple[List[Tuple[int, list]], int, bool]:
+    ) -> Tuple[
+        List[Tuple[int, Tuple[str, str, str, str, Optional[str], JsonDict]]], int, bool
+    ]:
         """Get updates for receipts replication stream.
 
         Args:
@@ -583,9 +559,13 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
 
         def get_all_updated_receipts_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[Tuple[int, list]], int, bool]:
+        ) -> Tuple[
+            List[Tuple[int, Tuple[str, str, str, str, Optional[str], JsonDict]]],
+            int,
+            bool,
+        ]:
             sql = """
-                SELECT stream_id, room_id, receipt_type, user_id, event_id, data
+                SELECT stream_id, room_id, receipt_type, user_id, event_id, thread_id, data
                 FROM receipts_linearized
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
@@ -594,8 +574,8 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
 
             updates = cast(
-                List[Tuple[int, list]],
-                [(r[0], r[1:5] + (db_to_json(r[5]),)) for r in txn],
+                List[Tuple[int, Tuple[str, str, str, str, Optional[str], JsonDict]]],
+                [(r[0], r[1:6] + (db_to_json(r[6]),)) for r in txn],
             )
 
             limited = False
@@ -647,6 +627,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         receipt_type: str,
         user_id: str,
         event_id: str,
+        thread_id: Optional[str],
         data: JsonDict,
         stream_id: int,
     ) -> Optional[int]:
@@ -673,11 +654,27 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
         if stream_ordering is not None:
-            sql = (
-                "SELECT event_stream_ordering, event_id FROM receipts_linearized"
-                " WHERE room_id = ? AND receipt_type = ? AND user_id = ?"
+            if thread_id is None:
+                thread_clause = "r.thread_id IS NULL"
+                thread_args: Tuple[str, ...] = ()
+            else:
+                thread_clause = "r.thread_id = ?"
+                thread_args = (thread_id,)
+
+            sql = f"""
+            SELECT event_stream_ordering, event_id FROM events
+            INNER JOIN receipts_linearized AS r USING (event_id, room_id)
+            WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ? AND {thread_clause}
+            """
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    receipt_type,
+                    user_id,
+                )
+                + thread_args,
             )
-            txn.execute(sql, (room_id, receipt_type, user_id))
 
             for so, eid in txn:
                 if so and int(so) >= stream_ordering:
@@ -697,21 +694,28 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             self._receipts_stream_cache.entity_has_changed, room_id, stream_id
         )
 
+        keyvalues = {
+            "room_id": room_id,
+            "receipt_type": receipt_type,
+            "user_id": user_id,
+        }
+        where_clause = ""
+        if thread_id is None:
+            where_clause = "thread_id IS NULL"
+        else:
+            keyvalues["thread_id"] = thread_id
+
         self.db_pool.simple_upsert_txn(
             txn,
             table="receipts_linearized",
-            keyvalues={
-                "room_id": room_id,
-                "receipt_type": receipt_type,
-                "user_id": user_id,
-            },
+            keyvalues=keyvalues,
             values={
                 "stream_id": stream_id,
                 "event_id": event_id,
                 "event_stream_ordering": stream_ordering,
                 "data": json_encoder.encode(data),
-                "thread_id": None,
             },
+            where_clause=where_clause,
             # receipts_linearized has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
             lock=False,
@@ -763,6 +767,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         receipt_type: str,
         user_id: str,
         event_ids: List[str],
+        thread_id: Optional[str],
         data: dict,
     ) -> Optional[Tuple[int, int]]:
         """Insert a receipt, either from local client or remote server.
@@ -795,6 +800,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
                 receipt_type,
                 user_id,
                 linearized_event_id,
+                thread_id,
                 data,
                 stream_id=stream_id,
                 # Read committed is actually beneficial here because we check for a receipt with
@@ -809,7 +815,8 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
 
         now = self._clock.time_msec()
         logger.debug(
-            "RR for event %s in %s (%i ms old)",
+            "Receipt %s for event %s in %s (%i ms old)",
+            receipt_type,
             linearized_event_id,
             room_id,
             now - event_ts,
@@ -822,6 +829,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             receipt_type,
             user_id,
             event_ids,
+            thread_id,
             data,
         )
 
@@ -836,6 +844,7 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         receipt_type: str,
         user_id: str,
         event_ids: List[str],
+        thread_id: Optional[str],
         data: JsonDict,
     ) -> None:
         assert self._can_write_to_receipts
@@ -847,19 +856,26 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
+        keyvalues = {
+            "room_id": room_id,
+            "receipt_type": receipt_type,
+            "user_id": user_id,
+        }
+        where_clause = ""
+        if thread_id is None:
+            where_clause = "thread_id IS NULL"
+        else:
+            keyvalues["thread_id"] = thread_id
+
         self.db_pool.simple_upsert_txn(
             txn,
             table="receipts_graph",
-            keyvalues={
-                "room_id": room_id,
-                "receipt_type": receipt_type,
-                "user_id": user_id,
-            },
+            keyvalues=keyvalues,
             values={
                 "event_ids": json_encoder.encode(event_ids),
                 "data": json_encoder.encode(data),
-                "thread_id": None,
             },
+            where_clause=where_clause,
             # receipts_graph has a unique constraint on
             # (user_id, room_id, receipt_type), so no need to lock
             lock=False,

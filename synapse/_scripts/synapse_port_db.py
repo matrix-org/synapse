@@ -107,10 +107,11 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "local_media_repository": ["safe_from_quarantine"],
-    "users": ["shadow_banned"],
+    "users": ["shadow_banned", "approved"],
     "e2e_fallback_keys_json": ["used"],
     "access_tokens": ["used"],
     "device_lists_changes_in_room": ["converted_to_destinations"],
+    "pushers": ["enabled"],
 }
 
 

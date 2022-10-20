@@ -16,7 +16,7 @@ from synapse.util.caches.lrucache import KT, VT, AsyncLruCache, T
 
 if TYPE_CHECKING:
     from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
-    from synapse.util.caches.descriptors import _CachedFunction
+    from synapse.util.caches.descriptors import CachedFunction
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def redisCached(
     get_cache_key: Callable,
     cache_name: str,
 ) -> Callable:
-    def decorator(f: Callable) -> "_CachedFunction":
+    def decorator(f: Callable) -> "CachedFunction":
         @wraps(f)
         async def _wrapped(self: Any, *args: Any, **kwargs: Any) -> Any:
             cache_key = _redis_key(get_cache_key(args, kwargs))
@@ -81,7 +81,7 @@ def redisCached(
                 _redis_key(key),
             )
 
-        wrapped = cast("_CachedFunction", _wrapped)
+        wrapped = cast("CachedFunction", _wrapped)
         wrapped.invalidate = _invalidate
         return wrapped
 

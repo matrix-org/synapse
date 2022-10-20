@@ -399,8 +399,7 @@ class RoomBatchHandler:
                         app_service_requester.app_service,
                         also_allow_user,
                     ),
-                    event=event,
-                    context=context,
+                    events_and_context=[(event, context)],
                     dont_notify=index < len(events_to_persist) - 1,
                 )
             return event_ids
@@ -416,8 +415,7 @@ class RoomBatchHandler:
                     app_service_requester.app_service,
                     also_allow_user,
                 ),
-                event=event,
-                context=context,
+                events_and_context=[(event, context)],
             )
 
         return event_ids

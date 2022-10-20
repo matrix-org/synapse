@@ -50,6 +50,7 @@ class ReceiptRestServlet(RestServlet):
             ReceiptTypes.FULLY_READ,
             ReceiptTypes.BEEPER_INBOX_DONE,
         }
+        self._msc3771_enabled = hs.config.experimental.msc3771_enabled
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
@@ -63,6 +64,16 @@ class ReceiptRestServlet(RestServlet):
             )
 
         body = parse_json_object_from_request(request, allow_empty_body=False)
+
+        # Pull the thread ID, if one exists.
+        thread_id = None
+        if self._msc3771_enabled:
+            if "thread_id" in body:
+                thread_id = body.get("thread_id")
+                if not thread_id or not isinstance(thread_id, str):
+                    raise SynapseError(
+                        400, "thread_id field must be a non-empty string"
+                    )
 
         await self.presence_handler.bump_presence_active_time(requester.user)
 
@@ -79,6 +90,7 @@ class ReceiptRestServlet(RestServlet):
                 receipt_type,
                 user_id=requester.user.to_string(),
                 event_id=event_id,
+                thread_id=thread_id,
                 extra_content=body,
             )
 

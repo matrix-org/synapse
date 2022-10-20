@@ -1334,15 +1334,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if rows:
             topo = rows[-1].topological_ordering
-            toke = rows[-1].stream_ordering
+            token = rows[-1].stream_ordering
             if direction == "b":
                 # Tokens are positions between events.
                 # This token points *after* the last event in the chunk.
                 # We need it to point to the event before it in the chunk
                 # when we are going backwards so we subtract one from the
                 # stream part.
-                toke -= 1
-            next_token = RoomStreamToken(topo, toke)
+                token -= 1
+            next_token = RoomStreamToken(topo, token)
         else:
             # TODO (erikj): We should work out what to do here instead.
             next_token = to_token if to_token else from_token

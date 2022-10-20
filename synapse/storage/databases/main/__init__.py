@@ -83,6 +83,7 @@ logger = logging.getLogger(__name__)
 
 class DataStore(
     EventsBackgroundUpdatesStore,
+    DeviceStore,
     RoomMemberStore,
     RoomStore,
     RoomBatchStore,
@@ -114,7 +115,6 @@ class DataStore(
     StreamWorkerStore,
     OpenIdStore,
     ClientIpWorkerStore,
-    DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
     UserErasureStore,
@@ -203,6 +203,7 @@ class DataStore(
         deactivated: bool = False,
         order_by: str = UserSortOrder.USER_ID.value,
         direction: str = "f",
+        approved: bool = True,
         appservice: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
@@ -218,6 +219,7 @@ class DataStore(
             deactivated: whether to include deactivated users
             order_by: the sort order of the returned list
             direction: sort ascending or descending
+            approved: whether to include approved users
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -255,6 +257,10 @@ class DataStore(
             elif appservice:
                 filters.append("appservice_id = ?")
                 args.append(appservice)
+            if not approved:
+                # We ignore NULL values for the approved flag because these should only
+                # be already existing users that we consider as already approved.
+                filters.append("approved IS FALSE")
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
@@ -269,7 +275,7 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts, appservice_id
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved, appservice_id
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?

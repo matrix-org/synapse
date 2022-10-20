@@ -57,7 +57,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.68.0"
+version = "1.69.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -220,7 +220,7 @@ oidc = ["authlib"]
 # `systemd.journal.JournalHandler`, as is documented in
 # `contrib/systemd/log_config.yaml`.
 systemd = ["systemd-python"]
-url_preview = ["lxml"]
+url-preview = ["lxml"]
 sentry = ["sentry-sdk"]
 opentracing = ["jaeger-client", "opentracing"]
 jwt = ["authlib"]
@@ -228,7 +228,7 @@ jwt = ["authlib"]
 # (if it is not installed, we fall back to slow code.)
 redis = ["txredisapi", "hiredis", "jump-consistent-hash"]
 # Required to use experimental `caches.track_memory_usage` config option.
-cache_memory = ["pympler"]
+cache-memory = ["pympler"]
 test = ["parameterized", "idna"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
@@ -251,7 +251,7 @@ all = [
     "pysaml2",
     # oidc and jwt
     "authlib",
-    # url_preview
+    # url-preview
     "lxml",
     # sentry
     "sentry-sdk",
@@ -259,7 +259,7 @@ all = [
     "jaeger-client", "opentracing",
     # redis
     "txredisapi", "hiredis", "jump-consistent-hash",
-    # cache_memory
+    # cache-memory
     "pympler",
     # omitted:
     #   - test: it's useful to have this separate from dev deps in the olddeps job
@@ -308,7 +308,12 @@ twine = "*"
 towncrier = ">=18.6.0rc1"
 
 [build-system]
-requires = ["poetry-core==1.2.0", "setuptools_rust==1.5.2"]
+# The upper bounds here are defensive, intended to prevent situations like
+# #13849 and #14079 where we see buildtime or runtime errors caused by build
+# system changes.
+# We are happy to raise these upper bounds upon request,
+# provided we check that it's safe to do so (i.e. that CI passes).
+requires = ["poetry-core>=1.0.0,<=1.3.1", "setuptools_rust>=1.3,<=1.5.2"]
 build-backend = "poetry.core.masonry.api"
 
 

@@ -19,16 +19,18 @@ import frozendict
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.appservice import ApplicationService
 from synapse.events import FrozenEvent
-from synapse.push import push_rule_evaluator
-from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
+from synapse.push.bulk_push_rule_evaluator import _flatten_dict
+from synapse.push.httppusher import tweaks_for_actions
+from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
-from synapse.types import JsonDict
+from synapse.synapse_rust.push import PushRuleEvaluator
+from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -42,7 +44,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         related_event=None,
         relations: Optional[Dict[str, Set[Tuple[str, str]]]] = None,
         relations_match_enabled: bool = False,
-    ) -> PushRuleEvaluatorForEvent:
+    ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -57,13 +59,13 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         room_member_count = 0
         sender_power_level = 0
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
-        return PushRuleEvaluatorForEvent(
-            event,
+        return PushRuleEvaluator(
+            _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels,
-            related_event,
-            relations or set(),
+            power_levels.get("notifications", {}),
+            _flatten_dict(related_event or {}),
+            relations or {},
             relations_match_enabled,
         )
 
@@ -295,7 +297,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         ]
 
         self.assertEqual(
-            push_rule_evaluator.tweaks_for_actions(actions),
+            tweaks_for_actions(actions),
             {"sound": "default", "highlight": True},
         )
 
@@ -304,7 +306,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {
                 "m.relates_to": {
                     "event_id": "$parent_event_id",
-                    "key": "\ud83d\udc4d\ufe0f",
+                    "key": "sender",
                     "rel_type": "m.annotation",
                 }
             },
@@ -377,9 +379,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         evaluator = self._get_evaluator(
             {}, {"m.annotation": {("@user:test", "m.reaction")}}
         )
-        condition = {"kind": "relation_match"}
-        # Oddly, an unknown condition always matches.
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
 
         # A push rule evaluator with the experimental rule enabled.
         evaluator = self._get_evaluator(
@@ -512,3 +511,80 @@ class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(len(users_with_push_actions), 0)
+
+
+class BulkPushRuleEvaluatorTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
+        self.main_store = homeserver.get_datastores().main
+
+        self.user_id1 = self.register_user("user1", "password")
+        self.tok1 = self.login(self.user_id1, "password")
+        self.user_id2 = self.register_user("user2", "password")
+        self.tok2 = self.login(self.user_id2, "password")
+
+        self.room_id = self.helper.create_room_as(tok=self.tok1)
+
+        # We want to test history visibility works correctly.
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.RoomHistoryVisibility,
+            {"history_visibility": HistoryVisibility.JOINED},
+            tok=self.tok1,
+        )
+
+    def get_notif_count(self, user_id: str) -> int:
+        return self.get_success(
+            self.main_store.db_pool.simple_select_one_onecol(
+                table="event_push_actions",
+                keyvalues={"user_id": user_id},
+                retcol="COALESCE(SUM(notif), 0)",
+                desc="get_staging_notif_count",
+            )
+        )
+
+    def test_plain_message(self) -> None:
+        """Test that sending a normal message in a room will trigger a
+        notification
+        """
+
+        # Have user2 join the room and cle
+        self.helper.join(self.room_id, self.user_id2, tok=self.tok2)
+
+        # They start off with no notifications, but get them when messages are
+        # sent.
+        self.assertEqual(self.get_notif_count(self.user_id2), 0)
+
+        user1 = UserID.from_string(self.user_id1)
+        self.create_and_send_event(self.room_id, user1)
+
+        self.assertEqual(self.get_notif_count(self.user_id2), 1)
+
+    def test_delayed_message(self) -> None:
+        """Test that a delayed message that was from before a user joined
+        doesn't cause a notification for the joined user.
+        """
+        user1 = UserID.from_string(self.user_id1)
+
+        # Send a message before user2 joins
+        event_id1 = self.create_and_send_event(self.room_id, user1)
+
+        # Have user2 join the room
+        self.helper.join(self.room_id, self.user_id2, tok=self.tok2)
+
+        # They start off with no notifications
+        self.assertEqual(self.get_notif_count(self.user_id2), 0)
+
+        # Send another message that references the event before the join to
+        # simulate a "delayed" event
+        self.create_and_send_event(self.room_id, user1, prev_event_ids=[event_id1])
+
+        # user2 should not be notified about it, because they can't see it.
+        self.assertEqual(self.get_notif_count(self.user_id2), 0)
