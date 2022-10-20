@@ -751,7 +751,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     SELECT room_id, state_key FROM current_state_events
                     WHERE type = 'm.room.member' AND membership = 'join' AND {clause}
                 ) AS b using (room_id)
-                LIMIT 1
             """
 
             txn.execute(sql, (user_id, *args))
