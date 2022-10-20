@@ -281,7 +281,7 @@ class DataStore(
             users = self.db_pool.cursor_to_dict(txn)
 
             # some of those boolean values are returned as integers when we're on SQLite
-            columns_to_boolify = ['erased']
+            columns_to_boolify = ["erased"]
             for user in users:
                 for column in columns_to_boolify:
                     user[column] = bool(user[column])

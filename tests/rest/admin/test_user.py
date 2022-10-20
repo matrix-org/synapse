@@ -924,7 +924,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, len(non_admin_user_ids), non_admin_user_ids)
         self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
-    def test_erasure_status(self):
+    def test_erasure_status(self) -> None:
         user_id = self.register_user("eraseme", "eraseme")
 
         channel = self.make_request(
