@@ -240,16 +240,16 @@ class BulkPushRuleEvaluator:
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
 
-        if not event.internal_metadata.is_notifiable():
-            # Push rules for events that aren't notifiable can't be processed by this
-            return
-
-        # Skip push notification actions for historical messages
-        # because we don't want to notify people about old history back in time.
-        # The historical messages also do not have the proper `context.current_state_ids`
-        # and `state_groups` because they have `prev_events` that aren't persisted yet
-        # (historical messages persisted in reverse-chronological order).
-        if event.internal_metadata.is_historical():
+        if (
+            not event.internal_metadata.is_notifiable()
+            or event.internal_metadata.is_historical()
+        ):
+            # Push rules for events that aren't notifiable can't be processed by this and
+            # we want to skip push notification actions for historical messages
+            # because we don't want to notify people about old history back in time.
+            # The historical messages also do not have the proper `context.current_state_ids`
+            # and `state_groups` because they have `prev_events` that aren't persisted yet
+            # (historical messages persisted in reverse-chronological order).
             return
 
         # Disable counting as unread unless the experimental configuration is
