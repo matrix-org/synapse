@@ -218,7 +218,6 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    @measure_func("action_for_events_by_user")
     async def action_for_events_by_user(
         self, events_and_context: List[Tuple[EventBase, EventContext]]
     ) -> None:
@@ -233,6 +232,7 @@ class BulkPushRuleEvaluator:
         for event, context in events_and_context:
             await self._action_for_event_by_user(event, context, event_id_to_event)
 
+    @measure_func("action_for_event_by_user")
     async def _action_for_event_by_user(
         self,
         event: EventBase,

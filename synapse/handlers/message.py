@@ -1432,10 +1432,10 @@ class EventCreationHandler:
         PartialStateConflictError: if attempting to persist a partial state event in
             a room that has been un-partial stated.
         """
-        with opentracing.start_active_span("calculate_push_actions"):
-            await self._bulk_push_rule_evaluator.action_for_events_by_user(
-                events_and_context
-            )
+
+        await self._bulk_push_rule_evaluator.action_for_events_by_user(
+            events_and_context
+        )
 
         try:
             # If we're a worker we need to hit out to the master.
