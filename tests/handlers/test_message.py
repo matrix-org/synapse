@@ -105,7 +105,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         event1, context = self._create_duplicate_event(txn_id)
 
         ret_event1 = self.get_success(
-            self.handler.handle_new_client_event(self.requester, event1, context)
+            self.handler.handle_new_client_event(
+                self.requester,
+                events_and_context=[(event1, context)],
+            )
         )
         stream_id1 = ret_event1.internal_metadata.stream_ordering
 
@@ -118,7 +121,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.assertNotEqual(event1.event_id, event2.event_id)
 
         ret_event2 = self.get_success(
-            self.handler.handle_new_client_event(self.requester, event2, context)
+            self.handler.handle_new_client_event(
+                self.requester,
+                events_and_context=[(event2, context)],
+            )
         )
         stream_id2 = ret_event2.internal_metadata.stream_ordering
 

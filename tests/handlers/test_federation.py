@@ -19,7 +19,13 @@ from unittest.mock import Mock, patch
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.federation_base import event_from_pdu_json
@@ -28,6 +34,7 @@ from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -321,6 +328,102 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                 limit,
             )
         self.get_success(d)
+
+    def test_backfill_ignores_known_events(self) -> None:
+        """
+        Tests that events that we already know about are ignored when backfilling.
+        """
+        # Set up users
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+
+        other_server = "otherserver"
+        other_user = "@otheruser:" + other_server
+
+        # Create a room to backfill events into
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(self.store.get_room_version(room_id))
+
+        # Build an event to backfill
+        event = event_from_pdu_json(
+            {
+                "type": EventTypes.Message,
+                "content": {"body": "hello world", "msgtype": "m.text"},
+                "room_id": room_id,
+                "sender": other_user,
+                "depth": 32,
+                "prev_events": [],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
+            },
+            room_version,
+        )
+
+        # Ensure the event is not already in the DB
+        self.get_failure(
+            self.store.get_event(event.event_id),
+            NotFoundError,
+        )
+
+        # Backfill the event and check that it has entered the DB.
+
+        # We mock out the FederationClient.backfill method, to pretend that a remote
+        # server has returned our fake event.
+        federation_client_backfill_mock = Mock(return_value=make_awaitable([event]))
+        self.hs.get_federation_client().backfill = federation_client_backfill_mock
+
+        # We also mock the persist method with a side effect of itself. This allows us
+        # to track when it has been called while preserving its function.
+        persist_events_and_notify_mock = Mock(
+            side_effect=self.hs.get_federation_event_handler().persist_events_and_notify
+        )
+        self.hs.get_federation_event_handler().persist_events_and_notify = (
+            persist_events_and_notify_mock
+        )
+
+        # Small side-tangent. We populate the event cache with the event, even though
+        # it is not yet in the DB. This is an invalid scenario that can currently occur
+        # due to not properly invalidating the event cache.
+        # See https://github.com/matrix-org/synapse/issues/13476.
+        #
+        # As a result, backfill should not rely on the event cache to check whether
+        # we already have an event in the DB.
+        # TODO: Remove this bit when the event cache is properly invalidated.
+        cache_entry = EventCacheEntry(
+            event=event,
+            redacted_event=None,
+        )
+        self.store._get_event_cache.set_local((event.event_id,), cache_entry)
+
+        # We now call FederationEventHandler.backfill (a separate method) to trigger
+        # a backfill request. It should receive the fake event.
+        self.get_success(
+            self.hs.get_federation_event_handler().backfill(
+                other_user,
+                room_id,
+                limit=10,
+                extremities=[],
+            )
+        )
+
+        # Check that our fake event was persisted.
+        persist_events_and_notify_mock.assert_called_once()
+        persist_events_and_notify_mock.reset_mock()
+
+        # Now we repeat the backfill, having the homeserver receive the fake event
+        # again.
+        self.get_success(
+            self.hs.get_federation_event_handler().backfill(
+                other_user,
+                room_id,
+                limit=10,
+                extremities=[],
+            ),
+        )
+
+        # This time, we expect no event persistence to have occurred, as we already
+        # have this event.
+        persist_events_and_notify_mock.assert_not_called()
 
     @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
