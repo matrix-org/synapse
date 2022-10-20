@@ -707,8 +707,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         # 250 users is pretty arbitrary but the data can be quite large if users
         # are in many rooms.
-        for user_ids in batch_iter(user_ids, 250):
-            all_user_rooms.update(await self._get_rooms_for_users(user_ids))
+        for batch_user_ids in batch_iter(user_ids, 250):
+            all_user_rooms.update(await self._get_rooms_for_users(batch_user_ids))
 
         return all_user_rooms
 
