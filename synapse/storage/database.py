@@ -435,7 +435,7 @@ class LoggingTransaction:
             ):
                 return func(sql, *args, **kwargs)
         except Exception as e:
-            sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
+            logger.error("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:
             secs = time.time() - start
