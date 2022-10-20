@@ -31,7 +31,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import devices, login, logout, profile, register, room, sync
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -924,6 +924,32 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, len(non_admin_user_ids), non_admin_user_ids)
         self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
+    def test_erasure_status(self):
+        user_id = self.register_user("eraseme", "eraseme")
+
+        channel = self.make_request(
+            "GET",
+            self.url + "?deactivated=true",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertIs(users[user_id]["erased"], False)
+
+        deactivate_account_handler = self.hs.get_deactivate_account_handler()
+        self.get_success(
+            deactivate_account_handler.deactivate_account(
+                user_id, True, create_requester(user_id)
+            )
+        )
+
+        channel = self.make_request(
+            "GET",
+            self.url + "?deactivated=true",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertIs(users[user_id]["erased"], True)
+
     def _order_test(
         self,
         expected_user_list: List[str],
@@ -1092,10 +1118,8 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         self.other_user = self.register_user("user", "pass", displayname="User1")
         self.other_user_token = self.login("user", "pass")
-        self.url_users = "/_synapse/admin/v2/users"
-        self.url_other_user = "%s/%s" % (
-            self.url_users,
-            urllib.parse.quote(self.other_user),
+        self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
+            self.other_user
         )
         self.url = "/_synapse/admin/v1/deactivate/%s" % urllib.parse.quote(
             self.other_user
@@ -1223,16 +1247,6 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(channel.json_body["displayname"])
 
         self._is_erased("@user:test", True)
-
-        channel = self.make_request(
-            "GET",
-            self.url_users + "?deactivated=true",
-            access_token=self.admin_user_tok,
-        )
-
-        users = {user["name"]: user for user in channel.json_body["users"]}
-
-        self.assertIs(users["@user:test"]["erased"], True)
 
     @override_config({"max_avatar_size": 1234})
     def test_deactivate_user_erase_true_avatar_nonnull_but_empty(self) -> None:
