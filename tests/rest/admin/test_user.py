@@ -1230,10 +1230,9 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            1,
-            len(list(filter(lambda user: user["erased"], channel.json_body["users"]))),
-        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+
+        self.assertIs(users["@user:test"]["erased"], True)
 
     @override_config({"max_avatar_size": 1234})
     def test_deactivate_user_erase_true_avatar_nonnull_but_empty(self) -> None:
