@@ -2080,19 +2080,19 @@ class PersistEventsStore:
             """
             txn.execute(sql, (redacted_relates_to, RelationTypes.THREAD))
 
-            row = txn.fetchone()
             # If a latest event is found, update the threads table, this might
             # be the same current latest event (if an earlier event in the thread
             # was redacted).
-            if row:
+            latest_event_row = txn.fetchone()
+            if latest_event_row:
                 self.db_pool.simple_upsert_txn(
                     txn,
                     table="threads",
                     keyvalues={"room_id": room_id, "thread_id": redacted_relates_to},
                     values={
-                        "latest_event_id": row[0],
-                        "topological_ordering": row[1],
-                        "stream_ordering": row[2],
+                        "latest_event_id": latest_event_row[0],
+                        "topological_ordering": latest_event_row[1],
+                        "stream_ordering": latest_event_row[2],
                     },
                 )
 
