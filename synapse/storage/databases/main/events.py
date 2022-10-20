@@ -2028,7 +2028,7 @@ class PersistEventsStore:
             redacted_event_id: The event that was redacted.
         """
 
-        # Fetch the current relation of the event being redacted.
+        # Fetch the relation of the event being redacted.
         redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_relations",
@@ -2036,26 +2036,29 @@ class PersistEventsStore:
             retcol="relates_to_id",
             allow_none=True,
         )
+        # Nothing to do if no relation is found.
+        if redacted_relates_to is None:
+            return
+
         # Any relation information for the related event must be cleared.
-        if redacted_relates_to is not None:
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_relations_for_event, (redacted_relates_to,)
-            )
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
-            )
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_applicable_edit, (redacted_relates_to,)
-            )
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_thread_summary, (redacted_relates_to,)
-            )
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_thread_participated, (redacted_relates_to,)
-            )
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_threads, (room_id,)
-            )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_relations_for_event, (redacted_relates_to,)
+        )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
+        )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_applicable_edit, (redacted_relates_to,)
+        )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_thread_summary, (redacted_relates_to,)
+        )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_thread_participated, (redacted_relates_to,)
+        )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_threads, (room_id,)
+        )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
