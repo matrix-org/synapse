@@ -2069,6 +2069,37 @@ class PersistEventsStore:
                 txn, self.store.get_threads, (room_id,)
             )
 
+            # Find the new latest event in the thread.
+            sql = """
+            SELECT event_id, topological_ordering, stream_ordering
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND relation_type = ?
+            ORDER BY topological_ordering DESC, stream_ordering DESC
+            LIMIT 1
+            """
+            txn.execute(sql, (redacted_relates_to, RelationTypes.THREAD))
+
+            row = txn.fetchone()
+            # If a new latest event is found, update the threads table.
+            if row:
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="threads",
+                    keyvalues={"room_id": room_id, "thread_id": redacted_relates_to},
+                    values={
+                        "latest_event_id": row[0],
+                        "topological_ordering": row[1],
+                        "stream_ordering": row[2],
+                    },
+                )
+
+            # Otherwise, delete the thread: it no longer exists.
+            else:
+                self.db_pool.simple_delete_one_txn(
+                    txn, table="threads", keyvalues={"thread_id": redacted_relates_to}
+                )
+
     def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase) -> None:
         if isinstance(event.content.get("topic"), str):
             self.store_event_search_txn(
