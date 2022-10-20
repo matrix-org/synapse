@@ -193,7 +193,7 @@ class BulkPushRuleEvaluator:
         # fastpath: if there's a power level event, that's all we need, and
         # not having a power level event is an extreme edge case
         if pl_event_id:
-            # check that the power level event is not in the batch before checking the DB
+            # Get the power level event from the batch, or fall back to the database.
             pl_event = event_id_to_event.get(pl_event_id)
             if pl_event:
                 auth_events = {POWER_KEY: pl_event}
@@ -204,8 +204,8 @@ class BulkPushRuleEvaluator:
                 event, prev_state_ids, for_verification=False
             )
             auth_events_dict = await self.store.get_events(auth_events_ids)
-            # check to see that there aren't any needed auth events in the batch as it
-            # hasn't been persisted yet
+            # Some needed auth events might be in the batch, combine them with those
+            # fetched from the database.
             for auth_event_id in auth_events_ids:
                 auth_event = event_id_to_event.get(auth_event_id)
                 if auth_event:
