@@ -1102,26 +1102,6 @@ class RoomCreationHandler:
 
             return new_event, new_context
 
-        async def send(
-            event: EventBase,
-            context: synapse.events.snapshot.EventContext,
-            creator: Requester,
-        ) -> int:
-            nonlocal last_sent_event_id
-
-            ev = await self.event_creation_handler.handle_new_client_event(
-                requester=creator,
-                events_and_context=[(event, context)],
-                ratelimit=False,
-                ignore_shadow_ban=True,
-            )
-
-            last_sent_event_id = ev.event_id
-
-            # we know it was persisted, so must have a stream ordering
-            assert ev.internal_metadata.stream_ordering
-            return ev.internal_metadata.stream_ordering
-
         try:
             config = self._presets_dict[preset_config]
         except KeyError:
@@ -1135,7 +1115,13 @@ class RoomCreationHandler:
         )
 
         logger.debug("Sending %s in new room", EventTypes.Member)
-        await send(creation_event, creation_context, creator)
+        ev = await self.event_creation_handler.handle_new_client_event(
+            requester=creator,
+            events_and_context=[(creation_event, creation_context)],
+            ratelimit=False,
+            ignore_shadow_ban=True,
+        )
+        last_sent_event_id = ev.event_id
 
         # Room create event must exist at this point
         assert last_sent_event_id is not None
