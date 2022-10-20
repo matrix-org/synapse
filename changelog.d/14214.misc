@@ -1,1 +1,0 @@
-When authenticating batched events, check for auth events in batch as well as DB.

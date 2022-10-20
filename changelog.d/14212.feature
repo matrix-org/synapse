@@ -1,1 +1,0 @@
-Build and publish binary wheels for `aarch64` platforms.
