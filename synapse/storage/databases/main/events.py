@@ -2081,7 +2081,9 @@ class PersistEventsStore:
             txn.execute(sql, (redacted_relates_to, RelationTypes.THREAD))
 
             row = txn.fetchone()
-            # If a new latest event is found, update the threads table.
+            # If a latest event is found, update the threads table, this might
+            # be the same current latest event (if an earlier event in the thread
+            # was redacted).
             if row:
                 self.db_pool.simple_upsert_txn(
                     txn,
