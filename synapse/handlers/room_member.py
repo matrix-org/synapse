@@ -322,6 +322,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -361,6 +362,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -399,6 +402,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 "state_key": user_id,
                 # For backwards compatibility:
                 "membership": membership,
+                "origin_server_ts": origin_server_ts,
             },
             txn_id=txn_id,
             allow_no_prev_events=allow_no_prev_events,
@@ -504,6 +508,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -542,6 +547,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -583,6 +590,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         prev_event_ids=prev_event_ids,
                         state_event_ids=state_event_ids,
                         depth=depth,
+                        origin_server_ts=origin_server_ts,
                     )
 
         return result
@@ -606,6 +614,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -646,6 +655,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -785,6 +796,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 require_consent=require_consent,
                 outlier=outlier,
                 historical=historical,
+                origin_server_ts=origin_server_ts,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
@@ -1030,6 +1042,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             content=content,
             require_consent=require_consent,
             outlier=outlier,
+            origin_server_ts=origin_server_ts,
         )
 
     async def _should_perform_remote_join(
@@ -1150,8 +1163,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         logger.info("Transferring room state from %s to %s", old_room_id, room_id)
 
         # Find all local users that were in the old room and copy over each user's state
-        users = await self.store.get_users_in_room(old_room_id)
-        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
+        local_users = await self.store.get_local_users_in_room(old_room_id)
+        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, local_users)
 
         # Add new room to the room directory if the old room was there
         # Remove old room from the room directory

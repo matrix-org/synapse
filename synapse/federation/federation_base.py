@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -58,7 +58,12 @@ class FederationBase:
 
     @trace
     async def _check_sigs_and_hash(
-        self, room_version: RoomVersion, pdu: EventBase
+        self,
+        room_version: RoomVersion,
+        pdu: EventBase,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> EventBase:
         """Checks that event is correctly signed by the sending server.
 
@@ -70,6 +75,11 @@ class FederationBase:
         Args:
             room_version: The room version of the PDU
             pdu: the event to be checked
+            record_failure_callback: A callback to run whenever the given event
+                fails signature or hash checks. This includes exceptions
+                that would be normally be thrown/raised but also things like
+                checking for event tampering where we just return the redacted
+                event.
 
         Returns:
               * the original event if the checks pass
@@ -80,7 +90,12 @@ class FederationBase:
           InvalidEventSignatureError if the signature check failed. Nothing
              will be logged in this case.
         """
-        await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        try:
+            await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        except InvalidEventSignatureError as exc:
+            if record_failure_callback:
+                await record_failure_callback(pdu, str(exc))
+            raise exc
 
         if not check_event_content_hash(pdu):
             # let's try to distinguish between failures because the event was
@@ -116,6 +131,10 @@ class FederationBase:
                         "event_id": pdu.event_id,
                     }
                 )
+                if record_failure_callback:
+                    await record_failure_callback(
+                        pdu, "Event content has been tampered with"
+                    )
             return redacted_event
 
         spam_check = await self.spam_checker.check_event_for_spam(pdu)

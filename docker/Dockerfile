@@ -106,7 +106,13 @@ ENV CARGO_HOME=/cargo
 ENV PATH=/cargo/bin:/rust/bin:$PATH
 RUN mkdir /rust /cargo
 
-RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable --profile minimal
+
+
+# arm64 builds consume a lot of memory if `CARGO_NET_GIT_FETCH_WITH_CLI` is not
+# set to true, so we expose it as a build-arg.
+ARG CARGO_NET_GIT_FETCH_WITH_CLI=false
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=$CARGO_NET_GIT_FETCH_WITH_CLI
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
@@ -121,7 +127,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY synapse /synapse/synapse/
 COPY rust /synapse/rust/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst build_rust.py /synapse/
+COPY pyproject.toml README.rst build_rust.py Cargo.toml Cargo.lock /synapse/
 
 # Repeat of earlier build argument declaration, as this is a new build stage.
 ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
@@ -129,7 +135,9 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 # Install the synapse package itself.
 # If we have populated requirements.txt, we don't install any dependencies
 # as we should already have those from the previous `pip install` step.
-RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+RUN --mount=type=cache,target=/synapse/target,sharing=locked \
+  --mount=type=cache,target=${CARGO_HOME}/registry,sharing=locked \
+  if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
     pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
   else \
     pip install --prefix="/install" --no-warn-script-location /synapse[all]; \

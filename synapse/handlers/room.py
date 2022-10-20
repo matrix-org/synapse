@@ -229,9 +229,7 @@ class RoomCreationHandler:
             },
         )
         validate_event_for_room_version(tombstone_event)
-        await self._event_auth_handler.check_auth_rules_from_context(
-            tombstone_event, tombstone_context
-        )
+        await self._event_auth_handler.check_auth_rules_from_context(tombstone_event)
 
         # Upgrade the room
         #
@@ -1646,7 +1644,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         self,
         user: UserID,
         from_key: RoomStreamToken,
-        limit: Optional[int],
+        limit: int,
         room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,

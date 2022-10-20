@@ -539,8 +539,10 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    EventContentFields.TRACING_CONTEXT: tracing_context,
                 }
+
+                if tracing_context != "{}":
+                    result[EventContentFields.TRACING_CONTEXT] = (tracing_context,)
 
                 prev_id = stream_id
 
@@ -549,7 +551,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                     if keys:
                         result["keys"] = keys
 
-                    device_display_name = device.display_name
+                    device_display_name = None
+                    if (
+                        self.hs.config.federation.allow_device_name_lookup_over_federation
+                    ):
+                        device_display_name = device.display_name
                     if device_display_name:
                         result["device_display_name"] = device_display_name
                 else:

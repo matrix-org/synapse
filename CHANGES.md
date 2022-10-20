@@ -1,3 +1,258 @@
+Synapse 1.70.0rc1 (2022-10-19)
+==============================
+
+Features
+--------
+
+- Support for [MSC3856](https://github.com/matrix-org/matrix-spec-proposals/pull/3856): threads list API. ([\#13394](https://github.com/matrix-org/synapse/issues/13394), [\#14171](https://github.com/matrix-org/synapse/issues/14171), [\#14175](https://github.com/matrix-org/synapse/issues/14175))
+- Support for thread-specific notifications & receipts ([MSC3771](https://github.com/matrix-org/matrix-spec-proposals/pull/3771) and [MSC3773](https://github.com/matrix-org/matrix-spec-proposals/pull/3773)). ([\#13776](https://github.com/matrix-org/synapse/issues/13776), [\#13824](https://github.com/matrix-org/synapse/issues/13824), [\#13877](https://github.com/matrix-org/synapse/issues/13877), [\#13878](https://github.com/matrix-org/synapse/issues/13878), [\#14050](https://github.com/matrix-org/synapse/issues/14050), [\#14140](https://github.com/matrix-org/synapse/issues/14140), [\#14159](https://github.com/matrix-org/synapse/issues/14159), [\#14163](https://github.com/matrix-org/synapse/issues/14163), [\#14174](https://github.com/matrix-org/synapse/issues/14174), [\#14222](https://github.com/matrix-org/synapse/issues/14222))
+- Stop fetching missing `prev_events` after we already know their signature is invalid. ([\#13816](https://github.com/matrix-org/synapse/issues/13816))
+- Send application service access tokens as a header (and query parameter). Implements [MSC2832](https://github.com/matrix-org/matrix-spec-proposals/pull/2832). ([\#13996](https://github.com/matrix-org/synapse/issues/13996))
+- Ignore server ACL changes when generating pushes. Implements [MSC3786](https://github.com/matrix-org/matrix-spec-proposals/pull/3786). ([\#13997](https://github.com/matrix-org/synapse/issues/13997))
+- Experimental support for redirecting to an implementation of a [MSC3886](https://github.com/matrix-org/matrix-spec-proposals/pull/3886) HTTP rendezvous service. ([\#14018](https://github.com/matrix-org/synapse/issues/14018))
+- The `/relations` endpoint can now be used on workers. ([\#14028](https://github.com/matrix-org/synapse/issues/14028))
+- Advertise support for Matrix 1.3 and 1.4 on `/_matrix/client/versions`. ([\#14032](https://github.com/matrix-org/synapse/issues/14032), [\#14184](https://github.com/matrix-org/synapse/issues/14184))
+- Improve validation of request bodies for the [Device Management](https://spec.matrix.org/v1.4/client-server-api/#device-management) and [MSC2697 Device Dehyrdation](https://github.com/matrix-org/matrix-spec-proposals/pull/2697) client-server API endpoints. ([\#14054](https://github.com/matrix-org/synapse/issues/14054))
+- Experimental support for [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874). ([\#14148](https://github.com/matrix-org/synapse/issues/14148))
+- Improve the validation of the following PUT endpoints: [`/directory/room/{roomAlias}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3directoryroomroomalias), [`/directory/list/room/{roomId}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3directorylistroomroomid) and [`/directory/list/appservice/{networkId}/{roomId}`](https://spec.matrix.org/v1.4/application-service-api/#put_matrixclientv3directorylistappservicenetworkidroomid). ([\#14179](https://github.com/matrix-org/synapse/issues/14179))
+- Build and publish binary wheels for `aarch64` platforms. ([\#14212](https://github.com/matrix-org/synapse/issues/14212))
+
+
+Bugfixes
+--------
+
+- Prevent device names from appearing in device list updates when `allow_device_name_lookup_over_federation` is `false`. ([\#10015](https://github.com/matrix-org/synapse/issues/10015))
+- Fix a long-standing bug where redactions were not being sent over federation if we did not have the original event. ([\#13813](https://github.com/matrix-org/synapse/issues/13813))
+- Fix a long-standing bug where edits of non-`m.room.message` events would not be correctly bundled or have their new content applied. ([\#14034](https://github.com/matrix-org/synapse/issues/14034))
+- Fix a bug introduced in Synapse 1.53.0 when querying `/publicRooms` with both a `room_type` filter and a `third_party_instance_id`. ([\#14053](https://github.com/matrix-org/synapse/issues/14053))
+- Fix a bug introduced in Synapse 1.35.0 where errors parsing a `/send_join` or `/state` response would produce excessive, low-quality Sentry events. ([\#14065](https://github.com/matrix-org/synapse/issues/14065))
+- Fix a long-standing bug where Synapse would error on the optional 'invite_room_state' field not being provided to [`PUT /_matrix/federation/v2/invite/{roomId}/{eventId}`](https://spec.matrix.org/v1.4/server-server-api/#put_matrixfederationv2inviteroomideventid). ([\#14083](https://github.com/matrix-org/synapse/issues/14083))
+- Fix a bug where invalid oEmbed fields would cause the entire response to be discarded. Introduced in Synapse 1.18.0. ([\#14089](https://github.com/matrix-org/synapse/issues/14089))
+- Fix a bug introduced in Synapse 1.37.0 in which an incorrect key name was used for sending and receiving room metadata when knocking on a room. ([\#14102](https://github.com/matrix-org/synapse/issues/14102))
+- Fix a bug introduced in v1.69.0rc1 where the joined hosts for a given event were not being properly cached. ([\#14125](https://github.com/matrix-org/synapse/issues/14125))
+- Fix a bug introduced in Synapse 1.30.0 where purging and rejoining a room without restarting in-between would result in a broken room. ([\#14161](https://github.com/matrix-org/synapse/issues/14161), [\#14164](https://github.com/matrix-org/synapse/issues/14164))
+- Fix [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) `/timestamp_to_event` endpoint returning potentially inaccurate closest events with `outliers` present. ([\#14215](https://github.com/matrix-org/synapse/issues/14215))
+
+
+Updates to the Docker image
+---------------------------
+
+- Update the version of frozendict in Docker images and Debian packages from 2.3.3 to 2.3.4, which may fix memory leak problems. ([\#13955](https://github.com/matrix-org/synapse/issues/13955))
+- Use the `minimal` Rust profile when building Synapse. ([\#14141](https://github.com/matrix-org/synapse/issues/14141))
+- Prevent a class of database sharding errors when using `Dockerfile-workers` to spawn multiple instances of the same worker. Contributed by Jason Little. ([\#14165](https://github.com/matrix-org/synapse/issues/14165))
+- Set `LD_PRELOAD` to use jemalloc memory allocator in Dockerfile-workers. ([\#14182](https://github.com/matrix-org/synapse/issues/14182))
+- Fix pre-startup logging being lost when using the `Dockerfile-workers` image. ([\#14195](https://github.com/matrix-org/synapse/issues/14195))
+
+
+Improved Documentation
+----------------------
+
+- Add sample worker files for `pusher` and `federation_sender`. ([\#14077](https://github.com/matrix-org/synapse/issues/14077))
+- Improve the listener example on the metrics documentation. ([\#14078](https://github.com/matrix-org/synapse/issues/14078))
+- Expand Google OpenID Connect example config to map email attribute. Contributed by @ptman. ([\#14081](https://github.com/matrix-org/synapse/issues/14081))
+- The changelog entry ending in a full stop or exclamation mark is not optional. ([\#14087](https://github.com/matrix-org/synapse/issues/14087))
+- Fix links to jemalloc documentation, which were broken in [#13491](https://github.com/matrix-org/synapse/pull/14124). ([\#14093](https://github.com/matrix-org/synapse/issues/14093))
+- Remove not needed `replication` listener in docker compose example. ([\#14107](https://github.com/matrix-org/synapse/issues/14107))
+- Fix name of `alias_creation_rules` option in the config manual documentation. ([\#14124](https://github.com/matrix-org/synapse/issues/14124))
+- Clarify comment on event contexts. ([\#14145](https://github.com/matrix-org/synapse/issues/14145))
+- Fix dead link to the [Admin Registration API](https://matrix-org.github.io/synapse/latest/admin_api/register_api.html). ([\#14189](https://github.com/matrix-org/synapse/issues/14189))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove the experimental implementation of [MSC3772](https://github.com/matrix-org/matrix-spec-proposals/pull/3772). ([\#14094](https://github.com/matrix-org/synapse/issues/14094))
+- Remove the unstable identifier for [MSC3715](https://github.com/matrix-org/matrix-doc/pull/3715). ([\#14106](https://github.com/matrix-org/synapse/issues/14106), [\#14146](https://github.com/matrix-org/synapse/issues/14146))
+
+
+Internal Changes
+----------------
+
+- Optimise queries used to get a users rooms during sync. Contributed by Nick @ Beeper (@fizzadar). ([\#13991](https://github.com/matrix-org/synapse/issues/13991))
+- Update authlib from 0.15.5 to 1.1.0. ([\#14006](https://github.com/matrix-org/synapse/issues/14006))
+- Make `parse_server_name` consistent in handling invalid server names. ([\#14007](https://github.com/matrix-org/synapse/issues/14007))
+- Don't repeatedly wake up the same users for batched events. ([\#14033](https://github.com/matrix-org/synapse/issues/14033))
+- Complement test image: capture logs from nginx. ([\#14063](https://github.com/matrix-org/synapse/issues/14063))
+- Don't create noisy Sentry events when a requester drops connection to the metrics server mid-request. ([\#14072](https://github.com/matrix-org/synapse/issues/14072))
+- Run the integration test suites with the asyncio reactor enabled in CI. ([\#14092](https://github.com/matrix-org/synapse/issues/14092))
+- Add debug logs to figure out why an event was filtered out of the client response. ([\#14095](https://github.com/matrix-org/synapse/issues/14095))
+- Indicate what endpoint came back with a JSON response we were unable to parse. ([\#14097](https://github.com/matrix-org/synapse/issues/14097))
+- Break up calls to fetch rooms for many users. Contributed by Nick @ Beeper (@fizzadar). ([\#14109](https://github.com/matrix-org/synapse/issues/14109))
+- Faster joins: prioritise the server we joined by when restarting a partial join resync. ([\#14126](https://github.com/matrix-org/synapse/issues/14126))
+- Cache Rust build cache when building docker images. ([\#14130](https://github.com/matrix-org/synapse/issues/14130))
+- Enable dependabot for Rust dependencies. ([\#14132](https://github.com/matrix-org/synapse/issues/14132))
+- Bump typing-extensions from 4.1.1 to 4.4.0. ([\#14134](https://github.com/matrix-org/synapse/issues/14134))
+- Use the `minimal` Rust profile when building Synapse. ([\#14141](https://github.com/matrix-org/synapse/issues/14141))
+- Remove unused configuration code. ([\#14142](https://github.com/matrix-org/synapse/issues/14142))
+- Prepare for the [`gotestfmt` repository move](https://github.com/GoTestTools/gotestfmt/discussions/46). ([\#14144](https://github.com/matrix-org/synapse/issues/14144))
+- Invalidate rooms for user caches on replicated event, fix sync cache race in synapse workers. Contributed by Nick @ Beeper (@fizzadar). ([\#14155](https://github.com/matrix-org/synapse/issues/14155))
+- Enable url previews when testing with complement. ([\#14198](https://github.com/matrix-org/synapse/issues/14198))
+- When authenticating batched events, check for auth events in batch as well as DB. ([\#14214](https://github.com/matrix-org/synapse/issues/14214))
+- Update CI config to avoid GitHub Actions deprecation warnings. ([\#14216](https://github.com/matrix-org/synapse/issues/14216), [\#14224](https://github.com/matrix-org/synapse/issues/14224))
+- Update dependency requirements to allow building with poetry-core 1.3.2. ([\#14217](https://github.com/matrix-org/synapse/issues/14217))
+- Rename the `cache_memory` extra to `cache-memory`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14221](https://github.com/matrix-org/synapse/issues/14221))
+- Specify dev-dependencies using lower bounds, to reduce the likelihood of a dependabot merge conflict. The lockfile continues to pin to specific versions. ([\#14227](https://github.com/matrix-org/synapse/issues/14227))
+
+
+Synapse 1.69.0 (2022-10-17)
+===========================
+
+Please note that legacy Prometheus metric names are now deprecated and will be removed in Synapse 1.73.0.
+Server administrators should update their dashboards and alerting rules to avoid using the deprecated metric names.
+See the [upgrade notes](https://matrix-org.github.io/synapse/v1.69/upgrade.html#upgrading-to-v1690) for more details.
+
+
+No significant changes since 1.69.0rc4.
+
+
+Synapse 1.69.0rc4 (2022-10-14)
+==============================
+
+Bugfixes
+--------
+
+- Fix poor performance of the `event_push_backfill_thread_id` background update, which was introduced in Synapse 1.68.0rc1. ([\#14172](https://github.com/matrix-org/synapse/issues/14172), [\#14181](https://github.com/matrix-org/synapse/issues/14181))
+
+
+Updates to the Docker image
+---------------------------
+
+- Fix docker build OOMing in CI for arm64 builds. ([\#14173](https://github.com/matrix-org/synapse/issues/14173))
+
+
+Synapse 1.69.0rc3 (2022-10-12)
+==============================
+
+Bugfixes
+--------
+
+- Fix an issue with Docker images causing the Rust dependencies to not be pinned correctly. Introduced in v1.68.0 ([\#14129](https://github.com/matrix-org/synapse/issues/14129))
+- Fix a bug introduced in Synapse 1.69.0rc1 which would cause registration replication requests to fail if the worker sending the request is not running Synapse 1.69. ([\#14135](https://github.com/matrix-org/synapse/issues/14135))
+- Fix error in background update when rotating existing notifications. Introduced in v1.69.0rc2. ([\#14138](https://github.com/matrix-org/synapse/issues/14138))
+
+
+Internal Changes
+----------------
+
+- Rename the `url_preview` extra to `url-preview`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14085](https://github.com/matrix-org/synapse/issues/14085))
+
+
+Synapse 1.69.0rc2 (2022-10-06)
+==============================
+
+Deprecations and Removals
+-------------------------
+
+- Deprecate the `generate_short_term_login_token` method in favor of an async `create_login_token` method in the Module API. ([\#13842](https://github.com/matrix-org/synapse/issues/13842))
+
+
+Internal Changes
+----------------
+
+- Ensure Synapse v1.69 works with upcoming database changes in v1.70. ([\#14045](https://github.com/matrix-org/synapse/issues/14045))
+- Fix a bug introduced in Synapse v1.68.0 where messages could not be sent in rooms with non-integer `notifications` power level. ([\#14073](https://github.com/matrix-org/synapse/issues/14073))
+- Temporarily pin build-system requirements to workaround an incompatibility with poetry-core 1.3.0. This will be reverted before the v1.69.0 release proper, see [\#14079](https://github.com/matrix-org/synapse/issues/14079). ([\#14080](https://github.com/matrix-org/synapse/issues/14080))
+
+
+Synapse 1.69.0rc1 (2022-10-04)
+==============================
+
+Features
+--------
+
+- Allow application services to set the `origin_server_ts` of a state event by providing the query parameter `ts` in [`PUT /_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3roomsroomidstateeventtypestatekey), per [MSC3316](https://github.com/matrix-org/matrix-doc/pull/3316). Contributed by @lukasdenk. ([\#11866](https://github.com/matrix-org/synapse/issues/11866))
+- Allow server admins to require a manual approval process before new accounts can be used (using [MSC3866](https://github.com/matrix-org/matrix-spec-proposals/pull/3866)). ([\#13556](https://github.com/matrix-org/synapse/issues/13556))
+- Exponentially backoff from backfilling the same event over and over. ([\#13635](https://github.com/matrix-org/synapse/issues/13635), [\#13936](https://github.com/matrix-org/synapse/issues/13936))
+- Add cache invalidation across workers to module API. ([\#13667](https://github.com/matrix-org/synapse/issues/13667), [\#13947](https://github.com/matrix-org/synapse/issues/13947))
+- Experimental implementation of [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882) to allow an existing device/session to generate a login token for use on a new device/session. ([\#13722](https://github.com/matrix-org/synapse/issues/13722), [\#13868](https://github.com/matrix-org/synapse/issues/13868))
+- Experimental support for thread-specific receipts ([MSC3771](https://github.com/matrix-org/matrix-spec-proposals/pull/3771)). ([\#13782](https://github.com/matrix-org/synapse/issues/13782), [\#13893](https://github.com/matrix-org/synapse/issues/13893), [\#13932](https://github.com/matrix-org/synapse/issues/13932), [\#13937](https://github.com/matrix-org/synapse/issues/13937), [\#13939](https://github.com/matrix-org/synapse/issues/13939))
+- Add experimental support for [MSC3881: Remotely toggle push notifications for another client](https://github.com/matrix-org/matrix-spec-proposals/pull/3881). ([\#13799](https://github.com/matrix-org/synapse/issues/13799), [\#13831](https://github.com/matrix-org/synapse/issues/13831), [\#13860](https://github.com/matrix-org/synapse/issues/13860))
+- Keep track when an event pulled over federation fails its signature check so we can intelligently back-off in the future. ([\#13815](https://github.com/matrix-org/synapse/issues/13815))
+- Improve validation for the unspecced, internal-only `_matrix/client/unstable/add_threepid/msisdn/submit_token` endpoint. ([\#13832](https://github.com/matrix-org/synapse/issues/13832))
+- Faster remote room joins: record _when_ we first partial-join to a room. ([\#13892](https://github.com/matrix-org/synapse/issues/13892))
+- Support a `dir` parameter on the `/relations` endpoint per [MSC3715](https://github.com/matrix-org/matrix-doc/pull/3715). ([\#13920](https://github.com/matrix-org/synapse/issues/13920))
+- Ask mail servers receiving emails from Synapse to not send automatic replies (e.g. out-of-office responses). ([\#13957](https://github.com/matrix-org/synapse/issues/13957))
+
+
+Bugfixes
+--------
+
+- Send push notifications for invites received over federation. ([\#13719](https://github.com/matrix-org/synapse/issues/13719), [\#14014](https://github.com/matrix-org/synapse/issues/14014))
+- Fix a long-standing bug where typing events would be accepted from remote servers not present in a room. Also fix a bug where incoming typing events would cause other incoming events to get stuck during a fast join. ([\#13830](https://github.com/matrix-org/synapse/issues/13830))
+- Fix a bug introduced in Synapse v1.53.0 where the experimental implementation of [MSC3715](https://github.com/matrix-org/matrix-spec-proposals/pull/3715) would give incorrect results when paginating forward. ([\#13840](https://github.com/matrix-org/synapse/issues/13840))
+- Fix access token leak to logs from proxy agent. ([\#13855](https://github.com/matrix-org/synapse/issues/13855))
+- Fix `have_seen_event` cache not being invalidated after we persist an event which causes inefficiency effects like extra `/state` federation calls. ([\#13863](https://github.com/matrix-org/synapse/issues/13863))
+- Faster room joins: Fix a bug introduced in 1.66.0 where an error would be logged when syncing after joining a room. ([\#13872](https://github.com/matrix-org/synapse/issues/13872))
+- Fix a bug introduced in 1.66.0 where some required fields in the pushrules sent to clients were not present anymore. Contributed by Nico. ([\#13904](https://github.com/matrix-org/synapse/issues/13904))
+- Fix packaging to include `Cargo.lock` in `sdist`. ([\#13909](https://github.com/matrix-org/synapse/issues/13909))
+- Fix a long-standing bug where device updates could cause delays sending out to-device messages over federation. ([\#13922](https://github.com/matrix-org/synapse/issues/13922))
+- Fix a bug introduced in v1.68.0 where Synapse would require `setuptools_rust` at runtime, even though the package is only required at build time. ([\#13952](https://github.com/matrix-org/synapse/issues/13952))
+- Fix a long-standing bug where `POST /_matrix/client/v3/keys/query` requests could result in excessively large SQL queries. ([\#13956](https://github.com/matrix-org/synapse/issues/13956))
+- Fix a performance regression in the `get_users_in_room` database query. Introduced in v1.67.0. ([\#13972](https://github.com/matrix-org/synapse/issues/13972))
+- Fix a bug introduced in v1.68.0 bug where Rust extension wasn't built in `release` mode when using `poetry install`. ([\#14009](https://github.com/matrix-org/synapse/issues/14009))
+- Do not return an unspecified `original_event` field when using the stable `/relations` endpoint. Introduced in Synapse v1.57.0. ([\#14025](https://github.com/matrix-org/synapse/issues/14025))
+- Correctly handle a race with device lists when a remote user leaves during a partial join. ([\#13885](https://github.com/matrix-org/synapse/issues/13885))
+- Correctly handle sending local device list updates to remote servers during a partial join. ([\#13934](https://github.com/matrix-org/synapse/issues/13934))
+
+
+Improved Documentation
+----------------------
+
+- Add `worker_main_http_uri` for the worker generator bash script. ([\#13772](https://github.com/matrix-org/synapse/issues/13772))
+- Update URL for the NixOS module for Synapse. ([\#13818](https://github.com/matrix-org/synapse/issues/13818))
+- Fix a mistake in sso_mapping_providers.md: `map_user_attributes` is expected to return `display_name`, not `displayname`. ([\#13836](https://github.com/matrix-org/synapse/issues/13836))
+- Fix a cross-link from the registration admin API to the `registration_shared_secret` configuration documentation. ([\#13870](https://github.com/matrix-org/synapse/issues/13870))
+- Update the man page for the `hash_password` script to correct the default number of bcrypt rounds performed. ([\#13911](https://github.com/matrix-org/synapse/issues/13911), [\#13930](https://github.com/matrix-org/synapse/issues/13930))
+- Emphasize the right reasons when to use `(room_id, event_id)` in a database schema. ([\#13915](https://github.com/matrix-org/synapse/issues/13915))
+- Add instruction to contributing guide for running unit tests in parallel. Contributed by @ashfame. ([\#13928](https://github.com/matrix-org/synapse/issues/13928))
+- Clarify that the `auto_join_rooms` config option can also be used with Space aliases. ([\#13931](https://github.com/matrix-org/synapse/issues/13931))
+- Add some cross references to worker documentation. ([\#13974](https://github.com/matrix-org/synapse/issues/13974))
+- Linkify urls in config documentation. ([\#14003](https://github.com/matrix-org/synapse/issues/14003))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove the `complete_sso_login` method from the Module API which was deprecated in Synapse 1.13.0. ([\#13843](https://github.com/matrix-org/synapse/issues/13843))
+- Announce that legacy metric names are deprecated, will be turned off by default in Synapse v1.71.0 and removed altogether in Synapse v1.73.0. See the upgrade notes for more information. ([\#14024](https://github.com/matrix-org/synapse/issues/14024))
+
+
+Internal Changes
+----------------
+
+- Speed up creation of DM rooms. ([\#13487](https://github.com/matrix-org/synapse/issues/13487), [\#13800](https://github.com/matrix-org/synapse/issues/13800))
+- Port push rules to using Rust. ([\#13768](https://github.com/matrix-org/synapse/issues/13768), [\#13838](https://github.com/matrix-org/synapse/issues/13838), [\#13889](https://github.com/matrix-org/synapse/issues/13889))
+- Optimise get rooms for user calls. Contributed by Nick @ Beeper (@fizzadar). ([\#13787](https://github.com/matrix-org/synapse/issues/13787))
+- Update the script which makes full schema dumps. ([\#13792](https://github.com/matrix-org/synapse/issues/13792))
+- Use shared methods for cache invalidation when persisting events, remove duplicate codepaths. Contributed by Nick @ Beeper (@fizzadar). ([\#13796](https://github.com/matrix-org/synapse/issues/13796))
+- Improve the `synapse.api.auth.Auth` mock used in unit tests. ([\#13809](https://github.com/matrix-org/synapse/issues/13809))
+- Faster Remote Room Joins: tell remote homeservers that we are unable to authorise them if they query a room which has partial state on our server. ([\#13823](https://github.com/matrix-org/synapse/issues/13823))
+- Carry IdP Session IDs through user-mapping sessions. ([\#13839](https://github.com/matrix-org/synapse/issues/13839))
+- Fix the release script not publishing binary wheels. ([\#13850](https://github.com/matrix-org/synapse/issues/13850))
+- Raise issue if complement fails with latest deps. ([\#13859](https://github.com/matrix-org/synapse/issues/13859))
+- Correct the comments in the complement dockerfile. ([\#13867](https://github.com/matrix-org/synapse/issues/13867))
+- Create a new snapshot of the database schema. ([\#13873](https://github.com/matrix-org/synapse/issues/13873))
+- Faster room joins: Send device list updates to most servers in rooms with partial state. ([\#13874](https://github.com/matrix-org/synapse/issues/13874), [\#14013](https://github.com/matrix-org/synapse/issues/14013))
+- Add comments to the Prometheus recording rules to make it clear which set of rules you need for Grafana or Prometheus Console. ([\#13876](https://github.com/matrix-org/synapse/issues/13876))
+- Only pull relevant backfill points from the database based on the current depth and limit (instead of all) every time we want to `/backfill`. ([\#13879](https://github.com/matrix-org/synapse/issues/13879))
+- Faster room joins: Avoid waiting for full state when processing `/keys/changes` requests. ([\#13888](https://github.com/matrix-org/synapse/issues/13888))
+- Improve backfill robustness by trying more servers when we get a `4xx` error back. ([\#13890](https://github.com/matrix-org/synapse/issues/13890))
+- Fix mypy errors with canonicaljson 1.6.3. ([\#13905](https://github.com/matrix-org/synapse/issues/13905))
+- Faster remote room joins: correctly handle remote device list updates during a partial join. ([\#13913](https://github.com/matrix-org/synapse/issues/13913))
+- Complement image: propagate SIGTERM to all workers. ([\#13914](https://github.com/matrix-org/synapse/issues/13914))
+- Update an innaccurate comment in Synapse's upsert database helper. ([\#13924](https://github.com/matrix-org/synapse/issues/13924))
+- Update mypy (0.950 -> 0.981) and mypy-zope (0.3.7 -> 0.3.11). ([\#13925](https://github.com/matrix-org/synapse/issues/13925), [\#13993](https://github.com/matrix-org/synapse/issues/13993))
+- Use dedicated `get_local_users_in_room(room_id)` function to find local users when calculating users to copy over during a room upgrade. ([\#13960](https://github.com/matrix-org/synapse/issues/13960))
+- Refactor language in user directory `_track_user_joined_room` code to make it more clear that we use both local and remote users. ([\#13966](https://github.com/matrix-org/synapse/issues/13966))
+- Revert catch-all exceptions being recorded as event pull attempt failures (only handle what we know about). ([\#13969](https://github.com/matrix-org/synapse/issues/13969))
+- Speed up calculating push actions in large rooms. ([\#13973](https://github.com/matrix-org/synapse/issues/13973), [\#13992](https://github.com/matrix-org/synapse/issues/13992))
+- Enable update notifications from Github's dependabot. ([\#13976](https://github.com/matrix-org/synapse/issues/13976))
+- Prototype a workflow to automatically add changelogs to dependabot PRs. ([\#13998](https://github.com/matrix-org/synapse/issues/13998), [\#14011](https://github.com/matrix-org/synapse/issues/14011), [\#14017](https://github.com/matrix-org/synapse/issues/14017), [\#14021](https://github.com/matrix-org/synapse/issues/14021), [\#14027](https://github.com/matrix-org/synapse/issues/14027))
+- Fix type annotations to be compatible with new annotations in development versions of twisted. ([\#14012](https://github.com/matrix-org/synapse/issues/14012))
+- Clear out stale entries in `event_push_actions_staging` table. ([\#14020](https://github.com/matrix-org/synapse/issues/14020))
+- Bump versions of GitHub actions. ([\#13978](https://github.com/matrix-org/synapse/issues/13978), [\#13979](https://github.com/matrix-org/synapse/issues/13979), [\#13980](https://github.com/matrix-org/synapse/issues/13980), [\#13982](https://github.com/matrix-org/synapse/issues/13982), [\#14015](https://github.com/matrix-org/synapse/issues/14015), [\#14019](https://github.com/matrix-org/synapse/issues/14019), [\#14022](https://github.com/matrix-org/synapse/issues/14022), [\#14023](https://github.com/matrix-org/synapse/issues/14023))
+
+
 Synapse 1.68.0 (2022-09-27)
 ===========================
 
