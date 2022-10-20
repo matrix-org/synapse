@@ -67,6 +67,16 @@ class StreamChangeCache:
             for entity, stream_pos in prefilled_cache.items():
                 self.entity_has_changed(entity, stream_pos)
 
+    def _check_current_position(self, current_pos: Optional[int] = None) -> None:
+        if current_pos and current_pos > self.max_stream_pos:
+            logger.warning(
+                "Checking entity in %s stream cache cache with current position %s "
+                "ahead of the max stream cache position %s",
+                self.name,
+                current_pos,
+                self.max_stream_pos,
+            )
+
     def set_cache_factor(self, factor: float) -> bool:
         """
         Set the cache factor for this individual cache.
@@ -84,8 +94,11 @@ class StreamChangeCache:
             return True
         return False
 
-    def has_entity_changed(self, entity: EntityType, stream_pos: int) -> bool:
+    def has_entity_changed(
+        self, entity: EntityType, stream_pos: int, current_pos: Optional[int] = None
+    ) -> bool:
         """Returns True if the entity may have been updated since stream_pos"""
+        self._check_current_position(current_pos)
         assert isinstance(stream_pos, int)
 
         if stream_pos < self._earliest_known_stream_pos:
@@ -105,14 +118,17 @@ class StreamChangeCache:
         return False
 
     def get_entities_changed(
-        self, entities: Collection[EntityType], stream_pos: int
+        self,
+        entities: Collection[EntityType],
+        stream_pos: int,
+        current_pos: Optional[int] = None,
     ) -> Union[Set[EntityType], FrozenSet[EntityType]]:
         """
         Returns subset of entities that have had new things since the given
         position.  Entities unknown to the cache will be returned.  If the
         position is too old it will just return the given list.
         """
-        changed_entities = self.get_all_entities_changed(stream_pos)
+        changed_entities = self.get_all_entities_changed(stream_pos, current_pos)
         if changed_entities is not None:
             # We now do an intersection, trying to do so in the most efficient
             # way possible (some of these sets are *large*). First check in the
@@ -132,8 +148,11 @@ class StreamChangeCache:
 
         return result
 
-    def has_any_entity_changed(self, stream_pos: int) -> bool:
+    def has_any_entity_changed(
+        self, stream_pos: int, current_pos: Optional[int] = None
+    ) -> bool:
         """Returns if any entity has changed"""
+        self._check_current_position(current_pos)
         assert type(stream_pos) is int
 
         if not self._cache:
@@ -147,12 +166,15 @@ class StreamChangeCache:
             self.metrics.inc_misses()
             return True
 
-    def get_all_entities_changed(self, stream_pos: int) -> Optional[List[EntityType]]:
+    def get_all_entities_changed(
+        self, stream_pos: int, current_pos: Optional[int] = None
+    ) -> Optional[List[EntityType]]:
         """Returns all entities that have had new things since the given
         position. If the position is too old it will return None.
 
         Returns the entities in the order that they were changed.
         """
+        self._check_current_position(current_pos)
         assert type(stream_pos) is int
 
         if stream_pos < self._earliest_known_stream_pos:
