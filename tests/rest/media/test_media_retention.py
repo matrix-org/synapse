@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import io
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional
+
+from matrix_common.types.mxc_uri import MXCUri
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -53,16 +55,19 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
         # Create a user to upload media with
         test_user_id = self.register_user("alice", "password")
 
-        # Inject media (3 images each; recently accessed, old access, never accessed)
-        # into both the local store and the remote cache
+        # Inject media (recently accessed, old access, never accessed, old access
+        # quarantined media) into both the local store and the remote cache, plus
+        # one additional local media that is marked as protected from quarantine.
         media_repository = hs.get_media_repository()
         test_media_content = b"example string"
 
-        def _create_media_and_set_last_accessed(
+        def _create_media_and_set_attributes(
             last_accessed_ms: Optional[int],
-        ) -> str:
+            is_quarantined: Optional[bool] = False,
+            is_protected: Optional[bool] = False,
+        ) -> MXCUri:
             # "Upload" some media to the local media store
-            mxc_uri = self.get_success(
+            mxc_uri: MXCUri = self.get_success(
                 media_repository.create_content(
                     media_type="text/plain",
                     upload_name=None,
@@ -72,23 +77,42 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                 )
             )
 
-            media_id = mxc_uri.split("/")[-1]
-
             # Set the last recently accessed time for this media
             if last_accessed_ms is not None:
                 self.get_success(
                     self.store.update_cached_last_access_time(
-                        local_media=(media_id,),
+                        local_media=(mxc_uri.media_id,),
                         remote_media=(),
                         time_ms=last_accessed_ms,
                     )
                 )
 
-            return media_id
+            if is_quarantined:
+                # Mark this media as quarantined
+                self.get_success(
+                    self.store.quarantine_media_by_id(
+                        server_name=self.hs.config.server.server_name,
+                        media_id=mxc_uri.media_id,
+                        quarantined_by="@theadmin:test",
+                    )
+                )
 
-        def _cache_remote_media_and_set_last_accessed(
-            media_id: str, last_accessed_ms: Optional[int]
-        ) -> str:
+            if is_protected:
+                # Mark this media as protected from quarantine
+                self.get_success(
+                    self.store.mark_local_media_as_safe(
+                        media_id=mxc_uri.media_id,
+                        safe=True,
+                    )
+                )
+
+            return mxc_uri
+
+        def _cache_remote_media_and_set_attributes(
+            media_id: str,
+            last_accessed_ms: Optional[int],
+            is_quarantined: Optional[bool] = False,
+        ) -> MXCUri:
             # Pretend to cache some remote media
             self.get_success(
                 self.store.store_cached_remote_media(
@@ -112,23 +136,58 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                     )
                 )
 
-            return media_id
+            if is_quarantined:
+                # Mark this media as quarantined
+                self.get_success(
+                    self.store.quarantine_media_by_id(
+                        server_name=self.remote_server_name,
+                        media_id=media_id,
+                        quarantined_by="@theadmin:test",
+                    )
+                )
+
+            return MXCUri(self.remote_server_name, media_id)
 
         # Start with the local media store
-        self.local_recently_accessed_media = _create_media_and_set_last_accessed(
-            self.THIRTY_DAYS_IN_MS
+        self.local_recently_accessed_media = _create_media_and_set_attributes(
+            last_accessed_ms=self.THIRTY_DAYS_IN_MS,
         )
-        self.local_not_recently_accessed_media = _create_media_and_set_last_accessed(
-            self.ONE_DAY_IN_MS
+        self.local_not_recently_accessed_media = _create_media_and_set_attributes(
+            last_accessed_ms=self.ONE_DAY_IN_MS,
         )
-        self.local_never_accessed_media = _create_media_and_set_last_accessed(None)
+        self.local_not_recently_accessed_quarantined_media = (
+            _create_media_and_set_attributes(
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+                is_quarantined=True,
+            )
+        )
+        self.local_not_recently_accessed_protected_media = (
+            _create_media_and_set_attributes(
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+                is_protected=True,
+            )
+        )
+        self.local_never_accessed_media = _create_media_and_set_attributes(
+            last_accessed_ms=None,
+        )
 
         # And now the remote media store
-        self.remote_recently_accessed_media = _cache_remote_media_and_set_last_accessed(
-            "a", self.THIRTY_DAYS_IN_MS
+        self.remote_recently_accessed_media = _cache_remote_media_and_set_attributes(
+            media_id="a",
+            last_accessed_ms=self.THIRTY_DAYS_IN_MS,
         )
         self.remote_not_recently_accessed_media = (
-            _cache_remote_media_and_set_last_accessed("b", self.ONE_DAY_IN_MS)
+            _cache_remote_media_and_set_attributes(
+                media_id="b",
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+            )
+        )
+        self.remote_not_recently_accessed_quarantined_media = (
+            _cache_remote_media_and_set_attributes(
+                media_id="c",
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+                is_quarantined=True,
+            )
         )
         # Remote media will always have a "last accessed" attribute, as it would not
         # be fetched from the remote homeserver unless instigated by a user.
@@ -155,16 +214,16 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
         # Remote media should be unaffected.
         self._assert_if_mxc_uris_purged(
             purged=[
-                (
-                    self.hs.config.server.server_name,
-                    self.local_not_recently_accessed_media,
-                ),
-                (self.hs.config.server.server_name, self.local_never_accessed_media),
+                self.local_not_recently_accessed_media,
+                self.local_never_accessed_media,
             ],
             not_purged=[
-                (self.hs.config.server.server_name, self.local_recently_accessed_media),
-                (self.remote_server_name, self.remote_recently_accessed_media),
-                (self.remote_server_name, self.remote_not_recently_accessed_media),
+                self.local_recently_accessed_media,
+                self.local_not_recently_accessed_quarantined_media,
+                self.local_not_recently_accessed_protected_media,
+                self.remote_recently_accessed_media,
+                self.remote_not_recently_accessed_media,
+                self.remote_not_recently_accessed_quarantined_media,
             ],
         )
 
@@ -190,36 +249,34 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
         # Remote media accessed <30 days ago should still exist.
         self._assert_if_mxc_uris_purged(
             purged=[
-                (self.remote_server_name, self.remote_not_recently_accessed_media),
+                self.remote_not_recently_accessed_media,
             ],
             not_purged=[
-                (self.remote_server_name, self.remote_recently_accessed_media),
-                (self.hs.config.server.server_name, self.local_recently_accessed_media),
-                (
-                    self.hs.config.server.server_name,
-                    self.local_not_recently_accessed_media,
-                ),
-                (self.hs.config.server.server_name, self.local_never_accessed_media),
+                self.remote_recently_accessed_media,
+                self.local_recently_accessed_media,
+                self.local_not_recently_accessed_media,
+                self.local_not_recently_accessed_quarantined_media,
+                self.local_not_recently_accessed_protected_media,
+                self.remote_not_recently_accessed_quarantined_media,
+                self.local_never_accessed_media,
             ],
         )
 
     def _assert_if_mxc_uris_purged(
-        self, purged: Iterable[Tuple[str, str]], not_purged: Iterable[Tuple[str, str]]
+        self, purged: Iterable[MXCUri], not_purged: Iterable[MXCUri]
     ) -> None:
-        def _assert_mxc_uri_purge_state(
-            server_name: str, media_id: str, expect_purged: bool
-        ) -> None:
+        def _assert_mxc_uri_purge_state(mxc_uri: MXCUri, expect_purged: bool) -> None:
             """Given an MXC URI, assert whether it has been purged or not."""
-            if server_name == self.hs.config.server.server_name:
+            if mxc_uri.server_name == self.hs.config.server.server_name:
                 found_media_dict = self.get_success(
-                    self.store.get_local_media(media_id)
+                    self.store.get_local_media(mxc_uri.media_id)
                 )
             else:
                 found_media_dict = self.get_success(
-                    self.store.get_cached_remote_media(server_name, media_id)
+                    self.store.get_cached_remote_media(
+                        mxc_uri.server_name, mxc_uri.media_id
+                    )
                 )
-
-            mxc_uri = f"mxc://{server_name}/{media_id}"
 
             if expect_purged:
                 self.assertIsNone(
@@ -232,7 +289,7 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                 )
 
         # Assert that the given MXC URIs have either been correctly purged or not.
-        for server_name, media_id in purged:
-            _assert_mxc_uri_purge_state(server_name, media_id, expect_purged=True)
-        for server_name, media_id in not_purged:
-            _assert_mxc_uri_purge_state(server_name, media_id, expect_purged=False)
+        for mxc_uri in purged:
+            _assert_mxc_uri_purge_state(mxc_uri, expect_purged=True)
+        for mxc_uri in not_purged:
+            _assert_mxc_uri_purge_state(mxc_uri, expect_purged=False)

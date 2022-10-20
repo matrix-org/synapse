@@ -24,9 +24,11 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
 from synapse.state import StateHandler
 from synapse.storage.databases.main import DataStore
+from synapse.storage.state import StateFilter
 from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
@@ -120,8 +122,12 @@ class EventBuilder:
             The signed and hashed event.
         """
         if auth_event_ids is None:
-            state_ids = await self._state.get_current_state_ids(
-                self.room_id, prev_event_ids
+            state_ids = await self._state.compute_state_after_events(
+                self.room_id,
+                prev_event_ids,
+                state_filter=StateFilter.from_types(
+                    auth_types_for_event(self.room_version, self)
+                ),
             )
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 self, state_ids
@@ -131,7 +137,7 @@ class EventBuilder:
         # The types of auth/prev events changes between event versions.
         prev_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         auth_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
-        if format_version == EventFormatVersions.V1:
+        if format_version == EventFormatVersions.ROOM_V1_V2:
             auth_events = await self._store.add_event_hashes(auth_event_ids)
             prev_events = await self._store.add_event_hashes(prev_event_ids)
         else:
@@ -161,7 +167,6 @@ class EventBuilder:
             "content": self.content,
             "unsigned": self.unsigned,
             "depth": depth,
-            "prev_state": [],
         }
 
         if self.is_state():
@@ -247,7 +252,7 @@ def create_local_event_from_event_dict(
 
     time_now = int(clock.time_msec())
 
-    if format_version == EventFormatVersions.V1:
+    if format_version == EventFormatVersions.ROOM_V1_V2:
         event_dict["event_id"] = _create_event_id(clock, hostname)
 
     event_dict["origin"] = hostname

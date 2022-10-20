@@ -1,0 +1,91 @@
+{{- /*gotype: github.com/haveyoudebuggedit/gotestfmt/parser.Package*/ -}}
+{{- /*
+This template contains the format for an individual package. GitHub actions does not currently support nested groups so
+we are creating a stylized header for each package.
+
+This template is based on https://github.com/haveyoudebuggedit/gotestfmt/blob/f179b0e462a9dcf7101515d87eec4e4d7e58b92a/.gotestfmt/github/package.gotpl
+which is under the Unlicense licence.
+*/ -}}
+{{- $settings := .Settings -}}
+{{- if and (or (not $settings.HideSuccessfulPackages) (ne .Result "PASS")) (or (not $settings.HideEmptyPackages) (ne .Result "SKIP") (ne (len .TestCases) 0)) -}}
+    {{- if eq .Result "PASS" -}}
+        {{ "\033" }}[0;32m
+    {{- else if eq .Result "SKIP" -}}
+        {{ "\033" }}[0;33m
+    {{- else -}}
+        {{ "\033" }}[0;31m
+    {{- end -}}
+    📦 {{ .Name }}{{- "\033" }}[0m
+    {{- with .Coverage -}}
+       {{- "\033" -}}[0;37m ({{ . }}% coverage){{- "\033" -}}[0m
+    {{- end -}}
+    {{- "\n" -}}
+    {{- with .Reason -}}
+        {{- "  " -}}🛑 {{ . -}}{{- "\n" -}}
+    {{- end -}}
+    {{- with .Output -}}
+        {{- . -}}{{- "\n" -}}
+    {{- end -}}
+    {{- with .TestCases -}}
+        {{- /* Passing tests are first */ -}}
+        {{- range . -}}
+            {{- if eq .Result "PASS" -}}
+                ::group::{{ "\033" }}[0;32m✅{{ " " }}{{- .Name -}}
+                {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
+                {{- with .Coverage -}}
+                    , coverage: {{ . }}%
+                {{- end -}})
+                {{- "\033" -}}[0m
+                {{- "\n" -}}
+
+                {{- with .Output -}}
+                    {{- formatTestOutput . $settings -}}
+                    {{- "\n" -}}
+                {{- end -}}
+
+                ::endgroup::{{- "\n" -}}
+            {{- end -}}
+        {{- end -}}
+
+        {{- /* Then skipped tests are second */ -}}
+        {{- range . -}}
+            {{- if eq .Result "SKIP" -}}
+                ::group::{{ "\033" }}[0;33m🚧{{ " " }}{{- .Name -}}
+                {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
+                {{- with .Coverage -}}
+                    , coverage: {{ . }}%
+                {{- end -}})
+                {{- "\033" -}}[0m
+                {{- "\n" -}}
+
+                {{- with .Output -}}
+                    {{- formatTestOutput . $settings -}}
+                    {{- "\n" -}}
+                {{- end -}}
+
+                ::endgroup::{{- "\n" -}}
+            {{- end -}}
+        {{- end -}}
+
+        {{- /* and failing tests are last */ -}}
+        {{- range . -}}
+            {{- if and (ne .Result "PASS") (ne .Result "SKIP") -}}
+                ::group::{{ "\033" }}[0;31m❌{{ " " }}{{- .Name -}}
+                {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
+                {{- with .Coverage -}}
+                    , coverage: {{ . }}%
+                {{- end -}})
+                {{- "\033" -}}[0m
+                {{- "\n" -}}
+
+                {{- with .Output -}}
+                    {{- formatTestOutput . $settings -}}
+                    {{- "\n" -}}
+                {{- end -}}
+
+                ::endgroup::{{- "\n" -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+    {{- "\n" -}}
+{{- end -}}

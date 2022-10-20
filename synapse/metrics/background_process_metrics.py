@@ -235,7 +235,7 @@ def run_as_background_process(
                         f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
                     )
                 else:
-                    ctx = nullcontext()
+                    ctx = nullcontext()  # type: ignore[assignment]
                 with ctx:
                     return await func(*args, **kwargs)
             except Exception:

@@ -15,11 +15,9 @@
 
 import argparse
 import logging
-import sys
 from typing import cast
 
 import yaml
-from matrix_common.versionstring import get_distribution_version_string
 
 from twisted.internet import defer, reactor as reactor_
 
@@ -28,6 +26,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.types import ISynapseReactor
+from synapse.util import SYNAPSE_VERSION
 
 # Cast safety: Twisted does some naughty magic which replaces the
 # twisted.internet.reactor module with a Reactor instance at runtime.
@@ -43,16 +42,18 @@ class MockHomeserver(HomeServer):
             hostname=config.server.server_name,
             config=config,
             reactor=reactor,
-            version_string="Synapse/"
-            + get_distribution_version_string("matrix-synapse"),
+            version_string=f"Synapse/{SYNAPSE_VERSION}",
         )
 
 
 def run_background_updates(hs: HomeServer) -> None:
-    store = hs.get_datastores().main
+    main = hs.get_datastores().main
+    state = hs.get_datastores().state
 
     async def run_background_updates() -> None:
-        await store.db_pool.updates.run_background_updates(sleep=False)
+        await main.db_pool.updates.run_background_updates(sleep=False)
+        if state:
+            await state.db_pool.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
@@ -97,10 +98,6 @@ def main() -> None:
 
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
-
-    if "database" not in hs_config:
-        sys.stderr.write("The configuration file must have a 'database' section.\n")
-        sys.exit(4)
 
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")

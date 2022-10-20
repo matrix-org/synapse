@@ -110,60 +110,6 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # It now knows about Charlie's server.
         self.assertEqual(self.store._known_servers_count, 2)
 
-    def test_get_joined_users_from_context(self) -> None:
-        room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
-        bob_event = self.get_success(
-            event_injection.inject_member_event(
-                self.hs, room, self.u_bob, Membership.JOIN
-            )
-        )
-
-        # first, create a regular event
-        event, context = self.get_success(
-            event_injection.create_event(
-                self.hs,
-                room_id=room,
-                sender=self.u_alice,
-                prev_event_ids=[bob_event.event_id],
-                type="m.test.1",
-                content={},
-            )
-        )
-
-        users = self.get_success(
-            self.store.get_joined_users_from_context(event, context)
-        )
-        self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
-
-        # Regression test for #7376: create a state event whose key matches bob's
-        # user_id, but which is *not* a membership event, and persist that; then check
-        # that `get_joined_users_from_context` returns the correct users for the next event.
-        non_member_event = self.get_success(
-            event_injection.inject_event(
-                self.hs,
-                room_id=room,
-                sender=self.u_bob,
-                prev_event_ids=[bob_event.event_id],
-                type="m.test.2",
-                state_key=self.u_bob,
-                content={},
-            )
-        )
-        event, context = self.get_success(
-            event_injection.create_event(
-                self.hs,
-                room_id=room,
-                sender=self.u_alice,
-                prev_event_ids=[non_member_event.event_id],
-                type="m.test.3",
-                content={},
-            )
-        )
-        users = self.get_success(
-            self.store.get_joined_users_from_context(event, context)
-        )
-        self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
-
     def test__null_byte_in_display_name_properly_handled(self) -> None:
         room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
 
@@ -211,6 +157,75 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
         # Check that alice's display name is now None
         self.assertEqual(row[0]["display_name"], None)
+
+    def test_room_is_locally_forgotten(self) -> None:
+        """Test that when the last local user has forgotten a room it is known as forgotten."""
+        # join two local and one remote user
+        self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+        self.get_success(
+            event_injection.inject_member_event(self.hs, self.room, self.u_bob, "join")
+        )
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_charlie.to_string(), "join"
+            )
+        )
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # local users leave the room and the room is not forgotten
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_alice, "leave"
+            )
+        )
+        self.get_success(
+            event_injection.inject_member_event(self.hs, self.room, self.u_bob, "leave")
+        )
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # first user forgets the room, room is not forgotten
+        self.get_success(self.store.forget(self.u_alice, self.room))
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # second (last local) user forgets the room and the room is forgotten
+        self.get_success(self.store.forget(self.u_bob, self.room))
+        self.assertTrue(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+    def test_join_locally_forgotten_room(self) -> None:
+        """Tests if a user joins a forgotten room the room is not forgotten anymore."""
+        self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # after leaving and forget the room, it is forgotten
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_alice, "leave"
+            )
+        )
+        self.get_success(self.store.forget(self.u_alice, self.room))
+        self.assertTrue(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # after rejoin the room is not forgotten anymore
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, self.room, self.u_alice, "join"
+            )
+        )
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
 
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):

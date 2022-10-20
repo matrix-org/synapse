@@ -1,0 +1,8 @@
+worker_app: synapse.app.federation_sender
+worker_name: synapse-federation-sender-1
+
+# The replication listener on the main synapse process.
+worker_replication_host: synapse
+worker_replication_http_port: 9093
+
+worker_log_config: /data/federation_sender.log.config

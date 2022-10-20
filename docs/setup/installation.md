@@ -84,19 +84,18 @@ file when you upgrade the Debian package to a later version.
 
 ##### Downstream Debian packages
 
-We do not recommend using the packages from the default Debian `buster`
-repository at this time, as they are old and suffer from known security
-vulnerabilities. You can install the latest version of Synapse from
-[our repository](#matrixorg-packages) or from `buster-backports`. Please
-see the [Debian documentation](https://backports.debian.org/Instructions/)
-for information on how to use backports.
-
-If you are using Debian `sid` or testing, Synapse is available in the default
-repositories and it should be possible to install it simply with:
+Andrej Shadura maintains a `matrix-synapse` package in the Debian repositories.
+For `bookworm` and `sid`, it can be installed simply with:
 
 ```sh
 sudo apt install matrix-synapse
 ```
+
+Synapse is also avaliable in `bullseye-backports`.  Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
+
+`matrix-synapse` is no longer maintained for `buster` and older.
 
 ##### Downstream Ubuntu packages
 
@@ -182,7 +181,7 @@ doas pkg_add synapse
 #### NixOS
 
 Robin Lambertz has packaged Synapse for NixOS at:
-<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
+<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix>
 
 
 ### Installing as a Python module from PyPI
@@ -196,6 +195,10 @@ System requirements:
 - POSIX-compliant system (tested on Linux & OS X)
 - Python 3.7 or later, up to Python 3.10.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
+
+If building on an uncommon architecture for which pre-built wheels are
+unavailable, you will need to have a recent Rust compiler installed. The easiest
+way of installing the latest version is to use [rustup](https://rustup.rs/).
 
 To install the Synapse homeserver run:
 
@@ -233,7 +236,9 @@ python -m synapse.app.homeserver \
     --report-stats=[yes|no]
 ```
 
-... substituting an appropriate value for `--server-name`.
+... substituting an appropriate value for `--server-name` and choosing whether
+or not to report usage statistics (hostname, Synapse version, uptime, total
+users, etc.) to the developers via the `--report-stats` argument.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your homeserver to
@@ -298,9 +303,10 @@ You may need to install the latest Xcode developer tools:
 xcode-select --install
 ```
 
-On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
+On ARM-based Macs you may need to install libjpeg and libpq. 
+You can use Homebrew (https://brew.sh):
 ```sh
- brew install jpeg
+ brew install jpeg libpq
  ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
@@ -406,11 +412,11 @@ The recommended way to do so is to set up a reverse proxy on port
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
 
-- First, under the `listeners` section, uncomment the configuration for the
-  TLS-enabled listener. (Remove the hash sign (`#`) at the start of
-  each line). The relevant lines are like this:
+- First, under the `listeners` option, add the configuration for the
+  TLS-enabled listener like so:
 
 ```yaml
+listeners:
   - port: 8448
     type: http
     tls: true
@@ -418,9 +424,11 @@ so, you will need to edit `homeserver.yaml`, as follows:
       - names: [client, federation]
   ```
 
-- You will also need to uncomment the `tls_certificate_path` and
-  `tls_private_key_path` lines under the `TLS` section. You will need to manage
-  provisioning of these certificates yourself.
+- You will also need to add the options `tls_certificate_path` and
+  `tls_private_key_path`. to your configuration file. You will need to manage provisioning of 
+   these certificates yourself.
+- You can find more information about these options as well as how to configure synapse in the 
+  [configuration manual](../usage/configuration/config_documentation.md).
 
   If you are using your own certificate, be sure to use a `.pem` file that
   includes the full certificate chain including any intermediate certificates
@@ -503,9 +511,13 @@ email will be disabled.
 
 ### Registering a user
 
-The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
+One way to create a new user is to do so from a client like
+[Element](https://element.io/).  This requires registration to be enabled via
+the
+[`enable_registration`](../usage/configuration/config_documentation.md#enable_registration)
+setting.
 
-Alternatively, you can do so from the command line. This can be done as follows:
+Alternatively, you can create new users from the command line. This can be done as follows:
 
  1. If synapse was installed via pip, activate the virtualenv as follows (if Synapse was
     installed via a prebuilt package, `register_new_matrix_user` should already be
@@ -517,7 +529,7 @@ Alternatively, you can do so from the command line. This can be done as follows:
     ```
  2. Run the following command:
     ```sh
-    register_new_matrix_user -c homeserver.yaml http://localhost:8008
+    register_new_matrix_user -c homeserver.yaml
     ```
 
 This will prompt you to add details for the new user, and will then connect to
@@ -530,12 +542,13 @@ Make admin [no]:
 Success!
 ```
 
-This process uses a setting `registration_shared_secret` in
-`homeserver.yaml`, which is shared between Synapse itself and the
-`register_new_matrix_user` script. It doesn't matter what it is (a random
-value is generated by `--generate-config`), but it should be kept secret, as
-anyone with knowledge of it can register users, including admin accounts,
-on your server even if `enable_registration` is `false`.
+This process uses a setting
+[`registration_shared_secret`](../usage/configuration/config_documentation.md#registration_shared_secret),
+which is shared between Synapse itself and the `register_new_matrix_user`
+script. It doesn't matter what it is (a random value is generated by
+`--generate-config`), but it should be kept secret, as anyone with knowledge of
+it can register users, including admin accounts, on your server even if
+`enable_registration` is `false`.
 
 ### Setting up a TURN server
 

@@ -25,7 +25,7 @@ from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -117,8 +117,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.room_members = []
 
-        async def check_user_in_room(room_id: str, user_id: str) -> None:
-            if user_id not in [u.to_string() for u in self.room_members]:
+        async def check_user_in_room(room_id: str, requester: Requester) -> None:
+            if requester.user.to_string() not in [
+                u.to_string() for u in self.room_members
+            ]:
                 raise AuthError(401, "User is not in the room")
             return None
 
@@ -127,12 +129,18 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         async def check_host_in_room(room_id: str, server_name: str) -> bool:
             return room_id == ROOM_ID
 
-        hs.get_event_auth_handler().check_host_in_room = check_host_in_room
+        hs.get_event_auth_handler().is_host_in_room = check_host_in_room
 
-        def get_joined_hosts_for_room(room_id: str):
+        async def get_current_hosts_in_room(room_id: str):
             return {member.domain for member in self.room_members}
 
-        self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
+        hs.get_storage_controllers().state.get_current_hosts_in_room = (
+            get_current_hosts_in_room
+        )
+
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
+            get_current_hosts_in_room
+        )
 
         async def get_users_in_room(room_id: str):
             return {str(u) for u in self.room_members}

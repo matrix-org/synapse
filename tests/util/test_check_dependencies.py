@@ -40,7 +40,10 @@ class TestDependencyChecker(TestCase):
     def mock_installed_package(
         self, distribution: Optional[DummyDistribution]
     ) -> Generator[None, None, None]:
-        """Pretend that looking up any distribution yields the given `distribution`."""
+        """Pretend that looking up any package yields the given `distribution`.
+
+        If `distribution = None`, we pretend that the package is not installed.
+        """
 
         def mock_distribution(name: str):
             if distribution is None:
@@ -81,7 +84,7 @@ class TestDependencyChecker(TestCase):
                 self.assertRaises(DependencyException, check_requirements)
 
     def test_checks_ignore_dev_dependencies(self) -> None:
-        """Bot generic and per-extra checks should ignore dev dependencies."""
+        """Both generic and per-extra checks should ignore dev dependencies."""
         with patch(
             "synapse.util.check_dependencies.metadata.requires",
             return_value=["dummypkg >= 1; extra == 'mypy'"],
@@ -141,4 +144,17 @@ class TestDependencyChecker(TestCase):
 
             with self.mock_installed_package(new_release_candidate):
                 # should not raise
+                check_requirements()
+
+    def test_setuptools_rust_ignored(self) -> None:
+        """Test a workaround for a `poetry build` problem. Reproduces #13926."""
+        with patch(
+            "synapse.util.check_dependencies.metadata.requires",
+            return_value=["setuptools_rust >= 1.3"],
+        ):
+            with self.mock_installed_package(None):
+                # should not raise, even if setuptools_rust is not installed
+                check_requirements()
+            with self.mock_installed_package(old):
+                # We also ignore old versions of setuptools_rust
                 check_requirements()

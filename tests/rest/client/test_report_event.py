@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
@@ -77,11 +75,6 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
 
     def _assert_status(self, response_status: int, data: JsonDict) -> None:
         channel = self.make_request(
-            "POST",
-            self.report_path,
-            json.dumps(data),
-            access_token=self.other_user_tok,
+            "POST", self.report_path, data, access_token=self.other_user_tok
         )
-        self.assertEqual(
-            response_status, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(response_status, channel.code, msg=channel.result["body"])

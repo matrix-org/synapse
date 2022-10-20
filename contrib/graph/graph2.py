@@ -14,22 +14,31 @@
 
 
 import argparse
-import cgi
 import datetime
+import html
 import json
 import sqlite3
 
 import pydot
 
-from synapse.events import FrozenEvent
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
 from synapse.util.frozenutils import unfreeze
 
 
-def make_graph(db_name, room_id, file_prefix, limit):
+def make_graph(db_name: str, room_id: str, file_prefix: str, limit: int) -> None:
+    """
+    Generate a dot and SVG file for a graph of events in the room based on the
+    topological ordering by reading from a Synapse SQLite database.
+    """
     conn = sqlite3.connect(db_name)
 
+    sql = "SELECT room_version FROM rooms WHERE room_id = ?"
+    c = conn.execute(sql, (room_id,))
+    room_version = KNOWN_ROOM_VERSIONS[c.fetchone()[0]]
+
     sql = (
-        "SELECT json FROM event_json as j "
+        "SELECT json, internal_metadata FROM event_json as j "
         "INNER JOIN events as e ON e.event_id = j.event_id "
         "WHERE j.room_id = ?"
     )
@@ -43,7 +52,10 @@ def make_graph(db_name, room_id, file_prefix, limit):
 
     c = conn.execute(sql, args)
 
-    events = [FrozenEvent(json.loads(e[0])) for e in c.fetchall()]
+    events = [
+        make_event_from_dict(json.loads(e[0]), room_version, json.loads(e[1]))
+        for e in c.fetchall()
+    ]
 
     events.sort(key=lambda e: e.depth)
 
@@ -84,7 +96,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
             "name": event.event_id,
             "type": event.type,
             "state_key": event.get("state_key", None),
-            "content": cgi.escape(content, quote=True),
+            "content": html.escape(content, quote=True),
             "time": t,
             "depth": event.depth,
             "state_group": state_group,
@@ -96,11 +108,11 @@ def make_graph(db_name, room_id, file_prefix, limit):
         graph.add_node(node)
 
     for event in events:
-        for prev_id, _ in event.prev_events:
+        for prev_id in event.prev_event_ids():
             try:
                 end_node = node_map[prev_id]
             except Exception:
-                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
+                end_node = pydot.Node(name=prev_id, label=f"<<b>{prev_id}</b>>")
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
@@ -112,7 +124,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
         if len(event_ids) <= 1:
             continue
 
-        cluster = pydot.Cluster(str(group), label="<State Group: %s>" % (str(group),))
+        cluster = pydot.Cluster(str(group), label=f"<State Group: {str(group)}>")
 
         for event_id in event_ids:
             cluster.add_node(node_map[event_id])
@@ -126,7 +138,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by talking "
-        "to the given homeserver to get the list of PDUs. \n"
+        "to the given Synapse SQLite file to get the list of PDUs. \n"
         "Requires pydot."
     )
     parser.add_argument(

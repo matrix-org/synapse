@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-import os
 from typing import Any, List, Optional, Pattern
 
 from matrix_common.regex import glob_to_regex
@@ -143,9 +142,6 @@ class TlsConfig(Config):
 
     def generate_config_section(
         self,
-        config_dir_path: str,
-        data_dir_path: str,
-        server_name: str,
         tls_certificate_path: Optional[str],
         tls_private_key_path: Optional[str],
         **kwargs: Any,
@@ -153,90 +149,18 @@ class TlsConfig(Config):
         """If the TLS paths are not specified the default will be certs in the
         config directory"""
 
-        base_key_name = os.path.join(config_dir_path, server_name)
-
         if bool(tls_certificate_path) != bool(tls_private_key_path):
             raise ConfigError(
                 "Please specify both a cert path and a key path or neither."
             )
 
-        tls_enabled = "" if tls_certificate_path and tls_private_key_path else "#"
-
-        if not tls_certificate_path:
-            tls_certificate_path = base_key_name + ".tls.crt"
-        if not tls_private_key_path:
-            tls_private_key_path = base_key_name + ".tls.key"
-
-        # flake8 doesn't recognise that variables are used in the below string
-        _ = tls_enabled
-
-        return (
-            """\
-        ## TLS ##
-
-        # PEM-encoded X509 certificate for TLS.
-        # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
-        # certificate, signed by a recognised Certificate Authority.
-        #
-        # Be sure to use a `.pem` file that includes the full certificate chain including
-        # any intermediate certificates (for instance, if using certbot, use
-        # `fullchain.pem` as your certificate, not `cert.pem`).
-        #
-        %(tls_enabled)stls_certificate_path: "%(tls_certificate_path)s"
-
-        # PEM-encoded private key for TLS
-        #
-        %(tls_enabled)stls_private_key_path: "%(tls_private_key_path)s"
-
-        # Whether to verify TLS server certificates for outbound federation requests.
-        #
-        # Defaults to `true`. To disable certificate verification, uncomment the
-        # following line.
-        #
-        #federation_verify_certificates: false
-
-        # The minimum TLS version that will be used for outbound federation requests.
-        #
-        # Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-        # that setting this value higher than `1.2` will prevent federation to most
-        # of the public Matrix network: only configure it to `1.3` if you have an
-        # entirely private federation setup and you can ensure TLS 1.3 support.
-        #
-        #federation_client_minimum_tls_version: 1.2
-
-        # Skip federation certificate verification on the following whitelist
-        # of domains.
-        #
-        # This setting should only be used in very specific cases, such as
-        # federation over Tor hidden services and similar. For private networks
-        # of homeservers, you likely want to use a private CA instead.
-        #
-        # Only effective if federation_verify_certicates is `true`.
-        #
-        #federation_certificate_verification_whitelist:
-        #  - lon.example.com
-        #  - "*.domain.com"
-        #  - "*.onion"
-
-        # List of custom certificate authorities for federation traffic.
-        #
-        # This setting should only normally be used within a private network of
-        # homeservers.
-        #
-        # Note that this list will replace those that are provided by your
-        # operating environment. Certificates must be in PEM format.
-        #
-        #federation_custom_ca_list:
-        #  - myCA1.pem
-        #  - myCA2.pem
-        #  - myCA3.pem
-        """
-            # Lowercase the string representation of boolean values
-            % {
-                x[0]: str(x[1]).lower() if isinstance(x[1], bool) else x[1]
-                for x in locals().items()
-            }
-        )
+        if tls_certificate_path and tls_private_key_path:
+            return f"""\
+                tls_certificate_path: {tls_certificate_path}
+                tls_private_key_path: {tls_private_key_path}
+                """
+        else:
+            return ""
 
     def read_tls_certificate(self) -> crypto.X509:
         """Reads the TLS certificate from the configured file, and returns it

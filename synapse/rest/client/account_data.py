@@ -15,11 +15,11 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import AuthError, NotFoundError, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict
+from synapse.types import JsonDict, RoomID
 
 from ._base import client_patterns
 
@@ -104,6 +104,13 @@ class RoomAccountDataServlet(RestServlet):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                400,
+                f"{room_id} is not a valid room ID",
+                Codes.INVALID_PARAM,
+            )
+
         body = parse_json_object_from_request(request)
 
         if account_data_type == "m.fully_read":
@@ -111,6 +118,7 @@ class RoomAccountDataServlet(RestServlet):
                 405,
                 "Cannot set m.fully_read through this API."
                 " Use /rooms/!roomId:server.name/read_markers",
+                Codes.BAD_JSON,
             )
 
         await self.handler.add_account_data_to_room(
@@ -129,6 +137,13 @@ class RoomAccountDataServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                400,
+                f"{room_id} is not a valid room ID",
+                Codes.INVALID_PARAM,
+            )
 
         event = await self.store.get_account_data_for_room_and_type(
             user_id, room_id, account_data_type

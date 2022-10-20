@@ -13,41 +13,46 @@
 # limitations under the License.
 from typing import Dict
 
-from synapse.api.constants import ReceiptTypes
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
+from synapse.util.async_helpers import concurrently_execute
 
 
 async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -> int:
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
-    my_receipts_by_room = await store.get_receipts_for_user(
-        user_id, (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
-    )
-
     badge = len(invites)
 
-    for room_id in joins:
-        if room_id in my_receipts_by_room:
-            last_unread_event_id = my_receipts_by_room[room_id]
+    room_notifs = []
 
-            notifs = await (
-                store.get_unread_event_push_actions_by_room_for_user(
-                    room_id, user_id, last_unread_event_id
-                )
+    async def get_room_unread_count(room_id: str) -> None:
+        room_notifs.append(
+            await store.get_unread_event_push_actions_by_room_for_user(
+                room_id,
+                user_id,
             )
-            if notifs.notify_count == 0:
-                continue
+        )
 
-            if group_by_room:
-                # return one badge count per conversation
-                badge += 1
-            else:
-                # increment the badge count by the number of unread messages in the room
-                badge += notifs.notify_count
+    await concurrently_execute(get_room_unread_count, joins, 10)
+
+    for notifs in room_notifs:
+        # Combine the counts from all the threads.
+        notify_count = notifs.main_timeline.notify_count + sum(
+            n.notify_count for n in notifs.threads.values()
+        )
+
+        if notify_count == 0:
+            continue
+
+        if group_by_room:
+            # return one badge count per conversation
+            badge += 1
+        else:
+            # increment the badge count by the number of unread messages in the room
+            badge += notify_count
     return badge
 
 

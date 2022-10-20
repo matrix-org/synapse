@@ -30,15 +30,15 @@ from tests.unittest import HomeserverTestCase, override_config
 
 class FederationSenderReceiptsTestCases(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-        mock_state_handler = Mock(spec=["get_current_hosts_in_room"])
-        # Ensure a new Awaitable is created for each call.
-        mock_state_handler.get_current_hosts_in_room.return_value = make_awaitable(
-            ["test", "host2"]
-        )
-        return self.setup_test_homeserver(
-            state_handler=mock_state_handler,
+        hs = self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
+
+        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(
+            return_value=make_awaitable({"test", "host2"})
+        )
+
+        return hs
 
     @override_config({"send_federation": True})
     def test_send_receipts(self):
@@ -49,7 +49,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         sender = self.hs.get_federation_sender()
         receipt = ReadReceipt(
-            "room_id", "m.read", "user_id", ["event_id"], {"ts": 1234}
+            "room_id",
+            "m.read",
+            "user_id",
+            ["event_id"],
+            thread_id=None,
+            data={"ts": 1234},
         )
         self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
 
@@ -89,7 +94,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         sender = self.hs.get_federation_sender()
         receipt = ReadReceipt(
-            "room_id", "m.read", "user_id", ["event_id"], {"ts": 1234}
+            "room_id",
+            "m.read",
+            "user_id",
+            ["event_id"],
+            thread_id=None,
+            data={"ts": 1234},
         )
         self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
 
@@ -121,7 +131,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         # send the second RR
         receipt = ReadReceipt(
-            "room_id", "m.read", "user_id", ["other_id"], {"ts": 1234}
+            "room_id",
+            "m.read",
+            "user_id",
+            ["other_id"],
+            thread_id=None,
+            data={"ts": 1234},
         )
         self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
         self.pump()
@@ -173,17 +188,24 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         return c
 
     def prepare(self, reactor, clock, hs):
-        # stub out `get_rooms_for_user` and `get_users_in_room` so that the
+        test_room_id = "!room:host1"
+
+        # stub out `get_rooms_for_user` and `get_current_hosts_in_room` so that the
         # server thinks the user shares a room with `@user2:host2`
         def get_rooms_for_user(user_id):
-            return defer.succeed({"!room:host1"})
+            return defer.succeed({test_room_id})
 
         hs.get_datastores().main.get_rooms_for_user = get_rooms_for_user
 
-        def get_users_in_room(room_id):
-            return defer.succeed({"@user2:host2"})
+        async def get_current_hosts_in_room(room_id):
+            if room_id == test_room_id:
+                return ["host2"]
 
-        hs.get_datastores().main.get_users_in_room = get_users_in_room
+            # TODO: We should fail the test when we encounter an unxpected room ID.
+            # We can't just use `self.fail(...)` here because the app code is greedy
+            # with `Exception` and will catch it before the test can see it.
+
+        hs.get_datastores().main.get_current_hosts_in_room = get_current_hosts_in_room
 
         # whenever send_transaction is called, record the edu data
         self.edus = []

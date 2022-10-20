@@ -1,0 +1,15 @@
+worker_app: synapse.app.generic_worker
+worker_name: synapse-generic-worker-1
+
+# The replication listener on the main synapse process.
+worker_replication_host: synapse
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 8081
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+
+worker_log_config: /data/worker.log.config

@@ -19,8 +19,6 @@ import sys
 import tempfile
 from typing import List, Optional
 
-from matrix_common.versionstring import get_distribution_version_string
-
 from twisted.internet import defer, task
 
 import synapse
@@ -30,38 +28,54 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage._base import BaseSlavedStore
-from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
-from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
-from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
-from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
-from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.server import HomeServer
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.storage.databases.main.account_data import AccountDataWorkerStore
+from synapse.storage.databases.main.appservice import (
+    ApplicationServiceTransactionWorkerStore,
+    ApplicationServiceWorkerStore,
+)
+from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
+from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
+from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.tags import TagsWorkerStore
 from synapse.types import StateMap
+from synapse.util import SYNAPSE_VERSION
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger("synapse.app.admin_cmd")
 
 
 class AdminCmdSlavedStore(
-    SlavedReceiptsStore,
-    SlavedAccountDataStore,
-    SlavedApplicationServiceStore,
-    SlavedRegistrationStore,
     SlavedFilteringStore,
-    SlavedDeviceInboxStore,
-    SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
-    BaseSlavedStore,
+    SlavedDeviceStore,
+    TagsWorkerStore,
+    DeviceInboxWorkerStore,
+    AccountDataWorkerStore,
+    ApplicationServiceTransactionWorkerStore,
+    ApplicationServiceWorkerStore,
+    RegistrationWorkerStore,
+    ReceiptsWorkerStore,
     RoomWorkerStore,
 ):
-    pass
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        # Annoyingly `filter_events_for_client` assumes that this exists. We
+        # should refactor it to take a `Clock` directly.
+        self.clock = hs.get_clock()
 
 
 class AdminCmdServer(HomeServer):
@@ -220,7 +234,7 @@ def start(config_options: List[str]) -> None:
     ss = AdminCmdServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
+        version_string=f"Synapse/{SYNAPSE_VERSION}",
     )
 
     setup_logging(ss, config, use_worker_options=True)

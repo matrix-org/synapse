@@ -272,7 +272,7 @@ class FilterEventsForClientTestCase(unittest.FederatingHomeserverTestCase):
             "state_key": "@user:test",
             "content": {"membership": "invite"},
         }
-        self.add_hashes_and_signatures(invite_pdu)
+        self.add_hashes_and_signatures_from_other_server(invite_pdu)
         invite_event_id = make_event_from_dict(invite_pdu, RoomVersions.V9).event_id
 
         self.get_success(

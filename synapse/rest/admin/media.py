@@ -54,7 +54,7 @@ class QuarantineMediaInRoom(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         logging.info("Quarantining room: %s", room_id)
 
@@ -81,9 +81,9 @@ class QuarantineMediaByUser(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
-        logging.info("Quarantining local media by user: %s", user_id)
+        logging.info("Quarantining media by user: %s", user_id)
 
         # Quarantine all media this user has uploaded
         num_quarantined = await self.store.quarantine_media_ids_by_user(
@@ -110,9 +110,9 @@ class QuarantineMediaByID(RestServlet):
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
-        logging.info("Quarantining local media by ID: %s/%s", server_name, media_id)
+        logging.info("Quarantining media by ID: %s/%s", server_name, media_id)
 
         # Quarantine this media id
         await self.store.quarantine_media_by_id(
@@ -140,9 +140,7 @@ class UnquarantineMediaByID(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        logging.info(
-            "Remove from quarantine local media by ID: %s/%s", server_name, media_id
-        )
+        logging.info("Remove from quarantine media by ID: %s/%s", server_name, media_id)
 
         # Remove from quarantine this media id
         await self.store.quarantine_media_by_id(server_name, media_id, None)

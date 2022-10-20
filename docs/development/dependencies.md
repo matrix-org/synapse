@@ -126,6 +126,23 @@ context of poetry's venv, without having to run `poetry shell` beforehand.
 poetry install --extras all --remove-untracked
 ```
 
+## ...delete everything and start over from scratch?
+
+```shell
+# Stop the current virtualenv if active
+$ deactivate
+
+# Remove all of the files from the current environment.
+# Don't worry, even though it says "all", this will only
+# remove the Poetry virtualenvs for the current project.
+$ poetry env remove --all
+
+# Reactivate Poetry shell to create the virtualenv again
+$ poetry shell
+# Install everything again
+$ poetry install --extras all
+```
+
 ## ...run a command in the `poetry` virtualenv?
 
 Use `poetry run cmd args` when you need the python virtualenv context.
@@ -237,3 +254,35 @@ poetry run pip install build && poetry run python -m build
 because [`build`](https://github.com/pypa/build) is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 `poetry build` too.
+
+
+# Troubleshooting
+
+## Check the version of poetry with `poetry --version`.
+
+The minimum version of poetry supported by Synapse is 1.2.
+
+It can also be useful to check the version of `poetry-core` in use. If you've
+installed `poetry` with `pipx`, try `pipx runpip poetry list | grep
+poetry-core`.
+
+## Clear caches: `poetry cache clear --all pypi`.
+
+Poetry caches a bunch of information about packages that isn't readily available
+from PyPI. (This is what makes poetry seem slow when doing the first
+`poetry install`.) Try `poetry cache list` and `poetry cache clear --all
+<name of cache>` to see if that fixes things.
+
+## Remove outdated egg-info
+
+Delete the `matrix_synapse.egg-info/` directory from the root of your Synapse
+install.
+
+This stores some cached information about dependencies and often conflicts with
+letting Poetry do the right thing.
+
+
+
+## Try `--verbose` or `--dry-run` arguments.
+
+Sometimes useful to see what poetry's internal logic is.

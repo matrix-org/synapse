@@ -154,7 +154,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self._record_users()
 
         # delete the device
-        self.get_success(self.handler.delete_device(user1, "abc"))
+        self.get_success(self.handler.delete_devices(user1, ["abc"]))
 
         # check the device was deleted
         self.get_failure(self.handler.get_device(user1, "abc"), NotFoundError)
@@ -179,7 +179,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         )
 
         # delete the device
-        self.get_success(self.handler.delete_device(user1, "abc"))
+        self.get_success(self.handler.delete_devices(user1, ["abc"]))
 
         # check that the device_inbox was deleted
         res = self.get_success(
