@@ -711,14 +711,22 @@ class ReceiptsWorkerStore(SQLBaseStore):
             ReceiptTypes.READ,
             ReceiptTypes.READ_PRIVATE,
         ):
-            sql = """
+            args = [room_id, user_id, stream_ordering]
+            where_clause = ""
+
+            if thread_id is not None:
+                where_clause = "AND thread_id = ?"
+                args.append(thread_id)
+
+            sql = f"""
                 DELETE FROM event_push_actions
                 WHERE room_id = ?
                 AND user_id = ?
                 AND stream_ordering <= ?
                 AND highlight = 0
+                {where_clause}
             """
-            txn.execute(sql, (room_id, user_id, stream_ordering))
+            txn.execute(sql, args)
 
         return rx_ts
 
