@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class KeyApiV2Resource(JsonResource):
+class KeyResource(JsonResource):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs, canonical_json=True)
         self.register_servlets(self, hs)

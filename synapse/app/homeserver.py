@@ -60,7 +60,7 @@ from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
@@ -249,7 +249,7 @@ class SynapseHomeServer(HomeServer):
                 )
 
         if name in ["keys", "federation"]:
-            resources[SERVER_KEY_PREFIX] = KeyApiV2Resource(self)
+            resources[SERVER_KEY_PREFIX] = KeyResource(self)
 
         if name == "metrics" and self.config.metrics.enable_metrics:
             metrics_resource: Resource = MetricsResource(RegistryProxy)

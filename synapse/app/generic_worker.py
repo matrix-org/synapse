@@ -89,7 +89,7 @@ from synapse.rest.client.register import (
     RegistrationTokenValidityRestServlet,
 )
 from synapse.rest.health import HealthResource
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
@@ -364,7 +364,7 @@ class GenericWorkerServer(HomeServer):
                     )
 
                 if name in ["keys", "federation"]:
-                    resources[SERVER_KEY_PREFIX] = KeyApiV2Resource(self)
+                    resources[SERVER_KEY_PREFIX] = KeyResource(self)
 
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
