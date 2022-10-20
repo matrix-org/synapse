@@ -63,7 +63,7 @@ class StateDeltasStore(SQLBaseStore):
         ), f"New stream id {max_stream_id} is smaller than prev stream id {prev_stream_id}"
 
         if not self._curr_state_delta_stream_cache.has_any_entity_changed(
-            prev_stream_id
+            prev_stream_id, max_stream_id
         ):
             # if the CSDs haven't changed between prev_stream_id and now, we
             # know for certain that they haven't changed between prev_stream_id and

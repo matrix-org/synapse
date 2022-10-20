@@ -422,7 +422,9 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         changed_rooms: Optional[
             Iterable[str]
-        ] = self._typing_stream_change_cache.get_all_entities_changed(last_id)
+        ] = self._typing_stream_change_cache.get_all_entities_changed(
+            last_id, current_id
+        )
 
         if changed_rooms is None:
             changed_rooms = self._room_serials
