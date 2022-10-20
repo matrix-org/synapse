@@ -1523,6 +1523,26 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
+    def _get_threads(self) -> List[Tuple[str, str]]:
+        """Request the threads in the room and returns a list of thread ID and latest event ID."""
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        threads = channel.json_body["chunk"]
+        return [
+            (
+                t["event_id"],
+                t["unsigned"]["m.relations"][RelationTypes.THREAD]["latest_event"][
+                    "event_id"
+                ],
+            )
+            for t in threads
+        ]
+
     def test_redact_relation_annotation(self) -> None:
         """
         Test that annotations of an event are properly handled after the
@@ -1601,21 +1621,9 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
 
         # Request the threads in the room.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/v1/rooms/{self.room}/threads",
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
-        threads = channel.json_body["chunk"]
+        threads = self._get_threads()
         # There should be one thread, the latest event is the event that will be redacted.
-        self.assertEqual([t["event_id"] for t in threads], [self.parent_id])
-        self.assertEqual(
-            threads[0]["unsigned"]["m.relations"][RelationTypes.THREAD]["latest_event"][
-                "event_id"
-            ],
-            to_redact_event_id,
-        )
+        self.assertEqual(threads, [(self.parent_id, to_redact_event_id)])
 
         # Redact one of the reactions.
         self._redact(to_redact_event_id)
@@ -1638,21 +1646,9 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
 
         # Request the threads in the room again.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/v1/rooms/{self.room}/threads",
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
-        threads = channel.json_body["chunk"]
+        threads = self._get_threads()
         # There should still be one thread, but the latest event is the unredacted event.
-        self.assertEqual([t["event_id"] for t in threads], [self.parent_id])
-        self.assertEqual(
-            threads[0]["unsigned"]["m.relations"][RelationTypes.THREAD]["latest_event"][
-                "event_id"
-            ],
-            unredacted_event_id,
-        )
+        self.assertEqual(threads, [(self.parent_id, unredacted_event_id)])
 
         # Redact the remaining event in the thread.
         self._redact(unredacted_event_id)
@@ -1663,14 +1659,9 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEquals(event_ids, [])
         self.assertEquals(relations, {})
 
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/v1/rooms/{self.room}/threads",
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
-        # There should still be one thread, but the latest event is the unredacted event.
-        self.assertEqual([], channel.json_body["chunk"])
+        threads = self._get_threads()
+        # There should be no threads.
+        self.assertEqual(threads, [])
 
     def test_redact_parent_edit(self) -> None:
         """Test that edits of an event are redacted when the original event
