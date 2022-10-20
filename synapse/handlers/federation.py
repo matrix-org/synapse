@@ -1017,7 +1017,7 @@ class FederationHandler:
 
         context = EventContext.for_outlier(self._storage_controllers)
 
-        await self._bulk_push_rule_evaluator.action_for_event_by_user(
+        await self._bulk_push_rule_evaluator.action_for_events_by_user(
             [(event, context)]
         )
         try:

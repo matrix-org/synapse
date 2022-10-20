@@ -1433,7 +1433,7 @@ class EventCreationHandler:
             a room that has been un-partial stated.
         """
         with opentracing.start_active_span("calculate_push_actions"):
-            await self._bulk_push_rule_evaluator.action_for_event_by_user(
+            await self._bulk_push_rule_evaluator.action_for_events_by_user(
                 events_and_context
             )
 
