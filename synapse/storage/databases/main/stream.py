@@ -468,15 +468,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 - list of recent events in the room
                 - stream ordering key for the start of the chunk of events returned.
         """
-
-        if to_key.stream > self._events_stream_cache.max_stream_pos:
-            logger.warning(
-                "Selecting from room events stream using position %s ahead of "
-                "the stream cache position %s",
-                to_key.stream,
-                self._events_stream_cache.max_stream_pos,
-            )
-
         room_ids = self._events_stream_cache.get_entities_changed(
             room_ids, from_key.stream
         )
