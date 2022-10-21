@@ -925,8 +925,10 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
     def test_erasure_status(self) -> None:
+        # Create a new user.
         user_id = self.register_user("eraseme", "eraseme")
 
+        # They should appear in the list users API, marked as not erased.
         channel = self.make_request(
             "GET",
             self.url + "?deactivated=true",
@@ -935,13 +937,15 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         users = {user["name"]: user for user in channel.json_body["users"]}
         self.assertIs(users[user_id]["erased"], False)
 
+        # Deactivate that user, requesting erasure.
         deactivate_account_handler = self.hs.get_deactivate_account_handler()
         self.get_success(
             deactivate_account_handler.deactivate_account(
-                user_id, True, create_requester(user_id)
+                user_id, erase_data=True, requester=create_requester(user_id)
             )
         )
 
+        # Repeat the list users query. They should now be marked as erased.
         channel = self.make_request(
             "GET",
             self.url + "?deactivated=true",
