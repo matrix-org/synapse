@@ -1055,9 +1055,6 @@ class RoomCreationHandler:
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
 
-        # the last event sent/persisted to the db
-        last_sent_event_id: Optional[str] = None
-
         # the most recently created event
         prev_event: List[str] = []
         # a map of event types, state keys -> event_ids. We collect these mappings this as events are
@@ -1123,8 +1120,6 @@ class RoomCreationHandler:
         )
         last_sent_event_id = ev.event_id
 
-        # Room create event must exist at this point
-        assert last_sent_event_id is not None
         member_event_id, _ = await self.room_member_handler.update_membership(
             creator,
             creator.user,
