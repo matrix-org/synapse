@@ -175,6 +175,15 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
             self.assertEqual(counts.threads, {})
 
+            aggregate_counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-aggregate-unread-counts",
+                    self.store._get_unread_counts_by_room_for_user_txn,
+                    user_id,
+                )
+            )
+            self.assertEqual(sum(aggregate_counts.values()), noitf_count)
+
         def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
                 room_id,
