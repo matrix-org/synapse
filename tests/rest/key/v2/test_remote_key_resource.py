@@ -26,7 +26,7 @@ from twisted.web.resource import NoResource, Resource
 
 from synapse.crypto.keyring import PerspectivesKeyFetcher
 from synapse.http.site import SynapseRequest
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict
@@ -46,7 +46,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
 
     def create_test_resource(self) -> Resource:
         return create_resource_tree(
-            {"/_matrix/key/v2": KeyApiV2Resource(self.hs)}, root_resource=NoResource()
+            {"/_matrix/key/v2": KeyResource(self.hs)}, root_resource=NoResource()
         )
 
     def expect_outgoing_key_request(

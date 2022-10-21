@@ -13,16 +13,15 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional
+import re
+from typing import TYPE_CHECKING, Optional, Tuple
 
-from canonicaljson import encode_canonical_json
 from signedjson.sign import sign_json
 from unpaddedbase64 import encode_base64
 
-from twisted.web.resource import Resource
 from twisted.web.server import Request
 
-from synapse.http.server import respond_with_json_bytes
+from synapse.http.servlet import RestServlet
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class LocalKey(Resource):
+class LocalKey(RestServlet):
     """HTTP resource containing encoding the TLS X.509 certificate and NACL
     signature verification keys for this server::
 
@@ -61,18 +60,17 @@ class LocalKey(Resource):
         }
     """
 
-    isLeaf = True
+    PATTERNS = (re.compile("^/_matrix/key/v2/server(/(?P<key_id>[^/]*))?$"),)
 
     def __init__(self, hs: "HomeServer"):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.update_response_body(self.clock.time_msec())
-        Resource.__init__(self)
 
     def update_response_body(self, time_now_msec: int) -> None:
         refresh_interval = self.config.key.key_refresh_interval
         self.valid_until_ts = int(time_now_msec + refresh_interval)
-        self.response_body = encode_canonical_json(self.response_json_object())
+        self.response_body = self.response_json_object()
 
     def response_json_object(self) -> JsonDict:
         verify_keys = {}
@@ -99,9 +97,11 @@ class LocalKey(Resource):
             json_object = sign_json(json_object, self.config.server.server_name, key)
         return json_object
 
-    def render_GET(self, request: Request) -> Optional[int]:
+    def on_GET(
+        self, request: Request, key_id: Optional[str] = None
+    ) -> Tuple[int, JsonDict]:
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key.key_refresh_interval / 2 > self.valid_until_ts:
             self.update_response_body(time_now)
-        return respond_with_json_bytes(request, 200, self.response_body)
+        return 200, self.response_body

@@ -90,18 +90,6 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(res, {self.event_ids[0]})
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
-    def test_query_via_event_cache(self):
-        # fetch an event into the event cache
-        self.get_success(self.store.get_event(self.event_ids[0]))
-
-        # looking it up should now cause no db hits
-        with LoggingContext(name="test") as ctx:
-            res = self.get_success(
-                self.store.have_seen_events(self.room_id, [self.event_ids[0]])
-            )
-            self.assertEqual(res, {self.event_ids[0]})
-            self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
-
     def test_persisting_event_invalidates_cache(self):
         """
         Test to make sure that the `have_seen_event` cache

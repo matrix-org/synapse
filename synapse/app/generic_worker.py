@@ -28,7 +28,7 @@ from synapse.api.urls import (
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
     MEDIA_V3_PREFIX,
-    SERVER_KEY_V2_PREFIX,
+    SERVER_KEY_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
@@ -89,7 +89,7 @@ from synapse.rest.client.register import (
     RegistrationTokenValidityRestServlet,
 )
 from synapse.rest.health import HealthResource
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
@@ -325,13 +325,13 @@ class GenericWorkerServer(HomeServer):
 
                     presence.register_servlets(self, resource)
 
-                    resources.update({CLIENT_API_PREFIX: resource})
+                    resources[CLIENT_API_PREFIX] = resource
 
                     resources.update(build_synapse_client_resource_tree(self))
-                    resources.update({"/.well-known": well_known_resource(self)})
+                    resources["/.well-known"] = well_known_resource(self)
 
                 elif name == "federation":
-                    resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(self)
                 elif name == "media":
                     if self.config.media.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
@@ -359,16 +359,12 @@ class GenericWorkerServer(HomeServer):
                     # Only load the openid resource separately if federation resource
                     # is not specified since federation resource includes openid
                     # resource.
-                    resources.update(
-                        {
-                            FEDERATION_PREFIX: TransportLayerServer(
-                                self, servlet_groups=["openid"]
-                            )
-                        }
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(
+                        self, servlet_groups=["openid"]
                     )
 
                 if name in ["keys", "federation"]:
-                    resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
+                    resources[SERVER_KEY_PREFIX] = KeyResource(self)
 
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
