@@ -1,0 +1,1 @@
+Return M_NOT_JSON rather than M_UNKNOWN when decode fails.
