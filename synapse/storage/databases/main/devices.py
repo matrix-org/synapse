@@ -276,7 +276,10 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         if not has_changed:
             # debugging for https://github.com/matrix-org/synapse/issues/14251
             issue_8631_logger.debug(
-                "%s: no change between %i and %i", from_stream_id, now_stream_id
+                "%s: no change between %i and %i",
+                destination,
+                from_stream_id,
+                now_stream_id,
             )
             return now_stream_id, []
 
