@@ -56,7 +56,6 @@ MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 # Watching /_matrix/media and related needs a "media" listener
 # Stream Writers require "client" and "replication" listeners because they
 #   have to attach by instance_map to the master process and have client endpoints.
-# BIG WARNING: typing and receipts stream writers are not working correctly at this time.
 WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     "pusher": {
         "app": "synapse.app.pusher",
