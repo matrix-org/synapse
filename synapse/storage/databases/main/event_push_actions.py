@@ -474,6 +474,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         Note that this function assumes the user is a member of the room. Because
         summary rows are not removed when a user leaves a room, the caller must
         filter out those results from the result.
+
+        Returns:
+            A map of room ID to notification counts for the given user.
         """
         return await self.db_pool.runInteraction(
             "get_unread_counts_by_room_for_user",
