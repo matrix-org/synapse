@@ -7,10 +7,6 @@ worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http
-    port: 8034
-    resources:
-      - names: [replication]
-  - type: http
     port: 8081
     x_forwarded: true
     resources:

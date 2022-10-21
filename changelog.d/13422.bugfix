@@ -1,0 +1,1 @@
+Fix a long-standing bug where the `update_synapse_database` script could not be run with multiple databases. Contributed by @thefinn93 @ Beeper.
