@@ -1,10 +1,7 @@
-<html>
-<head>
-<title>Authentication</title>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://www.recaptcha.net/recaptcha/api.js"
-    async defer></script>
+{% block title %}Authentication{% endblock %}
+
+{% block header %}
+<script src="https://www.recaptcha.net/recaptcha/api.js" async defer></script>
 <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
 <link rel="stylesheet" href="/_matrix/static/client/register/style.css">
 <script>
@@ -12,8 +9,9 @@ function captchaDone() {
     $('#registrationForm').submit();
 }
 </script>
-</head>
-<body>
+{% endblock %}
+
+{% block body %}
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
         {% if error is defined %}
@@ -37,5 +35,4 @@ function captchaDone() {
         </div>
     </div>
 </form>
-</body>
-</html>
+{% endblock %}
