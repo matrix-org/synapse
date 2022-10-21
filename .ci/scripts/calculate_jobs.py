@@ -189,7 +189,7 @@ print(json.dumps(complement_backwards_compatibility_tests, indent=4))
 print("::endgroup::")
 
 test_matrix = json.dumps(complement_test_jobs)
-set-output("complement_test_matrix", test_matrix)
+set_output("complement_test_matrix", test_matrix)
 
 test_matrix = json.dumps(complement_backwards_compatibility_tests)
-set-output("complement_backwards_compatibility_test_matrix", test_matrix)
+set_output("complement_backwards_compatibility_test_matrix", test_matrix)
