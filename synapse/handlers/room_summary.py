@@ -37,6 +37,7 @@ from synapse.api.errors import (
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
+from synapse.logging.opentracing import start_active_span, trace
 from synapse.types import JsonDict, Requester
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -162,6 +163,7 @@ class RoomSummaryHandler:
             from_token,
         )
 
+    @trace
     async def _get_room_hierarchy(
         self,
         requester: str,
@@ -341,6 +343,7 @@ class RoomSummaryHandler:
 
         return result
 
+    @trace
     async def get_federation_hierarchy(
         self,
         origin: str,
@@ -405,6 +408,7 @@ class RoomSummaryHandler:
             "inaccessible_children": inaccessible_children,
         }
 
+    @trace
     async def _summarize_local_room(
         self,
         requester: Optional[str],
@@ -514,6 +518,7 @@ class RoomSummaryHandler:
             set(inaccessible_children),
         )
 
+    @trace
     async def _is_local_room_accessible(
         self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
@@ -634,6 +639,7 @@ class RoomSummaryHandler:
         )
         return False
 
+    @trace
     async def _is_remote_room_accessible(
         self, requester: Optional[str], room_id: str, room: JsonDict
     ) -> bool:
@@ -682,6 +688,7 @@ class RoomSummaryHandler:
         # pending invite, etc.
         return await self._is_local_room_accessible(room_id, requester)
 
+    @trace
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
         Generate en entry summarising a single room.
