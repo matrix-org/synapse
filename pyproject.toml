@@ -318,7 +318,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.cibuildwheel]
 # Skip unsupported platforms (by us or by Rust).
-skip = "cp36* *-musllinux_i686"
+skip = "cp36* *-musllinux_i686 pp*aarch64 musllinux_aarch64"
 
 # We need a rust compiler
 before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
