@@ -74,6 +74,7 @@ receipt.
 """
 
 import logging
+from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Collection,
@@ -462,6 +463,141 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
 
         return result
+
+    async def get_unread_counts_by_room_for_user(self, user_id: str) -> Dict[str, int]:
+        """Get the notification count by room for a user. Only considers notifications,
+        no highlights or unreads, and threads are currently aggregated under their room.
+
+        This function is intentionally not cached because it is called to calculate the
+        unread badge for notifications and thus the result is expected to change.
+
+        Note that this function assumes the user is a member of the room. Because
+        summary rows are not removed when a user leaves a room, the caller must
+        filter out those results from the result.
+        """
+        return await self.db_pool.runInteraction(
+            "get_unread_counts_by_room_for_user",
+            self._get_unread_counts_by_room_for_user_txn,
+            user_id,
+        )
+
+    def _get_unread_counts_by_room_for_user_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> Dict[str, int]:
+        receipt_types_clause, args = make_in_list_sql_clause(
+            self.database_engine,
+            "receipt_type",
+            (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
+        )
+        args.extend([user_id, user_id])
+
+        room_to_count: Dict[str, int] = defaultdict(int)
+
+        # First get summary counts by room / thread for the user. Note we use a OR join
+        # condition here such that we handle both receipts with thread ID's and those
+        # without that get applied to any thread_id values.
+        sql = f"""
+            SELECT eps.room_id, notif_count
+            FROM event_push_summary AS eps
+            LEFT JOIN (
+                SELECT room_id, thread_id, MAX(stream_ordering) AS receipt_stream_ordering
+                FROM receipts_linearized
+                LEFT JOIN events USING (room_id, event_id)
+                WHERE
+                    {receipt_types_clause}
+                    AND user_id = ?
+                GROUP BY room_id, thread_id
+            ) AS receipts ON (
+                eps.room_id = receipts.room_id
+                AND eps.thread_id = receipts.thread_id
+            ) OR (
+                eps.room_id = receipts.room_id
+                AND receipts.thread_id IS NULL
+            )
+            WHERE user_id = ?
+            AND notif_count != 0
+            AND (
+                (last_receipt_stream_ordering IS NULL AND stream_ordering > receipt_stream_ordering)
+                OR last_receipt_stream_ordering = receipt_stream_ordering
+                OR receipt_stream_ordering IS NULL
+            )
+        """
+        txn.execute(sql, args)
+
+        for room_id, notif_count in txn:
+            room_to_count[room_id] += notif_count
+
+        # Now get any event push actions that haven't been rotated using the same OR
+        # join and filter by receipt and event push summary rotated up to stream ordering.
+        sql = f"""
+            SELECT epa.room_id, COUNT(CASE WHEN epa.notif = 1 THEN 1 END) AS notif_count
+            FROM event_push_actions AS epa
+            LEFT JOIN (
+                SELECT room_id, thread_id, MAX(stream_ordering) AS receipt_stream_ordering
+                FROM receipts_linearized
+                LEFT JOIN events USING (room_id, event_id)
+                WHERE
+                    {receipt_types_clause}
+                    AND user_id = ?
+                GROUP BY room_id, thread_id
+            ) AS receipts ON (
+                epa.room_id = receipts.room_id
+                AND epa.thread_id = receipts.thread_id
+            ) OR (
+                epa.room_id = receipts.room_id
+                AND receipts.thread_id IS NULL
+            )
+            WHERE user_id = ?
+            AND epa.notif = 1
+            AND stream_ordering > (SELECT stream_ordering FROM event_push_summary_stream_ordering)
+            AND (receipt_stream_ordering IS NULL OR stream_ordering > receipt_stream_ordering)
+            GROUP BY (epa.room_id)
+        """
+        txn.execute(sql, args)
+
+        for room_id, notif_count in txn:
+            room_to_count[room_id] += notif_count
+
+        room_id_clause, room_id_args = make_in_list_sql_clause(
+            self.database_engine, "epa.room_id", room_to_count.keys()
+        )
+
+        # Finally re-check event_push_actions for any rooms not in the summary, ignoring
+        # the rotated up-to position. This handles the case where a read receipt has arrived
+        # but not been rotated meaning the summary table is out of date, so we go back to
+        # the push actions table.
+        sql = f"""
+            SELECT epa.room_id, COUNT(CASE WHEN epa.notif = 1 THEN 1 END) AS notif_count
+            FROM event_push_actions AS epa
+            LEFT JOIN (
+                SELECT room_id, thread_id, MAX(stream_ordering) AS receipt_stream_ordering
+                FROM receipts_linearized
+                LEFT JOIN events USING (room_id, event_id)
+                WHERE
+                    {receipt_types_clause}
+                    AND user_id = ?
+                GROUP BY room_id, thread_id
+            ) AS receipts ON (
+                epa.room_id = receipts.room_id
+                AND epa.thread_id = receipts.thread_id
+            ) OR (
+                epa.room_id = receipts.room_id
+                AND receipts.thread_id IS NULL
+            )
+            WHERE user_id = ?
+            AND NOT {room_id_clause}
+            AND epa.notif = 1
+            AND (receipt_stream_ordering IS NULL OR stream_ordering > receipt_stream_ordering)
+            GROUP BY (epa.room_id)
+        """
+
+        args.extend(room_id_args)
+        txn.execute(sql, args)
+
+        for room_id, notif_count in txn:
+            room_to_count[room_id] += notif_count
+
+        return room_to_count
 
     @cached(tree=True, max_entries=5000, iterable=True)
     async def get_unread_event_push_actions_by_room_for_user(
