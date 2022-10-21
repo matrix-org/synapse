@@ -18,6 +18,13 @@
 import json
 import os
 
+
+def set_output(key: str, value: str):
+    # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter
+    with open(os.environ["GITHUB_OUTPUT"], "at") as f:
+        print(f"{key}={value}", file=f)
+
+
 IS_PR = os.environ["GITHUB_REF"].startswith("refs/pull/")
 
 # First calculate the various trial jobs.
@@ -81,7 +88,7 @@ print("::endgroup::")
 test_matrix = json.dumps(
     trial_sqlite_tests + trial_postgres_tests + trial_no_extra_tests
 )
-print(f"::set-output name=trial_test_matrix::{test_matrix}")
+set_output("trial_test_matrix", test_matrix)
 
 
 # First calculate the various sytest jobs.
@@ -125,7 +132,7 @@ print(json.dumps(sytest_tests, indent=4))
 print("::endgroup::")
 
 test_matrix = json.dumps(sytest_tests)
-print(f"::set-output name=sytest_test_matrix::{test_matrix}")
+set_output("sytest_test_matrix", test_matrix)
 
 
 # First calculate the workers used during complement jobs
@@ -182,9 +189,7 @@ print(json.dumps(complement_backwards_compatibility_tests, indent=4))
 print("::endgroup::")
 
 test_matrix = json.dumps(complement_test_jobs)
-print(f"::set-output name=complement_test_matrix::{test_matrix}")
+set-output("complement_test_matrix", test_matrix)
 
 test_matrix = json.dumps(complement_backwards_compatibility_tests)
-print(
-    f"::set-output name=complement_backwards_compatibility_test_matrix::{test_matrix}"
-)
+set-output("complement_backwards_compatibility_test_matrix", test_matrix)
