@@ -92,16 +92,13 @@ def main(wheel_file: str, dest_dir: str, archs: Optional[str]) -> None:
     if archs is not None:
         # If we are given archs then we are on macos and need to use
         # `delocate-listdeps`.
-        subprocess.run(f"delocate-listdeps {wheel_file}", shell=True, check=True)
+        subprocess.run(["delocate-listdeps", wheel_file], check=True)
         subprocess.run(
-            f"delocate-wheel --require-archs {archs} -w {dest_dir} {wheel_file}",
-            shell=True,
+            ["delocate-wheel" "--require-archs", archs, "-w", dest_dir, wheel_file],
             check=True,
         )
     else:
-        subprocess.run(
-            f"auditwheel repair -w {dest_dir} {wheel_file}", shell=True, check=True
-        )
+        subprocess.run(["auditwheel", "repair", "-w", dest_dir, wheel_file], check=True)
 
 
 if __name__ == "__main__":
