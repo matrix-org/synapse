@@ -432,7 +432,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
         num_args = cached_method.num_args
 
         if num_args != self.num_args:
-            raise Exception(
+            raise TypeError(
                 "Number of args (%s) does not match underlying cache_method_name=%s (%s)."
                 % (self.num_args, self.cached_method_name, num_args)
             )
