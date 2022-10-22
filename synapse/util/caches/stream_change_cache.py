@@ -14,9 +14,12 @@
 
 import logging
 import math
+from collections import defaultdict
 from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 from sortedcontainers import SortedDict
+
+from twisted.internet import defer
 
 from synapse.util import caches
 
@@ -50,6 +53,10 @@ class StreamChangeCache:
         # map from stream id to the a set of entities which changed at that stream id.
         self._cache: SortedDict[int, Set[EntityType]] = SortedDict()
 
+        # Maximum known stream position to wait on if behind the current persisted position.
+        self.max_stream_pos = current_stream_pos
+        self.wait_for_pos_deferreds: Dict[int, List[defer.Deferred]] = defaultdict(list)
+
         # the earliest stream_pos for which we can reliably answer
         # get_all_entities_changed. In other words, one less than the earliest
         # stream_pos for which we know _cache is valid.
@@ -63,6 +70,22 @@ class StreamChangeCache:
         if prefilled_cache:
             for entity, stream_pos in prefilled_cache.items():
                 self.entity_has_changed(entity, stream_pos)
+
+    async def wait_for_position(self, pos: int) -> None:
+        if self.max_stream_pos >= pos:
+            return
+
+        logger.warning(
+            "Waiting on lagging stream cache %s with current position %s "
+            "behind requested token position %s",
+            self.name,
+            self.max_stream_pos,
+            pos,
+        )
+
+        d: defer.Deferred[None] = defer.Deferred()
+        self.wait_for_pos_deferreds[pos].append(d)
+        await d
 
     def set_cache_factor(self, factor: float) -> bool:
         """
@@ -194,6 +217,12 @@ class StreamChangeCache:
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
             for entity in r:
                 del self._entity_to_key[entity]
+
+        if stream_pos > self.max_stream_pos:
+            self.max_stream_pos = stream_pos
+
+        for d in self.wait_for_pos_deferreds[stream_pos]:
+            d.callback(None)
 
     def _evict(self) -> None:
         while len(self._cache) > self._max_size:
