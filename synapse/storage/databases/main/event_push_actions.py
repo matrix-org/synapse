@@ -573,7 +573,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             AND stream_ordering > (SELECT stream_ordering FROM event_push_summary_stream_ordering)
             AND (threaded_receipt_stream_ordering IS NULL OR stream_ordering > threaded_receipt_stream_ordering)
             AND (unthreaded_receipt_stream_ordering IS NULL OR stream_ordering > unthreaded_receipt_stream_ordering)
-            GROUP BY (epa.thread_id)
+            GROUP BY epa.room_id, epa.thread_id
         """
         txn.execute(sql, args)
 
@@ -601,7 +601,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             AND epa.notif = 1
             AND (threaded_receipt_stream_ordering IS NULL OR stream_ordering > threaded_receipt_stream_ordering)
             AND (unthreaded_receipt_stream_ordering IS NULL OR stream_ordering > unthreaded_receipt_stream_ordering)
-            GROUP BY (epa.room_id)
+            GROUP BY epa.room_id
         """
 
         args.extend(thread_ids_args)
