@@ -334,7 +334,9 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     user_id,
                 )
             )
-            self.assertEqual(sum(aggregate_counts.values()), noitf_count + thread_notif_count)
+            self.assertEqual(
+                sum(aggregate_counts.values()), noitf_count + thread_notif_count
+            )
 
         def _create_event(
             highlight: bool = False, thread_id: Optional[str] = None
@@ -514,7 +516,9 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     user_id,
                 )
             )
-            self.assertEqual(sum(aggregate_counts.values()), noitf_count + thread_notif_count)
+            self.assertEqual(
+                sum(aggregate_counts.values()), noitf_count + thread_notif_count
+            )
 
         def _create_event(
             highlight: bool = False, thread_id: Optional[str] = None
