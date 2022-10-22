@@ -96,6 +96,7 @@ from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
+    PostgresEngine,
 )
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
@@ -526,10 +527,19 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # First get summary counts by room / thread for the user. We join the max receipt
         # stream ordering both threaded & unthreaded and use the max to compare against
         # the summary table.
-        max_clause = """MAX(
-            COALESCE(threaded_receipt_stream_ordering, 0),
-            COALESCE(unthreaded_receipt_stream_ordering, 0)
-        )"""
+        # PostgreSQL and SQLite differ in comparing scalar numerics.
+        if isinstance(self.database_engine, PostgresEngine):
+            # GREATEST ignores NULLs.
+            max_clause = """GREATEST(
+                threaded_receipt_stream_ordering,
+                unthreaded_receipt_stream_ordering
+            )"""
+        else:
+            # MAX returns NULL if any are NULL, so COALESCE to 0 first.
+            max_clause = """MAX(
+                COALESCE(threaded_receipt_stream_ordering, 0),
+                COALESCE(unthreaded_receipt_stream_ordering, 0)
+            )"""
 
         sql = f"""
             {receipts_cte}
