@@ -486,6 +486,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 - list of recent events in the room
                 - stream ordering key for the start of the chunk of events returned.
         """
+        await self._events_stream_cache.wait_for_position(to_key.stream)
         room_ids = self._events_stream_cache.get_entities_changed(
             room_ids, from_key.stream
         )
