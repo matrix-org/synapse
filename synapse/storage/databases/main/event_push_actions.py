@@ -496,15 +496,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         room_to_count: Dict[str, int] = defaultdict(int)
 
-        # First get summary counts by room / thread for the user. We join the max receipt
-        # stream ordering both threaded & unthreaded and use the max to compare against
-        # the summary table.
-        max_clause = """MAX(
-            COALESCE(threaded_receipt_stream_ordering, 0),
-            COALESCE(unthreaded_receipt_stream_ordering, 0)
-        )"""
-
-        sql = f"""
+        receipts_cte = f"""
             WITH all_receipts AS (
                 SELECT room_id, thread_id, MAX(event_stream_ordering) AS max_receipt_stream_ordering
                 FROM receipts_linearized
@@ -514,8 +506,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     AND user_id = ?
                 GROUP BY room_id, thread_id
             )
-            SELECT eps.room_id, eps.thread_id, notif_count
-            FROM event_push_summary AS eps
+        """
+
+        receipts_joins = """
             LEFT JOIN (
                 SELECT room_id, thread_id,
                 max_receipt_stream_ordering AS threaded_receipt_stream_ordering
@@ -528,6 +521,21 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 FROM all_receipts
                 WHERE thread_id IS NULL
             ) AS unthreaded_receipts USING (room_id)
+        """
+
+        # First get summary counts by room / thread for the user. We join the max receipt
+        # stream ordering both threaded & unthreaded and use the max to compare against
+        # the summary table.
+        max_clause = """MAX(
+            COALESCE(threaded_receipt_stream_ordering, 0),
+            COALESCE(unthreaded_receipt_stream_ordering, 0)
+        )"""
+
+        sql = f"""
+            {receipts_cte}
+            SELECT eps.room_id, eps.thread_id, notif_count
+            FROM event_push_summary AS eps
+            {receipts_joins}
             WHERE user_id = ?
             AND notif_count != 0
             AND (
@@ -546,29 +554,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # Now get any event push actions that haven't been rotated using the same OR
         # join and filter by receipt and event push summary rotated up to stream ordering.
         sql = f"""
-            WITH all_receipts AS (
-                SELECT room_id, thread_id, MAX(event_stream_ordering) AS max_receipt_stream_ordering
-                FROM receipts_linearized
-                LEFT JOIN events USING (room_id, event_id)
-                WHERE
-                    {receipt_types_clause}
-                    AND user_id = ?
-                GROUP BY room_id, thread_id
-            )
+            {receipts_cte}
             SELECT epa.room_id, epa.thread_id, COUNT(CASE WHEN epa.notif = 1 THEN 1 END) AS notif_count
             FROM event_push_actions AS epa
-            LEFT JOIN (
-                SELECT room_id, thread_id,
-                max_receipt_stream_ordering AS threaded_receipt_stream_ordering
-                FROM all_receipts
-                WHERE thread_id IS NOT NULL
-            ) AS threaded_receipts USING (room_id, thread_id)
-            LEFT JOIN (
-                SELECT room_id, thread_id,
-                max_receipt_stream_ordering AS unthreaded_receipt_stream_ordering
-                FROM all_receipts
-                WHERE thread_id IS NULL
-            ) AS unthreaded_receipts USING (room_id)
+            {receipts_joins}
             WHERE user_id = ?
             AND epa.notif = 1
             AND stream_ordering > (SELECT stream_ordering FROM event_push_summary_stream_ordering)
@@ -593,29 +582,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # but not been rotated meaning the summary table is out of date, so we go back to
         # the push actions table.
         sql = f"""
-            WITH all_receipts AS (
-                SELECT room_id, thread_id, MAX(event_stream_ordering) AS max_receipt_stream_ordering
-                FROM receipts_linearized
-                LEFT JOIN events USING (room_id, event_id)
-                WHERE
-                    {receipt_types_clause}
-                    AND user_id = ?
-                GROUP BY room_id, thread_id
-            )
+            {receipts_cte}
             SELECT epa.room_id, COUNT(CASE WHEN epa.notif = 1 THEN 1 END) AS notif_count
             FROM event_push_actions AS epa
-            LEFT JOIN (
-                SELECT room_id, thread_id,
-                max_receipt_stream_ordering AS threaded_receipt_stream_ordering
-                FROM all_receipts
-                WHERE thread_id IS NOT NULL
-            ) AS threaded_receipts USING (room_id, thread_id)
-            LEFT JOIN (
-                SELECT room_id, thread_id,
-                max_receipt_stream_ordering AS unthreaded_receipt_stream_ordering
-                FROM all_receipts
-                WHERE thread_id IS NULL
-            ) AS unthreaded_receipts USING (room_id)
+            {receipts_joins}
             WHERE user_id = ?
             AND NOT {thread_id_clause}
             AND epa.notif = 1
