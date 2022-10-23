@@ -31,7 +31,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import devices, login, logout, profile, register, room, sync
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -924,6 +924,36 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, len(non_admin_user_ids), non_admin_user_ids)
         self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
+    def test_erasure_status(self) -> None:
+        # Create a new user.
+        user_id = self.register_user("eraseme", "eraseme")
+
+        # They should appear in the list users API, marked as not erased.
+        channel = self.make_request(
+            "GET",
+            self.url + "?deactivated=true",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertIs(users[user_id]["erased"], False)
+
+        # Deactivate that user, requesting erasure.
+        deactivate_account_handler = self.hs.get_deactivate_account_handler()
+        self.get_success(
+            deactivate_account_handler.deactivate_account(
+                user_id, erase_data=True, requester=create_requester(user_id)
+            )
+        )
+
+        # Repeat the list users query. They should now be marked as erased.
+        channel = self.make_request(
+            "GET",
+            self.url + "?deactivated=true",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertIs(users[user_id]["erased"], True)
+
     def _order_test(
         self,
         expected_user_list: List[str],
@@ -1195,6 +1225,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User1", channel.json_body["displayname"])
+        self.assertFalse(channel.json_body["erased"])
 
         # Deactivate and erase user
         channel = self.make_request(
@@ -1219,6 +1250,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertIsNone(channel.json_body["avatar_url"])
         self.assertIsNone(channel.json_body["displayname"])
+        self.assertTrue(channel.json_body["erased"])
 
         self._is_erased("@user:test", True)
 
@@ -2757,6 +2789,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("avatar_url", content)
         self.assertIn("admin", content)
         self.assertIn("deactivated", content)
+        self.assertIn("erased", content)
         self.assertIn("shadow_banned", content)
         self.assertIn("creation_ts", content)
         self.assertIn("appservice_id", content)

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Optional
 
 import attr
 
@@ -101,9 +101,6 @@ class ExperimentalConfig(Config):
         # MSC3848: Introduce errcodes for specific event sending failures
         self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
 
-        # MSC3856: Threads list API
-        self.msc3856_enabled: bool = experimental.get("msc3856_enabled", False)
-
         # MSC3852: Expose last seen user agent field on /_matrix/client/v3/devices.
         self.msc3852_enabled: bool = experimental.get("msc3852_enabled", False)
 
@@ -119,4 +116,12 @@ class ExperimentalConfig(Config):
         self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)
         self.msc3882_token_timeout = self.parse_duration(
             experimental.get("msc3882_token_timeout", "5m")
+        )
+
+        # MSC3874: Filtering /messages with rel_types / not_rel_types.
+        self.msc3874_enabled: bool = experimental.get("msc3874_enabled", False)
+
+        # MSC3886: Simple client rendezvous capability
+        self.msc3886_endpoint: Optional[str] = experimental.get(
+            "msc3886_endpoint", None
         )

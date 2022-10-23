@@ -1677,7 +1677,6 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             {"chunk": [{"type": "m.reaction", "key": "👍", "count": 1}]},
         )
 
-    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_redact_parent_thread(self) -> None:
         """
         Test that thread replies are still available when the root event is redacted.
@@ -1710,7 +1709,15 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
 
 
 class ThreadsTestCase(BaseRelationsTestCase):
-    @unittest.override_config({"experimental_features": {"msc3856_enabled": True}})
+    def _get_threads(self, body: JsonDict) -> List[Tuple[str, str]]:
+        return [
+            (
+                ev["event_id"],
+                ev["unsigned"]["m.relations"]["m.thread"]["latest_event"]["event_id"],
+            )
+            for ev in body["chunk"]
+        ]
+
     def test_threads(self) -> None:
         """Create threads and ensure the ordering is due to their latest event."""
         # Create 2 threads.
@@ -1718,32 +1725,37 @@ class ThreadsTestCase(BaseRelationsTestCase):
         res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
         thread_2 = res["event_id"]
 
-        self._send_relation(RelationTypes.THREAD, "m.room.test")
-        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_1 = channel.json_body["event_id"]
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", parent_id=thread_2
+        )
+        reply_2 = channel.json_body["event_id"]
 
         # Request the threads in the room.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
-        self.assertEqual(thread_roots, [thread_2, thread_1])
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_2, reply_2), (thread_1, reply_1)])
 
         # Update the first thread, the ordering should swap.
-        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_3 = channel.json_body["event_id"]
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
-        self.assertEqual(thread_roots, [thread_1, thread_2])
+        # Tuple of (thread ID, latest event ID) for each thread.
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_1, reply_3), (thread_2, reply_2)])
 
-    @unittest.override_config({"experimental_features": {"msc3856_enabled": True}})
     def test_pagination(self) -> None:
         """Create threads and paginate through them."""
         # Create 2 threads.
@@ -1757,7 +1769,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
         # Request the threads in the room.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads?limit=1",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
@@ -1771,7 +1783,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads?limit=1&from={next_batch}",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1&from={next_batch}",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
@@ -1780,7 +1792,6 @@ class ThreadsTestCase(BaseRelationsTestCase):
 
         self.assertNotIn("next_batch", channel.json_body, channel.json_body)
 
-    @unittest.override_config({"experimental_features": {"msc3856_enabled": True}})
     def test_include(self) -> None:
         """Filtering threads to all or participated in should work."""
         # Thread 1 has the user as the root event.
@@ -1807,7 +1818,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
         # All threads in the room.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
@@ -1819,14 +1830,13 @@ class ThreadsTestCase(BaseRelationsTestCase):
         # Only participated threads.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads?include=participated",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?include=participated",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
         thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
         self.assertEqual(thread_roots, [thread_2, thread_1], channel.json_body)
 
-    @unittest.override_config({"experimental_features": {"msc3856_enabled": True}})
     def test_ignored_user(self) -> None:
         """Events from ignored users should be ignored."""
         # Thread 1 has a reply from an ignored user.
@@ -1852,7 +1862,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
         # Only thread 1 is returned.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)

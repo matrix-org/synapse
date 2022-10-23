@@ -481,6 +481,14 @@ class FederationServer(FederationBase):
                     pdu_results[pdu.event_id] = await process_pdu(pdu)
 
         async def process_pdu(pdu: EventBase) -> JsonDict:
+            """
+            Processes a pushed PDU sent to us via a `/send` transaction
+
+            Returns:
+                JsonDict representing a "PDU Processing Result" that will be bundled up
+                with the other processed PDU's in the `/send` transaction and sent back
+                to remote homeserver.
+            """
             event_id = pdu.event_id
             with nested_logging_context(event_id):
                 try:
