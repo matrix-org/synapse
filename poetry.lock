@@ -918,14 +918,14 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "pysaml2"
-version = "7.1.2"
+version = "7.2.1"
 description = "Python implementation of SAML Version 2 Standard"
 category = "main"
 optional = true
 python-versions = "<4,>=3.6"
 
 [package.dependencies]
-cryptography = ">=1.4"
+cryptography = ">=3.1"
 defusedxml = "*"
 importlib-resources = {version = "*", markers = "python_version < \"3.9\""}
 pyOpenSSL = "*"
@@ -2445,8 +2445,8 @@ pyrsistent = [
     {file = "pyrsistent-0.18.1.tar.gz", hash = "sha256:d4d61f8b993a7255ba714df3aca52700f8125289f84f704cf80916517c46eb96"},
 ]
 pysaml2 = [
-    {file = "pysaml2-7.1.2-py2.py3-none-any.whl", hash = "sha256:d915961aaa4d4d97d952b30fe5d18d64cf053465acf3e38d8090b36c5ff08325"},
-    {file = "pysaml2-7.1.2.tar.gz", hash = "sha256:1ec94442306511b93fe7a5710f224e05e0aba948682d506614d1e04f3232f827"},
+    {file = "pysaml2-7.2.1-py2.py3-none-any.whl", hash = "sha256:2ca155f4eeb1471b247a7b0cc79ccfd5780046d33d0b201e1199a00698dce795"},
+    {file = "pysaml2-7.2.1.tar.gz", hash = "sha256:f40f9576dce9afef156469179277ffeeca36829248be333252af0517a26d0b1f"},
 ]
 python-dateutil = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
