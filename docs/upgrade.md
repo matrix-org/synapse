@@ -1031,7 +1031,7 @@ by the client.
 
 Synapse also requires the `Host` header to be preserved.
 
-See the [reverse proxy documentation](reverse_proxy.md), where the
+See the [reverse proxy documentation](setup/reverse_proxy.md), where the
 example configurations have been updated to show how to set these
 headers.
 
@@ -1280,7 +1280,7 @@ acts the same as the `http_client` argument previously passed to
 
 ## Forwarding `/_synapse/client` through your reverse proxy
 
-The [reverse proxy documentation](reverse_proxy.md)
+The [reverse proxy documentation](setup/reverse_proxy.md)
 has been updated to include reverse proxy directives for
 `/_synapse/client/*` endpoints. As the user password reset flow now uses
 endpoints under this prefix, **you must update your reverse proxy
@@ -1482,7 +1482,7 @@ participating in many rooms.
     omitting the `CONCURRENTLY` keyword. Note however that this
     operation may in itself cause Synapse to stop running for some time.
     Synapse admins are reminded that [SQLite is not recommended for use
-    outside a test environment](postgres.md).
+    outside a test environment](setup/postgres.md).
 
 3.  Once the index has been created, the `SELECT` query in step 1 above
     should complete quickly. It is therefore safe to upgrade to Synapse
@@ -1500,7 +1500,7 @@ participating in many rooms.
 Synapse will now log a warning on start up if used with a PostgreSQL
 database that has a non-recommended locale set.
 
-See [Postgres](postgres.md) for details.
+See [Postgres](setup/postgres.md) for details.
 
 # Upgrading to v1.8.0
 

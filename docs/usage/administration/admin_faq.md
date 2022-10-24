@@ -122,7 +122,7 @@ Help!! Synapse is slow and eats all my RAM/CPU!
 -----------------------------------------------
 
 First, ensure you are running the latest version of Synapse, using Python 3
-with a [PostgreSQL database](../../postgres.md).
+with a [PostgreSQL database](../../setup/postgres.md).
 
 Synapse's architecture is quite RAM hungry currently - we deliberately
 cache a lot of recent room data and metadata in RAM in order to speed up

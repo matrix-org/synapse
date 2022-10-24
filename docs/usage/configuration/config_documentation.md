@@ -115,7 +115,7 @@ usernames on your server would be in the format `@user:example.com`
 In most cases you should avoid using a matrix specific subdomain such as
 matrix.example.com or synapse.example.com as the `server_name` for the same
 reasons you wouldn't use user@email.example.com as your email address.
-See [here](../../delegate.md)
+See [here](../../setup/delegate.md)
 for information on how to host Synapse on a subdomain while preserving
 a clean `server_name`.
 
@@ -179,7 +179,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-See [Delegation of incoming federation traffic](../../delegate.md) for more
+See [Delegation of incoming federation traffic](../../setup/delegate.md) for more
 information.
 
 Example configuration:
@@ -434,14 +434,14 @@ Sub-options for each listener include:
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-   behind a [reverse-proxy](../../reverse_proxy.md).
+   behind a [reverse-proxy](../../setup/reverse_proxy.md).
 
 * `request_id_header`: The header extracted from each incoming request that is
    used as the basis for the request ID. The request ID is used in
    [logs](../administration/request_log.md#request-log-format) and tracing to
    correlate and match up requests. When unset, Synapse will automatically
    generate sequential request IDs. This option is useful when Synapse is behind
-   a [reverse-proxy](../../reverse_proxy.md).
+   a [reverse-proxy](../../setup/reverse_proxy.md).
 
    _Added in Synapse 1.68.0._
 
@@ -1205,7 +1205,7 @@ Associated sub-options:
 * `allow_unsafe_locale` is an option specific to Postgres. Under the default behavior, Synapse will refuse to
   start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
   by setting `allow_unsafe_locale` to true. Note that doing so may corrupt your database. You can find more information
-  [here](../../postgres.md#fixing-incorrect-collate-or-ctype) and [here](https://wiki.postgresql.org/wiki/Locale_data_changes).
+  [here](../../setup/postgres.md#fixing-incorrect-collate-or-ctype) and [here](https://wiki.postgresql.org/wiki/Locale_data_changes).
 
 * `args` gives options which are passed through to the database engine,
   except for options starting with `cp_`, which are used to configure the Twisted
@@ -1215,7 +1215,7 @@ Associated sub-options:
     * for [the connection pool](https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
 
 For more information on using Synapse with Postgres,
-see [here](../../postgres.md).
+see [here](../../setup/postgres.md).
 
 Example SQLite configuration:
 ```yaml
@@ -1626,7 +1626,7 @@ The largest allowed upload size in bytes.
 
 If you are using a reverse proxy you may also need to set this value in
 your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body size by default.
-See [here](../../reverse_proxy.md) for more on using a reverse proxy with Synapse.
+See [here](../../setup/reverse_proxy.md) for more on using a reverse proxy with Synapse.
 
 Example configuration:
 ```yaml
