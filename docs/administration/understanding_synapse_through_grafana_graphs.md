@@ -2,7 +2,7 @@
 
 It is possible to monitor much of the internal state of Synapse using [Prometheus](https://prometheus.io) 
 metrics and [Grafana](https://grafana.com/). 
-A guide for configuring Synapse to provide metrics is available [here](../../metrics-howto.md) 
+A guide for configuring Synapse to provide metrics is available [here](../../administration/metrics-howto.md) 
 and information on setting up Grafana is [here](https://github.com/matrix-org/synapse/tree/master/contrib/grafana).
 In this setup, Prometheus will periodically scrape the information Synapse provides and
 store a record of it over time. Grafana is then used as an interface to query and
@@ -79,6 +79,6 @@ indicator of problems, and a symptom of other problems though, so check other gr
 
 If you're still having performance problems with your Synapse instance and you've 
 tried everything you can, it may just be a lack of system resources. Consider adding
-more CPU and RAM, and make use of [worker mode](../configuration/workers.md) 
+more CPU and RAM, and make use of [worker mode](../usage/configuration/workers.md) 
 to make use of multiple CPU cores / multiple machines for your homeserver.
 

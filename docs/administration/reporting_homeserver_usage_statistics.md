@@ -6,9 +6,9 @@ provide the foundation a glimpse into the number of Synapse homeservers
 participating in the network, as well as statistics such as the number of
 rooms being created and messages being sent. This feature is sometimes
 affectionately called "phone home" stats. Reporting
-[is optional](../../configuration/config_documentation.md#report_stats)
+[is optional](../usage/configuration/config_documentation.md#report_stats)
 and the reporting endpoint
-[can be configured](../../configuration/config_documentation.md#report_stats_endpoint),
+[can be configured](../usage/configuration/config_documentation.md#report_stats_endpoint),
 in case you would like to instead report statistics from a set of homeservers
 to your own infrastructure.
 
@@ -52,15 +52,15 @@ The following statistics are sent to the configured reporting endpoint:
 | `r30v2_users_ios`          | int    | The number of 30 day retained users, as defined above. Filtered only to clients with ("riot" or "element") and "ios" (case-insensitive) in the user agent string.                                                                                                                               |
 | `r30v2_users_electron`     | int    | The number of 30 day retained users, as defined above. Filtered only to clients with ("riot" or "element") and "electron" (case-insensitive) in the user agent string.                                                                                                                          |
 | `r30v2_users_web`          | int    | The number of 30 day retained users, as defined above. Filtered only to clients with "mozilla" or "gecko" (case-insensitive) in the user agent string.                                                                                                                                          |
-| `cache_factor`             | int    | The configured [`global factor`](../../configuration/config_documentation.md#caching) value for caching.                                                                                                                                                                                        |
-| `event_cache_size`         | int    | The configured [`event_cache_size`](../../configuration/config_documentation.md#caching) value for caching.                                                                                                                                                                                     |
+| `cache_factor`             | int    | The configured [`global factor`](../usage/configuration/config_documentation.md#caching) value for caching.                                                                                                                                                                                        |
+| `event_cache_size`         | int    | The configured [`event_cache_size`](../usage/configuration/config_documentation.md#caching) value for caching.                                                                                                                                                                                     |
 | `database_engine`          | string | The database engine that is in use. Either "psycopg2" meaning PostgreSQL is in use, or "sqlite3" for SQLite3.                                                                                                                                                                                   |
 | `database_server_version` | string | The version of the database server. Examples being "10.10" for PostgreSQL server version 10.0, and "3.38.5" for SQLite 3.38.5 installed on the system.                                                                                                                                          |
 | `log_level` | string | The log level in use. Examples are "INFO", "WARNING", "ERROR", "DEBUG", etc.                                                                                                                                                                                                                    |
 
 
 [^1]: Native matrix users and guests are always counted. If the
-[`track_puppeted_user_ips`](../../configuration/config_documentation.md#track_puppeted_user_ips)
+[`track_puppeted_user_ips`](../usage/configuration/config_documentation.md#track_puppeted_user_ips)
 option is set to `true`, "puppeted" users (users that an Application Service have performed
 [an action on behalf of](https://spec.matrix.org/v1.3/application-service-api/#identity-assertion))
 will also be counted. Note that an Application Service can "puppet" any user in their
@@ -71,7 +71,7 @@ will additionally be counted as a user (irrespective of `track_puppeted_user_ips
 ## Using a Custom Statistics Collection Server
 
 If statistics reporting is enabled, the endpoint that Synapse sends metrics to is configured by the
-[`report_stats_endpoint`](../../configuration/config_documentation.md#report_stats_endpoint) config
+[`report_stats_endpoint`](../usage/configuration/config_documentation.md#report_stats_endpoint) config
 option. By default, statistics are sent to Matrix.org.
 
 If you would like to set up your own statistics collection server and send metrics there, you may

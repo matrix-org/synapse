@@ -2,13 +2,13 @@ This blog post by Victor Berger explains how to use many of the tools listed on 
 
 # List of useful tools and scripts for maintenance Synapse database:
 
-## [Purge Remote Media API](../../admin_api/media_admin_api.md#purge-remote-media-api)
+## [Purge Remote Media API](../../administration/admin_api/media_admin_api.md#purge-remote-media-api)
 The purge remote media API allows server admins to purge old cached remote media.
 
-## [Purge Local Media API](../../admin_api/media_admin_api.md#delete-local-media)
+## [Purge Local Media API](../../administration/admin_api/media_admin_api.md#delete-local-media)
 This API deletes the *local* media from the disk of your own server.
 
-## [Purge History API](../../admin_api/purge_history_api.md)
+## [Purge History API](../../administration/admin_api/purge_history_api.md)
 The purge history API allows server admins to purge historic events from their database, reclaiming disk space.
 
 ## [synapse-compress-state](https://github.com/matrix-org/rust-synapse-compress-state)

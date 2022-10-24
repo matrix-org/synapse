@@ -3,11 +3,11 @@
 Synapse can be configured to record the number of monthly active users (also referred to as MAU) on a given homeserver.
 For clarity's sake, MAU only tracks local users.
 
-Please note that the metrics recorded by the [Homeserver Usage Stats](../../usage/administration/monitoring/reporting_homeserver_usage_statistics.md)
+Please note that the metrics recorded by the [Homeserver Usage Stats](reporting_homeserver_usage_statistics.md)
 are calculated differently. The `monthly_active_users` from the usage stats does not take into account any
 of the rules below, and counts any users who have made a request to the homeserver in the last 30 days.
 
-See the [configuration manual](../../usage/configuration/config_documentation.md#limit_usage_by_mau) for details on how to configure MAU.
+See the [configuration manual](../usage/configuration/config_documentation.md#limit_usage_by_mau) for details on how to configure MAU.
 
 ## Calculating active users
 

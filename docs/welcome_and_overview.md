@@ -17,15 +17,15 @@ This documentation covers topics for **installation**, **configuration** and
 
 * Administer your instance using the [Admin
   API](usage/administration/admin_api/index.html), installing [pluggable
-  modules](modules/index.html), or by accessing the [manhole](manhole.md).
+  modules](modules/index.html), or by accessing the [manhole](administration/manhole.md).
 
-* Learn how to [read log lines](usage/administration/request_log.md), configure
+* Learn how to [read log lines](administration/request_log.md), configure
   [logging](usage/configuration/logging_sample_config.md) or set up [structured
   logging](usage/configuration/structured_logging.md).
 
 * Scale Synapse through additional [worker processes](usage/configuration/workers.md).
 
-* Set up [monitoring and metrics](metrics-howto.md) to keep an eye on your
+* Set up [monitoring and metrics](administration/metrics-howto.md) to keep an eye on your
   Synapse instance's performance.
 
 ## Developing on Synapse

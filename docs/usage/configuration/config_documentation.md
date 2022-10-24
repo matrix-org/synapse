@@ -427,9 +427,9 @@ Sub-options for each listener include:
 
 * `type`: the type of listener. Normally `http`, but other valid options are:
 
-   * `manhole`: (see the docs [here](../../manhole.md)),
+   * `manhole`: (see the docs [here](../../administration/manhole.md)),
 
-   * `metrics`: (see the docs [here](../../metrics-howto.md)),
+   * `metrics`: (see the docs [here](../../administration/metrics-howto.md)),
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
@@ -438,7 +438,7 @@ Sub-options for each listener include:
 
 * `request_id_header`: The header extracted from each incoming request that is
    used as the basis for the request ID. The request ID is used in
-   [logs](../administration/request_log.md#request-log-format) and tracing to
+   [logs](../../administration/request_log.md#request-log-format) and tracing to
    correlate and match up requests. When unset, Synapse will automatically
    generate sequential request IDs. This option is useful when Synapse is behind
    a [reverse-proxy](../../setup/reverse_proxy.md).
@@ -468,7 +468,7 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
+* `metrics`: the metrics interface. See [here](../../administration/metrics-howto.md).
 
 * `openid`: OpenID authentication. See [here](user_authentication/single_sign_on/openid.md).
 
@@ -525,7 +525,7 @@ listeners:
 ### `manhole_settings`
 
 Connection settings for the manhole. You can find more information
-on the manhole [here](../../manhole.md). Manhole sub-options include:
+on the manhole [here](../../administration/manhole.md). Manhole sub-options include:
 * `username` : the username for the manhole. This defaults to 'matrix'.
 * `password`: The password for the manhole. This defaults to 'rabbithole'.
 * `ssh_priv_key_path` and `ssh_pub_key_path`: The private and public SSH key pair used to encrypt the manhole traffic.
@@ -602,7 +602,7 @@ server owner wants to limit to the number of monthly active users. When enabled 
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
 
-See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
+See [Monthly Active Users](../../administration/monthly_active_users.md) for details on how to configure MAU.
 
 Example configuration:
 ```yaml
@@ -1139,7 +1139,7 @@ number of entries that can be stored.
 
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory
-   usage and cache entry availability. You must be using [jemalloc](../administration/admin_faq.md#help-synapse-is-slow-and-eats-all-my-ramcpu)
+   usage and cache entry availability. You must be using [jemalloc](../../administration/admin_faq.md#help-synapse-is-slow-and-eats-all-my-ramcpu)
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
@@ -2498,7 +2498,7 @@ metrics_flags:
 Whether or not to report homeserver usage statistics. This is originally
 set when generating the config. Set this option to true or false to change the current
 behavior. See
-[Reporting Homeserver Usage Statistics](../administration/monitoring/reporting_homeserver_usage_statistics.md)
+[Reporting Homeserver Usage Statistics](../../administration/reporting_homeserver_usage_statistics.md)
 for information on what data is reported.
 
 Statistics will be reported 5 minutes after Synapse starts, and then every 3 hours

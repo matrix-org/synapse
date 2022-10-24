@@ -2,7 +2,7 @@
 
 How do I become a server admin?
 ---
-If your server already has an admin account you should use the [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not) to promote other accounts to become admins.
+If your server already has an admin account you should use the [User Admin API](../../administration/admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not) to promote other accounts to become admins.
 
 If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.
 
@@ -35,7 +35,7 @@ SELECT NAME from users;
 Manually resetting passwords
 ---
 Users can reset their password through their client. Alternatively, a server admin
-can reset a user's password using the [admin API](../../admin_api/user_admin_api.md#reset-password).
+can reset a user's password using the [admin API](../../administration/admin_api/user_admin_api.md#reset-password).
 
 
 I have a problem with my server. Can I just delete my database and start again?
@@ -101,7 +101,7 @@ ORDER BY num_rows desc
 LIMIT 10;
 ```
 
-You can also use the [List Room API](../../admin_api/rooms.md#list-room-api)
+You can also use the [List Room API](../../administration/admin_api/rooms.md#list-room-api)
 and `order_by` `state_events`.
 
 
@@ -122,7 +122,7 @@ Help!! Synapse is slow and eats all my RAM/CPU!
 -----------------------------------------------
 
 First, ensure you are running the latest version of Synapse, using Python 3
-with a [PostgreSQL database](../../setup/postgres.md).
+with a [PostgreSQL database](../setup/postgres.md).
 
 Synapse's architecture is quite RAM hungry currently - we deliberately
 cache a lot of recent room data and metadata in RAM in order to speed up
@@ -157,7 +157,7 @@ massive excess of outgoing federation requests (see [discussion](https://github.
 indicate that your server is also issuing far more outgoing federation
 requests than can be accounted for by your users' activity, this is a
 likely cause. The misbehavior can be worked around by disabling presence
-in the Synapse config file: [see here](../configuration/config_documentation.md#presence).
+in the Synapse config file: [see here](../usage/configuration/config_documentation.md#presence).
 
 
 Running out of File Handles
