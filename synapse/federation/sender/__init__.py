@@ -536,7 +536,7 @@ class FederationSender(AbstractFederationSender):
 
                 if event_entries:
                     now = self.clock.time_msec()
-                    ts = max(event_to_received_ts.values())
+                    ts = max(t for t in event_to_received_ts.values() if t)
                     assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
