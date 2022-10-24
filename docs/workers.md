@@ -374,6 +374,13 @@ An `event_persister` is passed these events and is tasked with persisting them t
 database, as well as updating the events stream. This requires linking the events to
 those already in the room DAG.
 
+The `event_persister` should not be mistaken for the `event_creator`.
+An `event_creator` listening for requests that create new events, then creates
+`EventBase` objects based off those requests. It will then pass those along over
+HTTP replication to any configured event stream writers responsible for persisting
+those events (or the main process if none are configured). The `event_creator`
+is part of the [`synapse.app.generic_worker`](#synapse.app.generic_worker).
+
 An example [`stream_writers`](usage/configuration/config_documentation.md#stream_writers)
 configuration with multiple writers:
 
