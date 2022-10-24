@@ -277,6 +277,9 @@ class FakeOidcServer:
             params = parse_qs(data.decode("utf-8"))
 
             if uri == self.token_endpoint:
+                # Even though this endpoint should be protected, this does not check
+                # for client authentication. We're not checking it for simplicity,
+                # and because client authentication is tested in other standalone tests.
                 return self.post_token_handler(params)
 
         elif method == "GET":
