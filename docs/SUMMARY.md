@@ -15,7 +15,7 @@
   - [Upgrading between Synapse Versions](upgrade.md)
 
 # Usage
-  - [Federation](federate.md)
+  - [Federation](usage/federate.md)
   - [Configuration](usage/configuration/README.md)
     - [Configuration Manual](usage/configuration/config_documentation.md) 
     - [Homeserver Sample Config File](usage/configuration/homeserver_sample_config.md)

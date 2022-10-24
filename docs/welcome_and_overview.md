@@ -52,8 +52,8 @@ following documentation:
 * Understand [how Synapse is
   built](development/internal_documentation/index.html), how to [migrate
   database schemas](development/database_schema.md), learn about
-  [federation](federate.md) and how to [set up a local
-  federation](federate.md#running-a-demo-federation-of-synapses) for development.
+  [federation](usage/federate.md) and how to [set up a local
+  federation](usage/federate.md#running-a-demo-federation-of-synapses) for development.
 
 * We like to keep our `git` history clean. [Learn](development/git.md) how to
   do so!

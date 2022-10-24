@@ -14,7 +14,7 @@ production-ready setup, you will probably want to specify your domain
 (`example.com`) rather than a matrix-specific hostname here (in the same way
 that your email address is probably `user@example.com` rather than
 `user@email.example.com`) - but doing so may require more advanced setup: see
-[Setting up Federation](../federate.md).
+[Setting up Federation](../usage/federate.md).
 
 ## Installing Synapse
 
@@ -436,7 +436,7 @@ listeners:
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
-[Federation](../federate.md).
+[Federation](../usage/federate.md).
 
 ### Client Well-Known URI
 
