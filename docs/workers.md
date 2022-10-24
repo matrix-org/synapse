@@ -89,11 +89,11 @@ shared configuration file.
 
 Normally, only a couple of changes are needed to make an existing configuration
 file suitable for use with workers. First, you need to enable an
-["HTTP replication listener"](usage/configuration/config_documentation.html#listeners)
+["HTTP replication listener"](usage/configuration/config_documentation.md#listeners)
 for the main process; and secondly, you need to enable
-[redis-based replication](usage/configuration/config_documentation.html#redis).
-Optionally, a shared secret can be used to authenticate HTTP
-traffic between workers. For example:
+[redis-based replication](usage/configuration/config_documentation.md#redis).
+Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
+can be used to authenticate HTTP traffic between workers. For example:
 
 ```yaml
 # extend the existing `listeners` section. This defines the ports that the
@@ -113,26 +113,27 @@ redis:
     enabled: true
 ```
 
-See the [configuration manual](usage/configuration/config_documentation.html)
+See the [configuration manual](usage/configuration/config_documentation.md)
 for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; replication traffic is:
 
 * always unencrypted
-* unauthenticated, unless `worker_replication_secret` is configured
+* unauthenticated, unless [`worker_replication_secret`](usage/configuration/config_documentation.md#worker_replication_secret)
+  is configured
 
 
 ### Worker configuration
 
 In the config file for each worker, you must specify:
- * The type of worker ([`worker_app`](#worker_app)).
+ * The type of worker ([`worker_app`](usage/configuration/config_documentation.md#worker_app)).
    The currently available worker applications are listed [below](#available-worker-applications).
- * A unique name for the worker ([`worker_name`](#worker_name)).
+ * A unique name for the worker ([`worker_name`](usage/configuration/config_documentation.md#worker_name)).
  * The HTTP replication endpoint that it should talk to on the main synapse process
-   ([`worker_replication_host`](#worker_replication_host) and
-   [`worker_replication_http_port`](#worker_replication_http_port)).
- * If handling HTTP requests, a [`worker_listeners`](#worker_listeners) option
+   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
+   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)).
+ * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners) option
    with an `http` listener.
  * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`).
@@ -149,100 +150,6 @@ plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
 
 Obviously you should configure your reverse-proxy to route the relevant
 endpoints to the worker (`localhost:8083` in the above example).
-
----
-#### `worker_app`
-
-The type of worker. The currently available worker applications are listed
-[below](#available-worker-applications).
-
-The most common worker is the `synapse.app.generic_worker`.
-
-Example configuration:
-```yaml
-worker_app: synapse.app.generic_worker
-```
----
-#### `worker_name`
-
-A unique name for the worker. The worker needs a name to be addressed in
-further parameters and identification in log files.
-
-Example configuration:
-```yaml
-worker_name: generic_worker1
-```
----
-#### `worker_replication_host`
-
-The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_host: 127.0.0.1
-```
----
-#### `worker_replication_http_port`
-
-The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](usage/configuration/config_documentation.html#listeners).
-
-Example configuration:
-```yaml
-worker_replication_http_port: 9093
-```
----
-#### `worker_listeners`
-
-A worker can handle HTTP requests. If handling HTTP requests, a `worker_listeners`
-option with an http listener, in the same way as the
-[`listeners` option](usage/configuration/config_documentation.html#listeners)
-in the shared config.
-
-Example configuration:
-```yaml
-worker_listeners:
-  - type: http
-    port: 8083
-    resources:
-      - names: [client, federation]
-```
----
-#### `worker_daemonize`
-
-Specifies whether the worker should be daemonize. If [systemd](systemd-with-workers/README.md)
-is used, this must not configured. Systemd manages daemonization itself. Defaults to `false`.
-
-Example configuration:
-```yaml
-worker_daemonize: true
-```
----
-#### `worker_pid_file`
-
-When running Synapse worker as a daemon, the file to store the pid in. Defaults to none.
-This is the same way as the[`pid_file` option](usage/configuration/config_documentation.html#pid_file)
-in the shared config.
-
-Example configuration:
-```yaml
-worker_pid_file: DATADIR/generic_worker1.pid
-```
----
-#### `worker_log_config`
-
-This option specifies a yaml python logging config file as described
-[here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
-This is the same way as the [`log_config` option](usage/configuration/config_documentation.html#log_config)
-in the shared config.
-
-Example configuration:
-```yaml
-worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
-```
 
 ### Running Synapse with workers
 
@@ -385,7 +292,8 @@ For multiple workers not handling the SSO endpoints properly, see
 [#9427](https://github.com/matrix-org/synapse/issues/9427).
 
 Note that a [HTTP listener](usage/configuration/config_documentation.md#listeners)
-with `client` and `federation` `resources` must be configured in the `worker_listeners`
+with `client` and `federation` `resources` must be configured in the
+[`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners)
 option in the worker config.
 
 #### Load balancing
@@ -428,9 +336,10 @@ of the main process to a particular worker.
 
 To enable this, the worker must have a
 [HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
-have a `worker_name` and be listed in the `instance_map` config. The same worker
-can handle multiple streams, but unless otherwise documented, each stream can only
-have a single writer.
+have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
+and be listed in the [`instance_map`](usage/configuration/config_documentation.md#instance_map)
+config. The same worker can handle multiple streams, but unless otherwise documented,
+each stream can only have a single writer.
 
 For example, to move event persistence off to a dedicated worker, the shared
 configuration would include:
@@ -459,7 +368,13 @@ streams and the endpoints associated with them:
 
 The `events` stream experimentally supports having multiple writers, where work
 is sharded between them by room ID. Note that you *must* restart all worker
-instances when adding or removing event persisters. An example `stream_writers`
+instances when adding or removing event persisters.
+
+An `event_persister` is passed these events and is tasked with persisting them to the
+database, as well as updating the events stream. This requires linking the events to
+those already in the room DAG.
+
+An example [`stream_writers`](usage/configuration/config_documentation.md#stream_writers)
 configuration with multiple writers:
 
 ```yaml
@@ -513,16 +428,18 @@ worker. Background tasks are run periodically or started via replication. Exactl
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled). This worker doesn't handle any REST endpoints itself.
 
-To enable this, the worker must have a `worker_name` and can be configured to run
-background tasks. For example, to move background tasks to a dedicated worker,
-the shared configuration would include:
+To enable this, the worker must have a
+[`worker_name`](usage/configuration/config_documentation.md#worker_name)
+and can be configured to run background tasks. For example, to move background tasks
+to a dedicated worker, the shared configuration would include:
 
 ```yaml
 run_background_tasks_on: background_worker
 ```
 
-You might also wish to investigate the `update_user_directory_from_worker` and
-`media_instance_running_background_jobs` settings.
+You might also wish to investigate the
+[`update_user_directory_from_worker`](#updating-the-user-directory) and
+[`media_instance_running_background_jobs`](#synapseappmedia_repository) settings.
 
 An example for a dedicated background worker instance:
 
@@ -575,11 +492,14 @@ worker application type.
 ### `synapse.app.pusher`
 
 Handles sending push notifications to sygnal and email. Doesn't handle any
-REST endpoints itself, but you should set `start_pushers: False` in the
+REST endpoints itself, but you should set
+[`start_pushers: False`](usage/configuration/config_documentation.md#start_pushers) in the
 shared configuration file to stop the main synapse sending push notifications.
 
-To run multiple instances at once the `pusher_instances` option should list all
-pusher instances by their worker name, e.g.:
+To run multiple instances at once the
+[`pusher_instances`](usage/configuration/config_documentation.md#pusher_instances)
+option should list all pusher instances by their
+[`worker_name`](usage/configuration/config_documentation.md#worker_name), e.g.:
 
 ```yaml
 pusher_instances:
@@ -609,11 +529,15 @@ Note this worker cannot be load-balanced: only one instance should be active.
 ### `synapse.app.federation_sender`
 
 Handles sending federation traffic to other servers. Doesn't handle any
-REST endpoints itself, but you should set `send_federation: False` in the
-shared configuration file to stop the main synapse sending this traffic.
+REST endpoints itself, but you should set
+[`send_federation: False`](usage/configuration/config_documentation.md#send_federation)
+in the shared configuration file to stop the main synapse sending this traffic.
 
 If running multiple federation senders then you must list each
-instance in the `federation_sender_instances` option by their `worker_name`.
+instance in the
+[`federation_sender_instances`](usage/configuration/config_documentation.md#federation_sender_instances)
+option by their
+[`worker_name`](usage/configuration/config_documentation.md#worker_name).
 All instances must be stopped and started when adding or removing instances.
 For example:
 
@@ -644,7 +568,9 @@ Handles the media repository. It can handle all endpoints starting with:
     ^/_synapse/admin/v1/quarantine_media/.*$
     ^/_synapse/admin/v1/users/.*/media$
 
-You should also set `enable_media_repo: False` in the shared configuration
+You should also set
+[`enable_media_repo: False`](usage/configuration/config_documentation.md#enable_media_repo)
+in the shared configuration
 file to stop the main synapse running background jobs related to managing the
 media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.

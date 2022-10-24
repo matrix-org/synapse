@@ -1767,7 +1767,7 @@ url_preview_ip_range_blacklist:
   - 'ff00::/8'
   - 'fec0::/10'
 ```
-----
+---
 ### `url_preview_ip_range_whitelist`
 
 This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
@@ -1861,7 +1861,7 @@ Example configuration:
    - 'fr;q=0.8'
    - '*;q=0.7'
 ```
-----
+---
 ### `oembed`
 
 oEmbed allows for easier embedding content from a website. It can be
@@ -1948,7 +1948,7 @@ Example configuration:
 ```yaml
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
-----
+---
 ### `turn_username` and `turn_password`
 
 The Username and password if the TURN server needs them and does not use a token.
@@ -2367,7 +2367,7 @@ Example configuration:
 ```yaml
 session_lifetime: 24h
 ```
-----
+---
 ### `refresh_access_token_lifetime`
 
 Time that an access token remains valid for, if the session is using refresh tokens.
@@ -2423,7 +2423,7 @@ nonrefreshable_access_token_lifetime: 24h
 ```
 
 ---
-## Metrics ###
+## Metrics ##
 Config options related to metrics.
 
 ---
@@ -3671,16 +3671,22 @@ opentracing:
         false
 ```
 ---
-## Workers ##
+## Worker configuration for main process
 Configuration options related to workers.
 Workers are used to scale horizontally and distribute the load to different processes.
 
-These switches are all for the shared configuration to give the main process
-the necessary information. The configuration of the workers is described
-in detail in the [worker documentation](../../workers.md).
+The worker configuration is divided into two parts.
+
+1. These switches for the shared configuration to give the main process
+   the necessary information.
+1. And the [switches for the worker configuration file](#worker-configuration-for-workers-configuration)
+   to configure each worker them self are futher below.
+
+The manual how to configure workers is described in detail in the
+[worker documentation](../../workers.md)
 
 ---
-#### `worker_replication_secret`
+### `worker_replication_secret`
 
 A shared secret used by the replication APIs to authenticate HTTP requests
 from workers.
@@ -3706,7 +3712,7 @@ start_pushers: false
 
 It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
 in which case the work is balanced across them. Use this setting to list the pushers by
-[`worker_name`](../../workers.md#worker_name).
+[`worker_name`](#worker_name).
 
 If only one pusher worker is configured, this setting is not necessary.
 
@@ -3747,7 +3753,7 @@ federation_sender_instances:
 ---
 ### `instance_map`
 
-When using workers this should be a map from worker name to the
+When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
 Not every type of worker needs a HTTP replications listener.
 
@@ -3763,7 +3769,7 @@ instance_map:
 
 Experimental: When using workers you can define which workers should
 handle event persistence and typing notifications. Any worker
-specified here must also be in the `instance_map`.
+specified here must also be in the [`instance_map`](#instance_map).
 
 Example configuration:
 ```yaml
@@ -3799,6 +3805,108 @@ redis:
   host: localhost
   port: 6379
   password: <secret_password>
+```
+---
+## Worker configuration for workers configuration
+These switches configure each worker them self with the a worker configuration file.
+
+Note also the configuration for the
+[main process above](#worker-configuration-for-main-process).
+
+The manual how to configure workers is described in detail in the
+[worker documentation](../../workers.md)
+
+---
+### `worker_app`
+
+The type of worker. The currently available worker applications are listed
+in [worker documentation](../../workers.md#available-worker-applications).
+
+The most common worker is the
+[`synapse.app.generic_worker`](../../workers.md#synapseappgeneric_worker).
+
+Example configuration:
+```yaml
+worker_app: synapse.app.generic_worker
+```
+---
+### `worker_name`
+
+A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files.
+
+Example configuration:
+```yaml
+worker_name: generic_worker1
+```
+---
+### `worker_replication_host`
+
+The HTTP replication endpoint that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_host: 127.0.0.1
+```
+---
+### `worker_replication_http_port`
+
+The HTTP replication port that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_http_port: 9093
+```
+---
+### `worker_listeners`
+
+A worker can handle HTTP requests. If handling HTTP requests, a `worker_listeners`
+option with an http listener, in the same way as the [`listeners` option](#listeners)
+in the shared config.
+
+Example configuration:
+```yaml
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+```
+---
+### `worker_daemonize`
+
+Specifies whether the worker should be daemonize. If
+[systemd](../../systemd-with-workers/README.md) is used, this must not configured.
+Systemd manages daemonization itself. Defaults to `false`.
+
+Example configuration:
+```yaml
+worker_daemonize: true
+```
+---
+### `worker_pid_file`
+
+When running Synapse worker as a daemon, the file to store the pid in. Defaults to none.
+This is the same way as the[`pid_file` option](#pid_file) in the shared config.
+
+Example configuration:
+```yaml
+worker_pid_file: DATADIR/generic_worker1.pid
+```
+---
+### `worker_log_config`
+
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
+This is the same way as the [`log_config` option](#log_config) in the shared config.
+
+Example configuration:
+```yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
 ---
 ## Background Updates ##
