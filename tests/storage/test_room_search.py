@@ -24,7 +24,7 @@ from synapse.api.errors import StoreError
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main import DataStore
-from synapse.storage.databases.main.search import Phrase, SearchToken, _tokenize_query
+from synapse.storage.databases.main.search import FollowedBy, Phrase, SearchToken, _tokenize_query
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.util import Clock
@@ -211,6 +211,7 @@ class MessageSearchTest(HomeserverTestCase):
     The result can be compared to the tokenized version for SQLite and Postgres < 11.
 
     """
+
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -241,12 +242,17 @@ class MessageSearchTest(HomeserverTestCase):
         ('" quick "', True),
         ('" nope"', False),
     ]
+    # TODO Test non-ASCII cases.
 
-    # Case that fail on sqlite.
+    # Case that fail on SQLite.
     POSTGRES_CASES = [
+        # SQLite treats NOT as a binary operator.
         ("- fox", False),
         ("- nope", True),
         ('"-fox quick', False),
+        # PostgreSQL skips stop words.
+        ('"the quick brown"', True),
+        ('"over lazy"', True),
     ]
 
     def prepare(
@@ -265,17 +271,19 @@ class MessageSearchTest(HomeserverTestCase):
         """Test the custom logic to tokenize a user's query."""
         cases = (
             ("brown", ["brown"]),
-            ("quick brown", ["quick", "brown"]),
-            ("quick \t brown", ["quick", "brown"]),
-            ('"brown quick"', [Phrase(["brown", "quick"])]),
+            ("quick brown", ["quick", SearchToken.And, "brown"]),
+            ("quick \t brown", ["quick", SearchToken.And, "brown"]),
+            ('"brown quick"', [Phrase(["brown", FollowedBy(1), "quick"])]),
             ("furphy OR fox", ["furphy", SearchToken.Or, "fox"]),
             ("fox -brown", ["fox", SearchToken.Not, "brown"]),
             ("- fox", [SearchToken.Not, "fox"]),
-            ('"fox" quick', [Phrase(["fox"]), "quick"]),
+            ('"fox" quick', [Phrase(["fox"]), SearchToken.And, "quick"]),
             # No trailing double quoe.
-            ('"fox quick', ["fox", "quick"]),
-            ('"-fox quick', [SearchToken.Not, "fox", "quick"]),
+            ('"fox quick', ["fox", SearchToken.And, "quick"]),
+            ('"-fox quick', [SearchToken.Not, "fox", SearchToken.And, "quick"]),
             ('" quick "', [Phrase(["quick"])]),
+            ('q"uick brow"n', ["q", SearchToken.And, Phrase(["uick", FollowedBy(1), "brow"]), SearchToken.And, "n"]),
+            ('-"quick brown"', [SearchToken.Not, Phrase(["quick", FollowedBy(1), "brown"])]),
         )
 
         for query, expected in cases:

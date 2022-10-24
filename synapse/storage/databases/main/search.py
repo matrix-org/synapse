@@ -783,7 +783,12 @@ def _to_postgres_options(options_dict: JsonDict) -> str:
 
 @dataclass
 class Phrase:
-    phrase: List[str]
+    phrase: List[Union[str, "FollowedBy"]]
+
+
+@dataclass
+class FollowedBy:
+    proximity: int
 
 
 class SearchToken(enum.Enum):
@@ -792,8 +797,14 @@ class SearchToken(enum.Enum):
     And = enum.auto()
 
 
-Token = Union[str, Phrase, SearchToken]
+Token = Union[str, Phrase, FollowedBy, SearchToken]
 TokenList = List[Token]
+
+
+def _is_stop_word(word: str) -> bool:
+    # TODO Pull these out of the dictionary:
+    #  https://github.com/postgres/postgres/blob/master/src/backend/snowball/stopwords/english.stop
+    return word in {"the", "a", "you", "me", "and", "but"}
 
 
 def _tokenize_query(query: str) -> TokenList:
@@ -815,57 +826,68 @@ def _tokenize_query(query: str) -> TokenList:
 
     """
     tokens: TokenList = []
-    # Split by runs on whitespace.
-    words = deque(query.split())
-    while words:
-        word = words.popleft()
-        if word.startswith('"'):
-            phrase_word = word[1:]
-            # Continue to handle additional words until a word ends in a
-            # double quote.
+
+    # Find phrases.
+    in_phrase = False
+    parts = deque(query.split('"'))
+    for i, part in enumerate(parts):
+        # The contents inside double quotes is treated as a phrase, a trailing
+        # double quote is not implied.
+        in_phrase = bool(i % 2) and i != (len(parts) - 1)
+
+        # Pull out the individual words, discarding any non-word characters.
+        words = deque(re.findall(r"([\w\-]+)", part, re.UNICODE))
+
+        # Phrases have simplified handling of words.
+        if in_phrase:
+            proximity = 1
             phrase = []
-            while True:
-                # If the word ends in a double quote, the phrase is over. Strip
-                # the double quote from the word.
-                found_end_quote = False
-                if phrase_word.endswith('"'):
-                    phrase_word = phrase_word[:-1]
-                    found_end_quote = True
+            for word in words:
+                # Skip stop words, but track the number that are skipped.
+                if _is_stop_word(word):
+                    proximity += 1
+                    continue
 
-                # If the phrase word is blank, then a bare double quote was found,
-                # do not add it to the phrase.
-                if phrase_word:
-                    phrase.append(phrase_word)
+                # If words already exist in the phrase, add a followed-by operator.
+                if phrase:
+                    phrase.append(FollowedBy(proximity))
 
-                # When a double quote is found, all done with the phrase.
-                if found_end_quote:
-                    break
+                phrase.append(word)
+                proximity = 1
 
-                # Nothing left to process, but no end double quote was found.
-                if not words:
-                    # Place each word in the phrase word back onto the deque.
-                    #
-                    # (Note that this word use the stripped double quote on the
-                    # first word, this is correct behavior to match websearch_to_tsquery.)
-                    words.extendleft(reversed(phrase))
-                    break
+            # Consecutive words are implictly ANDed together.
+            if tokens and tokens[-1] not in (SearchToken.Not, SearchToken.Or):
+                tokens.append(SearchToken.And)
 
-                phrase_word = words.popleft()
-            if found_end_quote:
-                tokens.append(Phrase(phrase))
-        elif word.startswith("-"):
-            tokens.append(SearchToken.Not)
+            # Add the phrase.
+            tokens.append(Phrase(phrase))
+            continue
 
-            # If there's no word after the hyphen, ignore.
-            word = word[1:]
-            if word:
+        # Otherwise, not in a phrase.
+        while words:
+            word = words.popleft()
+
+            if word.startswith("-"):
+                tokens.append(SearchToken.Not)
+
+                # If there's more word, put it back to be processed again.
+                word = word[1:]
+                if word:
+                    words.appendleft(word)
+            elif word.lower() == "or":
+                tokens.append(SearchToken.Or)
+            else:
+                # Skip stop words.
+                if _is_stop_word(word):
+                    continue
+
+                # Consecutive words are implictly ANDed together.
+                if tokens and tokens[-1] not in (SearchToken.Not, SearchToken.Or):
+                    tokens.append(SearchToken.And)
+
+                # Add the search term.
                 tokens.append(word)
-        elif word.lower() == "or":
-            tokens.append(SearchToken.Or)
-        elif word.lower() == "and":
-            tokens.append(SearchToken.And)
-        else:
-            tokens.append(word)
+
     return tokens
 
 
@@ -881,9 +903,16 @@ def _tokens_to_tsquery(tokens: TokenList) -> str:
         if isinstance(token, str):
             tsquery.append(token)
         elif isinstance(token, Phrase):
-            tsquery.append(" ( " + " <-> ".join(token.phrase) + " ) ")
+            tsquery.append(
+                " ( "
+                + "".join(
+                    t if isinstance(t, str) else f" <{t.proximity}> "
+                    for t in token.phrase
+                )
+                + " ) "
+            )
         elif token == SearchToken.Not:
-            tsquery.append("!")
+            tsquery.append(" !")
         elif token == SearchToken.Or:
             tsquery.append(" | ")
         elif token == SearchToken.And:
@@ -911,17 +940,20 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
     for token in tokens:
         if isinstance(token, str):
             match_query.append(token)
-            match_query.append(" ")
         elif isinstance(token, Phrase):
-            match_query.append(' "' + " ".join(token.phrase) + '" ')
+            # SQLite doesn't support followed by operators. NEAR is close, but
+            # discards order.
+            match_query.append(
+                '"' + " ".join(t for t in token.phrase if isinstance(t, str)) + '"'
+            )
         elif token == SearchToken.Not:
             # TODO: SQLite treats NOT as a *binary* operator. Hopefully a search
             # term has already been added before this.
-            match_query.append("NOT ")
+            match_query.append(" NOT ")
         elif token == SearchToken.Or:
-            match_query.append("OR ")
+            match_query.append(" OR ")
         elif token == SearchToken.And:
-            match_query.append("AND ")
+            match_query.append(" AND ")
         else:
             raise ValueError(f"unknown token {token}")
 
