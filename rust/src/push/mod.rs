@@ -479,7 +479,7 @@ fn test_deserialize_condition() {
 }
 
 #[test]
-fn test_deserialize_unstable_condition() {
+fn test_deserialize_unstable_msc3664_condition() {
     let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern":"coffee","rel_type":"m.in_reply_to"}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
