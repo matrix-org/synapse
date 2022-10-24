@@ -675,6 +675,7 @@ class OidcProvider:
             The decoded claims in the ID token.
         """
         id_token = token.get("id_token")
+        logger.debug("Attempting to decode JWT id_token %r", id_token)
 
         # That has been theoritically been checked by the caller, so even though
         # assertion are not enabled in production, it is mainly here to appease mypy
@@ -694,9 +695,6 @@ class OidcProvider:
         jwt = JsonWebToken(alg_values)
 
         claim_options = {"iss": {"values": [metadata["issuer"]]}}
-
-        id_token = token["id_token"]
-        logger.debug("Attempting to decode JWT id_token %r", id_token)
 
         # Try to decode the keys in cache first, then retry by forcing the keys
         # to be reloaded
