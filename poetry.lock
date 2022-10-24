@@ -1120,7 +1120,7 @@ testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (
 
 [[package]]
 name = "setuptools-rust"
-version = "1.5.1"
+version = "1.5.2"
 description = "Setuptools Rust extension plugin"
 category = "main"
 optional = false
@@ -2539,8 +2539,8 @@ setuptools = [
     {file = "setuptools-65.3.0.tar.gz", hash = "sha256:7732871f4f7fa58fb6bdcaeadb0161b2bd046c85905dbaa066bdcbcc81953b57"},
 ]
 setuptools-rust = [
-    {file = "setuptools-rust-1.5.1.tar.gz", hash = "sha256:0e05e456645d59429cb1021370aede73c0760e9360bbfdaaefb5bced530eb9d7"},
-    {file = "setuptools_rust-1.5.1-py3-none-any.whl", hash = "sha256:306b236ff3aa5229180e58292610d0c2c51bb488191122d2fc559ae4caeb7d5e"},
+    {file = "setuptools-rust-1.5.2.tar.gz", hash = "sha256:d8daccb14dc0eae1b6b6eb3ecef79675bd37b4065369f79c35393dd5c55652c7"},
+    {file = "setuptools_rust-1.5.2-py3-none-any.whl", hash = "sha256:8eb45851e34288f2296cd5ab9e924535ac1757318b730a13fe6836867843f206"},
 ]
 signedjson = [
     {file = "signedjson-1.1.4-py3-none-any.whl", hash = "sha256:45569ec54241c65d2403fe3faf7169be5322547706a231e884ca2b427f23d228"},
