@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.70.0rc1 where edits to non-message events were aggregated by the homeserver.
