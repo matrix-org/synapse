@@ -39,6 +39,7 @@
 # continue to work if so.
 
 import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -103,6 +104,34 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$",
             "^/_matrix/client/(api/v1|r0|v3)/initialSync$",
             "^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$",
+        ],
+        "shared_extra_conf": {},
+        "worker_extra_conf": "",
+    },
+    "client_reader": {
+        "app": "synapse.app.generic_worker",
+        "listener_resources": ["client"],
+        "endpoint_patterns": [
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/publicRooms$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/joined_members$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$",
+            "^/_matrix/client/v1/rooms/.*/hierarchy$",
+            "^/_matrix/client/(v1|unstable)/rooms/.*/relations/",
+            "^/_matrix/client/v1/rooms/.*/threads$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/login$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/account/whoami$",
+            "^/_matrix/client/versions$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$",
+            "^/_matrix/client/(r0|v3|unstable)/register$",
+            "^/_matrix/client/(r0|v3|unstable)/auth/.*/fallback/web$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/messages$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms",
+            "^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/search",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -201,22 +230,17 @@ upstream {upstream_worker_type} {{
 
 # Utility functions
 def log(txt: str) -> None:
-    """Log something to the stdout.
-
-    Args:
-        txt: The text to log.
-    """
     print(txt)
 
 
 def error(txt: str) -> NoReturn:
-    """Log something and exit with an error code.
-
-    Args:
-        txt: The text to log in error.
-    """
-    log(txt)
+    print(txt, file=sys.stderr)
     sys.exit(2)
+
+
+def flush_buffers() -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def convert(src: str, dst: str, **template_vars: object) -> None:
@@ -299,7 +323,7 @@ def generate_base_homeserver_config() -> None:
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
     os.environ["SYNAPSE_HTTP_PORT"] = str(MAIN_PROCESS_HTTP_LISTENER_PORT)
-    subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
+    subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"], check=True)
 
 
 def generate_worker_files(
@@ -373,8 +397,8 @@ def generate_worker_files(
         # No workers, just the main process
         worker_types = []
     else:
-        # Split type names by comma
-        worker_types = worker_types_env.split(",")
+        # Split type names by comma, ignoring whitespace.
+        worker_types = [x.strip() for x in worker_types_env.split(",")]
 
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
@@ -393,8 +417,6 @@ def generate_worker_files(
 
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
-        worker_type = worker_type.strip()
-
         worker_config = WORKERS_CONFIG.get(worker_type)
         if worker_config:
             worker_config = worker_config.copy()
@@ -604,14 +626,24 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         with open(mark_filepath, "w") as f:
             f.write("")
 
+    # Lifted right out of start.py
+    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
+
+    if os.path.isfile(jemallocpath):
+        environ["LD_PRELOAD"] = jemallocpath
+    else:
+        log("Could not find %s, will not use" % (jemallocpath,))
+
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
     log("Starting supervisord")
-    os.execl(
+    flush_buffers()
+    os.execle(
         "/usr/local/bin/supervisord",
         "supervisord",
         "-c",
         "/etc/supervisor/supervisord.conf",
+        environ,
     )
 
 

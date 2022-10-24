@@ -72,6 +72,7 @@ from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
 )
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomBackgroundUpdateStore
 from synapse.storage.databases.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.databases.main.search import SearchBackgroundUpdateStore
@@ -107,7 +108,7 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "local_media_repository": ["safe_from_quarantine"],
-    "users": ["shadow_banned"],
+    "users": ["shadow_banned", "approved"],
     "e2e_fallback_keys_json": ["used"],
     "access_tokens": ["used"],
     "device_lists_changes_in_room": ["converted_to_destinations"],
@@ -206,6 +207,7 @@ class Store(
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     ReceiptsBackgroundUpdateStore,
+    RelationsWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)

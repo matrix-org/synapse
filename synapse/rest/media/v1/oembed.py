@@ -139,65 +139,72 @@ class OEmbedProvider:
         try:
             # oEmbed responses *must* be UTF-8 according to the spec.
             oembed = json_decoder.decode(raw_body.decode("utf-8"))
+        except ValueError:
+            return OEmbedResult({}, None, None)
 
-            # The version is a required string field, but not always provided,
-            # or sometimes provided as a float. Be lenient.
-            oembed_version = oembed.get("version", "1.0")
-            if oembed_version != "1.0" and oembed_version != 1:
-                raise RuntimeError(f"Invalid oEmbed version: {oembed_version}")
+        # The version is a required string field, but not always provided,
+        # or sometimes provided as a float. Be lenient.
+        oembed_version = oembed.get("version", "1.0")
+        if oembed_version != "1.0" and oembed_version != 1:
+            return OEmbedResult({}, None, None)
 
-            # Ensure the cache age is None or an int.
-            cache_age = oembed.get("cache_age")
-            if cache_age:
-                cache_age = int(cache_age) * 1000
-
-            # The results.
-            open_graph_response = {
-                "og:url": url,
-            }
-
-            title = oembed.get("title")
-            if title:
-                open_graph_response["og:title"] = title
-
-            author_name = oembed.get("author_name")
-
-            # Use the provider name and as the site.
-            provider_name = oembed.get("provider_name")
-            if provider_name:
-                open_graph_response["og:site_name"] = provider_name
-
-            # If a thumbnail exists, use it. Note that dimensions will be calculated later.
-            if "thumbnail_url" in oembed:
-                open_graph_response["og:image"] = oembed["thumbnail_url"]
-
-            # Process each type separately.
-            oembed_type = oembed["type"]
-            if oembed_type == "rich":
-                calc_description_and_urls(open_graph_response, oembed["html"])
-
-            elif oembed_type == "photo":
-                # If this is a photo, use the full image, not the thumbnail.
-                open_graph_response["og:image"] = oembed["url"]
-
-            elif oembed_type == "video":
-                open_graph_response["og:type"] = "video.other"
-                calc_description_and_urls(open_graph_response, oembed["html"])
-                open_graph_response["og:video:width"] = oembed["width"]
-                open_graph_response["og:video:height"] = oembed["height"]
-
-            elif oembed_type == "link":
-                open_graph_response["og:type"] = "website"
-
-            else:
-                raise RuntimeError(f"Unknown oEmbed type: {oembed_type}")
-
-        except Exception as e:
-            # Trap any exception and let the code follow as usual.
-            logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
-            open_graph_response = {}
-            author_name = None
+        # Attempt to parse the cache age, if possible.
+        try:
+            cache_age = int(oembed.get("cache_age")) * 1000
+        except (TypeError, ValueError):
+            # If the cache age cannot be parsed (e.g. wrong type or invalid
+            # string), ignore it.
             cache_age = None
+
+        # The oEmbed response converted to Open Graph.
+        open_graph_response: JsonDict = {"og:url": url}
+
+        title = oembed.get("title")
+        if title and isinstance(title, str):
+            open_graph_response["og:title"] = title
+
+        author_name = oembed.get("author_name")
+        if not isinstance(author_name, str):
+            author_name = None
+
+        # Use the provider name and as the site.
+        provider_name = oembed.get("provider_name")
+        if provider_name and isinstance(provider_name, str):
+            open_graph_response["og:site_name"] = provider_name
+
+        # If a thumbnail exists, use it. Note that dimensions will be calculated later.
+        thumbnail_url = oembed.get("thumbnail_url")
+        if thumbnail_url and isinstance(thumbnail_url, str):
+            open_graph_response["og:image"] = thumbnail_url
+
+        # Process each type separately.
+        oembed_type = oembed.get("type")
+        if oembed_type == "rich":
+            html = oembed.get("html")
+            if isinstance(html, str):
+                calc_description_and_urls(open_graph_response, html)
+
+        elif oembed_type == "photo":
+            # If this is a photo, use the full image, not the thumbnail.
+            url = oembed.get("url")
+            if url and isinstance(url, str):
+                open_graph_response["og:image"] = url
+
+        elif oembed_type == "video":
+            open_graph_response["og:type"] = "video.other"
+            html = oembed.get("html")
+            if html and isinstance(html, str):
+                calc_description_and_urls(open_graph_response, oembed["html"])
+            for size in ("width", "height"):
+                val = oembed.get(size)
+                if val is not None and isinstance(val, int):
+                    open_graph_response[f"og:video:{size}"] = val
+
+        elif oembed_type == "link":
+            open_graph_response["og:type"] = "website"
+
+        else:
+            logger.warning("Unknown oEmbed type: %s", oembed_type)
 
         return OEmbedResult(open_graph_response, author_name, cache_age)
 

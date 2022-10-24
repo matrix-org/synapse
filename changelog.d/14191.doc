@@ -1,0 +1,1 @@
+Update docstrings of `SynapseError` and `FederationError` to bettter describe what they are used for and the effects of using them are.

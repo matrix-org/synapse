@@ -560,7 +560,11 @@ class RestHelper:
         )
 
     def login_via_oidc(
-        self, provider: FakeOidcProvider, remote_user_id: str, with_sid: bool = False
+        self,
+        provider: FakeOidcProvider,
+        remote_user_id: str,
+        with_sid: bool = False,
+        expected_status: int = 200,
     ) -> Tuple[JsonDict, FakeAuthorizationGrant]:
         """Log in (as a new user) via OIDC
 
@@ -599,7 +603,9 @@ class RestHelper:
             "/login",
             content={"type": "m.login.token", "token": login_token},
         )
-        assert channel.code == HTTPStatus.OK
+        assert (
+            channel.code == expected_status
+        ), f"unexpected status in response: {channel.code}"
         return channel.json_body, grant
 
     def auth_via_oidc(
