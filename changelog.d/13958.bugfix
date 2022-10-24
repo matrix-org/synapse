@@ -1,1 +1,1 @@
-Fix performance bottleneck with heavy appservice and bridged users in Synapse by checking appservice user interest against the local users instead of all users.
+Check appservice user interest against the local users instead of all users in the room to align with [MSC3905](https://github.com/matrix-org/matrix-spec-proposals/pull/3905).
