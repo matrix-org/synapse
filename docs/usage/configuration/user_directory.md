@@ -7,7 +7,7 @@ who are present in a publicly viewable room present on the server.
 
 The directory info is stored in various tables, which can (typically after
 DB corruption) get stale or out of sync. If this happens, for now the
-solution to fix it is to use the [admin API](../administration/admin_api/background_updates.md#run)
+solution to fix it is to use the [admin API](../../administration/admin_api/background_updates.md#run)
 and execute the job `regenerate_directory`. This should then start a background task to
 flush the current tables and regenerate the directory.
 

@@ -1702,9 +1702,9 @@ and the original media will be removed. If either of these options are unset,
 then media of that type will not be purged.
 
 Local or cached remote media that has been
-[quarantined](../../admin_api/media_admin_api.md#quarantining-media-in-a-room)
+[quarantined](../../administration/admin_api/media_admin_api.md#quarantining-media-in-a-room)
 will not be deleted. Similarly, local media that has been marked as
-[protected from quarantine](../../admin_api/media_admin_api.md#protecting-media-from-being-quarantined)
+[protected from quarantine](../../administration/admin_api/media_admin_api.md#protecting-media-from-being-quarantined)
 will not be deleted.
 
 Example configuration:
@@ -2068,7 +2068,7 @@ enable_3pid_lookup: false
 ### `registration_requires_token`
 
 Require users to submit a token during registration.
-Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
+Tokens can be managed using the admin [API](../../administration/admin_api/registration_tokens.md).
 Disabling this option will not delete any tokens previously generated.
 Defaults to `false`. Set to `true` to enable.
 
@@ -3425,7 +3425,7 @@ This option has the following sub-options:
     
     These indexes are built the first time Synapse starts; admins can
     manually trigger a rebuild via the API following the instructions
-    [for running background updates](../administration/admin_api/background_updates.md#run),
+    [for running background updates](../../administration/admin_api/background_updates.md#run),
     set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
