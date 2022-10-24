@@ -91,12 +91,11 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "lazy_load_members": {"type": "boolean"},
         "include_redundant_members": {"type": "boolean"},
         "unread_thread_notifications": {"type": "boolean"},
-        "org.matrix.msc3773.unread_thread_notifications": {"type": "boolean"},
         # Include or exclude events with the provided labels.
         # cf https://github.com/matrix-org/matrix-doc/pull/2326
         "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
         "org.matrix.not_labels": {"type": "array", "items": {"type": "string"}},
-        # MSC3440, filtering by event relations.
+        # Filtering by event relations, deprecated.
         "related_by_senders": {"type": "array", "items": {"type": "string"}},
         "related_by_rel_types": {"type": "array", "items": {"type": "string"}},
     },
@@ -318,13 +317,6 @@ class Filter:
         self.unread_thread_notifications: bool = filter_json.get(
             "unread_thread_notifications", False
         )
-        if (
-            not self.unread_thread_notifications
-            and hs.config.experimental.msc3773_enabled
-        ):
-            self.unread_thread_notifications = filter_json.get(
-                "org.matrix.msc3773.unread_thread_notifications", False
-            )
 
         self.types = filter_json.get("types", None)
         self.not_types = filter_json.get("not_types", [])
