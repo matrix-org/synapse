@@ -790,8 +790,6 @@ class SearchToken(enum.Enum):
     Not = enum.auto()
     Or = enum.auto()
     And = enum.auto()
-    LParen = enum.auto()
-    RParen = enum.auto()
 
 
 Token = Union[str, Phrase, SearchToken]
@@ -806,7 +804,7 @@ def _tokenize_query(query: str) -> TokenList:
     The following constructs are supported:
 
     - phrase queries using "double quotes"
-    - case-insensitive `or` and `and` operators, with parentheses to change operator precedence
+    - case-insensitive `or` and `and` operators
     - negation of a keyword via unary `-`
     - unary hyphen to denote NOT e.g. 'include -exclude'
 
@@ -866,16 +864,6 @@ def _tokenize_query(query: str) -> TokenList:
             tokens.append(SearchToken.Or)
         elif word.lower() == "and":
             tokens.append(SearchToken.And)
-        elif word.startswith("("):
-            tokens.append(SearchToken.LParen)
-            word = word[1:]
-            if word:
-                tokens.append(word)
-        elif word.endswith(")"):
-            word = word[:-1]
-            if word:
-                tokens.append(word)
-            tokens.append(SearchToken.RParen)
         else:
             tokens.append(word)
     return tokens
@@ -900,18 +888,13 @@ def _tokens_to_tsquery(tokens: TokenList) -> str:
             tsquery.append(" | ")
         elif token == SearchToken.And:
             tsquery.append(" & ")
-        elif token == SearchToken.LParen:
-            tsquery.append(" ( ")
-        elif token == SearchToken.RParen:
-            tsquery.append(" ) ")
         else:
             raise ValueError(f"unknown token {token}")
 
         if (
             i != len(tokens) - 1
             and isinstance(token, (str, Phrase))
-            and tokens[i + 1]
-            not in (SearchToken.Or, SearchToken.And, SearchToken.RParen)
+            and tokens[i + 1] not in (SearchToken.Or, SearchToken.And)
         ):
             tsquery.append(" & ")
     return "".join(tsquery)
@@ -939,10 +922,6 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
             match_query.append("OR ")
         elif token == SearchToken.And:
             match_query.append("AND ")
-        elif token == SearchToken.LParen:
-            match_query.append("( ")
-        elif token == SearchToken.RParen:
-            match_query.append(") ")
         else:
             raise ValueError(f"unknown token {token}")
 
