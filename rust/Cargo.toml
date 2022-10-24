@@ -20,7 +20,7 @@ crate-type = ["lib", "cdylib"]
 name = "synapse.synapse_rust"
 
 [dependencies]
-anyhow = "1.0.63"
+anyhow = "1.0.66"
 lazy_static = "1.4.0"
 log = "0.4.17"
 pyo3 = { version = "0.17.1", features = ["extension-module", "macros", "anyhow", "abi3", "abi3-py37"] }
