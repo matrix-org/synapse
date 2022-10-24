@@ -71,7 +71,7 @@ class FakeOidcServer:
         # We generate here an ECDSA key with the P-256 curve (ES256 algorithm) used for
         # signing JWTs. ECDSA keys are really quick to generate compared to RSA.
         self.key = ECKey.generate_key(crv="P-256", is_private=True)
-        self.jwks = KeySet([ECKey.import_key(self.key.raw_key.public_key())])
+        self.jwks = KeySet([ECKey.import_key(self.key.as_pem(is_private=False))])
 
         self._id_token_overrides: Dict[str, Any] = {}
 
