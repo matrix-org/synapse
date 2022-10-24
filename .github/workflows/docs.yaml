@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Setup mdbook
-        uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
+        uses: peaceiris/actions-mdbook@adeb05db28a0c0004681db83893d56c0388ea9ea # v1.1.14
         with:
           mdbook-version: '0.4.17'
 
