@@ -81,7 +81,7 @@ The following fields are returned in the JSON response body:
   - `failure_ts` - nullable integer - The first time Synapse tried and failed to reach the
     remote server, in ms. This is `null` if communication with the remote server has never failed.
   - `last_successful_stream_ordering` - nullable integer - The stream ordering of the most
-    recent successfully-sent [PDU](understanding_synapse_through_grafana_graphs.md#federation)
+    recent successfully-sent [PDU](../understanding_synapse_through_grafana_graphs.md#federation)
     to this destination, or `null` if this information has not been tracked yet.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
@@ -174,7 +174,7 @@ The following fields are returned in the JSON response body:
   Room objects contain the following fields:
   - `room_id` - string - The ID of the room.
   - `stream_ordering` - integer -  The stream ordering of the most recent
-    successfully-sent [PDU](understanding_synapse_through_grafana_graphs.md#federation)
+    successfully-sent [PDU](../understanding_synapse_through_grafana_graphs.md#federation)
     to this destination in this room.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.

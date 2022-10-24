@@ -115,7 +115,7 @@ something like the following in their logs:
 
     2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
 
-This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](docs/reverse_proxy.md) and double-check that your settings are correct.
+This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](../setup/reverse_proxy.md) and double-check that your settings are correct.
 
 
 Help!! Synapse is slow and eats all my RAM/CPU!
