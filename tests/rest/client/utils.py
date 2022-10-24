@@ -46,7 +46,7 @@ from synapse.types import JsonDict
 
 from tests.server import FakeChannel, FakeSite, make_request
 from tests.test_utils.html_parsers import TestHtmlParser
-from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcProvider
+from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcServer
 
 # an 'oidc_config' suitable for login_via_oidc.
 TEST_OIDC_ISSUER = "https://issuer.test/"
@@ -553,15 +553,23 @@ class RestHelper:
 
         return channel.json_body
 
-    def fake_oidc_provider(self, issuer: str = TEST_OIDC_ISSUER) -> FakeOidcProvider:
-        return FakeOidcProvider(
+    def fake_oidc_server(self, issuer: str = TEST_OIDC_ISSUER) -> FakeOidcServer:
+        """Create a ``FakeOidcServer``.
+
+        This can be used in conjuction with ``login_via_oidc``::
+
+            fake_oidc_server = self.helper.fake_oidc_server()
+            login_data, _ = self.helper.login_via_oidc(fake_oidc_server, "user")
+        """
+
+        return FakeOidcServer(
             clock=self.hs.get_clock(),
             issuer=issuer,
         )
 
     def login_via_oidc(
         self,
-        provider: FakeOidcProvider,
+        provider: FakeOidcServer,
         remote_user_id: str,
         with_sid: bool = False,
         expected_status: int = 200,
@@ -610,7 +618,7 @@ class RestHelper:
 
     def auth_via_oidc(
         self,
-        provider: FakeOidcProvider,
+        provider: FakeOidcServer,
         user_info_dict: JsonDict,
         client_redirect_url: Optional[str] = None,
         ui_auth_session_id: Optional[str] = None,
@@ -674,7 +682,7 @@ class RestHelper:
 
     def complete_oidc_auth(
         self,
-        provider: FakeOidcProvider,
+        provider: FakeOidcServer,
         oauth_uri: str,
         cookies: Mapping[str, str],
         user_info_dict: JsonDict,

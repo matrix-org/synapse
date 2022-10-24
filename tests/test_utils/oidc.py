@@ -40,7 +40,7 @@ class FakeAuthorizationGrant:
     sid: Optional[str]
 
 
-class FakeOidcProvider:
+class FakeOidcServer:
     """A fake OpenID Connect Provider."""
 
     # All methods here are mocks, so we can track when they are called, and override
@@ -83,6 +83,15 @@ class FakeOidcProvider:
         self.post_token_handler.reset_mock()
 
     def patch_homeserver(self, hs: HomeServer):
+        """Patch the ``HomeServer`` HTTP client to handle requests through the ``FakeOidcServer``.
+
+        This patch should be used whenever the HS is expected to perform request to the
+        OIDC provider, e.g.::
+
+            fake_oidc_server = self.helper.fake_oidc_server()
+            with fake_oidc_server.patch_homeserver(hs):
+                self.make_request("GET", "/_matrix/client/r0/login/sso/redirect")
+        """
         return patch.object(hs.get_proxied_http_client(), "request", self.request)
 
     @property

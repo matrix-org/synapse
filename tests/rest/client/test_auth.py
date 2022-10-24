@@ -465,7 +465,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
           * checking that the original operation succeeds
         """
 
-        fake_oidc_provider = self.helper.fake_oidc_provider()
+        fake_oidc_provider = self.helper.fake_oidc_server()
 
         # log the user in
         remote_user_id = UserID.from_string(self.user).localpart
@@ -501,7 +501,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
     @skip_unless(HAS_OIDC, "requires OIDC")
     @override_config({"oidc_config": TEST_OIDC_CONFIG})
     def test_does_not_offer_password_for_sso_user(self) -> None:
-        fake_oidc_provider = self.helper.fake_oidc_provider()
+        fake_oidc_provider = self.helper.fake_oidc_server()
         login_resp, _ = self.helper.login_via_oidc(fake_oidc_provider, "username")
         user_tok = login_resp["access_token"]
         device_id = login_resp["device_id"]
@@ -525,7 +525,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
     @override_config({"oidc_config": TEST_OIDC_CONFIG})
     def test_offers_both_flows_for_upgraded_user(self) -> None:
         """A user that had a password and then logged in with SSO should get both flows"""
-        fake_oidc_provider = self.helper.fake_oidc_provider()
+        fake_oidc_provider = self.helper.fake_oidc_server()
         login_resp, _ = self.helper.login_via_oidc(
             fake_oidc_provider, UserID.from_string(self.user).localpart
         )
@@ -546,7 +546,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
     def test_ui_auth_fails_for_incorrect_sso_user(self) -> None:
         """If the user tries to authenticate with the wrong SSO user, they get an error"""
 
-        fake_oidc_provider = self.helper.fake_oidc_provider()
+        fake_oidc_provider = self.helper.fake_oidc_server()
 
         # log the user in
         login_resp, _ = self.helper.login_via_oidc(
@@ -595,7 +595,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """Tests that if we register a user via SSO while requiring approval for new
         accounts, we still raise the correct error before logging the user in.
         """
-        fake_oidc_provider = self.helper.fake_oidc_provider()
+        fake_oidc_provider = self.helper.fake_oidc_server()
         login_resp, _ = self.helper.login_via_oidc(
             fake_oidc_provider, "username", expected_status=403
         )

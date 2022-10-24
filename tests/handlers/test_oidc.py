@@ -29,7 +29,7 @@ from synapse.util.macaroons import get_value_from_macaroon
 from synapse.util.stringutils import random_string
 
 from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
-from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcProvider
+from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcServer
 from tests.unittest import HomeserverTestCase, override_config
 
 try:
@@ -134,7 +134,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         return config
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.fake_provider = FakeOidcProvider(clock=clock, issuer=ISSUER)
+        self.fake_provider = FakeOidcServer(clock=clock, issuer=ISSUER)
 
         hs = self.setup_test_homeserver()
         self.hs_patcher = self.fake_provider.patch_homeserver(hs=hs)
