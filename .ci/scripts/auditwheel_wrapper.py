@@ -94,7 +94,7 @@ def main(wheel_file: str, dest_dir: str, archs: Optional[str]) -> None:
         # `delocate-listdeps`.
         subprocess.run(["delocate-listdeps", wheel_file], check=True)
         subprocess.run(
-            ["delocate-wheel" "--require-archs", archs, "-w", dest_dir, wheel_file],
+            ["delocate-wheel", "--require-archs", archs, "-w", dest_dir, wheel_file],
             check=True,
         )
     else:
