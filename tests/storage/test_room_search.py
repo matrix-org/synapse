@@ -24,7 +24,12 @@ from synapse.api.errors import StoreError
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main import DataStore
-from synapse.storage.databases.main.search import FollowedBy, Phrase, SearchToken, _tokenize_query
+from synapse.storage.databases.main.search import (
+    FollowedBy,
+    Phrase,
+    SearchToken,
+    _tokenize_query,
+)
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.util import Clock
@@ -282,8 +287,20 @@ class MessageSearchTest(HomeserverTestCase):
             ('"fox quick', ["fox", SearchToken.And, "quick"]),
             ('"-fox quick', [SearchToken.Not, "fox", SearchToken.And, "quick"]),
             ('" quick "', [Phrase(["quick"])]),
-            ('q"uick brow"n', ["q", SearchToken.And, Phrase(["uick", FollowedBy(1), "brow"]), SearchToken.And, "n"]),
-            ('-"quick brown"', [SearchToken.Not, Phrase(["quick", FollowedBy(1), "brown"])]),
+            (
+                'q"uick brow"n',
+                [
+                    "q",
+                    SearchToken.And,
+                    Phrase(["uick", FollowedBy(1), "brow"]),
+                    SearchToken.And,
+                    "n",
+                ],
+            ),
+            (
+                '-"quick brown"',
+                [SearchToken.Not, Phrase(["quick", FollowedBy(1), "brown"])],
+            ),
         )
 
         for query, expected in cases:

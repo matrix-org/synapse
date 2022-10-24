@@ -841,7 +841,7 @@ def _tokenize_query(query: str) -> TokenList:
         # Phrases have simplified handling of words.
         if in_phrase:
             proximity = 1
-            phrase = []
+            phrase: List[Union[str, FollowedBy]] = []
             for word in words:
                 # Skip stop words, but track the number that are skipped.
                 if _is_stop_word(word):

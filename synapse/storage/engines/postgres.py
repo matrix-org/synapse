@@ -173,6 +173,7 @@ class PostgresEngine(
     @property
     def supports_websearch_to_tsquery(self) -> bool:
         # Postgres 11 added support for websearch_to_tsquery.
+        assert self._version is not None
         return self._version >= 110000
 
     def is_deadlock(self, error: Exception) -> bool:
