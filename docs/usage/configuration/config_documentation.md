@@ -3493,7 +3493,7 @@ user_consent:
 ---
 ### `stats`
 
-Settings for local room and user statistics collection. See [here](../../room_and_user_statistics.md)
+Settings for local room and user statistics collection. See [here](../../development/internal_documentation/room_and_user_statistics.md)
 for more.
 
 * `enabled`: Set to false to disable room and user statistics. Note that doing
@@ -3642,7 +3642,7 @@ synapse or any other services which support opentracing
 Sub-options include:
 * `enabled`: whether tracing is enabled. Set to true to enable. Disabled by default.
 * `homeserver_whitelist`: The list of homeservers we wish to send and receive span contexts and span baggage.
-   See [here](../../opentracing.md) for more.
+   See [here](../../development/opentracing.md) for more.
    This is a list of regexes which are matched against the `server_name` of the homeserver.
    By default, it is empty, so no servers are matched.
 * `force_tracing_for_users`: # A list of the matrix IDs of users whose requests will always be traced,

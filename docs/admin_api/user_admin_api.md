@@ -548,8 +548,8 @@ The following fields are returned in the JSON response body:
 ### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
 These are media that the user has uploaded themselves
-([local media](../media_repository.md#local-media)), as well as
-[URL preview images](../media_repository.md#url-previews) requested by the user if the
+([local media](../development/internal_documentation/media_repository.md#local-media)), as well as
+[URL preview images](../development/internal_documentation/media_repository.md#url-previews) requested by the user if the
 [feature is enabled](../usage/configuration/config_documentation.md#url_preview_enabled).
 
 By default, the response is ordered by descending creation date and ascending media ID.
@@ -650,7 +650,7 @@ The following fields are returned in the JSON response body:
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
   - `media_id` - string - The id used to refer to the media. Details about the format
     are documented under
-    [media repository](../media_repository.md).
+    [media repository](../development/internal_documentation/media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
   - `quarantined_by` - string - The user ID that initiated the quarantine request

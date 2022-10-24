@@ -103,9 +103,9 @@ Synapse developers.
 regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
-Synapse's code style is documented [here](../code_style.md). Please follow
+Synapse's code style is documented [here](code_style.md). Please follow
 it, including the conventions for the [sample configuration
-file](../code_style.md#configuration-file-format).
+file](code_style.md#configuration-file-format).
 
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please

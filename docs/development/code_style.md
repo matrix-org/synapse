@@ -75,7 +75,7 @@ on save as they take a while and can be very resource intensive.
 When adding a configuration option to the code, if several settings are grouped into a single dict, ensure that your code
 correctly handles the top-level option being set to `None` (as it will be if no sub-options are enabled).
 
-The [configuration manual](usage/configuration/config_documentation.md) acts as a
+The [configuration manual](../usage/configuration/config_documentation.md) acts as a
 reference to Synapse's configuration options for server administrators.
 Remember that many readers will be unfamiliar with YAML and server
 administration in general, so it is important that when you add
