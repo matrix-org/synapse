@@ -669,7 +669,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         cached_method_name="get_rooms_for_user",
         list_name="user_ids",
     )
-    async def get_rooms_for_users(
+    async def _get_rooms_for_users(
         self, user_ids: Collection[str]
     ) -> Dict[str, FrozenSet[str]]:
         """A batched version of `get_rooms_for_user`.
@@ -699,6 +699,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_rooms[row["state_key"]].add(row["room_id"])
 
         return {key: frozenset(rooms) for key, rooms in user_rooms.items()}
+
+    async def get_rooms_for_users(
+        self, user_ids: Collection[str]
+    ) -> Dict[str, FrozenSet[str]]:
+        """A batched wrapper around `_get_rooms_for_users`, to prevent locking
+        other calls to `get_rooms_for_user` for large user lists.
+        """
+        all_user_rooms: Dict[str, FrozenSet[str]] = {}
+
+        # 250 users is pretty arbitrary but the data can be quite large if users
+        # are in many rooms.
+        for batch_user_ids in batch_iter(user_ids, 250):
+            all_user_rooms.update(await self._get_rooms_for_users(batch_user_ids))
+
+        return all_user_rooms
 
     @cached(max_entries=10000)
     async def does_pair_of_users_share_a_room(

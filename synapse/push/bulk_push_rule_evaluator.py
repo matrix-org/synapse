@@ -13,32 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
     Union,
 )
 
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
-from synapse.synapse_rust.push import FilteredPushRules, PushRule, PushRuleEvaluator
+from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
@@ -117,9 +114,6 @@ class BulkPushRuleEvaluator:
             resizable=False,
         )
 
-        # Whether to support MSC3772 is supported.
-        self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
-
     async def _get_rules_for_event(
         self,
         event: EventBase,
@@ -171,8 +165,21 @@ class BulkPushRuleEvaluator:
         return rules_by_user
 
     async def _get_power_levels_and_sender_level(
-        self, event: EventBase, context: EventContext
+        self,
+        event: EventBase,
+        context: EventContext,
+        event_id_to_event: Mapping[str, EventBase],
     ) -> Tuple[dict, Optional[int]]:
+        """
+        Given an event and an event context, get the power level event relevant to the event
+        and the power level of the sender of the event.
+        Args:
+            event: event to check
+            context: context of event to check
+            event_id_to_event: a mapping of event_id to event for a set of events being
+            batch persisted. This is needed as the sought-after power level event may
+            be in this batch rather than the DB
+        """
         # There are no power levels and sender levels possible to get from outlier
         if event.internal_metadata.is_outlier():
             return {}, None
@@ -183,15 +190,26 @@ class BulkPushRuleEvaluator:
         )
         pl_event_id = prev_state_ids.get(POWER_KEY)
 
+        # fastpath: if there's a power level event, that's all we need, and
+        # not having a power level event is an extreme edge case
         if pl_event_id:
-            # fastpath: if there's a power level event, that's all we need, and
-            # not having a power level event is an extreme edge case
-            auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
+            # Get the power level event from the batch, or fall back to the database.
+            pl_event = event_id_to_event.get(pl_event_id)
+            if pl_event:
+                auth_events = {POWER_KEY: pl_event}
+            else:
+                auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
         else:
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=False
             )
             auth_events_dict = await self.store.get_events(auth_events_ids)
+            # Some needed auth events might be in the batch, combine them with those
+            # fetched from the database.
+            for auth_event_id in auth_events_ids:
+                auth_event = event_id_to_event.get(auth_event_id)
+                if auth_event:
+                    auth_events_dict[auth_event_id] = auth_event
             auth_events = {(e.type, e.state_key): e for e in auth_events_dict.values()}
 
         sender_level = get_user_power_level(event.sender, auth_events)
@@ -200,61 +218,38 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _get_mutual_relations(
-        self, parent_id: str, rules: Iterable[Tuple[PushRule, bool]]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
+    async def action_for_events_by_user(
+        self, events_and_context: List[Tuple[EventBase, EventContext]]
+    ) -> None:
+        """Given a list of events and their associated contexts, evaluate the push rules
+        for each event, check if the message should increment the unread count, and
+        insert the results into the event_push_actions_staging table.
         """
-        Fetch event metadata for events which related to the same event as the given event.
-
-        If the given event has no relation information, returns an empty dictionary.
-
-        Args:
-            parent_id: The event ID which is targeted by relations.
-            rules: The push rules which will be processed for this event.
-
-        Returns:
-            A dictionary of relation type to:
-                A set of tuples of:
-                    The sender
-                    The event type
-        """
-
-        # If the experimental feature is not enabled, skip fetching relations.
-        if not self._relations_match_enabled:
-            return {}
-
-        # Pre-filter to figure out which relation types are interesting.
-        rel_types = set()
-        for rule, enabled in rules:
-            if not enabled:
-                continue
-
-            for condition in rule.conditions:
-                if condition["kind"] != "org.matrix.msc3772.relation_match":
-                    continue
-
-                # rel_type is required.
-                rel_type = condition.get("rel_type")
-                if rel_type:
-                    rel_types.add(rel_type)
-
-        # If no valid rules were found, no mutual relations.
-        if not rel_types:
-            return {}
-
-        # If any valid rules were found, fetch the mutual relations.
-        return await self.store.get_mutual_event_relations(parent_id, rel_types)
+        # For batched events the power level events may not have been persisted yet,
+        # so we pass in the batched events. Thus if the event cannot be found in the
+        # database we can check in the batch.
+        event_id_to_event = {e.event_id: e for e, _ in events_and_context}
+        for event, context in events_and_context:
+            await self._action_for_event_by_user(event, context, event_id_to_event)
 
     @measure_func("action_for_event_by_user")
-    async def action_for_event_by_user(
-        self, event: EventBase, context: EventContext
+    async def _action_for_event_by_user(
+        self,
+        event: EventBase,
+        context: EventContext,
+        event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-        """Given an event and context, evaluate the push rules, check if the message
-        should increment the unread count, and insert the results into the
-        event_push_actions_staging table.
-        """
-        if not event.internal_metadata.is_notifiable():
-            # Push rules for events that aren't notifiable can't be processed by this
+
+        if (
+            not event.internal_metadata.is_notifiable()
+            or event.internal_metadata.is_historical()
+        ):
+            # Push rules for events that aren't notifiable can't be processed by this and
+            # we want to skip push notification actions for historical messages
+            # because we don't want to notify people about old history back in time.
+            # The historical messages also do not have the proper `context.current_state_ids`
+            # and `state_groups` because they have `prev_events` that aren't persisted yet
+            # (historical messages persisted in reverse-chronological order).
             return
 
         # Disable counting as unread unless the experimental configuration is
@@ -274,28 +269,35 @@ class BulkPushRuleEvaluator:
         (
             power_levels,
             sender_power_level,
-        ) = await self._get_power_levels_and_sender_level(event, context)
+        ) = await self._get_power_levels_and_sender_level(
+            event, context, event_id_to_event
+        )
 
+        # Find the event's thread ID.
         relation = relation_from_event(event)
-        # If the event does not have a relation, then cannot have any mutual
-        # relations or thread ID.
-        relations = {}
-        thread_id = "main"
+        # If the event does not have a relation, then it cannot have a thread ID.
+        thread_id = MAIN_TIMELINE
         if relation:
-            relations = await self._get_mutual_relations(
-                relation.parent_id,
-                itertools.chain(*(r.rules() for r in rules_by_user.values())),
-            )
+            # Recursively attempt to find the thread this event relates to.
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
+            else:
+                # Since the event has not yet been persisted we check whether
+                # the parent is part of a thread.
+                thread_id = await self.store.get_thread_id(relation.parent_id)
+
+        # It's possible that old room versions have non-integer power levels (floats or
+        # strings). Workaround this by explicitly converting to int.
+        notification_levels = power_levels.get("notifications", {})
+        if not event.room_version.msc3667_int_only_power_levels:
+            for user_id, level in notification_levels.items():
+                notification_levels[user_id] = int(level)
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels.get("notifications", {}),
-            relations,
-            self._relations_match_enabled,
+            notification_levels,
         )
 
         users = rules_by_user.keys()

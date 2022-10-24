@@ -5,10 +5,4 @@ worker_name: synapse-federation-sender-1
 worker_replication_host: synapse
 worker_replication_http_port: 9093
 
-worker_listeners:
-  - type: http
-    port: 8034
-    resources:
-      - names: [replication]
-
 worker_log_config: /data/federation_sender.log.config

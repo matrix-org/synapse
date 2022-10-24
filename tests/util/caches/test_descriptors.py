@@ -1037,5 +1037,5 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         obj = Cls()
 
         # Make sure this raises an error about the arg mismatch
-        with self.assertRaises(Exception):
+        with self.assertRaises(TypeError):
             obj.list_fn([("foo", "bar")])
