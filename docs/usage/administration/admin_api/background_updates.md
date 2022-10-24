@@ -106,4 +106,4 @@ The following JSON body parameters are available:
 
 - `job_name` - A string which job to run. Valid values are:
   - `populate_stats_process_rooms` - Recalculate the stats for all rooms.
-  - `regenerate_directory` - Recalculate the [user directory](../../../user_directory.md) if it is stale or out of sync.
+  - `regenerate_directory` - Recalculate the [user directory](../../configuration/user_directory.md) if it is stale or out of sync.

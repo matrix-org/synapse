@@ -460,7 +460,7 @@ Valid resource names are:
 
 * `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
 
-* `consent`: user consent forms (/_matrix/consent). See [here](../../consent_tracking.md) for more.
+* `consent`: user consent forms (/_matrix/consent). See [here](consent_tracking.md) for more.
 
 * `federation`: the server-server API (/_matrix/federation). Also implies `media`, `keys`, `openid`
 
@@ -470,9 +470,9 @@ Valid resource names are:
 
 * `metrics`: the metrics interface. See [here](../../metrics-howto.md).
 
-* `openid`: OpenID authentication. See [here](../../openid.md).
+* `openid`: OpenID authentication. See [here](user_authentication/single_sign_on/openid.md).
 
-* `replication`: the HTTP replication API (/_synapse/replication). See [here](../../workers.md).
+* `replication`: the HTTP replication API (/_synapse/replication). See [here](workers.md).
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
 
@@ -835,7 +835,7 @@ find template files in to use to generate email or HTML page contents.
 If not set, or a file is not found within the template directory, a default
 template from within the Synapse package will be used.
 
-See [here](../../templates.md) for more
+See [here](templates.md) for more
 information about using custom templates.
 
 Example configuration:
@@ -862,7 +862,7 @@ The message retention policies feature is disabled by default. Please be advised
 that enabling this feature carries some risk. There are known bugs with the implementation
 which can cause database corruption. Setting retention to delete older history
 is less risky than deleting newer history but in general caution is advised when enabling this
-experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
+experimental feature. You can read more about this feature [here](message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -1879,7 +1879,7 @@ oembed:
 ---
 ## Captcha ##
 
-See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
+See [here](CAPTCHA_SETUP.md) for full details on setting up captcha.
 
 ---
 ### `recaptcha_public_key`
@@ -2879,7 +2879,7 @@ saml2_config:
 ### `oidc_providers`
 
 List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
-and login. See [here](../../openid.md)
+and login. See [here](user_authentication/single_sign_on/openid.md)
 for information on how to configure these options.
 
 For backwards compatibility, it is also possible to configure a single OIDC
@@ -2977,7 +2977,7 @@ Options for each entry include:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See [OpenID Mapping Providers](../../sso_mapping_providers.md#openid-mapping-providers)
+        See [OpenID Mapping Providers](user_authentication/single_sign_on/sso_mapping_providers.md#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
@@ -3096,7 +3096,7 @@ Additional settings to use with single-sign on systems such as OpenID Connect,
 SAML2 and CAS.
 
 Server admins can configure custom templates for pages related to SSO. See
-[here](../../templates.md) for more information.
+[here](templates.md) for more information.
 
 Options include:
 * `client_whitelist`: A list of client URLs which are whitelisted so that the user does not
@@ -3142,7 +3142,7 @@ and issued at ("iat") claims are validated if present.
 Note that this is a non-standard login type and client support is
 expected to be non-existent.
 
-See [here](../../jwt.md) for more.
+See [here](user_authentication/jwt.md) for more.
 
 Additional sub-options for this setting include:
 * `enabled`: Set to true to enable authorization using JSON web
@@ -3245,7 +3245,7 @@ ui_auth:
 Configuration for sending emails from Synapse.
 
 Server admins can configure custom templates for email content. See
-[here](../../templates.md) for more information.
+[here](templates.md) for more information.
 
 This setting has the following sub-options:
 * `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
@@ -3442,7 +3442,7 @@ user_directory:
 ---
 ### `user_consent`
 
-For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
+For detailed instructions on user consent configuration, see [here](consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
 [`listeners`](#listeners), in particular `template_dir` and `version`.

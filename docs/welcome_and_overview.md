@@ -21,9 +21,9 @@ This documentation covers topics for **installation**, **configuration** and
 
 * Learn how to [read log lines](usage/administration/request_log.md), configure
   [logging](usage/configuration/logging_sample_config.md) or set up [structured
-  logging](structured_logging.md).
+  logging](usage/configuration/structured_logging.md).
 
-* Scale Synapse through additional [worker processes](workers.md).
+* Scale Synapse through additional [worker processes](usage/configuration/workers.md).
 
 * Set up [monitoring and metrics](metrics-howto.md) to keep an eye on your
   Synapse instance's performance.

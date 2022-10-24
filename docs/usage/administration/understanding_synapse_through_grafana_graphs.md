@@ -79,6 +79,6 @@ indicator of problems, and a symptom of other problems though, so check other gr
 
 If you're still having performance problems with your Synapse instance and you've 
 tried everything you can, it may just be a lack of system resources. Consider adding
-more CPU and RAM, and make use of [worker mode](../../workers.md) 
+more CPU and RAM, and make use of [worker mode](../configuration/workers.md) 
 to make use of multiple CPU cores / multiple machines for your homeserver.
 

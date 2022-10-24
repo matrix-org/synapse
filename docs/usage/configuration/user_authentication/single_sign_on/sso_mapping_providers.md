@@ -37,7 +37,7 @@ as Synapse). The Synapse config is then modified to point to the mapping provide
 ## OpenID Mapping Providers
 
 The OpenID mapping provider can be customized by editing the
-[`oidc_providers.user_mapping_provider.module`](usage/configuration/config_documentation.md#oidc_providers)
+[`oidc_providers.user_mapping_provider.module`](../../config_documentation.md#oidc_providers)
 config option.
 
 `oidc_providers.user_mapping_provider.config` allows you to provide custom

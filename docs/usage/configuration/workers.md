@@ -68,7 +68,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-[the reverse proxy documentation](setup/reverse_proxy.md) for information on setting up a reverse
+[the reverse proxy documentation](../../setup/reverse_proxy.md) for information on setting up a reverse
 proxy.
 
 When using workers, each worker process has its own configuration file which
@@ -128,7 +128,7 @@ In the config file for each worker, you must specify:
  * The HTTP replication endpoint that it should talk to on the main synapse process
    (`worker_replication_host` and `worker_replication_http_port`)
  * If handling HTTP requests, a `worker_listeners` option with an `http`
-   listener, in the same way as the [`listeners`](usage/configuration/config_documentation.md#listeners)
+   listener, in the same way as the [`listeners`](config_documentation.md#listeners)
    option in the shared config.
  * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`).
@@ -287,7 +287,7 @@ For multiple workers not handling the SSO endpoints properly, see
 [#7530](https://github.com/matrix-org/synapse/issues/7530) and
 [#9427](https://github.com/matrix-org/synapse/issues/9427).
 
-Note that a [HTTP listener](usage/configuration/config_documentation.md#listeners)
+Note that a [HTTP listener](config_documentation.md#listeners)
 with `client` and `federation` `resources` must be configured in the `worker_listeners`
 option in the worker config.
 
@@ -330,7 +330,7 @@ Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
 
 To enable this, the worker must have a
-[HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
+[HTTP `replication` listener](config_documentation.md#listeners) configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
 can handle multiple streams, but unless otherwise documented, each stream can only
 have a single writer.
@@ -553,7 +553,7 @@ media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.
 
 In the `media_repository` worker configuration file, configure the
-[HTTP listener](usage/configuration/config_documentation.md#listeners) to
+[HTTP listener](config_documentation.md#listeners) to
 expose the `media` resource. For example:
 
 ```yaml

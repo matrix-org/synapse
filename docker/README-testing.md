@@ -98,7 +98,7 @@ Dockerfile makes use of to generate appropriate worker, nginx and supervisord co
 files.
 
 Sharding is supported for a subset of workers, in line with the
-[worker documentation](../docs/workers.md). To run multiple instances of a given worker
+[worker documentation](../docs/usage/configuration/workers.md). To run multiple instances of a given worker
 type, simply specify the type multiple times in `SYNAPSE_WORKER_TYPES`
 (e.g `SYNAPSE_WORKER_TYPES=event_creator,event_creator...`).
 

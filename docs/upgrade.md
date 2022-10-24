@@ -204,7 +204,7 @@ which relays replication commands between processes. This can give a significant
 CPU saving on the main process and is a prerequisite for upcoming
 performance improvements.
 
-To migrate to Redis add the [`redis` config](./workers.md#shared-configuration),
+To migrate to Redis add the [`redis` config](usage/configuration/workers.md#shared-configuration),
 and remove the TCP `replication` listener from config of the master and
 `worker_replication_port` from worker config. Note that a HTTP listener with a
 `replication` resource is still required.
@@ -507,8 +507,8 @@ Please see the [*Notifying Application Services*][v1_59_notify_ases_from] and
 [*Updating the User Directory*][v1_59_update_user_dir] sections of the worker
 documentation for more information.
 
-[v1_59_notify_ases_from]: workers.md#notifying-application-services
-[v1_59_update_user_dir]: workers.md#updating-the-user-directory
+[v1_59_notify_ases_from]: usage/configuration/workers.md#notifying-application-services
+[v1_59_update_user_dir]: usage/configuration/workers.md#updating-the-user-directory
 
 
 # Upgrading to v1.58.0
@@ -1050,7 +1050,7 @@ identity providers:
     `[synapse public baseurl]/_synapse/client/oidc/callback` to the list
     of permitted "redirect URIs" at the identity provider.
 
-    See the [OpenID docs](openid.md) for more information on setting
+    See the [OpenID docs](usage/configuration/user_authentication/single_sign_on/openid.md) for more information on setting
     up OpenID Connect.
 
 -   If your server is configured for single sign-on via a SAML2 identity
@@ -1286,7 +1286,7 @@ has been updated to include reverse proxy directives for
 endpoints under this prefix, **you must update your reverse proxy
 configurations for user password reset to work**.
 
-Additionally, note that the [Synapse worker documentation](workers.md) has been updated to
+Additionally, note that the [Synapse worker documentation](usage/configuration/workers.md) has been updated to
 
 :   state that the `/_synapse/client/password_reset/email/submit_token`
     endpoint can be handled

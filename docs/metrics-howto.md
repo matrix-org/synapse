@@ -92,7 +92,7 @@
 
 ## Monitoring workers
 
-To monitor a Synapse installation using [workers](workers.md),
+To monitor a Synapse installation using [workers](usage/configuration/workers.md),
 every worker needs to be monitored independently, in addition to
 the main homeserver process. This is because workers don't send
 their metrics to the main homeserver process, but expose them

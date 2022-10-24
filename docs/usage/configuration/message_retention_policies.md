@@ -52,7 +52,7 @@ clients.
 
 Support for this feature can be enabled and configured by adding a the
 `retention` in the Synapse configuration file (see
-[configuration manual](usage/configuration/config_documentation.md#retention)).
+[configuration manual](config_documentation.md#retention)).
 
 To enable support for message retention policies, set the setting
 `enabled` in this section to `true`.
@@ -88,7 +88,7 @@ expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
 Synapse will use a default configuration, which is described here in the
-[configuration manual](usage/configuration/config_documentation.md#retention).
+[configuration manual](config_documentation.md#retention).
 
 Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
