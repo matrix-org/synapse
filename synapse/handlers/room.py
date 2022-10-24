@@ -229,9 +229,7 @@ class RoomCreationHandler:
             },
         )
         validate_event_for_room_version(tombstone_event)
-        await self._event_auth_handler.check_auth_rules_from_context(
-            tombstone_event, tombstone_context
-        )
+        await self._event_auth_handler.check_auth_rules_from_context(tombstone_event)
 
         # Upgrade the room
         #
@@ -1057,9 +1055,6 @@ class RoomCreationHandler:
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
 
-        # the last event sent/persisted to the db
-        last_sent_event_id: Optional[str] = None
-
         # the most recently created event
         prev_event: List[str] = []
         # a map of event types, state keys -> event_ids. We collect these mappings this as events are
@@ -1104,26 +1099,6 @@ class RoomCreationHandler:
 
             return new_event, new_context
 
-        async def send(
-            event: EventBase,
-            context: synapse.events.snapshot.EventContext,
-            creator: Requester,
-        ) -> int:
-            nonlocal last_sent_event_id
-
-            ev = await self.event_creation_handler.handle_new_client_event(
-                requester=creator,
-                events_and_context=[(event, context)],
-                ratelimit=False,
-                ignore_shadow_ban=True,
-            )
-
-            last_sent_event_id = ev.event_id
-
-            # we know it was persisted, so must have a stream ordering
-            assert ev.internal_metadata.stream_ordering
-            return ev.internal_metadata.stream_ordering
-
         try:
             config = self._presets_dict[preset_config]
         except KeyError:
@@ -1137,10 +1112,14 @@ class RoomCreationHandler:
         )
 
         logger.debug("Sending %s in new room", EventTypes.Member)
-        await send(creation_event, creation_context, creator)
+        ev = await self.event_creation_handler.handle_new_client_event(
+            requester=creator,
+            events_and_context=[(creation_event, creation_context)],
+            ratelimit=False,
+            ignore_shadow_ban=True,
+        )
+        last_sent_event_id = ev.event_id
 
-        # Room create event must exist at this point
-        assert last_sent_event_id is not None
         member_event_id, _ = await self.room_member_handler.update_membership(
             creator,
             creator.user,
@@ -1159,6 +1138,7 @@ class RoomCreationHandler:
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
+        events_to_send = []
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
@@ -1167,7 +1147,7 @@ class RoomCreationHandler:
                 EventTypes.PowerLevels, pl_content, False
             )
             current_state_group = power_context._state_group
-            await send(power_event, power_context, creator)
+            events_to_send.append((power_event, power_context))
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1216,9 +1196,8 @@ class RoomCreationHandler:
                 False,
             )
             current_state_group = pl_context._state_group
-            await send(pl_event, pl_context, creator)
+            events_to_send.append((pl_event, pl_context))
 
-        events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             room_alias_event, room_alias_context = await create_event(
                 EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True

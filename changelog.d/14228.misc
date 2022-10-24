@@ -1,0 +1,1 @@
+Add initial power level event to batch of bulk persisted events when creating a new room.

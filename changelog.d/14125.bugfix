@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.69.0rc1 where the joined hosts for a given event were not being properly cached.
