@@ -111,7 +111,7 @@ redis:
     enabled: true
 ```
 
-See the [configuration manual](usage/configuration/config_documentation.html) for the full documentation of each option.
+See the [configuration manual](config_documentation.md) for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; replication traffic is:

@@ -16,7 +16,7 @@ This documentation covers topics for **installation**, **configuration** and
 * See how to [upgrade](upgrade.md) between Synapse versions.
 
 * Administer your instance using the [Admin
-  API](usage/administration/admin_api/index.html), installing [pluggable
+  API](administration/admin_api/index.html), installing [pluggable
   modules](modules/index.html), or by accessing the [manhole](administration/manhole.md).
 
 * Learn how to [read log lines](administration/request_log.md), configure

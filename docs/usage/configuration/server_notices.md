@@ -58,4 +58,4 @@ displayname and avatar of the Server Notices user.
 ## Sending notices
 
 To send server notices to users you can use the
-[admin_api](../../admin_api/server_notices.md).
+[admin_api](../../administration/admin_api/server_notices.md).
