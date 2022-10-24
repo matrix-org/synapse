@@ -726,7 +726,7 @@ will become a configuration error in Synapse v1.53.0.
 
 ## Dropping support for old Python and Postgres versions
 
-In line with our [deprecation policy](deprecation_policy.md),
+In line with our [deprecation policy](other/deprecation_policy.md),
 we've dropped support for Python 3.6 and PostgreSQL 9.6, as they are no
 longer supported upstream.
 
@@ -983,7 +983,7 @@ Instructions for doing so are provided
 
 ## Dropping support for old Python, Postgres and SQLite versions
 
-In line with our [deprecation policy](deprecation_policy.md),
+In line with our [deprecation policy](other/deprecation_policy.md),
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.
 
@@ -996,7 +996,7 @@ The deprecated v1 "list accounts" admin API
 (`GET /_synapse/admin/v1/users/<user_id>`) has been removed in this
 version.
 
-The [v2 list accounts API](admin_api/user_admin_api.md#list-accounts)
+The [v2 list accounts API](administration/admin_api/user_admin_api.md#list-accounts)
 has been available since Synapse 1.7.0 (2019-12-13), and is accessible
 under `GET /_synapse/admin/v2/users`.
 
@@ -1720,7 +1720,7 @@ back to v1.3.1, subject to the following:
 
 Some counter metrics have been renamed, with the old names deprecated.
 See [the metrics
-documentation](metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
+documentation](administration/metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
 for details.
 
 # Upgrading to v1.1.0

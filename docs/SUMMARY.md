@@ -107,5 +107,5 @@
   - [Scripts]()
 
 # Other
-  - [Dependency Deprecation Policy](deprecation_policy.md)
+  - [Dependency Deprecation Policy](other/deprecation_policy.md)
   - [Running Synapse on a Single-Board Computer](other/running_synapse_on_single_board_computers.md)
