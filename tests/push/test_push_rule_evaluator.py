@@ -395,6 +395,78 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             )
         )
 
+    def test_related_event_match_with_fallback(self):
+        evaluator = self._get_evaluator(
+            {
+                "m.relates_to": {
+                    "event_id": "$parent_event_id",
+                    "key": "😀",
+                    "rel_type": "m.thread",
+                    "is_falling_back": True,
+                    "m.in_reply_to": {
+                        "event_id": "$parent_event_id",
+                    },
+                }
+            },
+            {
+                "m.in_reply_to": {
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                    "im.vector.is_falling_back": "",
+                },
+                "m.thread": {
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                },
+            },
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                    "include_fallbacks": True,
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                    "include_fallbacks": False,
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+
     def test_related_event_match_no_related_event(self):
         evaluator = self._get_evaluator(
             {"msgtype": "m.text", "body": "Message without related event"}

@@ -272,6 +272,14 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
+        // If we are not matching fallbacks, don't match if our special key indicating this is a
+        // fallback relation is not present.
+        if !event_match.include_fallbacks.unwrap_or(false)
+            && event.contains_key("im.vector.is_falling_back")
+        {
+            return Ok(false);
+        }
+
         // if we have no key, accept the event as matching, if it existed without matching any
         // fields.
         let key = if let Some(key) = &event_match.key {

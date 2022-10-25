@@ -311,6 +311,8 @@ pub struct RelatedEventMatchCondition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_type: Option<Cow<'static, str>>,
     pub rel_type: Cow<'static, str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_fallbacks: Option<bool>,
 }
 
 /// The collection of push rules for a user.

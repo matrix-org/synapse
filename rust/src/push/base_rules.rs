@@ -124,6 +124,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
                 rel_type: Cow::Borrowed("m.in_reply_to"),
+                include_fallbacks: None,
             },
         ))]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),

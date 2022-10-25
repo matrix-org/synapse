@@ -195,6 +195,48 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
+    async def _related_events(self, event: EventBase) -> dict[str, dict[str, str]]:
+        """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
+
+        Returns:
+            Mapping of relation type to flattened events.
+        """
+        related_events: dict[str, dict[str, str]] = {}
+        if self._related_event_match_enabled:
+            related_event_id = event.content.get("m.relates_to", {}).get("event_id")
+            relation_type = event.content.get("m.relates_to", {}).get("rel_type")
+            if related_event_id is not None and relation_type is not None:
+                related_event = await self.store.get_event(
+                    related_event_id, allow_none=True
+                )
+                if related_event is not None:
+                    related_events[relation_type] = _flatten_dict(related_event)
+
+            reply_event_id = (
+                event.content.get("m.relates_to", {})
+                .get("m.in_reply_to", {})
+                .get("event_id")
+            )
+
+            # convert replies to pseudo relations
+            if reply_event_id is not None:
+                related_event = await self.store.get_event(
+                    reply_event_id, allow_none=True
+                )
+
+                if related_event is not None:
+                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
+
+                    # indicate that this is from a fallback relation.
+                    if relation_type == "m.thread" and event.content.get(
+                        "m.relates_to", {}
+                    ).get("is_falling_back", False):
+                        related_events["m.in_reply_to"][
+                            "im.vector.is_falling_back"
+                        ] = ""
+
+        return related_events
+
     @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
         self, event: EventBase, context: EventContext
@@ -226,34 +268,6 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
-        related_events: Dict[str, Dict[str, str]] = {}
-        if self._related_event_match_enabled:
-            related_event_id = event.content.get("m.relates_to", {}).get("event_id")
-            relation_type = event.content.get("m.relates_to", {}).get("rel_type")
-            if related_event_id is not None and relation_type is not None:
-                related_event = await self.store.get_event(
-                    related_event_id, allow_none=True
-                )
-                if related_event is not None:
-                    related_events[relation_type] = _flatten_dict(related_event)
-
-            reply_event_id = (
-                event.content.get("m.relates_to", {})
-                .get("m.in_reply_to", {})
-                .get("event_id")
-            )
-            if reply_event_id is not None and (
-                relation_type != "m.thread"
-                or not event.content.get("m.relates_to", {}).get(
-                    "is_falling_back", False
-                )
-            ):
-                related_event = await self.store.get_event(
-                    reply_event_id, allow_none=True
-                )
-                if related_event is not None:
-                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
-
         # Find the event's thread ID.
         relation = relation_from_event(event)
         # If the event does not have a relation, then it cannot have a thread ID.
@@ -266,6 +280,8 @@ class BulkPushRuleEvaluator:
                 # Since the event has not yet been persisted we check whether
                 # the parent is part of a thread.
                 thread_id = await self.store.get_thread_id(relation.parent_id)
+
+        related_events = await self._related_events(event)
 
         # It's possible that old room versions have non-integer power levels (floats or
         # strings). Workaround this by explicitly converting to int.
