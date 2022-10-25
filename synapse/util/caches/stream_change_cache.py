@@ -87,6 +87,10 @@ class StreamChangeCache:
         self.wait_for_pos_deferreds[pos].append(d)
         await d
 
+    def has_seen_position(self, pos: int) -> None:
+        if pos > self.max_stream_pos:
+            self.max_stream_pos = pos
+
     def set_cache_factor(self, factor: float) -> bool:
         """
         Set the cache factor for this individual cache.
@@ -218,8 +222,7 @@ class StreamChangeCache:
             for entity in r:
                 del self._entity_to_key[entity]
 
-        if stream_pos > self.max_stream_pos:
-            self.max_stream_pos = stream_pos
+        self.has_seen_position(stream_pos)
 
         for d in self.wait_for_pos_deferreds[stream_pos]:
             d.callback(None)
