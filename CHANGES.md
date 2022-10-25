@@ -1,3 +1,21 @@
+Synapse 1.70.0rc2 (2022-10-25)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.70.0rc1 where the information returned from the `/threads` API could be stale when threaded events are redacted. ([\#14248](https://github.com/matrix-org/synapse/issues/14248))
+- Fix a bug introduced in Synapse 1.70.0rc1 leading to broken outbound federation when using Python 3.7. ([\#14280](https://github.com/matrix-org/synapse/issues/14280))
+- Fix a bug introduced in Synapse 1.70.0rc1 where edits to non-message events were aggregated by the homeserver. ([\#14283](https://github.com/matrix-org/synapse/issues/14283))
+
+
+Internal Changes
+----------------
+
+- Build ABI3 wheels for CPython. ([\#14253](https://github.com/matrix-org/synapse/issues/14253))
+- For the aarch64 architecture, only build wheels for CPython manylinux. ([\#14259](https://github.com/matrix-org/synapse/issues/14259))
+
+
 Synapse 1.70.0rc1 (2022-10-19)
 ==============================
 
