@@ -781,12 +781,7 @@ def _to_postgres_options(options_dict: JsonDict) -> str:
 
 @dataclass
 class Phrase:
-    phrase: List[Union[str, "FollowedBy"]]
-
-
-@dataclass
-class FollowedBy:
-    proximity: int
+    phrase: List[str]
 
 
 class SearchToken(enum.Enum):
@@ -795,7 +790,7 @@ class SearchToken(enum.Enum):
     And = enum.auto()
 
 
-Token = Union[str, Phrase, FollowedBy, SearchToken]
+Token = Union[str, Phrase, SearchToken]
 TokenList = List[Token]
 
 
@@ -838,22 +833,10 @@ def _tokenize_query(query: str) -> TokenList:
 
         # Phrases have simplified handling of words.
         if in_phrase:
-            proximity = 1
-            phrase: List[Union[str, FollowedBy]] = []
-            for word in words:
-                # Skip stop words, but track the number that are skipped.
-                if _is_stop_word(word):
-                    proximity += 1
-                    continue
+            # Skip stop words.
+            phrase = [word for word in words if not _is_stop_word(word)]
 
-                # If words already exist in the phrase, add a followed-by operator.
-                if phrase:
-                    phrase.append(FollowedBy(proximity))
-
-                phrase.append(word)
-                proximity = 1
-
-            # Consecutive words are implictly ANDed together.
+            # Consecutive words are implicitly ANDed together.
             if tokens and tokens[-1] not in (SearchToken.Not, SearchToken.Or):
                 tokens.append(SearchToken.And)
 
@@ -879,7 +862,7 @@ def _tokenize_query(query: str) -> TokenList:
                 if _is_stop_word(word):
                     continue
 
-                # Consecutive words are implictly ANDed together.
+                # Consecutive words are implicitly ANDed together.
                 if tokens and tokens[-1] not in (SearchToken.Not, SearchToken.Or):
                     tokens.append(SearchToken.And)
 
@@ -901,11 +884,7 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
         if isinstance(token, str):
             match_query.append(token)
         elif isinstance(token, Phrase):
-            # SQLite doesn't support followed by operators. NEAR is close, but
-            # discards order.
-            match_query.append(
-                '"' + " ".join(t for t in token.phrase if isinstance(t, str)) + '"'
-            )
+            match_query.append('"' + " ".join(token.phrase) + '"')
         elif token == SearchToken.Not:
             # TODO: SQLite treats NOT as a *binary* operator. Hopefully a search
             # term has already been added before this.
