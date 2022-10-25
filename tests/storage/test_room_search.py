@@ -364,7 +364,7 @@ class MessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
-        if store.database_engine.tsquery_func == "websearch_to_tsquery":
+        if store.database_engine.tsquery_func != "websearch_to_tsquery":
             raise SkipTest(
                 "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
             )
