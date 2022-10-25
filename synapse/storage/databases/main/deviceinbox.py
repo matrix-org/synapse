@@ -148,6 +148,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     self._device_federation_outbox_stream_cache.entity_has_changed(
                         row.entity, token
                     )
+            # Both the device inbox and federation output stream caches use the device
+            # inbox ID generation as their stream IDs, thus when incrementing this
+            # value both must be notified even if there is no change.
+            self._device_inbox_stream_cache.has_seen_position(token)
+            self._device_federation_outbox_stream_cache.has_seen_position(token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def get_to_device_stream_token(self) -> int:
@@ -690,12 +695,21 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             await self.db_pool.runInteraction(
                 "add_messages_to_device_inbox", add_messages_txn, now_ms, stream_id
             )
+
+            # Both the device inbox and federation output stream caches use the device
+            # inbox ID generation as their stream IDs, thus when incrementing this
+            # value both must be notified even if there is no change, hence the elses.
             for user_id in local_messages_by_user_then_device.keys():
                 self._device_inbox_stream_cache.entity_has_changed(user_id, stream_id)
+            else:
+                self._device_inbox_stream_cache.has_seen_position(stream_id)
+
             for destination in remote_messages_by_destination.keys():
                 self._device_federation_outbox_stream_cache.entity_has_changed(
                     destination, stream_id
                 )
+            else:
+                self._device_federation_outbox_stream_cache.has_seen_position(stream_id)
 
         return self._device_inbox_id_gen.get_current_token()
 
@@ -751,6 +765,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             )
             for user_id in local_messages_by_user_then_device.keys():
                 self._device_inbox_stream_cache.entity_has_changed(user_id, stream_id)
+
+            # The device federation outbox stream cache also uses the device ID stream
+            # ID to track changes, so make sure it know's we've seen this position.
+            self._device_federation_outbox_stream_cache.has_seen_position(stream_id)
 
         return stream_id
 
