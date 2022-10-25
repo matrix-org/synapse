@@ -57,7 +57,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.69.0"
+version = "1.70.0rc2"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -192,7 +192,7 @@ psycopg2 = { version = ">=2.8", markers = "platform_python_implementation != 'Py
 psycopg2cffi = { version = ">=2.8", markers = "platform_python_implementation == 'PyPy'", optional = true }
 psycopg2cffi-compat = { version = "==1.1", markers = "platform_python_implementation == 'PyPy'", optional = true }
 pysaml2 = { version = ">=4.5.0", optional = true }
-authlib = { version = ">=0.14.0", optional = true }
+authlib = { version = ">=0.15.1", optional = true }
 # systemd-python is necessary for logging to the systemd journal via
 # `systemd.journal.JournalHandler`, as is documented in
 # `contrib/systemd/log_config.yaml`.
@@ -318,7 +318,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.cibuildwheel]
 # Skip unsupported platforms (by us or by Rust).
-skip = "cp36* *-musllinux_i686"
+skip = "cp36* *-musllinux_i686 pp*aarch64 *-musllinux_aarch64"
 
 # We need a rust compiler
 before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
@@ -330,3 +330,12 @@ environment= { PATH = "$PATH:$HOME/.cargo/bin" }
 before-build = "rm -rf {project}/build"
 build-frontend = "build"
 test-command = "python -c 'from synapse.synapse_rust import sum_as_string; print(sum_as_string(1, 2))'"
+
+
+[tool.cibuildwheel.linux]
+# Wrap the repair command to correctly rename the built cpython wheels as ABI3.
+repair-wheel-command = "./.ci/scripts/auditwheel_wrapper.py -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+# Wrap the repair command to correctly rename the built cpython wheels as ABI3.
+repair-wheel-command = "./.ci/scripts/auditwheel_wrapper.py --require-archs {delocate_archs} -w {dest_dir} {wheel}"

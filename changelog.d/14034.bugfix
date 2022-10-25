@@ -1,1 +1,0 @@
-Fix a long-standing bug where edits of non-`m.room.message` events would not be correctly bundled or have their new content applied.
