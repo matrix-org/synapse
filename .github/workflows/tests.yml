@@ -167,6 +167,14 @@ jobs:
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.job.postgres-version }}
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.58.1
+            override: true
+      - uses: Swatinem/rust-cache@v2
+
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.job.python-version }}
