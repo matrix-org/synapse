@@ -487,14 +487,6 @@ class PersistEventsStore:
         # NB: This function invalidates all state related caches
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
 
-        # Flag the stream change cache for this room if we added non-backfilled events
-        if max_stream_order > 0:
-            for event, _ in events_and_contexts:
-                assert event.internal_metadata.stream_ordering is not None
-                self.store._events_stream_cache.entity_has_changed(
-                    event.room_id, event.internal_metadata.stream_ordering
-                )
-
     def _persist_event_auth_chain_txn(
         self,
         txn: LoggingTransaction,
