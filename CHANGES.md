@@ -31,7 +31,7 @@ Features
 - The `/relations` endpoint can now be used on workers. ([\#14028](https://github.com/matrix-org/synapse/issues/14028))
 - Advertise support for Matrix 1.3 and 1.4 on `/_matrix/client/versions`. ([\#14032](https://github.com/matrix-org/synapse/issues/14032), [\#14184](https://github.com/matrix-org/synapse/issues/14184))
 - Improve validation of request bodies for the [Device Management](https://spec.matrix.org/v1.4/client-server-api/#device-management) and [MSC2697 Device Dehyrdation](https://github.com/matrix-org/matrix-spec-proposals/pull/2697) client-server API endpoints. ([\#14054](https://github.com/matrix-org/synapse/issues/14054))
-- Experimental support for [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874). ([\#14148](https://github.com/matrix-org/synapse/issues/14148))
+- Experimental support for [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874): Filtering threads from the `/messages` endpoint. ([\#14148](https://github.com/matrix-org/synapse/issues/14148))
 - Improve the validation of the following PUT endpoints: [`/directory/room/{roomAlias}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3directoryroomroomalias), [`/directory/list/room/{roomId}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3directorylistroomroomid) and [`/directory/list/appservice/{networkId}/{roomId}`](https://spec.matrix.org/v1.4/application-service-api/#put_matrixclientv3directorylistappservicenetworkidroomid). ([\#14179](https://github.com/matrix-org/synapse/issues/14179))
 - Build and publish binary wheels for `aarch64` platforms. ([\#14212](https://github.com/matrix-org/synapse/issues/14212))
 
