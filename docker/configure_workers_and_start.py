@@ -61,7 +61,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"start_pushers": False},
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "user_dir": {
@@ -98,7 +98,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"send_federation": False},
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "synchrotron": {
