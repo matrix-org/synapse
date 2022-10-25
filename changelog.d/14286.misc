@@ -1,0 +1,1 @@
+Fix race conditions with device inbox stream change cache invalidation when using synapse workers. Contributed by Nick @ Beeper (@fizzadar).
