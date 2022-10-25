@@ -108,7 +108,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 errcode=Codes.MISSING_PARAM,
             )
 
-        if self.store.is_partial_state_room(room_id):
+        if await self.store.is_partial_state_room(room_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Cannot insert history batches until we have fully joined the room",
