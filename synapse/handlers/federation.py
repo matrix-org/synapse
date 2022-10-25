@@ -443,11 +443,12 @@ class FederationHandler:
                     # TODO: We can probably do something more intelligent here.
                     return True
                 except NotRetryingDestination as e:
-                    logger.info(f"_maybe_backfill_inner: {e}")
+                    logger.info("_maybe_backfill_inner: %s", e)
                     continue
                 except FederationDeniedError:
                     logger.info(
-                        f"_maybe_backfill_inner: Not attempting to backfill from {dom} because the homeserver is not on our federation whitelist"
+                        "_maybe_backfill_inner: Not attempting to backfill from %s because the homeserver is not on our federation whitelist",
+                        dom,
                     )
                     continue
                 except (SynapseError, InvalidResponseError) as e:

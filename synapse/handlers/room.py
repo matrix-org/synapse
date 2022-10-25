@@ -1471,7 +1471,10 @@ class TimestampLookupHandler:
             SynapseError if unable to find any event locally in the given direction
         """
         logger.debug(
-            f"get_event_for_timestamp(room_id={room_id}, timestamp={timestamp}, direction={direction}) Finding closest event..."
+            "get_event_for_timestamp(room_id=%s, timestamp=%s, direction=%s) Finding closest event...",
+            room_id,
+            timestamp,
+            direction,
         )
         local_event_id = await self.store.get_event_id_for_timestamp(
             room_id, timestamp, direction
