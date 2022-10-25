@@ -569,7 +569,7 @@ class RestHelper:
 
     def login_via_oidc(
         self,
-        provider: FakeOidcServer,
+        fake_server: FakeOidcServer,
         remote_user_id: str,
         with_sid: bool = False,
         expected_status: int = 200,
@@ -588,7 +588,7 @@ class RestHelper:
         client_redirect_url = "https://x"
         userinfo = {"sub": remote_user_id}
         channel, grant = self.auth_via_oidc(
-            provider, userinfo, client_redirect_url, with_sid=with_sid
+            fake_server, userinfo, client_redirect_url, with_sid=with_sid
         )
 
         # expect a confirmation page
@@ -618,7 +618,7 @@ class RestHelper:
 
     def auth_via_oidc(
         self,
-        provider: FakeOidcServer,
+        fake_server: FakeOidcServer,
         user_info_dict: JsonDict,
         client_redirect_url: Optional[str] = None,
         ui_auth_session_id: Optional[str] = None,
@@ -657,7 +657,7 @@ class RestHelper:
 
         cookies: Dict[str, str] = {}
 
-        with provider.patch_homeserver(hs=self.hs):
+        with fake_server.patch_homeserver(hs=self.hs):
             # if we're doing a ui auth, hit the ui auth redirect endpoint
             if ui_auth_session_id:
                 # can't set the client redirect url for UI Auth
@@ -673,16 +673,16 @@ class RestHelper:
         # that synapse passes to the client.
 
         oauth_uri_path, _ = oauth_uri.split("?", 1)
-        assert oauth_uri_path == provider.authorization_endpoint, (
+        assert oauth_uri_path == fake_server.authorization_endpoint, (
             "unexpected SSO URI " + oauth_uri_path
         )
         return self.complete_oidc_auth(
-            provider, oauth_uri, cookies, user_info_dict, with_sid=with_sid
+            fake_server, oauth_uri, cookies, user_info_dict, with_sid=with_sid
         )
 
     def complete_oidc_auth(
         self,
-        provider: FakeOidcServer,
+        fake_serer: FakeOidcServer,
         oauth_uri: str,
         cookies: Mapping[str, str],
         user_info_dict: JsonDict,
@@ -698,6 +698,7 @@ class RestHelper:
         Requires the OIDC callback resource to be mounted at the normal place.
 
         Args:
+            fake_server: the fake OIDC server with which the auth should be done
             oauth_uri: the OIDC URI returned by synapse's redirect endpoint (ie,
                from initiate_sso_login or initiate_sso_ui_auth).
             cookies: the cookies set by synapse's redirect endpoint, which will be
@@ -712,7 +713,7 @@ class RestHelper:
         _, oauth_uri_qs = oauth_uri.split("?", 1)
         params = urllib.parse.parse_qs(oauth_uri_qs)
 
-        code, grant = provider.start_authorization(
+        code, grant = fake_serer.start_authorization(
             scope=params["scope"][0],
             userinfo=user_info_dict,
             client_id=params["client_id"][0],
@@ -727,7 +728,7 @@ class RestHelper:
             urllib.parse.urlencode({"state": state, "code": code}),
         )
 
-        with provider.patch_homeserver(hs=self.hs):
+        with fake_serer.patch_homeserver(hs=self.hs):
             # now hit the callback URI with the right params and a made-up code
             channel = make_request(
                 self.hs.get_reactor(),
