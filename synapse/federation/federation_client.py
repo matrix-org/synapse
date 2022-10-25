@@ -406,7 +406,7 @@ class FederationClient(FederationBase):
             event, pull_origin = get_pdu_cache_entry
         # If we don't see the event in the cache, go try to fetch it from the
         # provided remote federated destinations
-        elif not get_pdu_cache_entry:
+        else:
             pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
             # TODO: We can probably refactor this to use `_try_destination_list`
