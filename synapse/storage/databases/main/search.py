@@ -454,9 +454,8 @@ class SearchStore(SearchBackgroundUpdateStore):
         count_clauses = clauses
 
         if isinstance(self.database_engine, PostgresEngine):
-            search_query, tsquery_func = _parse_query_for_pgsql(
-                search_term, self.database_engine
-            )
+            search_query = search_term
+            tsquery_func = self.database_engine.tsquery_func
             sql = (
                 f"SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) AS rank,"
                 " room_id, event_id"
@@ -595,9 +594,8 @@ class SearchStore(SearchBackgroundUpdateStore):
             args.extend([origin_server_ts, origin_server_ts, stream])
 
         if isinstance(self.database_engine, PostgresEngine):
-            search_query, tsquery_func = _parse_query_for_pgsql(
-                search_term, self.database_engine
-            )
+            search_query = search_term
+            tsquery_func = self.database_engine.tsquery_func
             sql = (
                 f"SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
@@ -891,44 +889,6 @@ def _tokenize_query(query: str) -> TokenList:
     return tokens
 
 
-def _tokens_to_tsquery(tokens: TokenList) -> str:
-    """
-    Convert the list of tokens to a string suitable for passing to postgresql's to_tsquery
-
-    Ref: https://www.postgresql.org/docs/current/textsearch-controls.html
-    """
-
-    tsquery = []
-    for i, token in enumerate(tokens):
-        if isinstance(token, str):
-            tsquery.append(token)
-        elif isinstance(token, Phrase):
-            tsquery.append(
-                " ( "
-                + "".join(
-                    t if isinstance(t, str) else f" <{t.proximity}> "
-                    for t in token.phrase
-                )
-                + " ) "
-            )
-        elif token == SearchToken.Not:
-            tsquery.append(" !")
-        elif token == SearchToken.Or:
-            tsquery.append(" | ")
-        elif token == SearchToken.And:
-            tsquery.append(" & ")
-        else:
-            raise ValueError(f"unknown token {token}")
-
-        if (
-            i != len(tokens) - 1
-            and isinstance(token, (str, Phrase))
-            and tokens[i + 1] not in (SearchToken.Or, SearchToken.And)
-        ):
-            tsquery.append(" & ")
-    return "".join(tsquery)
-
-
 def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
     """
     Convert the list of tokens to a string suitable for passing to sqlite's MATCH.
@@ -958,23 +918,6 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
             raise ValueError(f"unknown token {token}")
 
     return "".join(match_query)
-
-
-def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
-    """Selects a tsquery_* func to use and transforms the search_term into syntax appropriate for it.
-
-    Args:
-        search_term: A user supplied search query.
-        engine: The database engine.
-
-    Returns:
-        A tuple of (parsed search_term, tsquery func to use).
-    """
-
-    if engine.supports_websearch_to_tsquery:
-        return search_term, "websearch_to_tsquery"
-    else:
-        return _tokens_to_tsquery(_tokenize_query(search_term)), "to_tsquery"
 
 
 def _parse_query_for_sqlite(search_term: str) -> str:

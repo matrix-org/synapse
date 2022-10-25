@@ -171,10 +171,20 @@ class PostgresEngine(
         return True
 
     @property
-    def supports_websearch_to_tsquery(self) -> bool:
+    def tsquery_func(self) -> str:
+        """
+        Selects a tsquery_* func to use.
+
+        Ref: https://www.postgresql.org/docs/current/textsearch-controls.html
+
+        Returns:
+            The function name.
+        """
         # Postgres 11 added support for websearch_to_tsquery.
         assert self._version is not None
-        return self._version >= 110000
+        if self._version >= 110000:
+            return "websearch_to_tsquery"
+        return "plainto_tsquery"
 
     def is_deadlock(self, error: Exception) -> bool:
         if isinstance(error, psycopg2.DatabaseError):
