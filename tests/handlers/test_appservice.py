@@ -504,12 +504,69 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             ) = self.send_mock.call_args[0]
 
             # Even though the message came from an uninteresting user, it should still
-            # notify us because the interesting user is joined to the room.
+            # notify us because the interesting user is joined to the room where the
+            # message was sent.
             self.assertEqual(service, interested_appservice)
             self.assertEqual(events[0]["type"], "m.room.message")
             self.assertEqual(events[0]["sender"], alice)
         else:
             self.send_mock.assert_not_called()
+
+    def test_application_services_receive_events_sent_by_interesting_local_user(self):
+        """
+        Test to make sure that a messages sent from a local user can be interesting and
+        picked up by the appservice.
+        """
+        # Register an application service that's interested in all local users
+        interested_appservice = self._register_application_service(
+            namespaces={
+                ApplicationService.NS_USERS: [
+                    {
+                        "regex": ".*",
+                        "exclusive": False,
+                    },
+                ],
+            },
+        )
+
+        # Create a room
+        alice = self.register_user("alice", "pass")
+        alice_access_token = self.login("alice", "pass")
+        room_id = self.helper.create_room_as(room_creator=alice, tok=alice_access_token)
+
+        # We don't care about interesting events before this (this test is making sure
+        # the next thing works)
+        self.send_mock.reset_mock()
+
+        # Send a message from the interesting local user
+        self.helper.send_event(
+            room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "message from interesting local user",
+            },
+            tok=alice_access_token,
+        )
+        # Kick the appservice into checking this new event
+        self._notify_interested_services()
+
+        self.send_mock.assert_called_once()
+        (
+            service,
+            events,
+            _ephemeral,
+            _to_device_messages,
+            _otks,
+            _fbks,
+            _device_list_summary,
+        ) = self.send_mock.call_args[0]
+
+        # Events sent from an interesting local user should also be picked up as
+        # interesting to the appservice.
+        self.assertEqual(service, interested_appservice)
+        self.assertEqual(events[0]["type"], "m.room.message")
+        self.assertEqual(events[0]["sender"], alice)
 
     def test_sending_read_receipt_batches_to_application_services(self):
         """Tests that a large batch of read receipts are sent correctly to
