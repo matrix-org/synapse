@@ -3385,7 +3385,7 @@ push:
 Config options relating to rooms.
 
 ---
-### `encryption_enabled_by_default`
+### `encryption_enabled_by_default_for_room_type`
 
 Controls whether locally-created rooms should be end-to-end encrypted by
 default.
