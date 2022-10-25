@@ -20,6 +20,7 @@ CREATE TABLE login_tokens (
     token TEXT PRIMARY KEY,
     user_id TEXT NOT NULL, 
     expiry_ts BIGINT NOT NULL,
+    used_ts BIGINT,
     auth_provider_id TEXT,
     auth_provider_session_id TEXT
 );

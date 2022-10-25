@@ -38,6 +38,7 @@ from typing import (
 import attr
 import bcrypt
 import unpaddedbase64
+from prometheus_client import Counter
 
 from twisted.internet.defer import CancelledError
 from twisted.web.server import Request
@@ -48,6 +49,7 @@ from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
     LoginError,
+    NotFoundError,
     StoreError,
     SynapseError,
     UserDeactivatedError,
@@ -63,7 +65,11 @@ from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.databases.main.registration import LoginTokenLookupResult
+from synapse.storage.databases.main.registration import (
+    LoginTokenExpired,
+    LoginTokenLookupResult,
+    LoginTokenReused,
+)
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
@@ -79,6 +85,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 INVALID_USERNAME_OR_PASSWORD = "Invalid username or password"
+
+invalid_login_token_counter = Counter(
+    "synapse_user_login_invalid_login_tokens",
+    "Counts the number of rejected m.login.token on /login",
+    ["reason"],
+)
 
 
 def convert_client_dict_legacy_fields_to_identifier(
@@ -1459,11 +1471,16 @@ class AuthHandler:
         return f"{base}_{crc}"
 
     async def consume_login_token(self, login_token: str) -> LoginTokenLookupResult:
-        res = await self.store.consume_login_token(login_token)
-        if res is None:
-            raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
+        try:
+            return await self.store.consume_login_token(login_token)
+        except LoginTokenExpired:
+            invalid_login_token_counter.labels("expired").inc()
+        except LoginTokenReused:
+            invalid_login_token_counter.labels("reused").inc()
+        except NotFoundError:
+            invalid_login_token_counter.labels("not found").inc()
 
-        return res
+        raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
     async def delete_access_token(self, access_token: str) -> None:
         """Invalidate a single access token
