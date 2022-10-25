@@ -612,9 +612,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
     def test_login_via_oidc(self) -> None:
         """If OIDC is chosen, should redirect to the OIDC auth endpoint"""
 
-        fake_oidc_provider = self.helper.fake_oidc_server()
+        fake_oidc_server = self.helper.fake_oidc_server()
 
-        with fake_oidc_provider.patch_homeserver(hs=self.hs):
+        with fake_oidc_server.patch_homeserver(hs=self.hs):
             # pick the default OIDC provider
             channel = self.make_request(
                 "GET",
@@ -629,7 +629,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
 
         # it should redirect us to the auth page of the OIDC server
-        self.assertEqual(oidc_uri_path, fake_oidc_provider.authorization_endpoint)
+        self.assertEqual(oidc_uri_path, fake_oidc_server.authorization_endpoint)
 
         # ... and should have set a cookie including the redirect url
         cookie_headers = channel.headers.getRawHeaders("Set-Cookie")
@@ -647,7 +647,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         )
 
         channel, _ = self.helper.complete_oidc_auth(
-            fake_oidc_provider, oidc_uri, cookies, {"sub": "user1"}
+            fake_oidc_server, oidc_uri, cookies, {"sub": "user1"}
         )
 
         # that should serve a confirmation page
@@ -698,9 +698,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
     def test_client_idp_redirect_to_oidc(self) -> None:
         """If the client pick a known IdP, redirect to it"""
-        fake_oidc_provider = self.helper.fake_oidc_server()
+        fake_oidc_server = self.helper.fake_oidc_server()
 
-        with fake_oidc_provider.patch_homeserver(hs=self.hs):
+        with fake_oidc_server.patch_homeserver(hs=self.hs):
             channel = self._make_sso_redirect_request("oidc")
         self.assertEqual(channel.code, 302, channel.result)
         location_headers = channel.headers.getRawHeaders("Location")
@@ -709,7 +709,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
 
         # it should redirect us to the auth page of the OIDC server
-        self.assertEqual(oidc_uri_path, fake_oidc_provider.authorization_endpoint)
+        self.assertEqual(oidc_uri_path, fake_oidc_server.authorization_endpoint)
 
     def _make_sso_redirect_request(self, idp_prov: Optional[str] = None) -> FakeChannel:
         """Send a request to /_matrix/client/r0/login/sso/redirect
@@ -1288,11 +1288,11 @@ class UsernamePickerTestCase(HomeserverTestCase):
     def test_username_picker(self) -> None:
         """Test the happy path of a username picker flow."""
 
-        fake_oidc_provider = self.helper.fake_oidc_server()
+        fake_oidc_server = self.helper.fake_oidc_server()
 
         # do the start of the login flow
         channel, _ = self.helper.auth_via_oidc(
-            fake_oidc_provider,
+            fake_oidc_server,
             {"sub": "tester", "displayname": "Jonny"},
             TEST_CLIENT_REDIRECT_URL,
         )

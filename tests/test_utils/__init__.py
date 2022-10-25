@@ -114,7 +114,7 @@ class FakeResponse:  # type: ignore[misc]
     attribute, and didn't support deliverBody until recently.
     """
 
-    verison: Tuple[bytes, int, int] = (b"HTTP", 1, 1)
+    version: Tuple[bytes, int, int] = (b"HTTP", 1, 1)
 
     # HTTP response code
     code: int = 200
@@ -122,7 +122,7 @@ class FakeResponse:  # type: ignore[misc]
     # body of the response
     body: bytes = b""
 
-    headers: Headers = Headers()
+    headers: Headers = attr.Factory(Headers)
 
     @property
     def phrase(self):

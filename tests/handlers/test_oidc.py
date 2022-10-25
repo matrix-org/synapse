@@ -134,10 +134,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
         return config
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.fake_provider = FakeOidcServer(clock=clock, issuer=ISSUER)
+        self.fake_server = FakeOidcServer(clock=clock, issuer=ISSUER)
 
         hs = self.setup_test_homeserver()
-        self.hs_patcher = self.fake_provider.patch_homeserver(hs=hs)
+        self.hs_patcher = self.fake_server.patch_homeserver(hs=hs)
         self.hs_patcher.start()
 
         self.handler = hs.get_oidc_handler()
@@ -163,16 +163,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     def reset_mocks(self):
         """Reset all the Mocks."""
-        self.fake_provider.reset_mocks()
+        self.fake_server.reset_mocks()
         self.render_error.reset_mock()
         self.complete_sso_login.reset_mock()
 
     def metadata_edit(self, values):
         """Modify the result that will be returned by the well-known query"""
 
-        metadata = self.fake_provider.get_metadata()
+        metadata = self.fake_server.get_metadata()
         metadata.update(values)
-        return patch.object(self.fake_provider, "get_metadata", return_value=metadata)
+        return patch.object(self.fake_server, "get_metadata", return_value=metadata)
 
     def start_authorization(
         self,
@@ -185,7 +185,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         nonce = random_string(10)
         state = random_string(10)
 
-        code, grant = self.fake_provider.start_authorization(
+        code, grant = self.fake_server.start_authorization(
             userinfo=userinfo,
             scope=scope,
             client_id=self.provider._client_auth.client_id,
@@ -218,48 +218,48 @@ class OidcHandlerTestCase(HomeserverTestCase):
         """The handler should discover the endpoints from OIDC discovery document."""
         # This would throw if some metadata were invalid
         metadata = self.get_success(self.provider.load_metadata())
-        self.fake_provider.get_metadata_handler.assert_called_once()
+        self.fake_server.get_metadata_handler.assert_called_once()
 
-        self.assertEqual(metadata.issuer, self.fake_provider.issuer)
+        self.assertEqual(metadata.issuer, self.fake_server.issuer)
         self.assertEqual(
             metadata.authorization_endpoint,
-            self.fake_provider.authorization_endpoint,
+            self.fake_server.authorization_endpoint,
         )
-        self.assertEqual(metadata.token_endpoint, self.fake_provider.token_endpoint)
-        self.assertEqual(metadata.jwks_uri, self.fake_provider.jwks_uri)
+        self.assertEqual(metadata.token_endpoint, self.fake_server.token_endpoint)
+        self.assertEqual(metadata.jwks_uri, self.fake_server.jwks_uri)
         # It seems like authlib does not have that defined in its metadata models
         self.assertEqual(
             metadata.get("userinfo_endpoint"),
-            self.fake_provider.userinfo_endpoint,
+            self.fake_server.userinfo_endpoint,
         )
 
         # subsequent calls should be cached
         self.reset_mocks()
         self.get_success(self.provider.load_metadata())
-        self.fake_provider.get_metadata_handler.assert_not_called()
+        self.fake_server.get_metadata_handler.assert_not_called()
 
     @override_config({"oidc_config": EXPLICIT_ENDPOINT_CONFIG})
     def test_no_discovery(self) -> None:
         """When discovery is disabled, it should not try to load from discovery document."""
         self.get_success(self.provider.load_metadata())
-        self.fake_provider.get_metadata_handler.assert_not_called()
+        self.fake_server.get_metadata_handler.assert_not_called()
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_load_jwks(self) -> None:
         """JWKS loading is done once (then cached) if used."""
         jwks = self.get_success(self.provider.load_jwks())
-        self.fake_provider.get_jwks_handler.assert_called_once()
-        self.assertEqual(jwks, self.fake_provider.get_jwks())
+        self.fake_server.get_jwks_handler.assert_called_once()
+        self.assertEqual(jwks, self.fake_server.get_jwks())
 
         # subsequent calls should be cached…
         self.reset_mocks()
         self.get_success(self.provider.load_jwks())
-        self.fake_provider.get_jwks_handler.assert_not_called()
+        self.fake_server.get_jwks_handler.assert_not_called()
 
         # …unless forced
         self.reset_mocks()
         self.get_success(self.provider.load_jwks(force=True))
-        self.fake_provider.get_jwks_handler.assert_called_once()
+        self.fake_server.get_jwks_handler.assert_called_once()
 
         with self.metadata_edit({"jwks_uri": None}):
             # If we don't do this, the load_metadata call will throw because of the
@@ -369,7 +369,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 self.provider.handle_redirect_request(req, b"http://client/redirect")
             )
         )
-        auth_endpoint = urlparse(self.fake_provider.authorization_endpoint)
+        auth_endpoint = urlparse(self.fake_server.authorization_endpoint)
 
         self.assertEqual(url.scheme, auth_endpoint.scheme)
         self.assertEqual(url.netloc, auth_endpoint.netloc)
@@ -456,8 +456,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             new_user=True,
             auth_provider_session_id=None,
         )
-        self.fake_provider.post_token_handler.assert_called_once()
-        self.fake_provider.get_userinfo_handler.assert_not_called()
+        self.fake_server.post_token_handler.assert_called_once()
+        self.fake_server.get_userinfo_handler.assert_not_called()
         self.render_error.assert_not_called()
 
         # Handle mapping errors
@@ -472,7 +472,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # Handle ID token errors
         request, _ = self.start_authorization(userinfo)
-        with self.fake_provider.id_token_override({"iss": "https://bad.issuer/"}):
+        with self.fake_server.id_token_override({"iss": "https://bad.issuer/"}):
             self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_token")
 
@@ -493,8 +493,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             new_user=False,
             auth_provider_session_id=None,
         )
-        self.fake_provider.post_token_handler.assert_called_once()
-        self.fake_provider.get_userinfo_handler.assert_called_once()
+        self.fake_server.post_token_handler.assert_called_once()
+        self.fake_server.get_userinfo_handler.assert_called_once()
         self.render_error.assert_not_called()
 
         self.reset_mocks()
@@ -514,18 +514,18 @@ class OidcHandlerTestCase(HomeserverTestCase):
             new_user=False,
             auth_provider_session_id=grant.sid,
         )
-        self.fake_provider.post_token_handler.assert_called_once()
-        self.fake_provider.get_userinfo_handler.assert_called_once()
+        self.fake_server.post_token_handler.assert_called_once()
+        self.fake_server.get_userinfo_handler.assert_called_once()
         self.render_error.assert_not_called()
 
         # Handle userinfo fetching error
         request, _ = self.start_authorization(userinfo)
-        with self.fake_provider.buggy_endpoint(userinfo=True):
+        with self.fake_server.buggy_endpoint(userinfo=True):
             self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("fetch_error")
 
         request, _ = self.start_authorization(userinfo)
-        with self.fake_provider.buggy_endpoint(token=True):
+        with self.fake_server.buggy_endpoint(token=True):
             self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("server_error")
 
@@ -582,17 +582,17 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "access_token": "aabbcc",
         }
 
-        self.fake_provider.post_token_handler.side_effect = None
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.side_effect = None
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             payload=token
         )
         code = "code"
         ret = self.get_success(self.provider._exchange_code(code))
-        kwargs = self.fake_provider.request.call_args[1]
+        kwargs = self.fake_server.request.call_args[1]
 
         self.assertEqual(ret, token)
         self.assertEqual(kwargs["method"], "POST")
-        self.assertEqual(kwargs["uri"], self.fake_provider.token_endpoint)
+        self.assertEqual(kwargs["uri"], self.fake_server.token_endpoint)
 
         args = parse_qs(kwargs["data"].decode("utf-8"))
         self.assertEqual(args["grant_type"], ["authorization_code"])
@@ -602,7 +602,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
 
         # Test error handling
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=400, payload={"error": "foo", "error_description": "bar"}
         )
         from synapse.handlers.oidc import OidcError
@@ -612,14 +612,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(exc.value.error_description, "bar")
 
         # Internal server error with no JSON body
-        self.fake_provider.post_token_handler.return_value = FakeResponse(
+        self.fake_server.post_token_handler.return_value = FakeResponse(
             code=500, body=b"Not JSON"
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "server_error")
 
         # Internal server error with JSON body
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=500, payload={"error": "internal_server_error"}
         )
 
@@ -627,14 +627,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(exc.value.error, "internal_server_error")
 
         # 4xx error without "error" field
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=400, payload={}
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "server_error")
 
         # 2xx error with "error" field
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=200, payload={"error": "some_error"}
         )
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
@@ -664,8 +664,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "access_token": "aabbcc",
         }
 
-        self.fake_provider.post_token_handler.side_effect = None
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.side_effect = None
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             payload=token
         )
         code = "code"
@@ -679,9 +679,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(ret, token)
 
         # the request should have hit the token endpoint
-        kwargs = self.fake_provider.request.call_args[1]
+        kwargs = self.fake_server.request.call_args[1]
         self.assertEqual(kwargs["method"], "POST")
-        self.assertEqual(kwargs["uri"], self.fake_provider.token_endpoint)
+        self.assertEqual(kwargs["uri"], self.fake_server.token_endpoint)
 
         # the client secret provided to the should be a jwt which can be checked with
         # the public key
@@ -720,8 +720,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "access_token": "aabbcc",
         }
 
-        self.fake_provider.post_token_handler.side_effect = None
-        self.fake_provider.post_token_handler.return_value = FakeResponse.json(
+        self.fake_server.post_token_handler.side_effect = None
+        self.fake_server.post_token_handler.return_value = FakeResponse.json(
             payload=token
         )
         code = "code"
@@ -730,9 +730,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(ret, token)
 
         # the request should have hit the token endpoint
-        kwargs = self.fake_provider.request.call_args[1]
+        kwargs = self.fake_server.request.call_args[1]
         self.assertEqual(kwargs["method"], "POST")
-        self.assertEqual(kwargs["uri"], self.fake_provider.token_endpoint)
+        self.assertEqual(kwargs["uri"], self.fake_server.token_endpoint)
 
         # check the POSTed data
         args = parse_qs(kwargs["data"].decode("utf-8"))

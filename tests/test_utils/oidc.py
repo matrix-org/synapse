@@ -54,7 +54,7 @@ class FakeOidcServer:
     def __init__(self, clock: Clock, issuer: str):
         from authlib.jose import ECKey, KeySet
 
-        self.clock = clock
+        self._clock = clock
         self.issuer = issuer
 
         self.request = Mock(side_effect=self._request)
@@ -64,14 +64,14 @@ class FakeOidcServer:
         self.post_token_handler = Mock(side_effect=self._post_token_handler)
 
         # A code -> grant mapping
-        self.authorization_grants: Dict[str, FakeAuthorizationGrant] = {}
+        self._authorization_grants: Dict[str, FakeAuthorizationGrant] = {}
         # An access token -> grant mapping
-        self.sessions: Dict[str, FakeAuthorizationGrant] = {}
+        self._sessions: Dict[str, FakeAuthorizationGrant] = {}
 
         # We generate here an ECDSA key with the P-256 curve (ES256 algorithm) used for
         # signing JWTs. ECDSA keys are really quick to generate compared to RSA.
-        self.key = ECKey.generate_key(crv="P-256", is_private=True)
-        self.jwks = KeySet([ECKey.import_key(self.key.as_pem(is_private=False))])
+        self._key = ECKey.generate_key(crv="P-256", is_private=True)
+        self._jwks = KeySet([ECKey.import_key(self._key.as_pem(is_private=False))])
 
         self._id_token_overrides: Dict[str, Any] = {}
 
@@ -127,11 +127,11 @@ class FakeOidcServer:
         }
 
     def get_jwks(self) -> dict:
-        return self.jwks.as_dict()
+        return self._jwks.as_dict()
 
     def get_userinfo(self, access_token: str) -> Optional[dict]:
         """Given an access token, get the userinfo of the associated session."""
-        session = self.sessions.get(access_token, None)
+        session = self._sessions.get(access_token, None)
         if session is None:
             return None
         return session.userinfo
@@ -143,10 +143,10 @@ class FakeOidcServer:
         kid = self.get_jwks()["keys"][0]["kid"]
         protected = {"alg": "ES256", "kid": kid}
         json_payload = json.dumps(payload)
-        return jws.serialize_compact(protected, json_payload, self.key).decode("utf-8")
+        return jws.serialize_compact(protected, json_payload, self._key).decode("utf-8")
 
     def generate_id_token(self, grant: FakeAuthorizationGrant) -> str:
-        now = self.clock.time()
+        now = self._clock.time()
         id_token = {
             **grant.userinfo,
             "iss": self.issuer,
@@ -193,17 +193,17 @@ class FakeOidcServer:
             client_id=client_id,
             sid=sid,
         )
-        self.authorization_grants[code] = grant
+        self._authorization_grants[code] = grant
 
         return code, grant
 
     def exchange_code(self, code: str) -> Optional[Dict[str, Any]]:
-        grant = self.authorization_grants.pop(code, None)
+        grant = self._authorization_grants.pop(code, None)
         if grant is None:
             return None
 
         access_token = random_string(10)
-        self.sessions[access_token] = grant
+        self._sessions[access_token] = grant
 
         token = {
             "token_type": "Bearer",
