@@ -219,13 +219,13 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _related_events(self, event: EventBase) -> dict[str, dict[str, str]]:
+    async def _related_events(self, event: EventBase) -> Dict[str, Dict[str, str]]:
         """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
 
         Returns:
             Mapping of relation type to flattened events.
         """
-        related_events: dict[str, dict[str, str]] = {}
+        related_events: Dict[str, Dict[str, str]] = {}
         if self._related_event_match_enabled:
             related_event_id = event.content.get("m.relates_to", {}).get("event_id")
             relation_type = event.content.get("m.relates_to", {}).get("rel_type")
