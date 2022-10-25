@@ -142,6 +142,9 @@ class DeviceMessageHandler:
                 message_type, sender_user_id, by_device
             )
 
+        if not local_messages:
+            return
+
         # Add messages to the database.
         # Retrieve the stream id of the last-processed to-device message.
         last_stream_id = await self.store.add_messages_from_remote_to_device_inbox(
@@ -275,6 +278,9 @@ class DeviceMessageHandler:
                 "message_id": message_id,
                 "org.matrix.opentracing_context": json_encoder.encode(context),
             }
+
+        if not (local_messages or remote_messages):
+            return
 
         # Add messages to the database.
         # Retrieve the stream id of the last-processed to-device message.
