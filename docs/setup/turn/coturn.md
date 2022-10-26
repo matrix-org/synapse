@@ -213,10 +213,12 @@ Your homeserver configuration file needs the following extra keys:
 As an example, here is the relevant section of the config file for `matrix.org`. The
 `turn_uris` are appropriate for TURN servers listening on the default ports, with no TLS.
 
-    turn_uris: [ "turn:turn.matrix.org?transport=udp", "turn:turn.matrix.org?transport=tcp" ]
-    turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
-    turn_user_lifetime: 86400000
-    turn_allow_guests: True
+```
+turn_uris: [ "turn:turn.matrix.org?transport=udp", "turn:turn.matrix.org?transport=tcp" ]
+turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
+turn_user_lifetime: 86400000
+turn_allow_guests: True
+```
 
 After updating the homeserver configuration, you must restart synapse:
 
