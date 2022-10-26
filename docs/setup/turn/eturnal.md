@@ -34,14 +34,16 @@ sudo systemctl --now enable eturnal
 ```
 
 On SUSE Linux Enterprise and openSUSE systems, [distribution repositories](https://software.opensuse.org/download/?package=eturnal&project=devel:languages:erlang)
-can be used instead. On other Linux systems, the binary release can be installed
-as [described](https://eturnal.net/documentation/#Installation) in the reference documentation. For Windows, an installer is
-[available](https://eturnal.net/windows/). On other platforms, `eturnal` is [built from source](https://github.com/processone/eturnal/blob/master/INSTALL.md).
+can be used instead. There is an official [AlpineLinux package](https://pkgs.alpinelinux.org/packages?name=eturnal) 
+available. On other Linux systems, the binary release can be installed as [described](https://eturnal.net/documentation/#Installation) 
+in the reference documentation. For Windows, an installer is [available](https://eturnal.net/windows/). 
+On other platforms, `eturnal` is [built from source](https://github.com/processone/eturnal/blob/master/INSTALL.md).
 
 ### Configuration
 
 1.  Create or edit the config file in `/etc/eturnal.yml`. 
-    See the [example configuration](https://github.com/processone/eturnal/blob/master/config/eturnal.yml) for explanations of the options.
+    See the [example configuration](https://github.com/processone/eturnal/blob/master/config/eturnal.yml) 
+    for explanations of the options.
     
     The relevant lines, with example values, are:
 
