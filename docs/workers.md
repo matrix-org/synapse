@@ -366,13 +366,16 @@ streams and the endpoints associated with them:
 
 ##### The `events` stream
 
-The `events` stream experimentally supports having multiple writers, where work
-is sharded between them by room ID. Note that you *must* restart all worker
-instances when adding or removing event persisters.
+The `events` stream experimentally supports having multiple writer workers, where load
+is sharded between them by room ID. Each writer is called an _event persister_. They are
+responsible for
+- receiving new events,
+- linking them to those already in the room DAG,
+- persisting them to the DB, and finally
+- updating the events stream.
 
-An `event_persister` is passed these events and is tasked with persisting them to the
-database, as well as updating the events stream. This requires linking the events to
-those already in the room DAG.
+Because load is sharded in this way, you *must* restart all worker instances when 
+adding or removing event persisters.
 
 An `event_persister` should not be mistaken for an `event_creator`.
 An `event_creator` listens for requests from clients to create new events and does
