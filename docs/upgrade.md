@@ -88,6 +88,15 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.71.0
+
+## Removal of the `generate_short_term_login_token` module API method
+
+As announced with the release of [Synapse 1.69.0](#deprecation-of-the-generate_short_term_login_token-module-api-method), the deprecated `generate_short_term_login_token` module method has been removed.
+
+Modules relying on it can instead use the `create_login_token` method.
+
+
 # Upgrading to v1.69.0
 
 ## Changes to the receipts replication streams
