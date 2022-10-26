@@ -1,0 +1,1 @@
+Fix a long-standing bug where device names would be returned via a federation user key query request when `allow_device_name_lookup_over_federation` was set to `false`.
