@@ -87,7 +87,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         # The first configured media worker will run the media background jobs
         "shared_extra_conf": {
             "enable_media_repo": False,
-            "media_instance_running_background_jobs", "media_repository1",
+            "media_instance_running_background_jobs": "media_repository1",
         },
         "worker_extra_conf": "enable_media_repo: true",
     },
