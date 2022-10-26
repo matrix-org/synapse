@@ -37,6 +37,7 @@ It returns a JSON body like the following:
     "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
+    "erased": false,
     "shadow_banned": 0,
     "creation_ts": 1560432506,
     "appservice_id": null,
@@ -167,6 +168,7 @@ A response body like the following is returned:
             "admin": 0,
             "user_type": null,
             "deactivated": 0,
+            "erased": false,
             "shadow_banned": 0,
             "displayname": "<User One>",
             "avatar_url": null,
@@ -177,6 +179,7 @@ A response body like the following is returned:
             "admin": 1,
             "user_type": null,
             "deactivated": 0,
+            "erased": false,
             "shadow_banned": 0,
             "displayname": "<User Two>",
             "avatar_url": "<avatar_url>",
@@ -247,6 +250,7 @@ The following fields are returned in the JSON response body:
   - `user_type` - string - Type of the user. Normal users are type `None`.
     This allows user type specific behaviour. There are also types `support` and `bot`. 
   - `deactivated` - bool - Status if that user has been marked as deactivated.
+  - `erased` - bool - Status if that user has been marked as erased.
   - `shadow_banned` - bool - Status if that user has been marked as shadow banned.
   - `displayname` - string - The user's display name if they have set one.
   - `avatar_url` - string -  The user's avatar URL if they have set one.

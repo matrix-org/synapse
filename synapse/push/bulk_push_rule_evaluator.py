@@ -13,36 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
+    Any,
     Collection,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
     Union,
 )
 
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
-from synapse.synapse_rust.push import FilteredPushRules, PushRule
+from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
-
-from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -118,9 +114,6 @@ class BulkPushRuleEvaluator:
             resizable=False,
         )
 
-        # Whether to support MSC3772 is supported.
-        self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
-
     async def _get_rules_for_event(
         self,
         event: EventBase,
@@ -173,7 +166,11 @@ class BulkPushRuleEvaluator:
 
     async def _get_power_levels_and_sender_level(
         self, event: EventBase, context: EventContext
-    ) -> Tuple[dict, int]:
+    ) -> Tuple[dict, Optional[int]]:
+        # There are no power levels and sender levels possible to get from outlier
+        if event.internal_metadata.is_outlier():
+            return {}, None
+
         event_types = auth_types_for_event(event.room_version, event)
         prev_state_ids = await context.get_prev_state_ids(
             StateFilter.from_types(event_types)
@@ -197,51 +194,6 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _get_mutual_relations(
-        self, parent_id: str, rules: Iterable[Tuple[PushRule, bool]]
-    ) -> Dict[str, Set[Tuple[str, str]]]:
-        """
-        Fetch event metadata for events which related to the same event as the given event.
-
-        If the given event has no relation information, returns an empty dictionary.
-
-        Args:
-            parent_id: The event ID which is targeted by relations.
-            rules: The push rules which will be processed for this event.
-
-        Returns:
-            A dictionary of relation type to:
-                A set of tuples of:
-                    The sender
-                    The event type
-        """
-
-        # If the experimental feature is not enabled, skip fetching relations.
-        if not self._relations_match_enabled:
-            return {}
-
-        # Pre-filter to figure out which relation types are interesting.
-        rel_types = set()
-        for rule, enabled in rules:
-            if not enabled:
-                continue
-
-            for condition in rule.conditions:
-                if condition["kind"] != "org.matrix.msc3772.relation_match":
-                    continue
-
-                # rel_type is required.
-                rel_type = condition.get("rel_type")
-                if rel_type:
-                    rel_types.add(rel_type)
-
-        # If no valid rules were found, no mutual relations.
-        if not rel_types:
-            return {}
-
-        # If any valid rules were found, fetch the mutual relations.
-        return await self.store.get_mutual_event_relations(parent_id, rel_types)
-
     @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
         self, event: EventBase, context: EventContext
@@ -250,8 +202,8 @@ class BulkPushRuleEvaluator:
         should increment the unread count, and insert the results into the
         event_push_actions_staging table.
         """
-        if event.internal_metadata.is_outlier():
-            # This can happen due to out of band memberships
+        if not event.internal_metadata.is_notifiable():
+            # Push rules for events that aren't notifiable can't be processed by this
             return
 
         # Disable counting as unread unless the experimental configuration is
@@ -273,26 +225,31 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
+        # Find the event's thread ID.
         relation = relation_from_event(event)
-        # If the event does not have a relation, then cannot have any mutual
-        # relations or thread ID.
-        relations = {}
-        thread_id = "main"
+        # If the event does not have a relation, then it cannot have a thread ID.
+        thread_id = MAIN_TIMELINE
         if relation:
-            relations = await self._get_mutual_relations(
-                relation.parent_id,
-                itertools.chain(*(r.rules() for r in rules_by_user.values())),
-            )
+            # Recursively attempt to find the thread this event relates to.
             if relation.rel_type == RelationTypes.THREAD:
                 thread_id = relation.parent_id
+            else:
+                # Since the event has not yet been persisted we check whether
+                # the parent is part of a thread.
+                thread_id = await self.store.get_thread_id(relation.parent_id)
 
-        evaluator = PushRuleEvaluatorForEvent(
-            event,
+        # It's possible that old room versions have non-integer power levels (floats or
+        # strings). Workaround this by explicitly converting to int.
+        notification_levels = power_levels.get("notifications", {})
+        if not event.room_version.msc3667_int_only_power_levels:
+            for user_id, level in notification_levels.items():
+                notification_levels[user_id] = int(level)
+
+        evaluator = PushRuleEvaluator(
+            _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels,
-            relations,
-            self._relations_match_enabled,
+            notification_levels,
         )
 
         users = rules_by_user.keys()
@@ -300,18 +257,8 @@ class BulkPushRuleEvaluator:
             event.room_id, users
         )
 
-        # This is a check for the case where user joins a room without being
-        # allowed to see history, and then the server receives a delayed event
-        # from before the user joined, which they should not be pushed for
-        uids_with_visibility = await filter_event_for_clients_with_state(
-            self.store, users, event, context
-        )
-
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
-                continue
-
-            if uid not in uids_with_visibility:
                 continue
 
             display_name = None
@@ -334,17 +281,30 @@ class BulkPushRuleEvaluator:
                 # current user, it'll be added to the dict later.
                 actions_by_user[uid] = []
 
-            for rule, enabled in rules.rules():
-                if not enabled:
-                    continue
+            actions = evaluator.run(rules, uid, display_name)
+            if "notify" in actions:
+                # Push rules say we should notify the user of this event
+                actions_by_user[uid] = actions
 
-                matches = evaluator.check_conditions(rule.conditions, uid, display_name)
-                if matches:
-                    actions = [x for x in rule.actions if x != "dont_notify"]
-                    if actions and "notify" in actions:
-                        # Push rules say we should notify the user of this event
-                        actions_by_user[uid] = actions
-                    break
+        # If there aren't any actions then we can skip the rest of the
+        # processing.
+        if not actions_by_user:
+            return
+
+        # This is a check for the case where user joins a room without being
+        # allowed to see history, and then the server receives a delayed event
+        # from before the user joined, which they should not be pushed for
+        #
+        # We do this *after* calculating the push actions as a) its unlikely
+        # that we'll filter anyone out and b) for large rooms its likely that
+        # most users will have push disabled and so the set of users to check is
+        # much smaller.
+        uids_with_visibility = await filter_event_for_clients_with_state(
+            self.store, actions_by_user.keys(), event, context
+        )
+
+        for user_id in set(actions_by_user).difference(uids_with_visibility):
+            actions_by_user.pop(user_id, None)
 
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
@@ -361,3 +321,21 @@ MemberMap = Dict[str, Optional[EventIdMembership]]
 Rule = Dict[str, dict]
 RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
+
+
+def _flatten_dict(
+    d: Union[EventBase, Mapping[str, Any]],
+    prefix: Optional[List[str]] = None,
+    result: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
+    if prefix is None:
+        prefix = []
+    if result is None:
+        result = {}
+    for key, value in d.items():
+        if isinstance(value, str):
+            result[".".join(prefix + [key])] = value.lower()
+        elif isinstance(value, Mapping):
+            _flatten_dict(value, prefix=(prefix + [key]), result=result)
+
+    return result

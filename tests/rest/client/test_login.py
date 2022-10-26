@@ -23,6 +23,8 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 import synapse.rest.admin
+from synapse.api.constants import ApprovalNoticeMedium, LoginType
+from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import devices, login, logout, register
 from synapse.rest.client.account import WhoamiRestServlet
@@ -94,6 +96,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         logout.register_servlets,
         devices.register_servlets,
         lambda hs, http_server: WhoamiRestServlet(hs).register(http_server),
+        register.register_servlets,
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
@@ -405,6 +408,44 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # test that the login fails with the correct error code
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_INVALID_PARAM")
+
+    @override_config(
+        {
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            }
+        }
+    )
+    def test_require_approval(self) -> None:
+        channel = self.make_request(
+            "POST",
+            "register",
+            {
+                "username": "kermit",
+                "password": "monkey",
+                "auth": {"type": LoginType.DUMMY},
+            },
+        )
+        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
+
+        params = {
+            "type": LoginType.PASSWORD,
+            "identifier": {"type": "m.id.user", "user": "kermit"},
+            "password": "monkey",
+        }
+        channel = self.make_request("POST", LOGIN_URL, params)
+        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")

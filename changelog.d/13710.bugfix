@@ -1,0 +1,1 @@
+Fix a long-standing bug where Synapse would count codepoints instead of bytes when validating the size of some fields.
