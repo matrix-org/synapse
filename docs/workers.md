@@ -504,7 +504,7 @@ worker application type.
 
 Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
-[`start_pushers: False`](usage/configuration/config_documentation.md#start_pushers) in the
+[`start_pushers: false`](usage/configuration/config_documentation.md#start_pushers) in the
 shared configuration file to stop the main synapse sending push notifications.
 
 To run multiple instances at once the
@@ -513,6 +513,7 @@ option should list all pusher instances by their
 [`worker_name`](usage/configuration/config_documentation.md#worker_name), e.g.:
 
 ```yaml
+start_pushers: false
 pusher_instances:
     - pusher_worker1
     - pusher_worker2
@@ -541,7 +542,7 @@ Note this worker cannot be load-balanced: only one instance should be active.
 
 Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
-[`send_federation: False`](usage/configuration/config_documentation.md#send_federation)
+[`send_federation: false`](usage/configuration/config_documentation.md#send_federation)
 in the shared configuration file to stop the main synapse sending this traffic.
 
 If running multiple federation senders then you must list each
@@ -553,6 +554,7 @@ All instances must be stopped and started when adding or removing instances.
 For example:
 
 ```yaml
+send_federation: false
 federation_sender_instances:
     - federation_sender1
     - federation_sender2

@@ -3721,6 +3721,7 @@ If only one pusher worker is configured, this setting is not necessary.
 
 Example configuration:
 ```yaml
+start_pushers: false
 pusher_instances:
   - pusher_worker1
   - pusher_worker2
@@ -3750,6 +3751,7 @@ events may be dropped).
 
 Example configuration:
 ```yaml
+send_federation: false
 federation_sender_instances:
   - federation_sender1
 ```
