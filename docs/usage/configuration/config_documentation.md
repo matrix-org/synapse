@@ -3760,7 +3760,9 @@ federation_sender_instances:
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
-Not every type of worker needs a HTTP replications listener.
+Only `synapse.app.generic_worker` as [`stream_writers`](../../workers.md#stream-writers)
+needs a HTTP replications listener. It must also be specified the
+[`instance_map`](#instance_map).
 
 Example configuration:
 ```yaml
@@ -3775,6 +3777,9 @@ instance_map:
 Experimental: When using workers you can define which workers should
 handle event persistence and typing notifications. Any worker
 specified here must also be in the [`instance_map`](#instance_map).
+
+See the list of available streams in the
+[worker documentation](../../workers.md#stream-writers).
 
 Example configuration:
 ```yaml
