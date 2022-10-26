@@ -3682,7 +3682,7 @@ As a result, the worker configuration is divided into two parts.
 1. The first part (in this section of the manual) defines which shardable tasks
    are delegated to privileged workers. This allows unprivileged workers to make
    request a privileged worker to act on their behalf.
-1. [The second part](#worker-configuration-for-workers-configuration)
+1. [The second part](#individual-worker-configuration)
    controls the behaviour of individual workers in isolation.
 
 For guidance on setting up workers, see the [worker documentation](../../workers.md).
