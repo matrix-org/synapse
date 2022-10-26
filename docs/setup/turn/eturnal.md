@@ -10,10 +10,12 @@ The `eturnal` TURN server implementation is available from a variety of sources 
 
 On **APT-based** Linux distributions, run:
 
-    sudo apt install extrepo
-    sudo extrepo enable eturnal
-    sudo apt update
-    sudo apt install eturnal
+```sh
+sudo apt install extrepo
+sudo extrepo enable eturnal
+sudo apt update
+sudo apt install eturnal
+```
 
 On **DNF-based** Linux distributions, run:
 
