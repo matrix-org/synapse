@@ -99,7 +99,7 @@ modules:
     config: {}
 ```
 ---
-## Server ##
+## Server
 
 Define your homeserver name and other base options.
 
@@ -570,7 +570,7 @@ Example configuration:
 delete_stale_devices_after: 1y
 ```
 
-## Homeserver blocking ##
+## Homeserver blocking
 Useful options for Synapse admins.
 
 ---
@@ -922,7 +922,7 @@ retention:
       interval: 1d
 ```
 ---
-## TLS ##
+## TLS
 
 Options related to TLS.
 
@@ -1012,7 +1012,7 @@ federation_custom_ca_list:
   - myCA3.pem
 ```
 ---
-## Federation ##
+## Federation
 
 Options related to federation.
 
@@ -1071,7 +1071,7 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
-## Caching ##
+## Caching
 
 Options related to caching.
 
@@ -1185,7 +1185,7 @@ file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
 `systemctl reload matrix-synapse`.
 
 ---
-## Database ##
+## Database
 Config options related to database settings.
 
 ---
@@ -1332,7 +1332,7 @@ databases:
       cp_max: 10
 ```
 ---
-## Logging ##
+## Logging
 Config options related to logging.
 
 ---
@@ -1346,7 +1346,7 @@ Example configuration:
 log_config: "CONFDIR/SERVERNAME.log.config"
 ```
 ---
-## Ratelimiting ##
+## Ratelimiting
 Options related to ratelimiting in Synapse.
 
 Each ratelimiting configuration is made of two parameters:
@@ -1577,7 +1577,7 @@ Example configuration:
 federation_rr_transactions_per_room_per_second: 40
 ```
 ---
-## Media Store ##
+## Media Store
 Config options related to Synapse's media store.
 
 ---
@@ -1878,7 +1878,7 @@ oembed:
     - oembed/my_providers.json
 ```
 ---
-## Captcha ##
+## Captcha
 
 See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 
@@ -1927,7 +1927,7 @@ Example configuration:
 recaptcha_siteverify_api: "https://my.recaptcha.site"
 ```
 ---
-## TURN ##
+## TURN
 Options related to adding a TURN server to Synapse.
 
 ---
@@ -2520,7 +2520,7 @@ Example configuration:
 report_stats_endpoint: https://example.com/report-usage-stats/push
 ```
 ---
-## API Configuration ##
+## API Configuration
 Config settings related to the client/server API
 
 ---
@@ -2620,7 +2620,7 @@ Example configuration:
 form_secret: <PRIVATE STRING>
 ```
 ---
-## Signing Keys ##
+## Signing Keys
 Config options relating to signing keys
 
 ---
@@ -2729,7 +2729,7 @@ Example configuration:
 key_server_signing_keys_path: "key_server_signing_keys.key"
 ```
 ---
-## Single sign-on integration ##
+## Single sign-on integration
 
 The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.
@@ -3349,7 +3349,7 @@ email:
     email_validation: "[%(server_name)s] Validate your email"
 ```
 ---
-## Push ##
+## Push
 Configuration settings related to push notifications
 
 ---
@@ -3382,7 +3382,7 @@ push:
   group_unread_count_by_room: false
 ```
 ---
-## Rooms ##
+## Rooms
 Config options relating to rooms.
 
 ---
@@ -3628,7 +3628,7 @@ default_power_level_content_override:
 ```
 
 ---
-## Opentracing ##
+## Opentracing
 Configuration options related to Opentracing support.
 
 ---
@@ -3919,7 +3919,7 @@ Example configuration:
 worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
 ---
-## Background Updates ##
+## Background Updates
 Configuration settings related to background updates.
 
 ---
