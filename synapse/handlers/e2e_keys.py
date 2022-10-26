@@ -59,6 +59,9 @@ class E2eKeysHandler:
 
         federation_registry = hs.get_federation_registry()
 
+        self._allow_device_name_lookup_over_federation = (
+            hs.config.federation.allow_device_name_lookup_over_federation
+        )
         self._is_master = hs.config.worker.worker_app is None
         if not self._is_master:
             self._user_device_resync_client = (
@@ -431,13 +434,17 @@ class E2eKeysHandler:
     @trace
     @cancellable
     async def query_local_devices(
-        self, query: Mapping[str, Optional[List[str]]]
+        self,
+        query: Mapping[str, Optional[List[str]]],
+        include_displaynames: bool = True,
     ) -> Dict[str, Dict[str, dict]]:
         """Get E2E device keys for local users
 
         Args:
             query: map from user_id to a list
                  of devices to query (None for all devices)
+            include_displaynames: Whether to include device displaynames in the returned
+                device details.
 
         Returns:
             A map from user_id -> device_id -> device details
@@ -469,7 +476,9 @@ class E2eKeysHandler:
             # make sure that each queried user appears in the result dict
             result_dict[user_id] = {}
 
-        results = await self.store.get_e2e_device_keys_for_cs_api(local_query)
+        results = await self.store.get_e2e_device_keys_for_cs_api(
+            local_query, include_displaynames
+        )
 
         # Build the result structure
         for user_id, device_keys in results.items():
@@ -482,11 +491,31 @@ class E2eKeysHandler:
     async def on_federation_query_client_keys(
         self, query_body: Dict[str, Dict[str, Optional[List[str]]]]
     ) -> JsonDict:
-        """Handle a device key query from a federated server"""
+        """Handle a device key query from a federated server:
+
+        Handles the path: /_matrix/federation/v1/users/keys/query
+
+        Args:
+            query_body: The body of the query request. Should contain a key
+                "device_keys" that map to a dictionary of user ID's -> list of
+                device IDs. If the list of device IDs is empty, all devices of
+                that user will be queried.
+
+        Returns:
+            A json dictionary containing the following:
+                - device_keys: A dictionary containing the requested device information.
+                - master_keys: An optional dictionary of user ID -> master cross-signing
+                   key info.
+                - self_signing_key: An optional dictionary of user ID -> self-signing
+                    key info.
+        """
         device_keys_query: Dict[str, Optional[List[str]]] = query_body.get(
             "device_keys", {}
         )
-        res = await self.query_local_devices(device_keys_query)
+        res = await self.query_local_devices(
+            device_keys_query,
+            include_displaynames=self._allow_device_name_lookup_over_federation,
+        )
         ret = {"device_keys": res}
 
         # add in the cross-signing keys
