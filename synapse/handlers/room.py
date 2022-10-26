@@ -559,7 +559,6 @@ class RoomCreationHandler:
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
-            ratelimit=False,
         )
 
         # Transfer membership events
@@ -1037,7 +1036,6 @@ class RoomCreationHandler:
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
-        ratelimit: bool = True,
     ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room. Sends the room creation, membership,
         and power level events into the room sequentially, then creates and batches up the
@@ -1125,7 +1123,7 @@ class RoomCreationHandler:
             creator.user,
             room_id,
             "join",
-            ratelimit=ratelimit,
+            ratelimit=False,
             content=creator_join_profile,
             new_room=True,
             prev_event_ids=[last_sent_event_id],
