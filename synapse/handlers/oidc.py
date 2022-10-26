@@ -1292,6 +1292,18 @@ class OidcProvider:
                 self.idp_id, sub
             )
 
+        # Invalidate any running user-mapping sessions
+        self._sso_handler.revoke_mapping_sessions_for_provider_session_id(
+            auth_provider_id=self.idp_id,
+            auth_provider_session_id=sid,
+        )
+
+        # Invalidate any in-flight login tokens
+        await self._store.invalidate_login_tokens_by_session_id(
+            auth_provider_id=self.idp_id,
+            auth_provider_session_id=sid,
+        )
+
         # Fetch any device(s) in the store associated with the session ID.
         devices = await self._store.get_devices_by_auth_provider_session_id(
             auth_provider_id=self.idp_id,

@@ -790,6 +790,32 @@ class SsoHandler:
         logger.info("Couldn't find session id %s", session_id)
         raise SynapseError(400, "unknown session")
 
+    def revoke_mapping_sessions_for_provider_session_id(
+        self, auth_provider_id: str, auth_provider_session_id: str
+    ) -> None:
+        """Revoke username mapping sessions with the given IdP session ID.
+
+        This is useful to revoke in-flight mapping sessions when a logout notification
+        arrives from the IdP.
+
+        Args:
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+            auth_provider_session_id: The session ID got during login from the SSO IdP.
+        """
+        to_delete = []
+
+        for session_id, session in self._username_mapping_sessions.items():
+            if (
+                session.auth_provider_id == auth_provider_id
+                and session.auth_provider_session_id == auth_provider_session_id
+            ):
+                to_delete.append(session_id)
+
+        for session_id in to_delete:
+            logger.info("Expiring mapping session %s", session_id)
+            del self._username_mapping_sessions[session_id]
+
     async def check_username_availability(
         self,
         localpart: str,

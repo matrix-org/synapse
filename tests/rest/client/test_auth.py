@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -21,7 +22,7 @@ from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.api.constants import ApprovalNoticeMedium, LoginType
-from synapse.api.errors import Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client import account, auth, devices, login, logout, register
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
@@ -33,7 +34,7 @@ from synapse.util import Clock
 from tests import unittest
 from tests.handlers.test_oidc import HAS_OIDC
 from tests.rest.client.utils import TEST_OIDC_CONFIG, TEST_OIDC_ISSUER
-from tests.server import FakeChannel
+from tests.server import FakeChannel, make_request
 from tests.unittest import override_config, skip_unless
 
 
@@ -1229,17 +1230,20 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         }
     )
     def test_simple_logout(self) -> None:
-        fake_oidc_provider = self.helper.fake_oidc_server()
+        """
+        Receiving a logout token should logout the user
+        """
+        fake_oidc_server = self.helper.fake_oidc_server()
         user = "john"
 
         login_resp, first_grant = self.helper.login_via_oidc(
-            fake_oidc_provider, user, with_sid=True
+            fake_oidc_server, user, with_sid=True
         )
         first_access_token: str = login_resp["access_token"]
         self.assertTrue(self.is_access_token_valid(first_access_token))
 
         login_resp, second_grant = self.helper.login_via_oidc(
-            fake_oidc_provider, user, with_sid=True
+            fake_oidc_server, user, with_sid=True
         )
         second_access_token: str = login_resp["access_token"]
         self.assertTrue(self.is_access_token_valid(second_access_token))
@@ -1248,7 +1252,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         self.assertEqual(first_grant.userinfo["sub"], second_grant.userinfo["sub"])
 
         # Logging out of the first session
-        logout_token = fake_oidc_provider.generate_logout_token(first_grant)
+        logout_token = fake_oidc_server.generate_logout_token(first_grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
@@ -1256,11 +1260,130 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         self.assertTrue(self.is_access_token_valid(second_access_token))
 
         # Logging out of the second session
-        logout_token = fake_oidc_provider.generate_logout_token(second_grant)
+        logout_token = fake_oidc_server.generate_logout_token(second_grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
-        self.assertFalse(self.is_access_token_valid(second_access_token))
+    @override_config(
+        {
+            "oidc_providers": [
+                {
+                    "idp_id": "oidc",
+                    "idp_name": "OIDC",
+                    "issuer": TEST_OIDC_ISSUER,
+                    "client_id": "test-client-id",
+                    "client_secret": "test-client-secret",
+                    "scopes": ["openid"],
+                    "user_mapping_provider": {
+                        "config": {"localpart_template": "{{ user.sub }}"}
+                    },
+                    "backchannel_logout_enabled": True,
+                }
+            ]
+        }
+    )
+    def test_logout_during_login(self) -> None:
+        """
+        It should revoke login tokens when receiving a logout token
+        """
+        fake_oidc_server = self.helper.fake_oidc_server()
+        user = "john"
+
+        # Get an authentication, and logout before submitting the logout token
+        client_redirect_url = "https://x"
+        userinfo = {"sub": user}
+        channel, grant = self.helper.auth_via_oidc(
+            fake_oidc_server,
+            userinfo,
+            client_redirect_url,
+            with_sid=True,
+        )
+
+        # expect a confirmation page
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+
+        # fish the matrix login token out of the body of the confirmation page
+        m = re.search(
+            'a href="%s.*loginToken=([^"]*)"' % (client_redirect_url,),
+            channel.text_body,
+        )
+        assert m, channel.text_body
+        login_token = m.group(1)
+
+        # Submit a logout
+        logout_token = fake_oidc_server.generate_logout_token(grant)
+        channel = self.submit_logout_token(logout_token)
+        self.assertEqual(channel.code, 200)
+
+        # Now try to exchange the login token
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "POST",
+            "/login",
+            content={"type": "m.login.token", "token": login_token},
+        )
+        # It should have failed
+        self.assertEqual(channel.code, 403)
+
+    @override_config(
+        {
+            "oidc_providers": [
+                {
+                    "idp_id": "oidc",
+                    "idp_name": "OIDC",
+                    "issuer": TEST_OIDC_ISSUER,
+                    "client_id": "test-client-id",
+                    "client_secret": "test-client-secret",
+                    "scopes": ["openid"],
+                    "user_mapping_provider": {"config": {}},
+                    "backchannel_logout_enabled": True,
+                }
+            ]
+        }
+    )
+    def test_logout_during_mapping(self) -> None:
+        """
+        It should stop ongoing user mapping session when receiving a logout token
+        """
+        fake_oidc_server = self.helper.fake_oidc_server()
+        user = "john"
+
+        # Get an authentication, and logout before submitting the logout token
+        client_redirect_url = "https://x"
+        userinfo = {"sub": user}
+        channel, grant = self.helper.auth_via_oidc(
+            fake_oidc_server,
+            userinfo,
+            client_redirect_url,
+            with_sid=True,
+        )
+
+        # Expect a user mapping page
+        self.assertEqual(channel.code, HTTPStatus.FOUND, channel.result)
+
+        # We should have a user_mapping_session cookie
+        cookie_headers = channel.headers.getRawHeaders("Set-Cookie")
+        assert cookie_headers
+        cookies: Dict[str, str] = {}
+        for h in cookie_headers:
+            key, value = h.split(";")[0].split("=", maxsplit=1)
+            cookies[key] = value
+
+        user_mapping_session_id = cookies["username_mapping_session"]
+
+        # Getting that session should not raise
+        session = self.hs.get_sso_handler().get_mapping_session(user_mapping_session_id)
+        self.assertIsNotNone(session)
+
+        # Submit a logout
+        logout_token = fake_oidc_server.generate_logout_token(grant)
+        channel = self.submit_logout_token(logout_token)
+        self.assertEqual(channel.code, 200)
+
+        # Now it should raise
+        with self.assertRaises(SynapseError):
+            self.hs.get_sso_handler().get_mapping_session(user_mapping_session_id)
 
     @override_config(
         {
@@ -1281,17 +1404,20 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         }
     )
     def test_disabled(self) -> None:
-        fake_oidc_provider = self.helper.fake_oidc_server()
+        """
+        Receiving a logout token should do nothing if it is disabled in the config
+        """
+        fake_oidc_server = self.helper.fake_oidc_server()
         user = "john"
 
         login_resp, grant = self.helper.login_via_oidc(
-            fake_oidc_provider, user, with_sid=True
+            fake_oidc_server, user, with_sid=True
         )
         access_token: str = login_resp["access_token"]
         self.assertTrue(self.is_access_token_valid(access_token))
 
         # Logging out shouldn't work
-        logout_token = fake_oidc_provider.generate_logout_token(grant)
+        logout_token = fake_oidc_server.generate_logout_token(grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 400)
 
@@ -1317,17 +1443,20 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         }
     )
     def test_no_sid(self) -> None:
-        fake_oidc_provider = self.helper.fake_oidc_server()
+        """
+        Receiving a logout token without `sid` during the login should do nothing
+        """
+        fake_oidc_server = self.helper.fake_oidc_server()
         user = "john"
 
         login_resp, grant = self.helper.login_via_oidc(
-            fake_oidc_provider, user, with_sid=False
+            fake_oidc_server, user, with_sid=False
         )
         access_token: str = login_resp["access_token"]
         self.assertTrue(self.is_access_token_valid(access_token))
 
         # Logging out shouldn't work
-        logout_token = fake_oidc_provider.generate_logout_token(grant)
+        logout_token = fake_oidc_server.generate_logout_token(grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 400)
 
@@ -1365,22 +1494,23 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         }
     )
     def test_multiple_providers(self) -> None:
-        first_provider = self.helper.fake_oidc_server(
-            issuer="https://first-issuer.com/"
-        )
-        second_provider = self.helper.fake_oidc_server(
+        """
+        It should be able to distinguish login tokens from two different IdPs
+        """
+        first_server = self.helper.fake_oidc_server(issuer="https://first-issuer.com/")
+        second_server = self.helper.fake_oidc_server(
             issuer="https://second-issuer.com/"
         )
         user = "john"
 
         login_resp, first_grant = self.helper.login_via_oidc(
-            first_provider, user, with_sid=True, idp_id="oidc-first"
+            first_server, user, with_sid=True, idp_id="oidc-first"
         )
         first_access_token: str = login_resp["access_token"]
         self.assertTrue(self.is_access_token_valid(first_access_token))
 
         login_resp, second_grant = self.helper.login_via_oidc(
-            second_provider, user, with_sid=True, idp_id="oidc-second"
+            second_server, user, with_sid=True, idp_id="oidc-second"
         )
         second_access_token: str = login_resp["access_token"]
         self.assertTrue(self.is_access_token_valid(second_access_token))
@@ -1391,7 +1521,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         self.assertEqual(first_grant.userinfo["sub"], second_grant.userinfo["sub"])
 
         # Logging out of the first session
-        logout_token = first_provider.generate_logout_token(first_grant)
+        logout_token = first_server.generate_logout_token(first_grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
@@ -1399,7 +1529,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         self.assertTrue(self.is_access_token_valid(second_access_token))
 
         # Logging out of the second session
-        logout_token = second_provider.generate_logout_token(second_grant)
+        logout_token = second_server.generate_logout_token(second_grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
