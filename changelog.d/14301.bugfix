@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.70.0rc1 where access tokens would be incorrectly sent to application services as headers. Application services which were obtaining access tokens from query parameters were not affected.
