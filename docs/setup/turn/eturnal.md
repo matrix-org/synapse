@@ -19,15 +19,19 @@ sudo apt install eturnal
 
 On **DNF-based** Linux distributions, run:
 
-    sudo dnf config-manager --add-repo https://eturnal.net/eturnal.repo
-    sudo dnf install eturnal
-    sudo systemctl --now enable eturnal
+```sh
+sudo dnf config-manager --add-repo https://eturnal.net/eturnal.repo
+sudo dnf install eturnal
+sudo systemctl --now enable eturnal
+```
 
 On **YUM-based** Linux distributions, run:
 
-    sudo yum-config-manager --add-repo https://eturnal.net/eturnal.repo
-    sudo yum install eturnal
-    sudo systemctl --now enable eturnal
+```sh
+sudo yum-config-manager --add-repo https://eturnal.net/eturnal.repo
+sudo yum install eturnal
+sudo systemctl --now enable eturnal
+```
 
 On SUSE Linux Enterprise and openSUSE systems, [distribution repositories](https://software.opensuse.org/download/?package=eturnal&project=devel:languages:erlang)
 can be used instead. On other Linux systems, the binary release can be installed
