@@ -178,13 +178,13 @@ class KeyUploadServlet(RestServlet):
             # Proxy headers from the original request, such as the auth headers
             # (in case the access token is there) and the original IP /
             # User-Agent of the request.
-            headers = {
-                header: request.requestHeaders.getRawHeaders(header, [])
+            headers: Dict[bytes, List[bytes]] = {
+                header: list(request.requestHeaders.getRawHeaders(header, []))
                 for header in (b"Authorization", b"User-Agent")
             }
             # Add the previous hop to the X-Forwarded-For header.
-            x_forwarded_for = request.requestHeaders.getRawHeaders(
-                b"X-Forwarded-For", []
+            x_forwarded_for = list(
+                request.requestHeaders.getRawHeaders(b"X-Forwarded-For", [])
             )
             # we use request.client here, since we want the previous hop, not the
             # original client (as returned by request.getClientAddress()).
