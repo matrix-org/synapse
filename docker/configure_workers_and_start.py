@@ -326,7 +326,7 @@ def handle_map_instances_for_shared_config(
     worker_port: int,
 ) -> None:
     """Given a dictionary representing a config file shared across all workers,
-    append sharded worker information to it for the current worker_type instance.
+    append appropriate worker information to it for the current worker_type instance.
 
     Args:
         shared_config: The config dict that all worker instances share (after being converted to YAML)
@@ -359,7 +359,7 @@ def handle_map_instances_for_shared_config(
 
     elif worker_type in ["account_data", "presence", "receipts", "to_device", "typing"]:
         # Update the list of stream writers
-        # It's convienent that the name of the worker type is the same as the event stream
+        # It's convenient that the name of the worker type is the same as the stream to write
         shared_config.setdefault("stream_writers", {}).setdefault(
             worker_type, []
         ).append(worker_name)
