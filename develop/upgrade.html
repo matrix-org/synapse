@@ -231,6 +231,10 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1710"><a class="header" href="#upgrading-to-v1710">Upgrading to v1.71.0</a></h1>
+<h2 id="removal-of-the-generate_short_term_login_token-module-api-method"><a class="header" href="#removal-of-the-generate_short_term_login_token-module-api-method">Removal of the <code>generate_short_term_login_token</code> module API method</a></h2>
+<p>As announced with the release of <a href="#deprecation-of-the-generate_short_term_login_token-module-api-method">Synapse 1.69.0</a>, the deprecated <code>generate_short_term_login_token</code> module method has been removed.</p>
+<p>Modules relying on it can instead use the <code>create_login_token</code> method.</p>
 <h1 id="upgrading-to-v1690"><a class="header" href="#upgrading-to-v1690">Upgrading to v1.69.0</a></h1>
 <h2 id="changes-to-the-receipts-replication-streams"><a class="header" href="#changes-to-the-receipts-replication-streams">Changes to the receipts replication streams</a></h2>
 <p>Synapse now includes information indicating if a receipt applies to a thread when
