@@ -1339,7 +1339,7 @@ Config options related to logging.
 ### `log_config`
 
 This option specifies a yaml python logging config file as described
-[here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
 
 Example configuration:
 ```yaml
@@ -3911,7 +3911,7 @@ worker_pid_file: DATADIR/generic_worker1.pid
 ### `worker_log_config`
 
 This option specifies a yaml python logging config file as described
-[here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
 See also the [`log_config` option](#log_config) option for the main Synapse process.
 
 Example configuration:
