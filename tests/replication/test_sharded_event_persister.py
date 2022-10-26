@@ -46,8 +46,8 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         conf = super().default_config()
         conf["stream_writers"] = {"events": ["worker1", "worker2"]}
         conf["instance_map"] = {
-            "worker1": {"host": "testserv", "port": 1001, "tls": False},
-            "worker2": {"host": "testserv", "port": 1002, "tls": False},
+            "worker1": {"host": "testserv", "port": 1001},
+            "worker2": {"host": "testserv", "port": 1002},
         }
         return conf
 

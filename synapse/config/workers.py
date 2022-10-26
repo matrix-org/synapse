@@ -67,7 +67,7 @@ class InstanceLocationConfig:
 
     host: str
     port: int
-    tls: bool
+    tls: bool = False
 
 
 @attr.s
