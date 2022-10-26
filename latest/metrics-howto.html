@@ -163,12 +163,19 @@ set to <code>True</code>.</p>
 collect data:</p>
 <p>There are two methods of enabling the metrics endpoint in Synapse.</p>
 <p>The first serves the metrics as a part of the usual web server and
-can be enabled by adding the &quot;metrics&quot; resource to the existing
-listener as such:</p>
-<pre><code class="language-yaml">  resources:
-    - names:
-      - client
-      - metrics
+can be enabled by adding the <code>metrics</code> resource to the existing
+listener as such as in this example:</p>
+<pre><code class="language-yaml">listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::1', '127.0.0.1']
+
+    resources:
+      # added &quot;metrics&quot; in this line
+      - names: [client, federation, metrics]
+        compress: false
 </code></pre>
 <p>This provides a simple way of adding metrics to your Synapse
 installation, and serves under <code>/_synapse/metrics</code>. If you do not
@@ -179,12 +186,22 @@ different thread to Synapse. This can make it more resilient to
 heavy load meaning metrics cannot be retrieved, and can be exposed
 to just internal networks easier. The served metrics are available
 over HTTP only, and will be available at <code>/_synapse/metrics</code>.</p>
-<p>Add a new listener to homeserver.yaml:</p>
-<pre><code class="language-yaml">  listeners:
-    - type: metrics
-      port: 9000
-      bind_addresses:
-        - '0.0.0.0'
+<p>Add a new listener to homeserver.yaml as in this example:</p>
+<pre><code class="language-yaml">listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::1', '127.0.0.1']
+
+    resources:
+      - names: [client, federation]
+        compress: false
+
+  # beginning of the new metrics listener
+  - port: 9000
+    type: metrics
+    bind_addresses: ['::1', '127.0.0.1']
 </code></pre>
 </li>
 <li>

@@ -448,11 +448,12 @@ does not return a <code>sub</code> property, an alternative <code>subject_claim<
     issuer: &quot;https://accounts.google.com/&quot;
     client_id: &quot;your-client-id&quot; # TO BE FILLED
     client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    scopes: [&quot;openid&quot;, &quot;profile&quot;, &quot;email&quot;] # email is optional, read below
     user_mapping_provider:
       config:
         localpart_template: &quot;{{ user.given_name|lower }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot; # needs &quot;email&quot; in scopes above
 </code></pre>
 </li>
 <li>Back in the Google console, add this Authorized redirect URI: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
@@ -530,7 +531,7 @@ and &quot;App Secret&quot; for use below.</li>
     user_mapping_provider:
       config:
         display_name_template: &quot;{{ user.name }}&quot;
-        email_template: &quot;{{ '{{ user.email }}' }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
 </code></pre>
 <p>Relevant documents:</p>
 <ul>
