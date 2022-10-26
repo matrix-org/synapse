@@ -16,7 +16,7 @@ This documentation provides two TURN server configuration examples:
 
 ## Requirements
 
-For TURN relaying with `eturnal` to work, it must be hosted on a server/endpoint with a public IP.
+For TURN relaying to work, it must be hosted on a server/endpoint with a public IP.
 
 Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
 However, even with appropriate configuration, NAT is known to cause issues and to often not work.
