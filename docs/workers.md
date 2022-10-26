@@ -435,7 +435,7 @@ worker. Background tasks are run periodically or started via replication. Exactl
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled). This worker doesn't handle any REST endpoints itself.
 
-To enable this, the worker must have a
+To enable this, the worker must have a unique
 [`worker_name`](usage/configuration/config_documentation.md#worker_name)
 and can be configured to run background tasks. For example, to move background tasks
 to a dedicated worker, the shared configuration would include:

@@ -2423,7 +2423,7 @@ nonrefreshable_access_token_lifetime: 24h
 ```
 
 ---
-## Metrics ##
+## Metrics
 Config options related to metrics.
 
 ---
@@ -3671,27 +3671,30 @@ opentracing:
         false
 ```
 ---
-## Worker configuration for main process
+## Coordinating workers
 Configuration options related to workers.
-Workers are used to scale horizontally and distribute the load to different processes.
+A Synapse deployment can scale horizontally by running multiple Synapse processes
+called _workers_. Incoming requests are distributed between workers to handle higher
+loads. Some workers are privileged and can accept requests from other workers.
 
-The worker configuration is divided into two parts.
+As a result, the worker configuration is divided into two parts.
 
-1. These switches for the shared configuration to give the main process
-   the necessary information.
-1. And the [switches for the worker configuration file](#worker-configuration-for-workers-configuration)
-   to configure each worker them self are futher below.
+1. The first part (in this section of the manual) defines which shardable tasks
+   are delegated to privileged workers. This allows unprivileged workers to make
+   request a privileged worker to act on their behalf.
+1. [The second part](#worker-configuration-for-workers-configuration)
+   controls the behaviour of individual workers in isolation.
 
-The manual how to configure workers is described in detail in the
-[worker documentation](../../workers.md)
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
 
 ---
 ### `worker_replication_secret`
 
-A shared secret used by the replication APIs to authenticate HTTP requests
-from workers.
+A shared secret used by the replication APIs on the main process to authenticate
+HTTP requests from workers.
 
-By default this is unused and traffic is not authenticated.
+The default, this value is omitted (equivalently `null`), which means that 
+traffic between the workers and the main process is not authenticated.
 
 Example configuration:
 ```yaml
@@ -3726,7 +3729,7 @@ pusher_instances:
 ### `send_federation`
 
 Controls sending of outbound federation transactions on the main process.
-Set to false if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
+Set to `false` if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
 Defaults to `true`.
 
 Example configuration:
@@ -3807,14 +3810,13 @@ redis:
   password: <secret_password>
 ```
 ---
-## Worker configuration for workers configuration
+## Individual worker configuration
 These switches configure each worker them self with the a worker configuration file.
 
-Note also the configuration for the
-[main process above](#worker-configuration-for-main-process).
+Note also the configuration above for
+[coordinating a cluster of workers](#coordinating-workers).
 
-The manual how to configure workers is described in detail in the
-[worker documentation](../../workers.md)
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
 
 ---
 ### `worker_app`
@@ -3879,9 +3881,11 @@ worker_listeners:
 ---
 ### `worker_daemonize`
 
-Specifies whether the worker should be daemonize. If
-[systemd](../../systemd-with-workers/README.md) is used, this must not configured.
-Systemd manages daemonization itself. Defaults to `false`.
+Specifies whether the worker should be started as a [daemon process](TODO_FIND_A_LINK).
+If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option 
+must be omitted or set to `false`.
+
+Defaults to `false`.
 
 Example configuration:
 ```yaml
@@ -3890,8 +3894,14 @@ worker_daemonize: true
 ---
 ### `worker_pid_file`
 
-When running Synapse worker as a daemon, the file to store the pid in. Defaults to none.
-This is the same way as the[`pid_file` option](#pid_file) in the shared config.
+When running a worker as a daemon, we need a place to store the 
+[PID](https://en.wikipedia.org/wiki/Process_identifier) of the worker.
+This option defines the location of that "pid file".
+
+This option is required if `worker_daemonize` is `true` and ignored 
+otherwise. It has no default.
+
+See also the [`pid_file` option](#pid_file) option for the main Synapse process.
 
 Example configuration:
 ```yaml
@@ -3902,7 +3912,7 @@ worker_pid_file: DATADIR/generic_worker1.pid
 
 This option specifies a yaml python logging config file as described
 [here](https://docs.python.org/3.11/library/logging.config.html#configuration-dictionary-schema).
-This is the same way as the [`log_config` option](#log_config) in the shared config.
+See also the [`log_config` option](#log_config) option for the main Synapse process.
 
 Example configuration:
 ```yaml
