@@ -319,7 +319,7 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         outfile.write(rendered)
 
 
-def handle_map_instances_for_for_shared_config(
+def handle_map_instances_for_shared_config(
     shared_config: dict,
     worker_type: str,
     worker_name: str,
