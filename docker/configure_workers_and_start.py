@@ -319,7 +319,7 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         outfile.write(rendered)
 
 
-def process_sharding_and_stream_writers_for_shared_config(
+def handle_map_instances_for_for_shared_config(
     shared_config: dict,
     worker_type: str,
     worker_name: str,
@@ -505,7 +505,7 @@ def generate_worker_files(
         worker_type_total_count = worker_types.count(worker_type)
 
         # Update the shared config with sharding-related options if necessary
-        process_sharding_and_stream_writers_for_shared_config(
+        handle_map_instances_for_shared_config(
             shared_config, worker_type, worker_name, worker_port
         )
 
