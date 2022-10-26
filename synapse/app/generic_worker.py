@@ -44,7 +44,7 @@ from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.http.site import SynapseRequest, SynapseSite
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
@@ -268,15 +268,8 @@ class GenericWorkerServer(HomeServer):
     DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
 
     def _listen_http(self, listener_config: ListenerConfig) -> None:
-        port = listener_config.port
-        bind_addresses = listener_config.bind_addresses
-        tls = listener_config.tls
 
         assert listener_config.http_options is not None
-
-        site_tag = listener_config.http_options.tag
-        if site_tag is None:
-            site_tag = str(port)
 
         # We always include a health resource.
         resources: Dict[str, Resource] = {"/health": HealthResource()}
@@ -376,37 +369,14 @@ class GenericWorkerServer(HomeServer):
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
-        site = SynapseSite(
-            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
-            site_tag,
+        _base.listen_http(
             listener_config,
             root_resource,
             self.version_string,
-            max_request_body_size=max_request_body_size(self.config),
+            max_request_body_size(self.config),
+            self.tls_server_context_factory,
             reactor=self.get_reactor(),
         )
-        # This has same logic as synapse/app/homeserver.py where we choose between
-        # listen_ssl and listen_tcp based on the tls configuration flag in listener
-        # config.
-        if tls:
-            # refresh_certificate should have been called before this.
-            assert self.tls_server_context_factory is not None
-            _base.listen_ssl(
-                bind_addresses,
-                port,
-                site,
-                self.tls_server_context_factory,
-                reactor=self.get_reactor(),
-            )
-            logger.info("Synapse worker now listening on port %d (TLS)", port)
-        else:
-            _base.listen_tcp(
-                bind_addresses,
-                port,
-                site,
-                reactor=self.get_reactor(),
-            )
-            logger.info("Synapse worker now listening on port %d", port)
 
     def start_listening(self) -> None:
         for listener in self.config.worker.worker_listeners:
