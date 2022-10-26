@@ -3811,7 +3811,8 @@ redis:
 ```
 ---
 ## Individual worker configuration
-These switches configure each worker them self with the a worker configuration file.
+These options configure an individual worker, in its worker configuration file.
+They should be not be provided when configuring the main process.
 
 Note also the configuration above for
 [coordinating a cluster of workers](#coordinating-workers).
