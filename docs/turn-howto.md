@@ -161,7 +161,9 @@ Here are a few things to try:
       ```
       
 
-    * Or (**coturn only**): Temporarily configure `coturn` to accept a static username/password. To do this, comment out `use-auth-secret` and `static-auth-secret` and add the following:
+    * Or (**coturn only**): Temporarily configure `coturn` to accept a static
+      username/password. To do this, comment out `use-auth-secret` and
+      `static-auth-secret` and add the following:
 
       ```
       lt-cred-mech
