@@ -1,1 +1,1 @@
-Fix a bug introduced in Synapse 1.64.0 regarding presence updates in sync.
+Fix a bug introduced in Synapse 1.64.0 where presence updates could be missing from `/sync` responses.
