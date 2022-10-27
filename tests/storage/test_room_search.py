@@ -273,6 +273,7 @@ class MessageSearchTest(HomeserverTestCase):
         main_store = homeserver.get_datastores().main
         found = False
         if isinstance(main_store.database_engine, PostgresEngine):
+            assert main_store.database_engine._version is not None
             found = main_store.database_engine._version < 140000
         self.COMMON_CASES.append(('"fox quick', (found, True)))
 
