@@ -93,10 +93,12 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
             toolchain: 1.58.1
-            override: true
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
@@ -111,11 +113,13 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
-            toolchain: 1.58.1
-            override: true
-            components: rustfmt
+          toolchain: 1.58.1
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo fmt --check
@@ -169,10 +173,12 @@ jobs:
             postgres:${{ matrix.job.postgres-version }}
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
             toolchain: 1.58.1
-            override: true
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -211,10 +217,12 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
             toolchain: 1.58.1
-            override: true
       - uses: Swatinem/rust-cache@v2
 
       # There aren't wheels for some of the older deps, so we need to install
@@ -327,10 +335,12 @@ jobs:
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
             toolchain: 1.58.1
-            override: true
       - uses: Swatinem/rust-cache@v2
 
       - name: Run SyTest
@@ -459,10 +469,12 @@ jobs:
           path: synapse
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
             toolchain: 1.58.1
-            override: true
       - uses: Swatinem/rust-cache@v2
 
       - name: Prepare Complement's Prerequisites
@@ -485,10 +497,12 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
             toolchain: 1.58.1
-            override: true
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo test
