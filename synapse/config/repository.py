@@ -47,7 +47,7 @@ THUMBNAIL_SIZE_YAML = """\
 THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP = {
     "image/jpeg": "jpeg",
     "image/jpg": "jpeg",
-    "image/webp": "jpeg",
+    "image/webp": "webp",
     # Thumbnails can only be jpeg or png. We choose png thumbnails for gif
     # because it can have transparency.
     "image/gif": "png",
@@ -101,6 +101,10 @@ def parse_thumbnail_requirements(
             elif thumbnail_format == "png":
                 requirement.append(
                     ThumbnailRequirement(width, height, method, "image/png")
+                )
+            elif thumbnail_format == "webp":
+                requirement.append(
+                    ThumbnailRequirement(width, height, method, "image/webp")
                 )
             else:
                 raise Exception(
