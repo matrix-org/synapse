@@ -3716,9 +3716,12 @@ start_pushers: false
 
 It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
 in which case the work is balanced across them. Use this setting to list the pushers by
-[`worker_name`](#worker_name).
+[`worker_name`](#worker_name). Ensure the main process and all pusher workers are
+restarted after changing this option.
 
-If only one pusher worker is configured, this setting is not necessary.
+If no or only one pusher worker is configured, this setting is not necessary.
+The main process will send out push notifications by default if you do not disable
+it by setting [`start_pushers: false`](#start_pushers).
 
 Example configuration:
 ```yaml
