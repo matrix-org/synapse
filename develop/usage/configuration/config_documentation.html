@@ -275,7 +275,7 @@ including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
 reverse proxy, this should be the URL to reach Synapse via the proxy.
 Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
-'listeners' below).</p>
+<a href="#listeners">'listeners'</a> below).</p>
 <p>Defaults to <code>https://&lt;server_name&gt;/</code>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">public_baseurl: https://example.com/
@@ -1269,7 +1269,8 @@ when Synapse is started.</p>
 <p>Config options related to logging.</p>
 <hr />
 <h3 id="log_config"><a class="header" href="#log_config"><code>log_config</code></a></h3>
-<p>This option specifies a yaml python logging config file as described <a href="https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema">here</a>.</p>
+<p>This option specifies a yaml python logging config file as described
+<a href="https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema">here</a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">log_config: &quot;CONFDIR/SERVERNAME.log.config&quot;
 </code></pre>
@@ -3289,31 +3290,82 @@ mostly related to trace sampling which is documented <a href="https://www.jaeger
         false
 </code></pre>
 <hr />
-<h2 id="workers"><a class="header" href="#workers">Workers</a></h2>
-<p>Configuration options related to workers.</p>
+<h2 id="coordinating-workers"><a class="header" href="#coordinating-workers">Coordinating workers</a></h2>
+<p>Configuration options related to workers which belong in the main config file
+(usually called <code>homeserver.yaml</code>).
+A Synapse deployment can scale horizontally by running multiple Synapse processes
+called <em>workers</em>. Incoming requests are distributed between workers to handle higher
+loads. Some workers are privileged and can accept requests from other workers.</p>
+<p>As a result, the worker configuration is divided into two parts.</p>
+<ol>
+<li>The first part (in this section of the manual) defines which shardable tasks
+are delegated to privileged workers. This allows unprivileged workers to make
+request a privileged worker to act on their behalf.</li>
+<li><a href="#individual-worker-configuration">The second part</a>
+controls the behaviour of individual workers in isolation.</li>
+</ol>
+<p>For guidance on setting up workers, see the <a href="../../workers.html">worker documentation</a>.</p>
+<hr />
+<h3 id="worker_replication_secret"><a class="header" href="#worker_replication_secret"><code>worker_replication_secret</code></a></h3>
+<p>A shared secret used by the replication APIs on the main process to authenticate
+HTTP requests from workers.</p>
+<p>The default, this value is omitted (equivalently <code>null</code>), which means that 
+traffic between the workers and the main process is not authenticated.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_replication_secret: &quot;secret_secret&quot;
+</code></pre>
+<hr />
+<h3 id="start_pushers"><a class="header" href="#start_pushers"><code>start_pushers</code></a></h3>
+<p>Controls sending of push notifications on the main process. Set to <code>false</code>
+if using a <a href="../../workers.html#synapseapppusher">pusher worker</a>. Defaults to <code>true</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">start_pushers: false
+</code></pre>
+<hr />
+<h3 id="pusher_instances"><a class="header" href="#pusher_instances"><code>pusher_instances</code></a></h3>
+<p>It is possible to run multiple <a href="../../workers.html#synapseapppusher">pusher workers</a>,
+in which case the work is balanced across them. Use this setting to list the pushers by
+<a href="#worker_name"><code>worker_name</code></a>. Ensure the main process and all pusher workers are
+restarted after changing this option.</p>
+<p>If no or only one pusher worker is configured, this setting is not necessary.
+The main process will send out push notifications by default if you do not disable
+it by setting <a href="#start_pushers"><code>start_pushers: false</code></a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">start_pushers: false
+pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+</code></pre>
 <hr />
 <h3 id="send_federation"><a class="header" href="#send_federation"><code>send_federation</code></a></h3>
 <p>Controls sending of outbound federation transactions on the main process.
-Set to false if using a federation sender worker. Defaults to true.</p>
+Set to <code>false</code> if using a <a href="../../workers.html#synapseappfederation_sender">federation sender worker</a>.
+Defaults to <code>true</code>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">send_federation: false
 </code></pre>
 <hr />
 <h3 id="federation_sender_instances"><a class="header" href="#federation_sender_instances"><code>federation_sender_instances</code></a></h3>
-<p>It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders.</p>
+<p>It is possible to run multiple
+<a href="../../workers.html#synapseappfederation_sender">federation sender worker</a>, in which
+case the work is balanced across them. Use this setting to list the senders.</p>
 <p>This configuration setting must be shared between all federation sender workers, and if
 changed all federation sender workers must be stopped at the same time and then
 started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">federation_sender_instances:
+<pre><code class="language-yaml">send_federation: false
+federation_sender_instances:
   - federation_sender1
 </code></pre>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
-<p>When using workers this should be a map from worker name to the
-HTTP replication listener of the worker, if configured.</p>
+<p>When using workers this should be a map from <a href="#worker_name"><code>worker_name</code></a> to the
+HTTP replication listener of the worker, if configured.
+Each worker declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> needs 
+a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
+(The main process also needs an HTTP replication listener, but it should not be 
+listed in the <code>instance_map</code>.)</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
   worker1:
@@ -3323,8 +3375,10 @@ HTTP replication listener of the worker, if configured.</p>
 <hr />
 <h3 id="stream_writers"><a class="header" href="#stream_writers"><code>stream_writers</code></a></h3>
 <p>Experimental: When using workers you can define which workers should
-handle event persistence and typing notifications. Any worker
-specified here must also be in the <code>instance_map</code>.</p>
+handle writing to streams such as event persistence and typing notifications.
+Any worker specified here must also be in the <a href="#instance_map"><code>instance_map</code></a>.</p>
+<p>See the list of available streams in the
+<a href="../../workers.html#stream-writers">worker documentation</a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">stream_writers:
   events: worker1
@@ -3332,22 +3386,15 @@ specified here must also be in the <code>instance_map</code>.</p>
 </code></pre>
 <hr />
 <h3 id="run_background_tasks_on"><a class="header" href="#run_background_tasks_on"><code>run_background_tasks_on</code></a></h3>
-<p>The worker that is used to run background tasks (e.g. cleaning up expired
-data). If not provided this defaults to the main process.</p>
+<p>The <a href="../../workers.html#background-tasks">worker</a> that is used to run
+background tasks (e.g. cleaning up expired data). If not provided this
+defaults to the main process.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">run_background_tasks_on: worker1
 </code></pre>
 <hr />
-<h3 id="worker_replication_secret"><a class="header" href="#worker_replication_secret"><code>worker_replication_secret</code></a></h3>
-<p>A shared secret used by the replication APIs to authenticate HTTP requests
-from workers.</p>
-<p>By default this is unused and traffic is not authenticated.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_secret: &quot;secret_secret&quot;
-</code></pre>
 <h3 id="redis"><a class="header" href="#redis"><code>redis</code></a></h3>
-<p>Configuration for Redis when using workers. This <em>must</em> be enabled when
-using workers (unless using old style direct TCP configuration).
+<p>Configuration for Redis when using workers. This <em>must</em> be enabled when using workers.
 This setting has the following sub-options:</p>
 <ul>
 <li><code>enabled</code>: whether to use Redis support. Defaults to false.</li>
@@ -3362,6 +3409,90 @@ localhost and 6379</li>
   port: 6379
   password: &lt;secret_password&gt;
 </code></pre>
+<hr />
+<h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>
+<p>These options configure an individual worker, in its worker configuration file.
+They should be not be provided when configuring the main process.</p>
+<p>Note also the configuration above for
+<a href="#coordinating-workers">coordinating a cluster of workers</a>.</p>
+<p>For guidance on setting up workers, see the <a href="../../workers.html">worker documentation</a>.</p>
+<hr />
+<h3 id="worker_app"><a class="header" href="#worker_app"><code>worker_app</code></a></h3>
+<p>The type of worker. The currently available worker applications are listed
+in <a href="../../workers.html#available-worker-applications">worker documentation</a>.</p>
+<p>The most common worker is the
+<a href="../../workers.html#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+</code></pre>
+<hr />
+<h3 id="worker_name"><a class="header" href="#worker_name"><code>worker_name</code></a></h3>
+<p>A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files. We strongly recommend
+giving each worker a unique <code>worker_name</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_name: generic_worker1
+</code></pre>
+<hr />
+<h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
+<p>The HTTP replication endpoint that it should talk to on the main Synapse process.
+The main Synapse process defines this with a <code>replication</code> resource in
+<a href="#listeners"><code>listeners</code> option</a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_replication_host: 127.0.0.1
+</code></pre>
+<hr />
+<h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
+<p>The HTTP replication port that it should talk to on the main Synapse process.
+The main Synapse process defines this with a <code>replication</code> resource in
+<a href="#listeners"><code>listeners</code> option</a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_replication_http_port: 9093
+</code></pre>
+<hr />
+<h3 id="worker_listeners"><a class="header" href="#worker_listeners"><code>worker_listeners</code></a></h3>
+<p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option 
+must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a> 
+in the shared config.</p>
+<p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> will need to include a
+<code>replication</code> listener here, in order to accept internal HTTP requests from
+other workers.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+</code></pre>
+<hr />
+<h3 id="worker_daemonize"><a class="header" href="#worker_daemonize"><code>worker_daemonize</code></a></h3>
+<p>Specifies whether the worker should be started as a daemon process.
+If Synapse is being managed by <a href="../../systemd-with-workers/README.html">systemd</a>, this option 
+must be omitted or set to <code>false</code>.</p>
+<p>Defaults to <code>false</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_daemonize: true
+</code></pre>
+<hr />
+<h3 id="worker_pid_file"><a class="header" href="#worker_pid_file"><code>worker_pid_file</code></a></h3>
+<p>When running a worker as a daemon, we need a place to store the 
+<a href="https://en.wikipedia.org/wiki/Process_identifier">PID</a> of the worker.
+This option defines the location of that &quot;pid file&quot;.</p>
+<p>This option is required if <code>worker_daemonize</code> is <code>true</code> and ignored 
+otherwise. It has no default.</p>
+<p>See also the <a href="#pid_file"><code>pid_file</code> option</a> option for the main Synapse process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_pid_file: DATADIR/generic_worker1.pid
+</code></pre>
+<hr />
+<h3 id="worker_log_config"><a class="header" href="#worker_log_config"><code>worker_log_config</code></a></h3>
+<p>This option specifies a yaml python logging config file as described
+<a href="https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema">here</a>.
+See also the <a href="#log_config"><code>log_config</code> option</a> option for the main Synapse process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+</code></pre>
+<hr />
 <h2 id="background-updates"><a class="header" href="#background-updates">Background Updates</a></h2>
 <p>Configuration settings related to background updates.</p>
 <hr />
