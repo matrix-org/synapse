@@ -3760,9 +3760,10 @@ federation_sender_instances:
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
-Only `synapse.app.generic_worker` as [`stream_writers`](../../workers.md#stream-writers)
-needs a HTTP replications listener. It must also be specified the
-[`instance_map`](#instance_map).
+Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs 
+a HTTP replication listener, and that listener should be included in the `instance_map`.
+(The main process also needs an HTTP replication listener, but it should not be 
+listed in the `instance_map`.)
 
 Example configuration:
 ```yaml
