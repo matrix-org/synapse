@@ -45,7 +45,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 push_rules_invalidation_counter = Counter(
     "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", ""
 )
@@ -106,6 +105,8 @@ class BulkPushRuleEvaluator:
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
+
+        self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -218,6 +219,48 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
+    async def _related_events(self, event: EventBase) -> Dict[str, Dict[str, str]]:
+        """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
+
+        Returns:
+            Mapping of relation type to flattened events.
+        """
+        related_events: Dict[str, Dict[str, str]] = {}
+        if self._related_event_match_enabled:
+            related_event_id = event.content.get("m.relates_to", {}).get("event_id")
+            relation_type = event.content.get("m.relates_to", {}).get("rel_type")
+            if related_event_id is not None and relation_type is not None:
+                related_event = await self.store.get_event(
+                    related_event_id, allow_none=True
+                )
+                if related_event is not None:
+                    related_events[relation_type] = _flatten_dict(related_event)
+
+            reply_event_id = (
+                event.content.get("m.relates_to", {})
+                .get("m.in_reply_to", {})
+                .get("event_id")
+            )
+
+            # convert replies to pseudo relations
+            if reply_event_id is not None:
+                related_event = await self.store.get_event(
+                    reply_event_id, allow_none=True
+                )
+
+                if related_event is not None:
+                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
+
+                    # indicate that this is from a fallback relation.
+                    if relation_type == "m.thread" and event.content.get(
+                        "m.relates_to", {}
+                    ).get("is_falling_back", False):
+                        related_events["m.in_reply_to"][
+                            "im.vector.is_falling_back"
+                        ] = ""
+
+        return related_events
+
     async def action_for_events_by_user(
         self, events_and_context: List[Tuple[EventBase, EventContext]]
     ) -> None:
@@ -286,6 +329,8 @@ class BulkPushRuleEvaluator:
                 # the parent is part of a thread.
                 thread_id = await self.store.get_thread_id(relation.parent_id)
 
+        related_events = await self._related_events(event)
+
         # It's possible that old room versions have non-integer power levels (floats or
         # strings). Workaround this by explicitly converting to int.
         notification_levels = power_levels.get("notifications", {})
@@ -298,6 +343,8 @@ class BulkPushRuleEvaluator:
             room_member_count,
             sender_power_level,
             notification_levels,
+            related_events,
+            self._related_event_match_enabled,
         )
 
         users = rules_by_user.keys()
