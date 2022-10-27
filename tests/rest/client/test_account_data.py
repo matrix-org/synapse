@@ -132,3 +132,40 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(marked_unread["unread"], True)
         self.assertEqual(marked_unread["ts"], ts)
+
+    def test_beeper_inbox_state_endpoint_can_clear_unread(self) -> None:
+        store = self.hs.get_datastores().main
+
+        user_id = self.register_user("user", "password")
+        tok = self.login("user", "password")
+
+        room_id = self.helper.create_room_as(user_id, tok=tok)
+        channel = self.make_request(
+            "PUT",
+            f"/user/{user_id}/rooms/{room_id}/beeper_inbox_state",
+            {"marked_unread": False},
+            access_token=tok,
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
+
+        # FIXME: I give up, I don't know how to mock time in tests
+        # ts = self.clock.time_msec()
+        ts = 400
+
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertIsNone(
+            self.get_success(
+                store.get_account_data_for_room_and_type(
+                    user_id, room_id, "com.beeper.inbox.done"
+                )
+            )
+        )
+
+        marked_unread = self.get_success(
+            store.get_account_data_for_room_and_type(
+                user_id, room_id, "m.marked_unread"
+            )
+        )
+        self.assertEqual(marked_unread["unread"], False)
+        self.assertEqual(marked_unread["ts"], ts)

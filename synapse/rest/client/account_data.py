@@ -189,13 +189,13 @@ class RoomBeeperInboxStateServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        if body.get("marked_unread"):
+        if "marked_unread" in body:
             marked_unread = {"unread": body["marked_unread"], "ts": ts}
             await self.handler.add_account_data_to_room(
                 user_id, room_id, "m.marked_unread", marked_unread
             )
 
-        if body.get("done"):
+        if "done" in body:
             done = {"updated_ts": ts, "at_ts": ts + body["done"].get("at_delta", 0)}
             await self.handler.add_account_data_to_room(
                 user_id, room_id, "com.beeper.inbox.done", done
