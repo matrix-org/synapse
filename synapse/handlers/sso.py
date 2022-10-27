@@ -151,6 +151,9 @@ class UsernameMappingSession:
     # A unique identifier for this SSO provider, e.g.  "oidc" or "saml".
     auth_provider_id: str
 
+    # An optional session ID from the IdP.
+    auth_provider_session_id: Optional[str]
+
     # user ID on the IdP server
     remote_user_id: str
 
@@ -470,6 +473,7 @@ class SsoHandler:
                         client_redirect_url,
                         next_step_url,
                         extra_login_attributes,
+                        auth_provider_session_id,
                     )
 
                 user_id = await self._register_mapped_user(
@@ -591,6 +595,7 @@ class SsoHandler:
         client_redirect_url: str,
         next_step_url: bytes,
         extra_login_attributes: Optional[JsonDict],
+        auth_provider_session_id: Optional[str],
     ) -> NoReturn:
         """Creates a UsernameMappingSession and redirects the browser
 
@@ -613,6 +618,8 @@ class SsoHandler:
             extra_login_attributes: An optional dictionary of extra
                 attributes to be provided to the client in the login response.
 
+            auth_provider_session_id: An optional session ID from the IdP.
+
         Raises:
             RedirectException
         """
@@ -621,6 +628,7 @@ class SsoHandler:
         now = self._clock.time_msec()
         session = UsernameMappingSession(
             auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
             remote_user_id=remote_user_id,
             display_name=attributes.display_name,
             emails=attributes.emails,
@@ -933,7 +941,7 @@ class SsoHandler:
         )
 
     async def handle_terms_accepted(
-        self, request: Request, session_id: str, terms_version: str
+        self, request: SynapseRequest, session_id: str, terms_version: str
     ) -> None:
         """Handle a request to the new-user 'consent' endpoint
 
@@ -1035,6 +1043,7 @@ class SsoHandler:
             session.client_redirect_url,
             session.extra_login_attributes,
             new_user=True,
+            auth_provider_session_id=session.auth_provider_session_id,
         )
 
     def _expire_old_sessions(self) -> None:

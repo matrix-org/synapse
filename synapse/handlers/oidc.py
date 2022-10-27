@@ -275,6 +275,7 @@ class OidcProvider:
         provider: OidcProviderConfig,
     ):
         self._store = hs.get_datastores().main
+        self._clock = hs.get_clock()
 
         self._macaroon_generaton = macaroon_generator
 
@@ -673,6 +674,13 @@ class OidcProvider:
         Returns:
             The decoded claims in the ID token.
         """
+        id_token = token.get("id_token")
+        logger.debug("Attempting to decode JWT id_token %r", id_token)
+
+        # That has been theoritically been checked by the caller, so even though
+        # assertion are not enabled in production, it is mainly here to appease mypy
+        assert id_token is not None
+
         metadata = await self.load_metadata()
         claims_params = {
             "nonce": nonce,
@@ -687,9 +695,6 @@ class OidcProvider:
         jwt = JsonWebToken(alg_values)
 
         claim_options = {"iss": {"values": [metadata["issuer"]]}}
-
-        id_token = token["id_token"]
-        logger.debug("Attempting to decode JWT id_token %r", id_token)
 
         # Try to decode the keys in cache first, then retry by forcing the keys
         # to be reloaded
@@ -715,7 +720,9 @@ class OidcProvider:
 
         logger.debug("Decoded id_token JWT %r; validating", claims)
 
-        claims.validate(leeway=120)  # allows 2 min of clock skew
+        claims.validate(
+            now=self._clock.time(), leeway=120
+        )  # allows 2 min of clock skew
 
         return claims
 

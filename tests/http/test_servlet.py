@@ -35,11 +35,13 @@ from tests.http.server._base import test_disconnect
 
 def make_request(content):
     """Make an object that acts enough like a request."""
-    request = Mock(spec=["content"])
+    request = Mock(spec=["method", "uri", "content"])
 
     if isinstance(content, dict):
         content = json.dumps(content).encode("utf8")
 
+    request.method = bytes("STUB_METHOD", "ascii")
+    request.uri = bytes("/test_stub_uri", "ascii")
     request.content = BytesIO(content)
     return request
 

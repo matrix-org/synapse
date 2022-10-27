@@ -734,7 +734,9 @@ class HomeserverTestCase(TestCase):
             event.internal_metadata.soft_failed = True
 
         self.get_success(
-            event_creator.handle_new_client_event(requester, event, context)
+            event_creator.handle_new_client_event(
+                requester, events_and_context=[(event, context)]
+            )
         )
 
         return event.event_id

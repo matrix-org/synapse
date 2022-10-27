@@ -1,30 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Confirm it's you</title>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style type="text/css">
-            {% include "sso.css" without context %}
-        </style>
-    </head>
-    <body>
-        <header>
-            <h1>Confirm it's you to continue</h1>
-            <p>
-                A client is trying to {{ description }}. To confirm this action
-                re-authorize your account with single sign-on.
-            </p>
-            <p><strong>
-                If you did not expect this, your account may be compromised.
-            </strong></p>
-        </header>
-        <main>
-            <a href="{{ redirect_url }}" class="primary-button">
-                Continue with {{ idp.idp_name }}
-            </a>
-        </main>
-        {% include "sso_footer.html" without context %}
-    </body>
-</html>
+{% block title %}Confirm it's you{% endblock %}
+
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+</style>
+{% endblock %}
+
+{% block body %}
+<header>
+    <h1>Confirm it's you to continue</h1>
+    <p>
+        A client is trying to {{ description }}. To confirm this action
+        re-authorize your account with single sign-on.
+    </p>
+    <p><strong>
+        If you did not expect this, your account may be compromised.
+    </strong></p>
+</header>
+<main>
+    <a href="{{ redirect_url }}" class="primary-button">
+        Continue with {{ idp.idp_name }}
+    </a>
+</main>
+{% include "sso_footer.html" without context %}
+{% endblock %}

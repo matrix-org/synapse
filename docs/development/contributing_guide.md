@@ -167,6 +167,12 @@ was broken. They are slower than the linters but will typically catch more error
 poetry run trial tests
 ```
 
+You can run unit tests in parallel by specifying `-jX` argument to `trial` where `X` is the number of parallel runners you want. To use 4 cpu cores, you would run them like:
+
+```sh
+poetry run trial -j4 tests
+```
+
 If you wish to only run *some* unit tests, you may specify
 another module instead of `tests` - or a test class or a method:
 
@@ -327,7 +333,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/compleme
 ### Prettier formatting with `gotestfmt`
 
 If you want to format the output of the tests the same way as it looks in CI,
-install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+install [gotestfmt](https://github.com/GoTestTools/gotestfmt).
 
 You can then use this incantation to format the tests appropriately:
 
@@ -384,7 +390,7 @@ This file will become part of our [changelog](
 https://github.com/matrix-org/synapse/blob/master/CHANGES.md) at the next
 release, so the content of the file should be a short description of your
 change in the same style as the rest of the changelog. The file can contain Markdown
-formatting, and should end with a full stop (.) or an exclamation mark (!) for
+formatting, and must end with a full stop (.) or an exclamation mark (!) for
 consistency.
 
 Adding credits to the changelog is encouraged, we value your

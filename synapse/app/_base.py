@@ -98,9 +98,7 @@ def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) 
         func: Function to be called when sent a SIGHUP signal.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    # This type-ignore should be redundant once we use a mypy release with
-    # https://github.com/python/mypy/pull/12668.
-    _sighup_callbacks.append((func, args, kwargs))  # type: ignore[arg-type]
+    _sighup_callbacks.append((func, args, kwargs))
 
 
 def start_worker_reactor(
@@ -560,7 +558,7 @@ def reload_cache_config(config: HomeServerConfig) -> None:
             logger.warning(f)
     else:
         logger.debug(
-            "New cache config. Was:\n %s\nNow:\n",
+            "New cache config. Was:\n %s\nNow:\n %s",
             previous_cache_config.__dict__,
             config.caches.__dict__,
         )

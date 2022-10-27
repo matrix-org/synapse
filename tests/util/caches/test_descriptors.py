@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Set
+from typing import Iterable, Set, Tuple
 from unittest import mock
 
 from twisted.internet import defer, reactor
@@ -28,44 +28,12 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.util.caches import descriptors
-from synapse.util.caches.descriptors import cached, cachedList, lru_cache
+from synapse.util.caches.descriptors import cached, cachedList
 
 from tests import unittest
 from tests.test_utils import get_awaitable_result
 
 logger = logging.getLogger(__name__)
-
-
-class LruCacheDecoratorTestCase(unittest.TestCase):
-    def test_base(self):
-        class Cls:
-            def __init__(self):
-                self.mock = mock.Mock()
-
-            @lru_cache()
-            def fn(self, arg1, arg2):
-                return self.mock(arg1, arg2)
-
-        obj = Cls()
-        obj.mock.return_value = "fish"
-        r = obj.fn(1, 2)
-        self.assertEqual(r, "fish")
-        obj.mock.assert_called_once_with(1, 2)
-        obj.mock.reset_mock()
-
-        # a call with different params should call the mock again
-        obj.mock.return_value = "chips"
-        r = obj.fn(1, 3)
-        self.assertEqual(r, "chips")
-        obj.mock.assert_called_once_with(1, 3)
-        obj.mock.reset_mock()
-
-        # the two values should now be cached
-        r = obj.fn(1, 2)
-        self.assertEqual(r, "fish")
-        r = obj.fn(1, 3)
-        self.assertEqual(r, "chips")
-        obj.mock.assert_not_called()
 
 
 def run_on_reactor():
@@ -478,10 +446,10 @@ class DescriptorTestCase(unittest.TestCase):
 
             @cached(cache_context=True)
             async def func2(self, key, cache_context):
-                return self.func3(key, on_invalidate=cache_context.invalidate)
+                return await self.func3(key, on_invalidate=cache_context.invalidate)
 
-            @lru_cache(cache_context=True)
-            def func3(self, key, cache_context):
+            @cached(cache_context=True)
+            async def func3(self, key, cache_context):
                 self.invalidate = cache_context.invalidate
                 return 42
 
@@ -1008,3 +976,34 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             obj.inner_context_was_finished, "Tried to restart a finished logcontext"
         )
         self.assertEqual(current_context(), SENTINEL_CONTEXT)
+
+    def test_num_args_mismatch(self):
+        """
+        Make sure someone does not accidentally use @cachedList on a method with
+        a mismatch in the number args to the underlying single cache method.
+        """
+
+        class Cls:
+            @descriptors.cached(tree=True)
+            def fn(self, room_id, event_id):
+                pass
+
+            # This is wrong ❌. `@cachedList` expects to be given the same number
+            # of arguments as the underlying cached function, just with one of
+            # the arguments being an iterable
+            @descriptors.cachedList(cached_method_name="fn", list_name="keys")
+            def list_fn(self, keys: Iterable[Tuple[str, str]]):
+                pass
+
+            # Corrected syntax ✅
+            #
+            # @cachedList(cached_method_name="fn", list_name="event_ids")
+            # async def list_fn(
+            #     self, room_id: str, event_ids: Collection[str],
+            # )
+
+        obj = Cls()
+
+        # Make sure this raises an error about the arg mismatch
+        with self.assertRaises(TypeError):
+            obj.list_fn([("foo", "bar")])

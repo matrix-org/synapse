@@ -31,7 +31,7 @@ from synapse.api.urls import (
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
     MEDIA_V3_PREFIX,
-    SERVER_KEY_V2_PREFIX,
+    SERVER_KEY_PREFIX,
     STATIC_PREFIX,
 )
 from synapse.app import _base
@@ -60,7 +60,7 @@ from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
@@ -215,30 +215,22 @@ class SynapseHomeServer(HomeServer):
             consent_resource: Resource = ConsentResource(self)
             if compress:
                 consent_resource = gz_wrap(consent_resource)
-            resources.update({"/_matrix/consent": consent_resource})
+            resources["/_matrix/consent"] = consent_resource
 
         if name == "federation":
             federation_resource: Resource = TransportLayerServer(self)
             if compress:
                 federation_resource = gz_wrap(federation_resource)
-            resources.update({FEDERATION_PREFIX: federation_resource})
+            resources[FEDERATION_PREFIX] = federation_resource
 
         if name == "openid":
-            resources.update(
-                {
-                    FEDERATION_PREFIX: TransportLayerServer(
-                        self, servlet_groups=["openid"]
-                    )
-                }
+            resources[FEDERATION_PREFIX] = TransportLayerServer(
+                self, servlet_groups=["openid"]
             )
 
         if name in ["static", "client"]:
-            resources.update(
-                {
-                    STATIC_PREFIX: StaticResource(
-                        os.path.join(os.path.dirname(synapse.__file__), "static")
-                    )
-                }
+            resources[STATIC_PREFIX] = StaticResource(
+                os.path.join(os.path.dirname(synapse.__file__), "static")
             )
 
         if name in ["media", "federation", "client"]:
@@ -257,7 +249,7 @@ class SynapseHomeServer(HomeServer):
                 )
 
         if name in ["keys", "federation"]:
-            resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
+            resources[SERVER_KEY_PREFIX] = KeyResource(self)
 
         if name == "metrics" and self.config.metrics.enable_metrics:
             metrics_resource: Resource = MetricsResource(RegistryProxy)

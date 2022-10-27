@@ -31,7 +31,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
+class PostgresEngine(
+    BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
+):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -168,6 +170,22 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return True
 
+    @property
+    def tsquery_func(self) -> str:
+        """
+        Selects a tsquery_* func to use.
+
+        Ref: https://www.postgresql.org/docs/current/textsearch-controls.html
+
+        Returns:
+            The function name.
+        """
+        # Postgres 11 added support for websearch_to_tsquery.
+        assert self._version is not None
+        if self._version >= 110000:
+            return "websearch_to_tsquery"
+        return "plainto_tsquery"
+
     def is_deadlock(self, error: Exception) -> bool:
         if isinstance(error, psycopg2.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html
@@ -212,3 +230,11 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)
+
+    @staticmethod
+    def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+        """
+        cursor.execute(script)

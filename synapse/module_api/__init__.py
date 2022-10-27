@@ -748,16 +748,16 @@ class ModuleApi:
             )
         )
 
-    def generate_short_term_login_token(
+    async def create_login_token(
         self,
         user_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: str = "",
+        auth_provider_id: Optional[str] = None,
         auth_provider_session_id: Optional[str] = None,
     ) -> str:
-        """Generate a login token suitable for m.login.token authentication
+        """Create a login token suitable for m.login.token authentication
 
-        Added in Synapse v1.9.0.
+        Added in Synapse v1.69.0.
 
         Args:
             user_id: gives the ID of the user that the token is for
@@ -765,14 +765,17 @@ class ModuleApi:
             duration_in_ms: the time that the token will be valid for
 
             auth_provider_id: the ID of the SSO IdP that the user used to authenticate
-               to get this token, if any. This is encoded in the token so that
-               /login can report stats on number of successful logins by IdP.
+                to get this token, if any. This is encoded in the token so that
+                /login can report stats on number of successful logins by IdP.
+
+            auth_provider_session_id: The session ID got during login from the SSO IdP,
+                if any.
         """
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
+        return await self._hs.get_auth_handler().create_login_token_for_user_id(
             user_id,
+            duration_in_ms,
             auth_provider_id,
             auth_provider_session_id,
-            duration_in_ms,
         )
 
     @defer.inlineCallbacks
@@ -842,6 +845,8 @@ class ModuleApi:
         however invalidation that needs to go to other workers needs to call `invalidate_cache`
         on the module API instead.
 
+        Added in Synapse v1.69.0.
+
         Args:
             cached_function: The cached function that will be registered to receive invalidation
             locally and from other workers.
@@ -855,6 +860,8 @@ class ModuleApi:
     ) -> None:
         """Invalidate a cache entry of a cached function across workers. The cached function
         needs to be registered on all workers first with `register_cached_function`.
+
+        Added in Synapse v1.69.0.
 
         Args:
             cached_function: The cached function that needs an invalidation
