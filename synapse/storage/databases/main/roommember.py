@@ -742,7 +742,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # user and the set of other users, and then checking if there is any
             # overlap.
             sql = f"""
-                SELECT b.state_key
+                SELECT DISTINCT b.state_key
                 FROM (
                     SELECT room_id FROM current_state_events
                     WHERE type = 'm.room.member' AND membership = 'join' AND state_key = ?
@@ -751,7 +751,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     SELECT room_id, state_key FROM current_state_events
                     WHERE type = 'm.room.member' AND membership = 'join' AND {clause}
                 ) AS b using (room_id)
-                LIMIT 1
             """
 
             txn.execute(sql, (user_id, *args))
