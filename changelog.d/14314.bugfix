@@ -1,0 +1,1 @@
+Fix room creation being rate limited too aggressively since Synapse v1.69.0.
