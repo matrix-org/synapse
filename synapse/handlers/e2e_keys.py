@@ -493,7 +493,7 @@ class E2eKeysHandler:
     ) -> JsonDict:
         """Handle a device key query from a federated server:
 
-        Handles the path: /_matrix/federation/v1/users/keys/query
+        Handles the path: GET /_matrix/federation/v1/users/keys/query
 
         Args:
             query_body: The body of the query request. Should contain a key
