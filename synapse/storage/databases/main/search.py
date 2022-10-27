@@ -163,8 +163,8 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         def reindex_search_txn(txn: LoggingTransaction) -> int:
             sql = """
-            SELECT stream_ordering, event_id, room_id, type, json,
-            origin_server_ts FROM events
+            SELECT stream_ordering, event_id, room_id, type, json, origin_server_ts
+            FROM events
             JOIN event_json USING (room_id, event_id)
             WHERE ? <= stream_ordering AND stream_ordering < ?
             AND (%s)
@@ -328,14 +328,14 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                 # we get the ones with non null origin_server_ts *first*
                 c.execute(
                     """
-                    CREATE INDEX CONCURRENTLY event_search_room_order ON event_search(
-                    room_id, origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)
+                    CREATE INDEX CONCURRENTLY event_search_room_order
+                    ON event_search(room_id, origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)
                     """
                 )
                 c.execute(
                     """
-                    CREATE INDEX CONCURRENTLY event_search_order ON event_search(
-                    origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)
+                    CREATE INDEX CONCURRENTLY event_search_order
+                    ON event_search(origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)
                     """
                 )
                 conn.set_session(autocommit=False)
@@ -354,8 +354,8 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         def reindex_search_txn(txn: LoggingTransaction) -> Tuple[int, bool]:
             sql = """
-            UPDATE event_search AS es SET stream_ordering = e.stream_ordering,
-            origin_server_ts = e.origin_server_ts
+            UPDATE event_search AS es
+            SET stream_ordering = e.stream_ordering, origin_server_ts = e.origin_server_ts
             FROM events AS e
             WHERE e.event_id = es.event_id
             AND ? <= e.stream_ordering AND e.stream_ordering < ?
@@ -596,8 +596,8 @@ class SearchStore(SearchBackgroundUpdateStore):
                 raise SynapseError(400, "Invalid pagination token")
 
             clauses.append(
-                """(origin_server_ts < ?
-                OR (origin_server_ts = ? AND stream_ordering < ?))
+                """
+                (origin_server_ts < ? OR (origin_server_ts = ? AND stream_ordering < ?))
                 """
             )
             args.extend([origin_server_ts, origin_server_ts, stream])
@@ -629,11 +629,12 @@ class SearchStore(SearchBackgroundUpdateStore):
             # to use the indexes in this order because sqlite refuses to
             # MATCH unless it uses the full text search index
             sql = """
-            SELECT rank(matchinfo) as rank, room_id, event_id,
-            origin_server_ts, stream_ordering
-            FROM (SELECT key, event_id, matchinfo(event_search) as matchinfo
-            FROM event_search
-            WHERE value MATCH ?
+            SELECT
+                rank(matchinfo) as rank, room_id, event_id, origin_server_ts, stream_ordering
+            FROM (
+                SELECT key, event_id, matchinfo(event_search) as matchinfo
+                FROM event_search
+                WHERE value MATCH ?
             )
             CROSS JOIN events USING (event_id)
             WHERE
@@ -657,8 +658,8 @@ class SearchStore(SearchBackgroundUpdateStore):
         # entire table from the database.
         if isinstance(self.database_engine, PostgresEngine):
             sql += """
-            ORDER BY origin_server_ts DESC NULLS LAST,
-            stream_ordering DESC NULLS LAST LIMIT ?
+            ORDER BY origin_server_ts DESC NULLS LAST, stream_ordering DESC NULLS LAST
+            LIMIT ?
             """
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql += " ORDER BY origin_server_ts DESC, stream_ordering DESC LIMIT ?"
