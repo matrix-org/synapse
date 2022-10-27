@@ -1100,7 +1100,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
         logger.info("Searching for stream ordering 1 day ago")
         self.stream_ordering_day_ago = self._find_first_stream_ordering_after_ts_txn(
-            txn, self._clock.time_msec() - 4 * 60 * 60 * 1000
+            txn, self._clock.time_msec() - 2 * 60 * 60 * 1000
         )
         logger.info(
             "Found stream ordering 1 day ago: it's %d", self.stream_ordering_day_ago
