@@ -370,7 +370,7 @@ The `events` stream experimentally supports having multiple writer workers, wher
 is sharded between them by room ID. Each writer is called an _event persister_. They are
 responsible for
 - receiving new events,
-- linking them to those already in the room DAG,
+- linking them to those already in the room [DAG](development/room-dag-concepts.md),
 - persisting them to the DB, and finally
 - updating the events stream.
 
