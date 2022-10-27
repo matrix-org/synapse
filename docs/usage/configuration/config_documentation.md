@@ -3672,7 +3672,8 @@ opentracing:
 ```
 ---
 ## Coordinating workers
-Configuration options related to workers.
+Configuration options related to workers which belong in the main config file
+(usually called `homeserver.yaml`).
 A Synapse deployment can scale horizontally by running multiple Synapse processes
 called _workers_. Incoming requests are distributed between workers to handle higher
 loads. Some workers are privileged and can accept requests from other workers.
