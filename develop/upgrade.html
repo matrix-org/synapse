@@ -235,6 +235,20 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 <h2 id="removal-of-the-generate_short_term_login_token-module-api-method"><a class="header" href="#removal-of-the-generate_short_term_login_token-module-api-method">Removal of the <code>generate_short_term_login_token</code> module API method</a></h2>
 <p>As announced with the release of <a href="#deprecation-of-the-generate_short_term_login_token-module-api-method">Synapse 1.69.0</a>, the deprecated <code>generate_short_term_login_token</code> module method has been removed.</p>
 <p>Modules relying on it can instead use the <code>create_login_token</code> method.</p>
+<h2 id="changes-to-the-events-received-by-application-services-interest"><a class="header" href="#changes-to-the-events-received-by-application-services-interest">Changes to the events received by application services (interest)</a></h2>
+<p>To align with spec (changed in
+<a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3905">MSC3905</a>), Synapse now
+only considers local users to be interesting. In other words, the <code>users</code> namespace
+regex is only be applied against local users of the homeserver.</p>
+<p>Please note, this probably doesn't affect the expected behavior of your application
+service, since an interesting local user in a room still means all messages in the room
+(from local or remote users) will still be considered interesting. And matching a room
+with the <code>rooms</code> or <code>aliases</code> namespace regex will still consider all events sent in the
+room to be interesting to the application service.</p>
+<p>If one of your application service's <code>users</code> regex was intending to match a remote user,
+this will no longer match as you expect. The behavioral mismatch between matching all
+local users and some remote users is why the spec was changed/clarified and this
+caveat is no longer supported.</p>
 <h1 id="upgrading-to-v1690"><a class="header" href="#upgrading-to-v1690">Upgrading to v1.69.0</a></h1>
 <h2 id="changes-to-the-receipts-replication-streams"><a class="header" href="#changes-to-the-receipts-replication-streams">Changes to the receipts replication streams</a></h2>
 <p>Synapse now includes information indicating if a receipt applies to a thread when
