@@ -824,9 +824,8 @@ def _tokenize_query(query: str) -> TokenList:
     in_phrase = False
     parts = deque(query.split('"'))
     for i, part in enumerate(parts):
-        # The contents inside double quotes is treated as a phrase, a trailing
-        # double quote is not implied.
-        in_phrase = bool(i % 2) and i != (len(parts) - 1)
+        # The contents inside double quotes is treated as a phrase.
+        in_phrase = bool(i % 2)
 
         # Pull out the individual words, discarding any non-word characters.
         words = deque(re.findall(r"([\w\-]+)", part, re.UNICODE))
