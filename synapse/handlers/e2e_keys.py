@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 class E2eKeysHandler:
     def __init__(self, hs: "HomeServer"):
+        self.config = hs.config
         self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.device_handler = hs.get_device_handler()
@@ -59,9 +60,6 @@ class E2eKeysHandler:
 
         federation_registry = hs.get_federation_registry()
 
-        self._allow_device_name_lookup_over_federation = (
-            hs.config.federation.allow_device_name_lookup_over_federation
-        )
         self._is_master = hs.config.worker.worker_app is None
         if not self._is_master:
             self._user_device_resync_client = (
@@ -514,7 +512,9 @@ class E2eKeysHandler:
         )
         res = await self.query_local_devices(
             device_keys_query,
-            include_displaynames=self._allow_device_name_lookup_over_federation,
+            include_displaynames=(
+                self.config.federation.allow_device_name_lookup_over_federation
+            ),
         )
         ret = {"device_keys": res}
 
