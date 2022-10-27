@@ -3879,9 +3879,13 @@ worker_replication_http_port: 9093
 ---
 ### `worker_listeners`
 
-A worker can handle HTTP requests. If handling HTTP requests, a `worker_listeners`
-option with an http listener, in the same way as the [`listeners` option](#listeners)
+A worker can handle HTTP requests. To do so, a `worker_listeners` option 
+must be declared, in the same way as the [`listeners` option](#listeners) 
 in the shared config.
+
+Workers declared in [`stream_writers`](#stream_writers) will need to include a
+`replication` listener here, in order to accept internal HTTP requests from
+other workers.
 
 Example configuration:
 ```yaml
