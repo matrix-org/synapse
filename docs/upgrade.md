@@ -99,7 +99,7 @@ only considers local users to be interesting. In other words, the `users` namesp
 regex is only be applied against local users of the homeserver.
 
 Please note, this probably doesn't affect the expected behavior of your application
-service since an interesting local user in a room, still means all messages in the room
+service, since an interesting local user in a room still means all messages in the room
 (from local or remote users) will still be considered interesting. And matching a room
 with the `rooms` or `aliases` namespace regex will still consider all events sent in the
 room to be interesting to the application service.
