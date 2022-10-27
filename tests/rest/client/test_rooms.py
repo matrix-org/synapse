@@ -54,6 +54,7 @@ from tests.http.server._base import make_request_with_cancellation_test
 from tests.storage.test_stream import PaginationTestCase
 from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import create_event
+from tests.unittest import override_config
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -870,6 +871,41 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         self.assertEqual(join_mock.call_count, 0)
+
+    def _create_basic_room(self) -> Tuple[int, object]:
+        """
+        Tries to create a basic room and returns the response code.
+        """
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        return channel.code, channel.json_body
+
+    @override_config(
+        {
+            "rc_message": {"per_second": 0.2, "burst_count": 10},
+        }
+    )
+    def test_room_creation_ratelimiting(self) -> None:
+        """
+        Regression test for #14312, where ratelimiting was made too strict.
+        Clients should be able to create 5 rooms in a row
+        without hitting rate limits, using default rate limit config.
+        (We override rate limiting config back to its default value.)
+
+        To ensure we don't make ratelimiting too generous accidentally,
+        also check that we can't create a 6th room.
+        """
+
+        for _ in range(5):
+            code, json_body = self._create_basic_room()
+            self.assertEqual(code, HTTPStatus.OK, json_body)
+
+        # The 6th room hits the rate limit.
+        code, json_body = self._create_basic_room()
+        self.assertEqual(code, HTTPStatus.TOO_MANY_REQUESTS, json_body)
 
 
 class RoomTopicTestCase(RoomBase):
