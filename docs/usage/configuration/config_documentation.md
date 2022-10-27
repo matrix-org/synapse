@@ -3848,7 +3848,8 @@ worker_app: synapse.app.generic_worker
 ### `worker_name`
 
 A unique name for the worker. The worker needs a name to be addressed in
-further parameters and identification in log files.
+further parameters and identification in log files. We strongly recommend
+giving each worker a unique `worker_name`.
 
 Example configuration:
 ```yaml
