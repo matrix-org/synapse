@@ -1,3 +1,13 @@
+Synapse 1.70.1 (2022-10-28)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.70.0rc1 where access tokens would be incorrectly sent to application services as headers. Application services which were obtaining access tokens from query parameters were not affected. ([\#14301](https://github.com/matrix-org/synapse/issues/14301))
+- Fix room creation being rate limited too aggressively since Synapse v1.69.0. ([\#14314](https://github.com/matrix-org/synapse/issues/14314))
+
+
 Synapse 1.70.0 (2022-10-26)
 ===========================
 
