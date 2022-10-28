@@ -1,6 +1,14 @@
 Synapse 1.70.1 (2022-10-28)
 ===========================
 
+This release fixes some regressions that were discovered in 1.70.0.
+
+[#14300](https://github.com/matrix-org/synapse/issues/14300)
+was previously reported to be a regression in 1.70.0 as well. However, we have
+since concluded that it was limited to the reporter and thus have not needed
+to include any fix for it in 1.70.1.
+
+
 Bugfixes
 --------
 
