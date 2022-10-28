@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Sequence, Union
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -70,13 +70,15 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
         self.request_url = None
 
         async def get_json(
-            url: str, args: Mapping[Any, Any], headers: Mapping[Any, Any]
+            url: str,
+            args: Mapping[Any, Any],
+            headers: Mapping[Union[str, bytes], Sequence[Union[str, bytes]]],
         ) -> List[JsonDict]:
             # Ensure the access token is passed as both a header and query arg.
             if not headers.get("Authorization") or not args.get(b"access_token"):
                 raise RuntimeError("Access token not provided")
 
-            self.assertEqual(headers.get("Authorization"), f"Bearer {TOKEN}")
+            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
             self.assertEqual(args.get(b"access_token"), TOKEN)
             self.request_url = url
             if url == URL_USER:

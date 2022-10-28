@@ -239,7 +239,6 @@ class MessageSearchTest(HomeserverTestCase):
         ("fox -nope", (True, False)),
         ("fox -brown", (False, True)),
         ('"fox" quick', True),
-        ('"fox quick', True),
         ('"quick brown', True),
         ('" quick "', True),
         ('" nope"', False),
@@ -269,6 +268,15 @@ class MessageSearchTest(HomeserverTestCase):
         response = self.helper.send(self.room_id, self.PHRASE, tok=self.access_token)
         self.assertIn("event_id", response)
 
+        # The behaviour of a missing trailing double quote changed in PostgreSQL 14
+        # from ignoring the initial double quote to treating it as a phrase.
+        main_store = homeserver.get_datastores().main
+        found = False
+        if isinstance(main_store.database_engine, PostgresEngine):
+            assert main_store.database_engine._version is not None
+            found = main_store.database_engine._version < 140000
+        self.COMMON_CASES.append(('"fox quick', (found, True)))
+
     def test_tokenize_query(self) -> None:
         """Test the custom logic to tokenize a user's query."""
         cases = (
@@ -280,9 +288,9 @@ class MessageSearchTest(HomeserverTestCase):
             ("fox -brown", ["fox", SearchToken.Not, "brown"]),
             ("- fox", [SearchToken.Not, "fox"]),
             ('"fox" quick', [Phrase(["fox"]), SearchToken.And, "quick"]),
-            # No trailing double quoe.
-            ('"fox quick', ["fox", SearchToken.And, "quick"]),
-            ('"-fox quick', [SearchToken.Not, "fox", SearchToken.And, "quick"]),
+            # No trailing double quote.
+            ('"fox quick', [Phrase(["fox", "quick"])]),
+            ('"-fox quick', [Phrase(["-fox", "quick"])]),
             ('" quick "', [Phrase(["quick"])]),
             (
                 'q"uick brow"n',
