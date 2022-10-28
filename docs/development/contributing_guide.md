@@ -324,7 +324,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 
 - Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
-
+  - If setting `WORKERS=1`, optionally set `WORKER_TYPES=` to declare which worker types you wish to test. A simple comma-delimited string containing the worker types defined from the template in [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py). A safe example would be `WORKER_TYPES="federation_inbound,federation_sender,synchrotron"`. See the [worker documentation](https://matrix-org.github.io/synapse/latest/workers.html) for additional information on workers.
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
 SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
