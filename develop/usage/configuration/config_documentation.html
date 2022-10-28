@@ -2300,6 +2300,11 @@ is still supported for backwards-compatibility, but it is deprecated.</p>
 <p><code>trusted_key_servers</code> defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
 <code>suppress_key_server_warning</code> to true.</p>
+<p>If the use of a trusted key server has to be deactivated, e.g. in a private
+federation or for privacy reasons, this can be realised by setting
+an empty array (<code>trusted_key_servers: []</code>). Then Synapse will request the keys
+directly from the server that owns the keys. If Synapse does not get keys directly
+from the server, the events of this server will be rejected.</p>
 <p>Options for each entry in the list include:</p>
 <ul>
 <li><code>server_name</code>: the name of the server. Required.</li>
