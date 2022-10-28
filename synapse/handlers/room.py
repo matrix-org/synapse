@@ -559,7 +559,6 @@ class RoomCreationHandler:
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
-            ratelimit=False,
         )
 
         # Transfer membership events
@@ -753,6 +752,10 @@ class RoomCreationHandler:
                 )
 
         if ratelimit:
+            # Rate limit once in advance, but don't rate limit the individual
+            # events in the room — room creation isn't atomic and it's very
+            # janky if half the events in the initial state don't make it because
+            # of rate limiting.
             await self.request_ratelimiter.ratelimit(requester)
 
         room_version_id = config.get(
@@ -913,7 +916,6 @@ class RoomCreationHandler:
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
-            ratelimit=ratelimit,
         )
 
         if "name" in config:
@@ -1037,7 +1039,6 @@ class RoomCreationHandler:
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
-        ratelimit: bool = True,
     ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room. Sends the room creation, membership,
         and power level events into the room sequentially, then creates and batches up the
@@ -1045,6 +1046,8 @@ class RoomCreationHandler:
 
         `power_level_content_override` doesn't apply when initial state has
         power level state event content.
+
+        Rate limiting should already have been applied by this point.
 
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
@@ -1144,7 +1147,7 @@ class RoomCreationHandler:
             creator.user,
             room_id,
             "join",
-            ratelimit=ratelimit,
+            ratelimit=False,
             content=creator_join_profile,
             new_room=True,
             prev_event_ids=[last_sent_event_id],
@@ -1269,7 +1272,10 @@ class RoomCreationHandler:
             events_to_send.append((encryption_event, encryption_context))
 
         last_event = await self.event_creation_handler.handle_new_client_event(
-            creator, events_to_send, ignore_shadow_ban=True
+            creator,
+            events_to_send,
+            ignore_shadow_ban=True,
+            ratelimit=False,
         )
         assert last_event.internal_metadata.stream_ordering is not None
         return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
