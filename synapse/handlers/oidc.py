@@ -327,9 +327,7 @@ class OidcHandler:
         # what provider it is coming from
         oidc_provider: Optional[OidcProvider] = None
         for provider in self._providers.values():
-            if provider.issuer == issuer and any(
-                a == provider.client_id for a in audience
-            ):
+            if provider.issuer == issuer and provider.client_id in audience:
                 oidc_provider = provider
                 break
 
@@ -504,7 +502,7 @@ class OidcProvider:
             elif not m.get("backchannel_logout_session_supported", False):
                 logger.warning(
                     "OIDC Back-Channel Logout is enabled and supported "
-                    "by issuer %r but it might not send session ID with "
+                    "by issuer %r but it might not send a session ID with "
                     "logout tokens, which is required for the logouts to work",
                     self.issuer,
                 )
@@ -521,11 +519,11 @@ class OidcProvider:
                 except Exception:
                     logger.warning(
                         f"OIDC Back-Channel Logout is enabled for issuer {self.issuer!r} "
-                        f"but it looks like the configured `user_mapping_provider` "
-                        f"does not use the `sub` claim as subject. If it is the case, "
-                        f"and you want Synapse to ignore the `sub` claim in OIDC "
-                        f"Back-Channel Logouts, set `backchannel_logout_ignore_sub` "
-                        f"to `true` in the issuer config."
+                        "but it looks like the configured `user_mapping_provider` "
+                        "does not use the `sub` claim as subject. If it is the case, "
+                        "and you want Synapse to ignore the `sub` claim in OIDC "
+                        "Back-Channel Logouts, set `backchannel_logout_ignore_sub` "
+                        "to `true` in the issuer config."
                     )
 
     @property
