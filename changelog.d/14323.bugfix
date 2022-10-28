@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 0.34.0rc2 where logs could include error spam when background processes are measured as taking a negative amount of time.
