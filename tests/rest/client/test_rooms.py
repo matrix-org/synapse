@@ -891,15 +891,15 @@ class RoomsCreateTestCase(RoomBase):
     def test_room_creation_ratelimiting(self) -> None:
         """
         Regression test for #14312, where ratelimiting was made too strict.
-        Clients should be able to create 5 rooms in a row
+        Clients should be able to create 10 rooms in a row
         without hitting rate limits, using default rate limit config.
         (We override rate limiting config back to its default value.)
 
         To ensure we don't make ratelimiting too generous accidentally,
-        also check that we can't create a 6th room.
+        also check that we can't create an 11th room.
         """
 
-        for _ in range(5):
+        for _ in range(10):
             code, json_body = self._create_basic_room()
             self.assertEqual(code, HTTPStatus.OK, json_body)
 
@@ -1426,10 +1426,22 @@ class RoomJoinRatelimitTestCase(RoomBase):
     )
     def test_join_local_ratelimit(self) -> None:
         """Tests that local joins are actually rate-limited."""
-        for _ in range(3):
-            self.helper.create_room_as(self.user_id)
+        # Create 4 rooms
+        room_ids = [
+            self.helper.create_room_as(self.user_id, is_public=True) for _ in range(4)
+        ]
 
-        self.helper.create_room_as(self.user_id, expect_code=429)
+        joiner_user_id = self.register_user("joiner", "secret")
+        # Now make a new user try to join some of them.
+
+        # The user can join 3 rooms
+        for room_id in room_ids[0:3]:
+            self.helper.join(room_id, joiner_user_id)
+
+        # But the user cannot join a 4th room
+        self.helper.join(
+            room_ids[3], joiner_user_id, expect_code=HTTPStatus.TOO_MANY_REQUESTS
+        )
 
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}

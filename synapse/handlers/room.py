@@ -752,13 +752,11 @@ class RoomCreationHandler:
                 )
 
         if ratelimit:
-            # We rate limit by 2 actions because historical Synapse versions,
-            # up to and including v1.68.0 did so: they applied one count for the
-            # room creation and one count for setting the membership of the room
-            # creator.
-            # This makes room creations more 'expensive' from a ratelimiting
-            # point of view, so it's sensible as well.
-            await self.request_ratelimiter.ratelimit(requester, n_actions=2)
+            # Rate limit once in advance, but don't rate limit the individual
+            # events in the room — room creation isn't atomic and it's very
+            # janky if half the events in the initial state don't make it because
+            # of rate limiting.
+            await self.request_ratelimiter.ratelimit(requester)
 
         room_version_id = config.get(
             "room_version", self.config.server.default_room_version.identifier
