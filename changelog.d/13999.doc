@@ -1,1 +1,1 @@
-Add documentation for using an empty `trusted_key_servers` config option.
+Explain how to disable the use of `trusted_key_servers`.
