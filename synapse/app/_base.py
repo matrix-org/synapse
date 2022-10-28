@@ -399,7 +399,7 @@ def listen_http(
             context_factory,
             reactor=reactor,
         )
-        logger.info("Synapse worker now listening on port %d (TLS)", port)
+        logger.info("Synapse now listening on TCP port %d (TLS)", port)
     else:
         ports = listen_tcp(
             bind_addresses,
@@ -407,7 +407,7 @@ def listen_http(
             site,
             reactor=reactor,
         )
-        logger.info("Synapse worker now listening on port %d", port)
+        logger.info("Synapse now listening on TCP port %d", port)
     return ports
 
 
