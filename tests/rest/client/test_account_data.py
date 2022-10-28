@@ -83,7 +83,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         room_id = self.helper.create_room_as(user_id, tok=tok)
         channel = self.make_request(
             "PUT",
-            f"/user/{user_id}/rooms/{room_id}/beeper_inbox_state",
+            f"/_matrix/client/unstable/com.beeper.inbox/user/{user_id}/rooms/{room_id}/inbox_state",
             {},
             access_token=tok,
         )
@@ -106,7 +106,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            f"/user/{user_id}/rooms/{room_id}/beeper_inbox_state",
+            f"/_matrix/client/unstable/com.beeper.inbox/user/{user_id}/rooms/{room_id}/inbox_state",
             {"done": {"at_delta": 1000 * 60 * 5}, "marked_unread": True},
             access_token=tok,
         )
@@ -142,7 +142,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         room_id = self.helper.create_room_as(user_id, tok=tok)
         channel = self.make_request(
             "PUT",
-            f"/user/{user_id}/rooms/{room_id}/beeper_inbox_state",
+            f"/_matrix/client/unstable/com.beeper.inbox/user/{user_id}/rooms/{room_id}/inbox_state",
             {"marked_unread": False},
             access_token=tok,
         )

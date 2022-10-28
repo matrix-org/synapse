@@ -160,8 +160,16 @@ class RoomBeeperInboxStateServlet(RestServlet):
     PUT /user/{user_id}/rooms/{room_id}/beeper_inbox_state HTTP/1.1
     """
 
-    PATTERNS = client_patterns(
-        "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/beeper_inbox_state"
+    PATTERNS = list(
+        client_patterns(
+            "/com.beeper.inbox/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/inbox_state",
+            releases=(),  # not in the matrix spec, only include under /unstable
+        )
+    ) + list(
+        # Improperly namespaced version of the above endpoint (TODO: remove once everything uses the namespaced version)
+        client_patterns(
+            "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/beeper_inbox_state"
+        )
     )
 
     def __init__(self, hs: "HomeServer"):
