@@ -377,7 +377,7 @@ class OidcProviderConfig:
     # Whether Synapse should react to backchannel logouts
     backchannel_logout_enabled: bool
 
-    # Whetever Synapse should ignore the `sub` claim in backchannel logouts or not
+    # Whether Synapse should ignore the `sub` claim in backchannel logouts or not.
     backchannel_logout_ignore_sub: bool
 
     # Whether to skip metadata verification

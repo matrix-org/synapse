@@ -813,7 +813,7 @@ class SsoHandler:
                 to_delete.append(session_id)
 
         for session_id in to_delete:
-            logger.info("Expiring mapping session %s", session_id)
+            logger.info("Revoking mapping session %s", session_id)
             del self._username_mapping_sessions[session_id]
 
     async def check_username_availability(
