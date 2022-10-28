@@ -1,3 +1,37 @@
+Synapse 1.70.1 (2022-10-28)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.70.0rc1 where the access tokens sent to application services as headers were malformed. Application services which were obtaining access tokens from query parameters were not affected. ([\#14301](https://github.com/matrix-org/synapse/issues/14301))
+- Fix room creation being rate limited too aggressively since Synapse v1.69.0. ([\#14314](https://github.com/matrix-org/synapse/issues/14314))
+
+
+Synapse 1.70.0 (2022-10-26)
+===========================
+
+No significant changes since 1.70.0rc2.
+
+
+Synapse 1.70.0rc2 (2022-10-25)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.70.0rc1 where the information returned from the `/threads` API could be stale when threaded events are redacted. ([\#14248](https://github.com/matrix-org/synapse/issues/14248))
+- Fix a bug introduced in Synapse 1.70.0rc1 leading to broken outbound federation when using Python 3.7. ([\#14280](https://github.com/matrix-org/synapse/issues/14280))
+- Fix a bug introduced in Synapse 1.70.0rc1 where edits to non-message events were aggregated by the homeserver. ([\#14283](https://github.com/matrix-org/synapse/issues/14283))
+
+
+Internal Changes
+----------------
+
+- Build ABI3 wheels for CPython. ([\#14253](https://github.com/matrix-org/synapse/issues/14253))
+- For the aarch64 architecture, only build wheels for CPython manylinux. ([\#14259](https://github.com/matrix-org/synapse/issues/14259))
+
+
 Synapse 1.70.0rc1 (2022-10-19)
 ==============================
 
@@ -13,7 +47,7 @@ Features
 - The `/relations` endpoint can now be used on workers. ([\#14028](https://github.com/matrix-org/synapse/issues/14028))
 - Advertise support for Matrix 1.3 and 1.4 on `/_matrix/client/versions`. ([\#14032](https://github.com/matrix-org/synapse/issues/14032), [\#14184](https://github.com/matrix-org/synapse/issues/14184))
 - Improve validation of request bodies for the [Device Management](https://spec.matrix.org/v1.4/client-server-api/#device-management) and [MSC2697 Device Dehyrdation](https://github.com/matrix-org/matrix-spec-proposals/pull/2697) client-server API endpoints. ([\#14054](https://github.com/matrix-org/synapse/issues/14054))
-- Experimental support for [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874). ([\#14148](https://github.com/matrix-org/synapse/issues/14148))
+- Experimental support for [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874): Filtering threads from the `/messages` endpoint. ([\#14148](https://github.com/matrix-org/synapse/issues/14148))
 - Improve the validation of the following PUT endpoints: [`/directory/room/{roomAlias}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3directoryroomroomalias), [`/directory/list/room/{roomId}`](https://spec.matrix.org/v1.4/client-server-api/#put_matrixclientv3directorylistroomroomid) and [`/directory/list/appservice/{networkId}/{roomId}`](https://spec.matrix.org/v1.4/application-service-api/#put_matrixclientv3directorylistappservicenetworkidroomid). ([\#14179](https://github.com/matrix-org/synapse/issues/14179))
 - Build and publish binary wheels for `aarch64` platforms. ([\#14212](https://github.com/matrix-org/synapse/issues/14212))
 
