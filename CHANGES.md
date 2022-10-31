@@ -1,3 +1,27 @@
+Synapse 1.70.1 (2022-10-28)
+===========================
+
+This release fixes some regressions that were discovered in 1.70.0.
+
+[#14300](https://github.com/matrix-org/synapse/issues/14300)
+was previously reported to be a regression in 1.70.0 as well. However, we have
+since concluded that it was limited to the reporter and thus have not needed
+to include any fix for it in 1.70.1.
+
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.70.0rc1 where the access tokens sent to application services as headers were malformed. Application services which were obtaining access tokens from query parameters were not affected. ([\#14301](https://github.com/matrix-org/synapse/issues/14301))
+- Fix room creation being rate limited too aggressively since Synapse v1.69.0. ([\#14314](https://github.com/matrix-org/synapse/issues/14314))
+
+
+Synapse 1.70.0 (2022-10-26)
+===========================
+
+No significant changes since 1.70.0rc2.
+
+
 Synapse 1.70.0rc2 (2022-10-25)
 ==============================
 
