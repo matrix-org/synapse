@@ -271,7 +271,6 @@ class DehydratedDeviceServlet(RestServlet):
             raise errors.NotFoundError("No dehydrated device available")
 
     class PutBody(RequestBodyModel):
-        device_id: StrictStr
         device_data: DehydratedDeviceDataModel
         initial_device_display_name: Optional[StrictStr]
 
@@ -281,7 +280,7 @@ class DehydratedDeviceServlet(RestServlet):
 
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
-            submission.device_data,
+            submission.device_data.dict(),
             submission.initial_device_display_name,
         )
         return 200, {"device_id": device_id}
