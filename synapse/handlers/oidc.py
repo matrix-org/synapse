@@ -292,10 +292,9 @@ class OidcHandler:
         # The aud and iss claims we care about are in the payload part, which
         # is a JSON object.
         try:
-            # By splitting a maximum of 3 times and destructuring the resulting array,
-            # we ensure that we have exactly 3 segments, while avoiding doing
-            # unnecessary splits.
-            _, payload, _ = logout_token.rsplit(".", 3)
+            # By destructuring the list after splitting, we ensure that we have
+            # exactly 3 segments
+            _, payload, _ = logout_token.split(".")
         except ValueError:
             raise SynapseError(400, "Invalid logout_token in request")
 
@@ -519,7 +518,7 @@ class OidcProvider:
                 try:
                     subject = self._user_mapping_provider.get_remote_user_id(user)
                     if subject != user["sub"]:
-                        raise Exception()
+                        raise ValueError("Unexpected subject")
                 except Exception:
                     logger.warning(
                         f"OIDC Back-Channel Logout is enabled for issuer {self.issuer!r} "
@@ -1238,6 +1237,12 @@ class OidcProvider:
             logger.warning(
                 f"Received an OIDC Back-Channel Logout request from issuer {self.issuer!r} but it is disabled in config"
             )
+
+            # TODO: this responds with a 400 status code, which is what the OIDC
+            # Back-Channel Logout spec expects, but spec also suggests answering with
+            # a JSON object, with the `error` and `error_description` fields set, which
+            # we are not doing here.
+            # See https://openid.net/specs/openid-connect-backchannel-1_0.html#BCResponse
             raise SynapseError(
                 400, "OpenID Connect Back-Channel Logout is disabled for this provider"
             )
