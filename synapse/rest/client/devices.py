@@ -231,7 +231,7 @@ class DehydratedDeviceServlet(RestServlet):
       }
     }
 
-    PUT /org.matrix.msc2697/dehydrated_device
+    PUT /org.matrix.msc2697.v2/dehydrated_device
     Content-Type: application/json
 
     {
