@@ -58,7 +58,7 @@ from synapse.event_auth import (
 )
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.federation.federation_client import InvalidResponseError
+from synapse.federation.federation_client import InvalidResponseError, PulledPduInfo
 from synapse.logging.context import nested_logging_context
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -1517,8 +1517,8 @@ class FederationEventHandler:
         )
 
     async def backfill_event_id(
-        self, destination: str, room_id: str, event_id: str
-    ) -> EventBase:
+        self, destinations: List[str], room_id: str, event_id: str
+    ) -> PulledPduInfo:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
 
@@ -1530,24 +1530,21 @@ class FederationEventHandler:
         Raises:
             FederationError if we are unable to find the event from the destination
         """
-        logger.info(
-            "backfill_event_id: event_id=%s from destination=%s", event_id, destination
-        )
+        logger.info("backfill_event_id: event_id=%s", event_id)
 
         room_version = await self._store.get_room_version(room_id)
 
-        event_from_response = await self._federation_client.get_pdu(
-            [destination],
+        pulled_pdu_info = await self._federation_client.get_pdu(
+            destinations,
             event_id,
             room_version,
         )
 
-        if not event_from_response:
+        if not pulled_pdu_info:
             raise FederationError(
                 "ERROR",
                 404,
-                "Unable to find event_id=%s from destination=%s to backfill."
-                % (event_id, destination),
+                f"Unable to find event_id={event_id} from remote servers to backfill.",
                 affected=event_id,
             )
 
@@ -1555,13 +1552,13 @@ class FederationEventHandler:
         # and auth events to de-outlier it. This also sets up the necessary
         # `state_groups` for the event.
         await self._process_pulled_events(
-            destination,
-            [event_from_response],
+            pulled_pdu_info.pull_origin,
+            [pulled_pdu_info.pdu],
             # Prevent notifications going to clients
             backfilled=True,
         )
 
-        return event_from_response
+        return pulled_pdu_info
 
     @trace
     @tag_args
@@ -1584,19 +1581,19 @@ class FederationEventHandler:
         async def get_event(event_id: str) -> None:
             with nested_logging_context(event_id):
                 try:
-                    event = await self._federation_client.get_pdu(
+                    pulled_pdu_info = await self._federation_client.get_pdu(
                         [destination],
                         event_id,
                         room_version,
                     )
-                    if event is None:
+                    if pulled_pdu_info is None:
                         logger.warning(
                             "Server %s didn't return event %s",
                             destination,
                             event_id,
                         )
                         return
-                    events.append(event)
+                    events.append(pulled_pdu_info.pdu)
 
                 except Exception as e:
                     logger.warning(

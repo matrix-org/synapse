@@ -152,6 +152,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         the forward extremities of those rooms will exclude most members. We may also
         calculate room state incorrectly for such rooms and believe that a member is or
         is not in the room when the opposite is true.
+
+        Note: If you only care about users in the room local to the homeserver, use
+        `get_local_users_in_room(...)` instead which will be more performant.
         """
         return await self.db_pool.simple_select_onecol(
             table="current_state_events",
@@ -742,7 +745,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # user and the set of other users, and then checking if there is any
             # overlap.
             sql = f"""
-                SELECT b.state_key
+                SELECT DISTINCT b.state_key
                 FROM (
                     SELECT room_id FROM current_state_events
                     WHERE type = 'm.room.member' AND membership = 'join' AND state_key = ?
@@ -751,7 +754,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     SELECT room_id, state_key FROM current_state_events
                     WHERE type = 'm.room.member' AND membership = 'join' AND {clause}
                 ) AS b using (room_id)
-                LIMIT 1
             """
 
             txn.execute(sql, (user_id, *args))
