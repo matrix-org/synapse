@@ -362,8 +362,8 @@ def listen_tcp(
 def listen_http(
     listener_config: ListenerConfig,
     root_resource: Resource,
-    version_string,
-    max_request_body_size,
+    version_string: str,
+    max_request_body_size: int,
     context_factory: IOpenSSLContextFactory,
     reactor: IReactorSSL = reactor,
 ) -> List[Port]:
