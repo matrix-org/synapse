@@ -2990,6 +2990,10 @@ Options for each entry include:
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
 
+       * picture_claim: name of the claim containing an url for user's profile picture.
+         Defaults to 'picture', which OpenID Connect compliant providers should provide
+         and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
           own username (see the documentation for the `sso_auth_account_details.html`
