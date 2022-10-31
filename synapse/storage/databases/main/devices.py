@@ -274,6 +274,13 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             destination, int(from_stream_id)
         )
         if not has_changed:
+            # debugging for https://github.com/matrix-org/synapse/issues/14251
+            issue_8631_logger.debug(
+                "%s: no change between %i and %i",
+                destination,
+                from_stream_id,
+                now_stream_id,
+            )
             return now_stream_id, []
 
         updates = await self.db_pool.runInteraction(
@@ -539,8 +546,10 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    "org.matrix.opentracing_context": opentracing_context,
                 }
+
+                if opentracing_context != "{}":
+                    result["org.matrix.opentracing_context"] = opentracing_context
 
                 prev_id = stream_id
 
@@ -549,7 +558,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                     if keys:
                         result["keys"] = keys
 
-                    device_display_name = device.display_name
+                    device_display_name = None
+                    if (
+                        self.hs.config.federation.allow_device_name_lookup_over_federation
+                    ):
+                        device_display_name = device.display_name
                     if device_display_name:
                         result["device_display_name"] = device_display_name
                 else:
@@ -1842,7 +1855,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self,
         txn: LoggingTransaction,
         user_id: str,
-        device_ids: Iterable[str],
+        device_id: str,
         hosts: Collection[str],
         stream_ids: List[int],
         context: Optional[Dict[str, str]],
@@ -1858,6 +1871,21 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         stream_id_iterator = iter(stream_ids)
 
         encoded_context = json_encoder.encode(context)
+        mark_sent = not self.hs.is_mine_id(user_id)
+
+        values = [
+            (
+                destination,
+                next(stream_id_iterator),
+                user_id,
+                device_id,
+                mark_sent,
+                now,
+                encoded_context if whitelisted_homeserver(destination) else "{}",
+            )
+            for destination in hosts
+        ]
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
@@ -1870,22 +1898,20 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 "ts",
                 "opentracing_context",
             ),
-            values=[
-                (
-                    destination,
-                    next(stream_id_iterator),
-                    user_id,
-                    device_id,
-                    not self.hs.is_mine_id(
-                        user_id
-                    ),  # We only need to send out update for *our* users
-                    now,
-                    encoded_context if whitelisted_homeserver(destination) else "{}",
-                )
-                for destination in hosts
-                for device_id in device_ids
-            ],
+            values=values,
         )
+
+        # debugging for https://github.com/matrix-org/synapse/issues/14251
+        if issue_8631_logger.isEnabledFor(logging.DEBUG):
+            issue_8631_logger.debug(
+                "Recorded outbound pokes for %s:%s with device stream ids %s",
+                user_id,
+                device_id,
+                {
+                    stream_id: destination
+                    for (destination, stream_id, _, _, _, _, _) in values
+                },
+            )
 
     def _add_device_outbound_room_poke_txn(
         self,
@@ -1991,7 +2017,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 self._add_device_outbound_poke_to_stream_txn(
                     txn,
                     user_id=user_id,
-                    device_ids=[device_id],
+                    device_id=device_id,
                     hosts=hosts,
                     stream_ids=stream_ids,
                     context=context,

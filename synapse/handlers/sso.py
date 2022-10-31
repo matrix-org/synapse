@@ -874,7 +874,7 @@ class SsoHandler:
         )
 
     async def handle_terms_accepted(
-        self, request: Request, session_id: str, terms_version: str
+        self, request: SynapseRequest, session_id: str, terms_version: str
     ) -> None:
         """Handle a request to the new-user 'consent' endpoint
 

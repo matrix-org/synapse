@@ -53,7 +53,7 @@ DEFAULT_LOG_CONFIG = Template(
 # Synapse also supports structured logging for machine readable logs which can
 # be ingested by ELK stacks. See [2] for details.
 #
-# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [1]: https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema
 # [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
@@ -326,6 +326,8 @@ def setup_logging(
         logBeginner: The Twisted logBeginner to use.
 
     """
+    from twisted.internet import reactor
+
     log_config_path = (
         config.worker.worker_log_config
         if use_worker_options
@@ -348,3 +350,4 @@ def setup_logging(
     )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())
+    logging.info("Twisted reactor: %s", type(reactor).__name__)
