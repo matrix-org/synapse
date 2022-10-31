@@ -2667,6 +2667,17 @@ without modifications.</p>
 which is set to the claims returned by the UserInfo Endpoint and/or
 in the ID Token.</p>
 </li>
+<li>
+<p><code>backchannel_logout_enabled</code>: set to <code>true</code> to process OIDC Back-Channel Logout notifications. 
+Those notifications are expected to be received on <code>/_synapse/client/oidc/backchannel_logout</code>.
+Defaults to <code>false</code>.</p>
+</li>
+<li>
+<p><code>backchannel_logout_ignore_sub</code>: by default, the OIDC Back-Channel Logout feature checks that the
+<code>sub</code> claim matches the subject claim received during login. This check can be disabled by setting
+this to <code>true</code>. Defaults to <code>false</code>.</p>
+<p>You might want to disable this if the <code>subject_claim</code> returned by the mapping provider is not <code>sub</code>.</p>
+</li>
 </ul>
 <p>It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under

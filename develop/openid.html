@@ -188,6 +188,10 @@ maintainer.</p>
 setting in your configuration file.
 See the <a href="usage/configuration/config_documentation.html#oidc_providers">configuration manual</a> for some sample settings, as well as
 the text below for example configurations for specific providers.</p>
+<h2 id="oidc-back-channel-logout"><a class="header" href="#oidc-back-channel-logout">OIDC Back-Channel Logout</a></h2>
+<p>Synapse supports receiving <a href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout</a> notifications.</p>
+<p>This lets the OpenID Connect Provider notify Synapse when a user logs out, so that Synapse can end that user session.
+This feature can be enabled by setting the <code>backchannel_logout_enabled</code> property to <code>true</code> in the provider configuration, and setting the following URL as destination for Back-Channel Logout notifications in your OpenID Connect Provider: <code>[synapse public baseurl]/_synapse/client/oidc/backchannel_logout</code></p>
 <h2 id="sample-configs"><a class="header" href="#sample-configs">Sample configs</a></h2>
 <p>Here are a few configs for providers that should work with Synapse.</p>
 <h3 id="microsoft-azure-active-directory"><a class="header" href="#microsoft-azure-active-directory">Microsoft Azure Active Directory</a></h3>
@@ -245,6 +249,8 @@ to install Dex.</p>
 </code></pre>
 <h3 id="keycloak"><a class="header" href="#keycloak">Keycloak</a></h3>
 <p><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a> is an opensource IdP maintained by Red Hat.</p>
+<p>Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
+This can be optionally enabled by setting <code>backchannel_logout_enabled</code> to <code>true</code> in the Synapse configuration, and by setting the &quot;Backchannel Logout URL&quot; in Keycloak.</p>
 <p>Follow the <a href="https://www.keycloak.org/getting-started">Getting Started Guide</a> to install Keycloak and set up a realm.</p>
 <ol>
 <li>
@@ -268,6 +274,8 @@ to install Dex.</p>
 <tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
 <tr><td>Access Type</td><td><code>confidential</code></td></tr>
 <tr><td>Valid Redirect URIs</td><td><code>[synapse public baseurl]/_synapse/client/oidc/callback</code></td></tr>
+<tr><td>Backchannel Logout URL (optional)</td><td> <code>[synapse public baseurl]/_synapse/client/oidc/backchannel_logout</code></td></tr>
+<tr><td>Backchannel Logout Session Required (optional)</td><td> <code>On</code></td></tr>
 </tbody></table>
 <ol start="5">
 <li>Click <code>Save</code></li>
@@ -291,6 +299,7 @@ to install Dex.</p>
       config:
         localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
+    backchannel_logout_enabled: true # Optional
 </code></pre>
 <h3 id="auth0"><a class="header" href="#auth0">Auth0</a></h3>
 <p><a href="https://auth0.com/">Auth0</a> is a hosted SaaS IdP solution.</p>
