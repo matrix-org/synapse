@@ -1258,7 +1258,7 @@ class OidcProvider:
         # Which means the audience should contain Synapse's client_id and the
         # issuer should be the IdP issuer
         claims_options = {
-            "iss": {"values": [self.issuer]},
+            "iss": {"values": [metadata["issuer"]]},
             "aud": {"values": [self.client_id]},
         }
 
