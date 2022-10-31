@@ -292,8 +292,10 @@ class OidcHandler:
         # The aud and iss claims we care about are in the payload part, which
         # is a JSON object.
         try:
-            # This raises if there are too many or not enough segments in the token
-            _, payload, _ = logout_token.rsplit(".", 4)
+            # By splitting a maximum of 3 times and destructuring the resulting array,
+            # we ensure that we have exactly 3 segments, while avoiding doing
+            # unnecessary splits.
+            _, payload, _ = logout_token.rsplit(".", 3)
         except ValueError:
             raise SynapseError(400, "Invalid logout_token in request")
 
