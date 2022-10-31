@@ -386,9 +386,6 @@ def listen_http(
         max_request_body_size=max_request_body_size,
         reactor=reactor,
     )
-    # This has same logic as synapse/app/homeserver.py where we choose between
-    # listen_ssl and listen_tcp based on the tls configuration flag in listener
-    # config.
     if tls:
         # refresh_certificate should have been called before this.
         assert context_factory is not None
