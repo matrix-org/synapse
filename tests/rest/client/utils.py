@@ -553,6 +553,34 @@ class RestHelper:
 
         return channel.json_body
 
+    def whoami(
+        self,
+        access_token: str,
+        expect_code: Literal[HTTPStatus.OK, HTTPStatus.UNAUTHORIZED] = HTTPStatus.OK,
+    ) -> JsonDict:
+        """Perform a 'whoami' request, which can be a quick way to check for access
+        token validity
+
+        Args:
+            access_token: The user token to use during the request
+            expect_code: The return code to expect from attempting the whoami request
+        """
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            "account/whoami",
+            access_token=access_token,
+        )
+
+        assert channel.code == expect_code, "Exepcted: %d, got %d, resp: %r" % (
+            expect_code,
+            channel.code,
+            channel.result["body"],
+        )
+
+        return channel.json_body
+
     def fake_oidc_server(self, issuer: str = TEST_OIDC_ISSUER) -> FakeOidcServer:
         """Create a ``FakeOidcServer``.
 

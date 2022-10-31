@@ -639,19 +639,6 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": refresh_token},
         )
 
-    def is_access_token_valid(self, access_token: str) -> bool:
-        """
-        Checks whether an access token is valid, returning whether it is or not.
-        """
-        code = self.make_request(
-            "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
-        ).code
-
-        # Either 200 or 401 is what we get back; anything else is a bug.
-        assert code in {HTTPStatus.OK, HTTPStatus.UNAUTHORIZED}
-
-        return code == HTTPStatus.OK
-
     def test_login_issue_refresh_token(self) -> None:
         """
         A login response should include a refresh_token only if asked.
@@ -848,29 +835,37 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.reactor.advance(59.0)
 
         # Both tokens should still be valid.
-        self.assertTrue(self.is_access_token_valid(refreshable_access_token))
-        self.assertTrue(self.is_access_token_valid(nonrefreshable_access_token))
+        self.helper.whoami(refreshable_access_token, expect_code=HTTPStatus.OK)
+        self.helper.whoami(nonrefreshable_access_token, expect_code=HTTPStatus.OK)
 
         # Advance to 61 s (just past 1 minute, the time of expiry)
         self.reactor.advance(2.0)
 
         # Only the non-refreshable token is still valid.
-        self.assertFalse(self.is_access_token_valid(refreshable_access_token))
-        self.assertTrue(self.is_access_token_valid(nonrefreshable_access_token))
+        self.helper.whoami(
+            refreshable_access_token, expect_code=HTTPStatus.UNAUTHORIZED
+        )
+        self.helper.whoami(nonrefreshable_access_token, expect_code=HTTPStatus.OK)
 
         # Advance to 599 s (just shy of 10 minutes, the time of expiry)
         self.reactor.advance(599.0 - 61.0)
 
         # It's still the case that only the non-refreshable token is still valid.
-        self.assertFalse(self.is_access_token_valid(refreshable_access_token))
-        self.assertTrue(self.is_access_token_valid(nonrefreshable_access_token))
+        self.helper.whoami(
+            refreshable_access_token, expect_code=HTTPStatus.UNAUTHORIZED
+        )
+        self.helper.whoami(nonrefreshable_access_token, expect_code=HTTPStatus.OK)
 
         # Advance to 601 s (just past 10 minutes, the time of expiry)
         self.reactor.advance(2.0)
 
         # Now neither token is valid.
-        self.assertFalse(self.is_access_token_valid(refreshable_access_token))
-        self.assertFalse(self.is_access_token_valid(nonrefreshable_access_token))
+        self.helper.whoami(
+            refreshable_access_token, expect_code=HTTPStatus.UNAUTHORIZED
+        )
+        self.helper.whoami(
+            nonrefreshable_access_token, expect_code=HTTPStatus.UNAUTHORIZED
+        )
 
     @override_config(
         {"refreshable_access_token_lifetime": "1m", "refresh_token_lifetime": "2m"}
@@ -1226,19 +1221,6 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         resource_dict.update(build_synapse_client_resource_tree(self.hs))
         return resource_dict
 
-    def is_access_token_valid(self, access_token: str) -> bool:
-        """
-        Checks whether an access token is valid, returning whether it is or not.
-        """
-        code = self.make_request(
-            "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
-        ).code
-
-        # Either 200 or 401 is what we get back; anything else is a bug.
-        assert code in {HTTPStatus.OK, HTTPStatus.UNAUTHORIZED}
-
-        return code == HTTPStatus.OK
-
     def submit_logout_token(self, logout_token: str) -> FakeChannel:
         return self.make_request(
             "POST",
@@ -1269,13 +1251,13 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
             fake_oidc_server, user, with_sid=True
         )
         first_access_token: str = login_resp["access_token"]
-        self.assertTrue(self.is_access_token_valid(first_access_token))
+        self.helper.whoami(first_access_token, expect_code=HTTPStatus.OK)
 
         login_resp, second_grant = self.helper.login_via_oidc(
             fake_oidc_server, user, with_sid=True
         )
         second_access_token: str = login_resp["access_token"]
-        self.assertTrue(self.is_access_token_valid(second_access_token))
+        self.helper.whoami(second_access_token, expect_code=HTTPStatus.OK)
 
         self.assertNotEqual(first_grant.sid, second_grant.sid)
         self.assertEqual(first_grant.userinfo["sub"], second_grant.userinfo["sub"])
@@ -1285,8 +1267,8 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
-        self.assertFalse(self.is_access_token_valid(first_access_token))
-        self.assertTrue(self.is_access_token_valid(second_access_token))
+        self.helper.whoami(first_access_token, expect_code=HTTPStatus.UNAUTHORIZED)
+        self.helper.whoami(second_access_token, expect_code=HTTPStatus.OK)
 
         # Logging out of the second session
         logout_token = fake_oidc_server.generate_logout_token(second_grant)
@@ -1424,7 +1406,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
             fake_oidc_server, user, with_sid=True
         )
         access_token: str = login_resp["access_token"]
-        self.assertTrue(self.is_access_token_valid(access_token))
+        self.helper.whoami(access_token, expect_code=HTTPStatus.OK)
 
         # Logging out shouldn't work
         logout_token = fake_oidc_server.generate_logout_token(grant)
@@ -1432,7 +1414,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400)
 
         # And the token should still be valid
-        self.assertTrue(self.is_access_token_valid(access_token))
+        self.helper.whoami(access_token, expect_code=HTTPStatus.OK)
 
     @override_config(
         {
@@ -1456,7 +1438,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
             fake_oidc_server, user, with_sid=False
         )
         access_token: str = login_resp["access_token"]
-        self.assertTrue(self.is_access_token_valid(access_token))
+        self.helper.whoami(access_token, expect_code=HTTPStatus.OK)
 
         # Logging out shouldn't work
         logout_token = fake_oidc_server.generate_logout_token(grant)
@@ -1464,7 +1446,7 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400)
 
         # And the token should still be valid
-        self.assertTrue(self.is_access_token_valid(access_token))
+        self.helper.whoami(access_token, expect_code=HTTPStatus.OK)
 
     @override_config(
         {
@@ -1498,13 +1480,13 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
             first_server, user, with_sid=True, idp_id="oidc-first"
         )
         first_access_token: str = login_resp["access_token"]
-        self.assertTrue(self.is_access_token_valid(first_access_token))
+        self.helper.whoami(first_access_token, expect_code=HTTPStatus.OK)
 
         login_resp, second_grant = self.helper.login_via_oidc(
             second_server, user, with_sid=True, idp_id="oidc-second"
         )
         second_access_token: str = login_resp["access_token"]
-        self.assertTrue(self.is_access_token_valid(second_access_token))
+        self.helper.whoami(second_access_token, expect_code=HTTPStatus.OK)
 
         # `sid` in the fake providers are generated by a counter, so the first grant of
         # each provider should give the same SID
@@ -1516,12 +1498,12 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
-        self.assertFalse(self.is_access_token_valid(first_access_token))
-        self.assertTrue(self.is_access_token_valid(second_access_token))
+        self.helper.whoami(first_access_token, expect_code=HTTPStatus.UNAUTHORIZED)
+        self.helper.whoami(second_access_token, expect_code=HTTPStatus.OK)
 
         # Logging out of the second session
         logout_token = second_server.generate_logout_token(second_grant)
         channel = self.submit_logout_token(logout_token)
         self.assertEqual(channel.code, 200)
 
-        self.assertFalse(self.is_access_token_valid(second_access_token))
+        self.helper.whoami(second_access_token, expect_code=HTTPStatus.UNAUTHORIZED)
