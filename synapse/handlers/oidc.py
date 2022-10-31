@@ -275,7 +275,9 @@ class OidcHandler:
 
         Since at this point we don't know who signed the JWT, we can't just
         decode it using authlib since it will always verifies the signature. We
-        have to decode it manually without validating the signature.
+        have to decode it manually without validating the signature. The actual JWT
+        verification is done in the `OidcProvider.handler_backchannel_logout` method,
+        once we figured out which provider sent the request.
 
         Args:
             request: the incoming request from the browser.
