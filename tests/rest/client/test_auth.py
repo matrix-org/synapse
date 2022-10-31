@@ -1168,6 +1168,42 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(_table_length("refresh_tokens"), 0)
 
 
+def oidc_config(
+    id: str, with_localpart_template: bool, **kwargs: Any
+) -> Dict[str, Any]:
+    """Sample OIDC provider config used in backchannel logout tests.
+
+    Args:
+        id: IDP ID for this provider
+        with_localpart_template: Set to `true` to have a default localpart_template in
+            the `user_mapping_provider` config and skip the user mapping session
+        **kwargs: rest of the config
+
+    Returns:
+        A dict suitable for the `oidc_config` or the `oidc_providers[]` parts of
+        the HS config
+    """
+    config: Dict[str, Any] = {
+        "idp_id": id,
+        "idp_name": id,
+        "issuer": TEST_OIDC_ISSUER,
+        "client_id": "test-client-id",
+        "client_secret": "test-client-secret",
+        "scopes": ["openid"],
+    }
+
+    if with_localpart_template:
+        config["user_mapping_provider"] = {
+            "config": {"localpart_template": "{{ user.sub }}"}
+        }
+    else:
+        config["user_mapping_provider"] = {"config": {}}
+
+    config.update(kwargs)
+
+    return config
+
+
 @skip_unless(HAS_OIDC, "Requires OIDC")
 class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     servlets = [
@@ -1214,18 +1250,11 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     @override_config(
         {
             "oidc_providers": [
-                {
-                    "idp_id": "oidc",
-                    "idp_name": "OIDC",
-                    "issuer": TEST_OIDC_ISSUER,
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {
-                        "config": {"localpart_template": "{{ user.sub }}"}
-                    },
-                    "backchannel_logout_enabled": True,
-                }
+                oidc_config(
+                    id="oidc",
+                    with_localpart_template=True,
+                    backchannel_logout_enabled=True,
+                )
             ]
         }
     )
@@ -1267,18 +1296,11 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     @override_config(
         {
             "oidc_providers": [
-                {
-                    "idp_id": "oidc",
-                    "idp_name": "OIDC",
-                    "issuer": TEST_OIDC_ISSUER,
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {
-                        "config": {"localpart_template": "{{ user.sub }}"}
-                    },
-                    "backchannel_logout_enabled": True,
-                }
+                oidc_config(
+                    id="oidc",
+                    with_localpart_template=True,
+                    backchannel_logout_enabled=True,
+                )
             ]
         }
     )
@@ -1329,16 +1351,11 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     @override_config(
         {
             "oidc_providers": [
-                {
-                    "idp_id": "oidc",
-                    "idp_name": "OIDC",
-                    "issuer": TEST_OIDC_ISSUER,
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {"config": {}},
-                    "backchannel_logout_enabled": True,
-                }
+                oidc_config(
+                    id="oidc",
+                    with_localpart_template=False,
+                    backchannel_logout_enabled=True,
+                )
             ]
         }
     )
@@ -1388,18 +1405,11 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     @override_config(
         {
             "oidc_providers": [
-                {
-                    "idp_id": "oidc",
-                    "idp_name": "OIDC",
-                    "issuer": TEST_OIDC_ISSUER,
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {
-                        "config": {"localpart_template": "{{ user.sub }}"}
-                    },
-                    "backchannel_logout_enabled": False,
-                }
+                oidc_config(
+                    id="oidc",
+                    with_localpart_template=True,
+                    backchannel_logout_enabled=False,
+                )
             ]
         }
     )
@@ -1427,18 +1437,11 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     @override_config(
         {
             "oidc_providers": [
-                {
-                    "idp_id": "oidc",
-                    "idp_name": "OIDC",
-                    "issuer": TEST_OIDC_ISSUER,
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {
-                        "config": {"localpart_template": "{{ user.sub }}"}
-                    },
-                    "backchannel_logout_enabled": True,
-                }
+                oidc_config(
+                    id="oidc",
+                    with_localpart_template=True,
+                    backchannel_logout_enabled=True,
+                )
             ]
         }
     )
@@ -1466,30 +1469,18 @@ class OidcBackchannelLogoutTests(unittest.HomeserverTestCase):
     @override_config(
         {
             "oidc_providers": [
-                {
-                    "idp_id": "first",
-                    "idp_name": "First",
-                    "issuer": "https://first-issuer.com/",
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {
-                        "config": {"localpart_template": "{{ user.sub }}"}
-                    },
-                    "backchannel_logout_enabled": True,
-                },
-                {
-                    "idp_id": "second",
-                    "idp_name": "Second",
-                    "issuer": "https://second-issuer.com/",
-                    "client_id": "test-client-id",
-                    "client_secret": "test-client-secret",
-                    "scopes": ["openid"],
-                    "user_mapping_provider": {
-                        "config": {"localpart_template": "{{ user.sub }}"}
-                    },
-                    "backchannel_logout_enabled": True,
-                },
+                oidc_config(
+                    "first",
+                    issuer="https://first-issuer.com/",
+                    with_localpart_template=True,
+                    backchannel_logout_enabled=True,
+                ),
+                oidc_config(
+                    "second",
+                    issuer="https://second-issuer.com/",
+                    with_localpart_template=True,
+                    backchannel_logout_enabled=True,
+                ),
             ]
         }
     )
