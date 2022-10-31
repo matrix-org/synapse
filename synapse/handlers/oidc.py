@@ -1294,53 +1294,13 @@ class OidcProvider:
                 self.idp_id, sub
             )
 
-        # Invalidate any running user-mapping sessions
-        self._sso_handler.revoke_mapping_sessions_for_provider_session_id(
+        # Invalidate any running user-mapping sessions, in-flight login tokens and
+        # active devices
+        await self._sso_handler.revoke_sessions_for_provider_session_id(
             auth_provider_id=self.idp_id,
             auth_provider_session_id=sid,
+            expected_user_id=expected_user_id,
         )
-
-        # Invalidate any in-flight login tokens
-        await self._store.invalidate_login_tokens_by_session_id(
-            auth_provider_id=self.idp_id,
-            auth_provider_session_id=sid,
-        )
-
-        # Fetch any device(s) in the store associated with the session ID.
-        devices = await self._store.get_devices_by_auth_provider_session_id(
-            auth_provider_id=self.idp_id,
-            auth_provider_session_id=sid,
-        )
-
-        # We have no guarantee that all the devices of that session are for the same
-        # `user_id`. Hence, we have to iterate over the list of devices and log them out
-        # one by one.
-        for device in devices:
-            user_id = device["user_id"]
-            device_id = device["device_id"]
-
-            # If the user_id associated with that device/session is not the one we got
-            # out of the `sub` claim, skip that device and show log an error.
-            if expected_user_id is not None and user_id != expected_user_id:
-                logger.error(
-                    f"Received an OIDC Back-Channel Logout request "
-                    f"from issuer {self.issuer!r}, "
-                    f"for the user {expected_user_id!r} (sub: {sub!r}), "
-                    f"but with a session ID ({sid!r}) which belongs to {user_id!r}. "
-                    f"This may happen when the OIDC user mapper uses something else "
-                    f"than the `sub` claim as subject claim. "
-                    f"Set `backchannel_logout_ignore_sub` to `true` "
-                    f"in the provider config it that is the case."
-                )
-                continue
-
-            logger.info(
-                "Logging out %r (device %r) via OIDC backchannel logout (sid %r).",
-                user_id,
-                device_id,
-                sid,
-            )
-            await self._device_handler.delete_devices(user_id, [device_id])
 
         request.setResponseCode(200)
         request.setHeader(b"Cache-Control", b"no-cache, no-store")
