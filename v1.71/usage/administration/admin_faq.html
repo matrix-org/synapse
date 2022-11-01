@@ -1,0 +1,312 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Admin FAQ - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../../favicon.svg">
+        <link rel="shortcut icon" href="../../favicon.png">
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
+        <link rel="stylesheet" href="../../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../highlight.css">
+        <link rel="stylesheet" href="../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../../usage/administration/admin_faq.html" class="active">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/usage/administration/admin_faq.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h2 id="admin-faq"><a class="header" href="#admin-faq">Admin FAQ</a></h2>
+<h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
+<p>If your server already has an admin account you should use the <a href="../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a> to promote other accounts to become admins.</p>
+<p>If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.</p>
+<pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
+</code></pre>
+<h2 id="what-servers-are-my-server-talking-to"><a class="header" href="#what-servers-are-my-server-talking-to">What servers are my server talking to?</a></h2>
+<p>Run this sql query on your db:</p>
+<pre><code class="language-sql">SELECT * FROM destinations;
+</code></pre>
+<h2 id="what-servers-are-currently-participating-in-this-room"><a class="header" href="#what-servers-are-currently-participating-in-this-room">What servers are currently participating in this room?</a></h2>
+<p>Run this sql query on your db:</p>
+<pre><code class="language-sql">SELECT DISTINCT split_part(state_key, ':', 2)
+    FROM current_state_events AS c
+    INNER JOIN room_memberships AS m USING (room_id, event_id)
+    WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
+</code></pre>
+<h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
+<pre><code class="language-sql">SELECT NAME from users;
+</code></pre>
+<h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords</a></h2>
+<p>Users can reset their password through their client. Alternatively, a server admin
+can reset a user's password using the <a href="../../admin_api/user_admin_api.html#reset-password">admin API</a>.</p>
+<h2 id="i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again"><a class="header" href="#i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again">I have a problem with my server. Can I just delete my database and start again?</a></h2>
+<p>Deleting your database is unlikely to make anything better. </p>
+<p>It's easy to make the mistake of thinking that you can start again from a clean slate by dropping your database, but things don't work like that in a federated network: lots of other servers have information about your server.</p>
+<p>For example: other servers might think that you are in a room, your server will think that you are not, and you'll probably be unable to interact with that room in a sensible way ever again.</p>
+<p>In general, there are better solutions to any problem than dropping the database. Come and seek help in https://matrix.to/#/#synapse:matrix.org.</p>
+<p>There are two exceptions when it might be sensible to delete your database and start again:</p>
+<ul>
+<li>You have <em>never</em> joined any rooms which are federated with other servers. For instance, a local deployment which the outside world can't talk to. </li>
+<li>You are changing the <code>server_name</code> in the homeserver configuration. In effect this makes your server a completely new one from the point of view of the network, so in this case it makes sense to start with a clean database.
+(In both cases you probably also want to clear out the media_store.)</li>
+</ul>
+<h2 id="ive-stuffed-up-access-to-my-room-how-can-i-delete-it-to-free-up-the-alias"><a class="header" href="#ive-stuffed-up-access-to-my-room-how-can-i-delete-it-to-free-up-the-alias">I've stuffed up access to my room, how can I delete it to free up the alias?</a></h2>
+<p>Using the following curl command:</p>
+<pre><code>curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
+</code></pre>
+<p><code>&lt;access-token&gt;</code> - can be obtained in riot by looking in the riot settings, down the bottom is:
+Access Token:&lt;click to reveal&gt; </p>
+<p><code>&lt;room-alias&gt;</code> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
+<h2 id="how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log"><a class="header" href="#how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log">How can I find the lines corresponding to a given HTTP request in my homeserver log?</a></h2>
+<p>Synapse tags each log line according to the HTTP request it is processing. When it finishes processing each request, it logs a line containing the words <code>Processed request: </code>. For example:</p>
+<pre><code>2019-02-14 22:35:08,196 - synapse.access.http.8008 - 302 - INFO - GET-37 - ::1 - 8008 - {@richvdh:localhost} Processed request: 0.173sec/0.001sec (0.002sec, 0.000sec) (0.027sec/0.026sec/2) 687B 200 &quot;GET /_matrix/client/r0/sync HTTP/1.1&quot; &quot;Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36&quot; [0 dbevts]&quot;
+</code></pre>
+<p>Here we can see that the request has been tagged with <code>GET-37</code>. (The tag depends on the method of the HTTP request, so might start with <code>GET-</code>, <code>PUT-</code>, <code>POST-</code>, <code>OPTIONS-</code> or <code>DELETE-</code>.) So to find all lines corresponding to this request, we can do:</p>
+<pre><code>grep 'GET-37' homeserver.log
+</code></pre>
+<p>If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code).</p>
+<h2 id="what-do-all-those-fields-in-the-processed-line-mean"><a class="header" href="#what-do-all-those-fields-in-the-processed-line-mean">What do all those fields in the 'Processed' line mean?</a></h2>
+<p>See <a href="request_log.html">Request log format</a>.</p>
+<h2 id="what-are-the-biggest-rooms-on-my-server"><a class="header" href="#what-are-the-biggest-rooms-on-my-server">What are the biggest rooms on my server?</a></h2>
+<pre><code class="language-sql">SELECT s.canonical_alias, g.room_id, count(*) AS num_rows 
+FROM 
+  state_groups_state AS g, 
+  room_stats_state AS s 
+WHERE g.room_id = s.room_id 
+GROUP BY s.canonical_alias, g.room_id
+ORDER BY num_rows desc 
+LIMIT 10;
+</code></pre>
+<p>You can also use the <a href="../../admin_api/rooms.html#list-room-api">List Room API</a>
+and <code>order_by</code> <code>state_events</code>.</p>
+<h2 id="people-cant-accept-room-invitations-from-me"><a class="header" href="#people-cant-accept-room-invitations-from-me">People can't accept room invitations from me</a></h2>
+<p>The typical failure mode here is that you send an invitation to someone
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of &quot;Invalid signature&quot;). They might see
+something like the following in their logs:</p>
+<pre><code>2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server &lt;server&gt; with key ed25519:a_EqML: Unable to verify signature for &lt;server&gt;
+</code></pre>
+<p>This is normally caused by a misconfiguration in your reverse-proxy. See <a href="docs/reverse_proxy.html">the reverse proxy docs</a> and double-check that your settings are correct.</p>
+<h2 id="help-synapse-is-slow-and-eats-all-my-ramcpu"><a class="header" href="#help-synapse-is-slow-and-eats-all-my-ramcpu">Help!! Synapse is slow and eats all my RAM/CPU!</a></h2>
+<p>First, ensure you are running the latest version of Synapse, using Python 3
+with a <a href="../../postgres.html">PostgreSQL database</a>.</p>
+<p>Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests. We'll improve this in the future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented <code>SYNAPSE_CACHE_FACTOR</code> environment
+variable. The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained environments, or increased if performance starts to
+degrade.</p>
+<p>However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.</p>
+<p>Using <a href="https://jemalloc.net">libjemalloc</a> can also yield a significant
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the <code>libjemalloc1</code> package and adding this
+line to <code>/etc/default/matrix-synapse</code>:</p>
+<pre><code>LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+</code></pre>
+<p>This made a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.</p>
+<p>If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see <a href="https://github.com/matrix-org/synapse/issues/3971">discussion</a>). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by disabling presence
+in the Synapse config file: <a href="../configuration/config_documentation.html#presence">see here</a>.</p>
+<h2 id="running-out-of-file-handles"><a class="header" href="#running-out-of-file-handles">Running out of File Handles</a></h2>
+<p>If Synapse runs out of file handles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like <code>#matrix:matrix.org</code> containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries &amp; HTTPS sockets, especially if DNS is slow
+to respond. (We need to improve the routing algorithm used to be better than
+full mesh, but as of March 2019 this hasn't happened yet).</p>
+<p>If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing <code>/etc/security/limits.conf</code></p>
+<p>Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute. Please let us know at <a href="https://matrix.to/#/#synapse-dev:matrix.org"><code>#synapse:matrix.org</code></a> if
+you see this failure mode so we can help debug it, however.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../usage/administration/request_log.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../../development/contributing_guide.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../usage/administration/request_log.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../../development/contributing_guide.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

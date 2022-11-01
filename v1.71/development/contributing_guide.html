@@ -1,0 +1,606 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Contributing Guide - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html" class="active">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/development/contributing_guide.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
+<p>This document aims to get you started with contributing to Synapse!</p>
+<h1 id="1-who-can-contribute-to-synapse"><a class="header" href="#1-who-can-contribute-to-synapse">1. Who can contribute to Synapse?</a></h1>
+<p>Everyone is welcome to contribute code to <a href="https://github.com/matrix-org">matrix.org
+projects</a>, provided that they are willing to
+license their contributions under the same license as the project itself. We
+follow a simple 'inbound=outbound' model for contributions: the act of
+submitting an 'inbound' contribution means that the contributor agrees to
+license the code under the same terms as the project's overall 'outbound'
+license - in our case, this is almost always Apache Software License v2 (see
+<a href="https://github.com/matrix-org/synapse/blob/develop/LICENSE">LICENSE</a>).</p>
+<h1 id="2-what-do-i-need"><a class="header" href="#2-what-do-i-need">2. What do I need?</a></h1>
+<p>If you are running Windows, the Windows Subsystem for Linux (WSL) is strongly
+recommended for development. More information about WSL can be found at
+<a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a>. Running Synapse natively
+on Windows is not officially supported.</p>
+<p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://www.python.org/downloads/">a recent version of Python 3</a>. Your Python also needs support for <a href="https://docs.python.org/3/library/venv.html">virtual environments</a>. This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running <code>sudo apt install python3-venv</code> should be enough.</p>
+<p>Synapse can connect to PostgreSQL via the <a href="https://pypi.org/project/psycopg2/">psycopg2</a> Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with <code>sudo apt install libpq-dev</code>.</p>
+<p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
+<p>For some tests, you will need <a href="https://docs.docker.com/get-docker/">a recent version of Docker</a>.</p>
+<p>A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
+<h1 id="3-get-the-source"><a class="header" href="#3-get-the-source">3. Get the source.</a></h1>
+<p>The preferred and easiest way to contribute changes is to fork the relevant
+project on GitHub, and then <a href="https://help.github.com/articles/using-pull-requests/">create a pull request</a> to ask us to pull your
+changes into our repo.</p>
+<p>Please base your changes on the <code>develop</code> branch.</p>
+<pre><code class="language-sh">git clone git@github.com:YOUR_GITHUB_USER_NAME/synapse.git
+git checkout develop
+</code></pre>
+<p>If you need help getting started with git, this is beyond the scope of the document, but you
+can find many good git tutorials on the web.</p>
+<h1 id="4-install-the-dependencies"><a class="header" href="#4-install-the-dependencies">4. Install the dependencies</a></h1>
+<p>Synapse uses the <a href="https://python-poetry.org/">poetry</a> project to manage its dependencies
+and development environment. Once you have installed Python 3 and added the
+source, you should install <code>poetry</code>.
+Of their installation methods, we recommend
+<a href="https://python-poetry.org/docs/#installing-with-pipx">installing <code>poetry</code> using <code>pipx</code></a>,</p>
+<pre><code class="language-shell">pip install --user pipx
+pipx install poetry
+</code></pre>
+<p>but see poetry's <a href="https://python-poetry.org/docs/#installation">installation instructions</a>
+for other installation methods.</p>
+<p>Synapse requires Poetry version 1.2.0 or later.</p>
+<p>Next, open a terminal and install dependencies as follows:</p>
+<pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
+poetry install --extras all
+</code></pre>
+<p>This will install the runtime and developer dependencies for the project.</p>
+<h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
+<p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
+<h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
+<p>Fix your favorite problem or perhaps find a <a href="https://github.com/matrix-org/synapse/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+First+Issue%22">Good First Issue</a>
+to work on.</p>
+<h1 id="7-turn-coffee-into-code-and-documentation"><a class="header" href="#7-turn-coffee-into-code-and-documentation">7. Turn coffee into code and documentation!</a></h1>
+<p>There is a growing amount of documentation located in the
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs"><code>docs</code></a>
+directory, with a rendered version <a href="https://matrix-org.github.io/synapse">available online</a>.
+This documentation is intended primarily for sysadmins running their
+own Synapse instance, as well as developers interacting externally with
+Synapse.
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs/development"><code>docs/development</code></a>
+exists primarily to house documentation for
+Synapse developers.
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs/admin_api"><code>docs/admin_api</code></a> houses documentation
+regarding Synapse's Admin API, which is used mostly by sysadmins and external
+service developers.</p>
+<p>Synapse's code style is documented <a href="../code_style.html">here</a>. Please follow
+it, including the conventions for the <a href="../code_style.html#configuration-file-format">sample configuration
+file</a>.</p>
+<p>We welcome improvements and additions to our documentation itself! When
+writing new pages, please
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs#adding-to-the-documentation">build <code>docs</code> to a book</a>
+to check that your contributions render correctly. The docs are written in
+<a href="https://guides.github.com/features/mastering-markdown/">GitHub-Flavoured Markdown</a>.</p>
+<p>Some documentation also exists in <a href="https://github.com/matrix-org/synapse/wiki">Synapse's GitHub
+Wiki</a>, although this is primarily
+contributed to by community authors.</p>
+<p>When changes are made to any Rust code then you must call either <code>poetry install</code>
+or <code>maturin develop</code> (if installed) to rebuild the Rust code. Using <a href="https://github.com/PyO3/maturin"><code>maturin</code></a>
+is quicker than <code>poetry install</code>, so is recommended when making frequent
+changes to the Rust code.</p>
+<h1 id="8-test-test-test"><a class="header" href="#8-test-test-test">8. Test, test, test!</a></h1>
+<p><a name="test-test-test"></a></p>
+<p>While you're developing and before submitting a patch, you'll
+want to test your code.</p>
+<h2 id="run-the-linters"><a class="header" href="#run-the-linters">Run the linters.</a></h2>
+<p>The linters look at your code and do two things:</p>
+<ul>
+<li>ensure that your code follows the coding style adopted by the project;</li>
+<li>catch a number of errors in your code.</li>
+</ul>
+<p>The linter takes no time at all to run as soon as you've <a href="#4-install-the-dependencies">downloaded the dependencies</a>.</p>
+<pre><code class="language-sh">poetry run ./scripts-dev/lint.sh
+</code></pre>
+<p>Note that this script <em>will modify your files</em> to fix styling errors.
+Make sure that you have saved all your files.</p>
+<p>If you wish to restrict the linters to only the files changed since the last commit
+(much faster!), you can instead run:</p>
+<pre><code class="language-sh">poetry run ./scripts-dev/lint.sh -d
+</code></pre>
+<p>Or if you know exactly which files you wish to lint, you can instead run:</p>
+<pre><code class="language-sh">poetry run ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
+</code></pre>
+<h2 id="run-the-unit-tests-twisted-trial"><a class="header" href="#run-the-unit-tests-twisted-trial">Run the unit tests (Twisted trial).</a></h2>
+<p>The unit tests run parts of Synapse, including your changes, to see if anything
+was broken. They are slower than the linters but will typically catch more errors.</p>
+<pre><code class="language-sh">poetry run trial tests
+</code></pre>
+<p>You can run unit tests in parallel by specifying <code>-jX</code> argument to <code>trial</code> where <code>X</code> is the number of parallel runners you want. To use 4 cpu cores, you would run them like:</p>
+<pre><code class="language-sh">poetry run trial -j4 tests
+</code></pre>
+<p>If you wish to only run <em>some</em> unit tests, you may specify
+another module instead of <code>tests</code> - or a test class or a method:</p>
+<pre><code class="language-sh">poetry run trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
+</code></pre>
+<p>If your tests fail, you may wish to look at the logs (the default log level is <code>ERROR</code>):</p>
+<pre><code class="language-sh">less _trial_temp/test.log
+</code></pre>
+<p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>:</p>
+<pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG poetry run trial tests
+</code></pre>
+<p>By default, tests will use an in-memory SQLite database for test data. For additional
+help with debugging, one can use an on-disk SQLite database file instead, in order to
+review database state during and after running tests. This can be done by setting
+the <code>SYNAPSE_TEST_PERSIST_SQLITE_DB</code> environment variable. Doing so will cause the
+database state to be stored in a file named <code>test.db</code> under the trial process'
+working directory. Typically, this ends up being <code>_trial_temp/test.db</code>. For example:</p>
+<pre><code class="language-sh">SYNAPSE_TEST_PERSIST_SQLITE_DB=1 poetry run trial tests
+</code></pre>
+<p>The database file can then be inspected with:</p>
+<pre><code class="language-sh">sqlite3 _trial_temp/test.db
+</code></pre>
+<p>Note that the database file is cleared at the beginning of each test run. Thus it
+will always only contain the data generated by the <em>last run test</em>. Though generally
+when debugging, one is only running a single test anyway.</p>
+<h3 id="running-tests-under-postgresql"><a class="header" href="#running-tests-under-postgresql">Running tests under PostgreSQL</a></h3>
+<p>Invoking <code>trial</code> as above will use an in-memory SQLite database. This is great for
+quick development and testing. However, we recommend using a PostgreSQL database
+in production (and indeed, we have some code paths specific to each database).
+This means that we need to run our unit tests against PostgreSQL too. Our CI does
+this automatically for pull requests and release candidates, but it's sometimes
+useful to reproduce this locally.</p>
+<h4 id="using-docker"><a class="header" href="#using-docker">Using Docker</a></h4>
+<p>The easiest way to do so is to run Postgres via a docker container. In one
+terminal:</p>
+<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+</code></pre>
+<p>If you see an error like</p>
+<pre><code>docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
+</code></pre>
+<p>then something is already bound to port 5432. You're probably already running postgres locally.</p>
+<p>Once you have a postgres server running, invoke <code>trial</code> in a second terminal:</p>
+<pre><code class="language-shell">SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
+</code></pre>
+<h4 id="using-an-existing-postgres-installation"><a class="header" href="#using-an-existing-postgres-installation">Using an existing Postgres installation</a></h4>
+<p>If you have postgres already installed on your system, you can run <code>trial</code> with the
+following environment variables matching your configuration:</p>
+<ul>
+<li><code>SYNAPSE_POSTGRES</code> to anything nonempty</li>
+<li><code>SYNAPSE_POSTGRES_HOST</code> (optional if it's the default: UNIX socket)</li>
+<li><code>SYNAPSE_POSTGRES_PORT</code> (optional if it's the default: 5432)</li>
+<li><code>SYNAPSE_POSTGRES_USER</code> (optional if using a UNIX socket)</li>
+<li><code>SYNAPSE_POSTGRES_PASSWORD</code> (optional if using a UNIX socket)</li>
+</ul>
+<p>For example:</p>
+<pre><code class="language-shell">export SYNAPSE_POSTGRES=1
+export SYNAPSE_POSTGRES_HOST=localhost
+export SYNAPSE_POSTGRES_USER=postgres
+export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
+trial
+</code></pre>
+<p>You don't need to specify the host, user, port or password if your Postgres
+server is set to authenticate you over the UNIX socket (i.e. if the <code>psql</code> command
+works without further arguments).</p>
+<p>Your Postgres account needs to be able to create databases; see the postgres
+docs for <a href="https://www.postgresql.org/docs/current/sql-alterrole.html"><code>ALTER ROLE</code></a>.</p>
+<h2 id="run-the-integration-tests-sytest"><a class="header" href="#run-the-integration-tests-sytest">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
+<p>The integration tests are a more comprehensive suite of tests. They
+run a full version of Synapse, including your changes, to check if
+anything was broken. They are slower than the unit tests but will
+typically catch more errors.</p>
+<p>The following command will let you run the integration test with the most common
+configuration:</p>
+<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
+</code></pre>
+<p>(Note that the paths must be full paths! You could also write <code>$(realpath relative/path)</code> if needed.)</p>
+<p>This configuration should generally cover your needs.</p>
+<ul>
+<li>To run with Postgres, supply the <code>-e POSTGRES=1 -e MULTI_POSTGRES=1</code> environment flags.</li>
+<li>To run with Synapse in worker mode, supply the <code>-e WORKERS=1 -e REDIS=1</code> environment flags (in addition to the Postgres flags).</li>
+</ul>
+<p>For more details about other configurations, see the <a href="https://github.com/matrix-org/sytest/blob/develop/docker/README.md">Docker-specific documentation in the SyTest repo</a>.</p>
+<h2 id="run-the-integration-tests-complement"><a class="header" href="#run-the-integration-tests-complement">Run the integration tests (<a href="https://github.com/matrix-org/complement">Complement</a>).</a></h2>
+<p><a href="https://github.com/matrix-org/complement">Complement</a> is a suite of black box tests that can be run on any homeserver implementation. It can also be thought of as end-to-end (e2e) tests.</p>
+<p>It's often nice to develop on Synapse and write Complement tests at the same time.
+Here is how to run your local Synapse checkout against your local Complement checkout.</p>
+<p>(checkout <a href="https://github.com/matrix-org/complement"><code>complement</code></a> alongside your <code>synapse</code> checkout)</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
+</code></pre>
+<p>To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
+</code></pre>
+<p>To run a specific test, you can specify the whole name structure:</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
+</code></pre>
+<p>The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:</p>
+<ul>
+<li>Passing <code>POSTGRES=1</code> as an environment variable to use the Postgres database instead.</li>
+<li>Passing <code>WORKERS=1</code> as an environment variable to use a workerised setup instead. This option implies the use of Postgres.</li>
+</ul>
+<p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>, e.g:</p>
+<pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
+</code></pre>
+<h3 id="prettier-formatting-with-gotestfmt"><a class="header" href="#prettier-formatting-with-gotestfmt">Prettier formatting with <code>gotestfmt</code></a></h3>
+<p>If you want to format the output of the tests the same way as it looks in CI,
+install <a href="https://github.com/GoTestTools/gotestfmt">gotestfmt</a>.</p>
+<p>You can then use this incantation to format the tests appropriately:</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -json | gotestfmt -hide successful-tests
+</code></pre>
+<p>(Remove <code>-hide successful-tests</code> if you don't want to hide successful tests.)</p>
+<h3 id="access-database-for-homeserver-after-complement-test-runs"><a class="header" href="#access-database-for-homeserver-after-complement-test-runs">Access database for homeserver after Complement test runs.</a></h3>
+<p>If you're curious what the database looks like after you run some tests, here are some steps to get you going in Synapse:</p>
+<ol>
+<li>In your Complement test comment out <code>defer deployment.Destroy(t)</code> and replace with <code>defer time.Sleep(2 * time.Hour)</code> to keep the homeserver running after the tests complete</li>
+<li>Start the Complement tests</li>
+<li>Find the name of the container, <code>docker ps -f name=complement_</code> (this will filter for just the Compelement related Docker containers)</li>
+<li>Access the container replacing the name with what you found in the previous step: <code>docker exec -it complement_1_hs_with_application_service.hs1_2 /bin/bash</code></li>
+<li>Install sqlite (database driver), <code>apt-get update &amp;&amp; apt-get install -y sqlite3</code></li>
+<li>Then run <code>sqlite3</code> and open the database <code>.open /conf/homeserver.db</code> (this db path comes from the Synapse homeserver.yaml)</li>
+</ol>
+<h1 id="9-submit-your-patch"><a class="header" href="#9-submit-your-patch">9. Submit your patch.</a></h1>
+<p>Once you're happy with your patch, it's time to prepare a Pull Request.</p>
+<p>To prepare a Pull Request, please:</p>
+<ol>
+<li>verify that <a href="#test-test-test">all the tests pass</a>, including the coding style;</li>
+<li><a href="#sign-off">sign off</a> your contribution;</li>
+<li><code>git push</code> your commit to your fork of Synapse;</li>
+<li>on GitHub, <a href="https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request">create the Pull Request</a>;</li>
+<li>add a <a href="#changelog">changelog entry</a> and push it to your Pull Request;</li>
+<li>that's it for now, a non-draft pull request will automatically request review from the team;</li>
+<li>if you need to update your PR, please avoid rebasing and just add new commits to your branch.</li>
+</ol>
+<h2 id="changelog"><a class="header" href="#changelog">Changelog</a></h2>
+<p>All changes, even minor ones, need a corresponding changelog / newsfragment
+entry. These are managed by <a href="https://github.com/hawkowl/towncrier">Towncrier</a>.</p>
+<p>To create a changelog entry, make a new file in the <code>changelog.d</code> directory named
+in the format of <code>PRnumber.type</code>. The type can be one of the following:</p>
+<ul>
+<li><code>feature</code></li>
+<li><code>bugfix</code></li>
+<li><code>docker</code> (for updates to the Docker image)</li>
+<li><code>doc</code> (for updates to the documentation)</li>
+<li><code>removal</code> (also used for deprecations)</li>
+<li><code>misc</code> (for internal-only changes)</li>
+</ul>
+<p>This file will become part of our <a href="https://github.com/matrix-org/synapse/blob/master/CHANGES.md">changelog</a> at the next
+release, so the content of the file should be a short description of your
+change in the same style as the rest of the changelog. The file can contain Markdown
+formatting, and must end with a full stop (.) or an exclamation mark (!) for
+consistency.</p>
+<p>Adding credits to the changelog is encouraged, we value your
+contributions and would like to have you shouted out in the release notes!</p>
+<p>For example, a fix in PR #1234 would have its changelog entry in
+<code>changelog.d/1234.bugfix</code>, and contain content like:</p>
+<blockquote>
+<p>The security levels of Florbs are now validated when received
+via the <code>/federation/florb</code> endpoint. Contributed by Jane Matrix.</p>
+</blockquote>
+<p>If there are multiple pull requests involved in a single bugfix/feature/etc,
+then the content for each <code>changelog.d</code> file should be the same. Towncrier will
+merge the matching files together into a single changelog entry when we come to
+release.</p>
+<h3 id="how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr"><a class="header" href="#how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr">How do I know what to call the changelog file before I create the PR?</a></h3>
+<p>Obviously, you don't know if you should call your newsfile
+<code>1234.bugfix</code> or <code>5678.bugfix</code> until you create the PR, which leads to a
+chicken-and-egg problem.</p>
+<p>There are two options for solving this:</p>
+<ol>
+<li>
+<p>Open the PR without a changelog file, see what number you got, and <em>then</em>
+add the changelog file to your branch (see <a href="#updating-your-pull-request">Updating your pull
+request</a>), or:</p>
+</li>
+<li>
+<p>Look at the <a href="https://github.com/matrix-org/synapse/issues?q=">list of all
+issues/PRs</a>, add one to the
+highest number you see, and quickly open the PR before somebody else claims
+your number.</p>
+<p><a href="https://github.com/richvdh/scripts/blob/master/next_github_number.sh">This
+script</a>
+might be helpful if you find yourself doing this a lot.</p>
+</li>
+</ol>
+<p>Sorry, we know it's a bit fiddly, but it's <em>really</em> helpful for us when we come
+to put together a release!</p>
+<h3 id="debian-changelog"><a class="header" href="#debian-changelog">Debian changelog</a></h3>
+<p>Changes which affect the debian packaging files (in <code>debian</code>) are an
+exception to the rule that all changes require a <code>changelog.d</code> file.</p>
+<p>In this case, you will need to add an entry to the debian changelog for the
+next release. For this, run the following command:</p>
+<pre><code>dch
+</code></pre>
+<p>This will make up a new version number (if there isn't already an unreleased
+version in flight), and open an editor where you can add a new changelog entry.
+(Our release process will ensure that the version number and maintainer name is
+corrected for the release.)</p>
+<p>If your change affects both the debian packaging <em>and</em> files outside the debian
+directory, you will need both a regular newsfragment <em>and</em> an entry in the
+debian changelog. (Though typically such changes should be submitted as two
+separate pull requests.)</p>
+<h2 id="sign-off"><a class="header" href="#sign-off">Sign off</a></h2>
+<p>In order to have a concrete record that your contribution is intentional
+and you agree to license it under the same terms as the project's license, we've adopted the
+same lightweight approach that the Linux Kernel
+<a href="https://www.kernel.org/doc/html/latest/process/submitting-patches.html#sign-your-work-the-developer-s-certificate-of-origin%3E">submitting patches process</a>,
+<a href="https://github.com/docker/docker/blob/master/CONTRIBUTING.md">Docker</a>, and many other
+projects use: the DCO (<a href="http://developercertificate.org/">Developer Certificate of Origin</a>).
+This is a simple declaration that you wrote
+the contribution or otherwise have the right to contribute it to Matrix:</p>
+<pre><code>Developer Certificate of Origin
+Version 1.1
+
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+660 York Street, Suite 102,
+San Francisco, CA 94110 USA
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+</code></pre>
+<p>If you agree to this for your contribution, then all that's needed is to
+include the line in your commit or pull request comment:</p>
+<pre><code>Signed-off-by: Your Name &lt;your@email.example.org&gt;
+</code></pre>
+<p>We accept contributions under a legally identifiable name, such as
+your name on government documentation or common-law names (names
+claimed by legitimate usage or repute). Unfortunately, we cannot
+accept anonymous contributions at this time.</p>
+<p>Git allows you to add this signoff automatically when using the <code>-s</code>
+flag to <code>git commit</code>, which uses the name and email set in your
+<code>user.name</code> and <code>user.email</code> git configs.</p>
+<h3 id="private-sign-off"><a class="header" href="#private-sign-off">Private Sign off</a></h3>
+<p>If you would like to provide your legal name privately to the Matrix.org
+Foundation (instead of in a public commit or comment), you can do so
+by emailing your legal name and a link to the pull request to
+<a href="mailto:dco@matrix.org?subject=Private%20sign%20off">dco@matrix.org</a>.
+It helps to include &quot;sign off&quot; or similar in the subject line. You will then
+be instructed further.</p>
+<p>Once private sign off is complete, doing so for future contributions will not
+be required.</p>
+<h1 id="10-turn-feedback-into-better-code"><a class="header" href="#10-turn-feedback-into-better-code">10. Turn feedback into better code.</a></h1>
+<p>Once the Pull Request is opened, you will see a few things:</p>
+<ol>
+<li>our automated CI (Continuous Integration) pipeline will run (again) the linters, the unit tests, the integration tests and more;</li>
+<li>one or more of the developers will take a look at your Pull Request and offer feedback.</li>
+</ol>
+<p>From this point, you should:</p>
+<ol>
+<li>Look at the results of the CI pipeline.
+<ul>
+<li>If there is any error, fix the error.</li>
+</ul>
+</li>
+<li>If a developer has requested changes, make these changes and let us know if it is ready for a developer to review again.
+<ul>
+<li>A pull request is a conversation, if you disagree with the suggestions, please respond and discuss it.</li>
+</ul>
+</li>
+<li>Create a new commit with the changes.
+<ul>
+<li>Please do NOT overwrite the history. New commits make the reviewer's life easier.</li>
+<li>Push this commits to your Pull Request.</li>
+</ul>
+</li>
+<li>Back to 1.</li>
+<li>Once the pull request is ready for review again please re-request review from whichever developer did your initial
+review (or leave a comment in the pull request that you believe all required changes have been done).</li>
+</ol>
+<p>Once both the CI and the developers are happy, the patch will be merged into Synapse and released shortly!</p>
+<h1 id="11-find-a-new-issue"><a class="header" href="#11-find-a-new-issue">11. Find a new issue.</a></h1>
+<p>By now, you know the drill!</p>
+<h1 id="notes-for-maintainers-on-merging-prs-etc"><a class="header" href="#notes-for-maintainers-on-merging-prs-etc">Notes for maintainers on merging PRs etc</a></h1>
+<p>There are some notes for those with commit access to the project on how we
+manage git <a href="git.html">here</a>.</p>
+<h1 id="conclusion"><a class="header" href="#conclusion">Conclusion</a></h1>
+<p>That's it! Matrix is a very open and collaborative project as you might expect
+given our obsession with open communication. If we're going to successfully
+matrix together all the fragmented communication technologies out there we are
+reliant on contributions and collaboration from the community to do so. So
+please get involved - and we hope you have as much fun hacking on Matrix as we
+do!</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../usage/administration/admin_faq.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../code_style.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../usage/administration/admin_faq.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../code_style.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

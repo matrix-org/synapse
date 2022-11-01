@@ -1,0 +1,1209 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Users - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html" class="active">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/monitoring/reporting_homeserver_usage_statistics.html">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/admin_api/user_admin_api.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="user-admin-api"><a class="header" href="#user-admin-api">User Admin API</a></h1>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
+<h2 id="query-user-account"><a class="header" href="#query-user-account">Query User Account</a></h2>
+<p>This API returns information about a specific user account.</p>
+<p>The api is:</p>
+<pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;
+</code></pre>
+<p>It returns a JSON body like the following:</p>
+<pre><code class="language-jsonc">{
+    &quot;name&quot;: &quot;@user:example.com&quot;,
+    &quot;displayname&quot;: &quot;User&quot;, // can be null if not set
+    &quot;threepids&quot;: [
+        {
+            &quot;medium&quot;: &quot;email&quot;,
+            &quot;address&quot;: &quot;&lt;user_mail_1&gt;&quot;,
+            &quot;added_at&quot;: 1586458409743,
+            &quot;validated_at&quot;: 1586458409743
+        },
+        {
+            &quot;medium&quot;: &quot;email&quot;,
+            &quot;address&quot;: &quot;&lt;user_mail_2&gt;&quot;,
+            &quot;added_at&quot;: 1586458409743,
+            &quot;validated_at&quot;: 1586458409743
+        }
+    ],
+    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,  // can be null if not set
+    &quot;is_guest&quot;: 0,
+    &quot;admin&quot;: 0,
+    &quot;deactivated&quot;: 0,
+    &quot;erased&quot;: false,
+    &quot;shadow_banned&quot;: 0,
+    &quot;creation_ts&quot;: 1560432506,
+    &quot;appservice_id&quot;: null,
+    &quot;consent_server_notice_sent&quot;: null,
+    &quot;consent_version&quot;: null,
+    &quot;consent_ts&quot;: null,
+    &quot;external_ids&quot;: [
+        {
+            &quot;auth_provider&quot;: &quot;&lt;provider1&gt;&quot;,
+            &quot;external_id&quot;: &quot;&lt;user_id_provider_1&gt;&quot;
+        },
+        {
+            &quot;auth_provider&quot;: &quot;&lt;provider2&gt;&quot;,
+            &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
+        }
+    ],
+    &quot;user_type&quot;: null
+}
+</code></pre>
+<p>URL parameters:</p>
+<ul>
+<li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
+</ul>
+<h2 id="create-or-modify-account"><a class="header" href="#create-or-modify-account">Create or modify Account</a></h2>
+<p>This API allows an administrator to create or modify a user account with a
+specific <code>user_id</code>.</p>
+<p>This api is:</p>
+<pre><code>PUT /_synapse/admin/v2/users/&lt;user_id&gt;
+</code></pre>
+<p>with a body of:</p>
+<pre><code class="language-json">{
+    &quot;password&quot;: &quot;user_password&quot;,
+    &quot;displayname&quot;: &quot;User&quot;,
+    &quot;threepids&quot;: [
+        {
+            &quot;medium&quot;: &quot;email&quot;,
+            &quot;address&quot;: &quot;&lt;user_mail_1&gt;&quot;
+        },
+        {
+            &quot;medium&quot;: &quot;email&quot;,
+            &quot;address&quot;: &quot;&lt;user_mail_2&gt;&quot;
+        }
+    ],
+    &quot;external_ids&quot;: [
+        {
+            &quot;auth_provider&quot;: &quot;&lt;provider1&gt;&quot;,
+            &quot;external_id&quot;: &quot;&lt;user_id_provider_1&gt;&quot;
+        },
+        {
+            &quot;auth_provider&quot;: &quot;&lt;provider2&gt;&quot;,
+            &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
+        }
+    ],
+    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
+    &quot;admin&quot;: false,
+    &quot;deactivated&quot;: false,
+    &quot;user_type&quot;: null
+}
+</code></pre>
+<p>Returns HTTP status code:</p>
+<ul>
+<li><code>201</code> - When a new user object was created.</li>
+<li><code>200</code> - When a user was modified.</li>
+</ul>
+<p>URL parameters:</p>
+<ul>
+<li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p>Body parameters:</p>
+<ul>
+<li><code>password</code> - string, optional. If provided, the user's password is updated and all
+devices are logged out, unless <code>logout_devices</code> is set to <code>false</code>.</li>
+<li><code>logout_devices</code> - bool, optional, defaults to <code>true</code>. If set to false, devices aren't
+logged out even when <code>password</code> is provided.</li>
+<li><code>displayname</code> - string, optional, defaults to the value of <code>user_id</code>.</li>
+<li><code>threepids</code> - array, optional, allows setting the third-party IDs (email, msisdn)
+<ul>
+<li><code>medium</code> - string. Kind of third-party ID, either <code>email</code> or <code>msisdn</code>.</li>
+<li><code>address</code> - string. Value of third-party ID.
+belonging to a user.</li>
+</ul>
+</li>
+<li><code>external_ids</code> - array, optional. Allow setting the identifier of the external identity
+provider for SSO (Single sign-on). Details in the configuration manual under the
+sections <a href="../usage/configuration/config_documentation.html#sso">sso</a> and <a href="../usage/configuration/config_documentation.html#oidc_providers">oidc_providers</a>.
+<ul>
+<li><code>auth_provider</code> - string. ID of the external identity provider. Value of <code>idp_id</code>
+in the homeserver configuration. Note that no error is raised if the provided
+value is not in the homeserver configuration.</li>
+<li><code>external_id</code> - string, user ID in the external identity provider.</li>
+</ul>
+</li>
+<li><code>avatar_url</code> - string, optional, must be a
+<a href="https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris">MXC URI</a>.</li>
+<li><code>admin</code> - bool, optional, defaults to <code>false</code>.</li>
+<li><code>deactivated</code> - bool, optional. If unspecified, deactivation state will be left
+unchanged on existing accounts and set to <code>false</code> for new accounts.
+A user cannot be erased by deactivating with this API. For details on
+deactivating users see <a href="#deactivate-account">Deactivate Account</a>.</li>
+<li><code>user_type</code> - string or null, optional. If provided, the user type will be
+adjusted. If <code>null</code> given, the user type will be cleared. Other 
+allowed options are: <code>bot</code> and <code>support</code>.</li>
+</ul>
+<p>If the user already exists then optional parameters default to the current value.</p>
+<p>In order to re-activate an account <code>deactivated</code> must be set to <code>false</code>. If
+users do not login via single-sign-on, a new <code>password</code> must be provided.</p>
+<h2 id="list-accounts"><a class="header" href="#list-accounts">List Accounts</a></h2>
+<p>This API returns all local user accounts.
+By default, the response is ordered by ascending user ID.</p>
+<pre><code>GET /_synapse/admin/v2/users?from=0&amp;limit=10&amp;guests=false
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;users&quot;: [
+        {
+            &quot;name&quot;: &quot;&lt;user_id1&gt;&quot;,
+            &quot;is_guest&quot;: 0,
+            &quot;admin&quot;: 0,
+            &quot;user_type&quot;: null,
+            &quot;deactivated&quot;: 0,
+            &quot;erased&quot;: false,
+            &quot;shadow_banned&quot;: 0,
+            &quot;displayname&quot;: &quot;&lt;User One&gt;&quot;,
+            &quot;avatar_url&quot;: null,
+            &quot;creation_ts&quot;: 1560432668000
+        }, {
+            &quot;name&quot;: &quot;&lt;user_id2&gt;&quot;,
+            &quot;is_guest&quot;: 0,
+            &quot;admin&quot;: 1,
+            &quot;user_type&quot;: null,
+            &quot;deactivated&quot;: 0,
+            &quot;erased&quot;: false,
+            &quot;shadow_banned&quot;: 0,
+            &quot;displayname&quot;: &quot;&lt;User Two&gt;&quot;,
+            &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
+            &quot;creation_ts&quot;: 1561550621000
+        }
+    ],
+    &quot;next_token&quot;: &quot;100&quot;,
+    &quot;total&quot;: 200
+}
+</code></pre>
+<p>To paginate, check for <code>next_token</code> and if present, call the endpoint again
+with <code>from</code> set to the value of <code>next_token</code>. This will return a new page.</p>
+<p>If the endpoint does not return a <code>next_token</code> then there are no more users
+to paginate through.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li>
+<p><code>user_id</code> - Is optional and filters to only return users with user IDs
+that contain this value. This parameter is ignored when using the <code>name</code> parameter.</p>
+</li>
+<li>
+<p><code>name</code> - Is optional and filters to only return users with user ID localparts
+<strong>or</strong> displaynames that contain this value.</p>
+</li>
+<li>
+<p><code>guests</code> - string representing a bool - Is optional and if <code>false</code> will <strong>exclude</strong> guest users.
+Defaults to <code>true</code> to include guest users.</p>
+</li>
+<li>
+<p><code>deactivated</code> - string representing a bool - Is optional and if <code>true</code> will <strong>include</strong> deactivated users.
+Defaults to <code>false</code> to exclude deactivated users.</p>
+</li>
+<li>
+<p><code>limit</code> - string representing a positive integer - Is optional but is used for pagination,
+denoting the maximum number of items to return in this call. Defaults to <code>100</code>.</p>
+</li>
+<li>
+<p><code>from</code> - string representing a positive integer - Is optional but used for pagination,
+denoting the offset in the returned results. This should be treated as an opaque value and
+not explicitly set to anything other than the return value of <code>next_token</code> from a previous call.
+Defaults to <code>0</code>.</p>
+</li>
+<li>
+<p><code>order_by</code> - The method by which to sort the returned list of users.
+If the ordered field has duplicates, the second order is always by ascending <code>name</code>,
+which guarantees a stable ordering. Valid values are:</p>
+<ul>
+<li><code>name</code> - Users are ordered alphabetically by <code>name</code>. This is the default.</li>
+<li><code>is_guest</code> - Users are ordered by <code>is_guest</code> status.</li>
+<li><code>admin</code> - Users are ordered by <code>admin</code> status.</li>
+<li><code>user_type</code> - Users are ordered alphabetically by <code>user_type</code>.</li>
+<li><code>deactivated</code> - Users are ordered by <code>deactivated</code> status.</li>
+<li><code>shadow_banned</code> - Users are ordered by <code>shadow_banned</code> status.</li>
+<li><code>displayname</code> - Users are ordered alphabetically by <code>displayname</code>.</li>
+<li><code>avatar_url</code> - Users are ordered alphabetically by avatar URL.</li>
+<li><code>creation_ts</code> - Users are ordered by when the users was created in ms.</li>
+</ul>
+</li>
+<li>
+<p><code>dir</code> - Direction of media order. Either <code>f</code> for forwards or <code>b</code> for backwards.
+Setting this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</p>
+</li>
+</ul>
+<p>Caution. The database only has indexes on the columns <code>name</code> and <code>creation_ts</code>.
+This means that if a different sort order is used (<code>is_guest</code>, <code>admin</code>,
+<code>user_type</code>, <code>deactivated</code>, <code>shadow_banned</code>, <code>avatar_url</code> or <code>displayname</code>),
+this can cause a large load on the database, especially for large environments.</p>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li>
+<p><code>users</code> - An array of objects, each containing information about an user.
+User objects contain the following fields:</p>
+<ul>
+<li><code>name</code> - string - Fully-qualified user ID (ex. <code>@user:server.com</code>).</li>
+<li><code>is_guest</code> - bool - Status if that user is a guest account.</li>
+<li><code>admin</code> - bool - Status if that user is a server administrator.</li>
+<li><code>user_type</code> - string - Type of the user. Normal users are type <code>None</code>.
+This allows user type specific behaviour. There are also types <code>support</code> and <code>bot</code>. </li>
+<li><code>deactivated</code> - bool - Status if that user has been marked as deactivated.</li>
+<li><code>erased</code> - bool - Status if that user has been marked as erased.</li>
+<li><code>shadow_banned</code> - bool - Status if that user has been marked as shadow banned.</li>
+<li><code>displayname</code> - string - The user's display name if they have set one.</li>
+<li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>
+<li><code>creation_ts</code> - integer - The user's creation timestamp in ms.</li>
+</ul>
+</li>
+<li>
+<p><code>next_token</code>: string representing a positive integer - Indication for pagination. See above.</p>
+</li>
+<li>
+<p><code>total</code> - integer - Total number of media.</p>
+</li>
+</ul>
+<h2 id="query-current-sessions-for-a-user"><a class="header" href="#query-current-sessions-for-a-user">Query current sessions for a user</a></h2>
+<p>This API returns information about the active sessions for a specific user.</p>
+<p>The endpoints are:</p>
+<pre><code>GET /_synapse/admin/v1/whois/&lt;user_id&gt;
+</code></pre>
+<p>and:</p>
+<pre><code>GET /_matrix/client/r0/admin/whois/&lt;userId&gt;
+</code></pre>
+<p>See also: <a href="https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid">Client Server
+API Whois</a>.</p>
+<p>It returns a JSON body like the following:</p>
+<pre><code class="language-json">{
+    &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;,
+    &quot;devices&quot;: {
+        &quot;&quot;: {
+            &quot;sessions&quot;: [
+                {
+                    &quot;connections&quot;: [
+                        {
+                            &quot;ip&quot;: &quot;1.2.3.4&quot;,
+                            &quot;last_seen&quot;: 1417222374433,
+                            &quot;user_agent&quot;: &quot;Mozilla/5.0 ...&quot;
+                        },
+                        {
+                            &quot;ip&quot;: &quot;1.2.3.10&quot;,
+                            &quot;last_seen&quot;: 1417222374500,
+                            &quot;user_agent&quot;: &quot;Dalvik/2.1.0 ...&quot;
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
+</code></pre>
+<p><code>last_seen</code> is measured in milliseconds since the Unix epoch.</p>
+<h2 id="deactivate-account"><a class="header" href="#deactivate-account">Deactivate Account</a></h2>
+<p>This API deactivates an account. It removes active access tokens, resets the
+password, and deletes third-party IDs (to prevent the user requesting a
+password reset).</p>
+<p>It can also mark the user as GDPR-erased. This means messages sent by the
+user will still be visible by anyone that was in the room when these messages
+were sent, but hidden from users joining the room afterwards.</p>
+<p>The api is:</p>
+<pre><code>POST /_synapse/admin/v1/deactivate/&lt;user_id&gt;
+</code></pre>
+<p>with a body of:</p>
+<pre><code class="language-json">{
+    &quot;erase&quot;: true
+}
+</code></pre>
+<p>The erase parameter is optional and defaults to <code>false</code>.
+An empty body may be passed for backwards compatibility.</p>
+<p>The following actions are performed when deactivating an user:</p>
+<ul>
+<li>Try to unbind 3PIDs from the identity server</li>
+<li>Remove all 3PIDs from the homeserver</li>
+<li>Delete all devices and E2EE keys</li>
+<li>Delete all access tokens</li>
+<li>Delete all pushers</li>
+<li>Delete the password hash</li>
+<li>Removal from all rooms the user is a member of</li>
+<li>Remove the user from the user directory</li>
+<li>Reject all pending invites</li>
+<li>Remove all account validity information related to the user</li>
+<li>Remove the arbitrary data store known as <em>account data</em>. For example, this includes:
+<ul>
+<li>list of ignored users;</li>
+<li>push rules;</li>
+<li>secret storage keys; and</li>
+<li>cross-signing keys.</li>
+</ul>
+</li>
+</ul>
+<p>The following additional actions are performed during deactivation if <code>erase</code>
+is set to <code>true</code>:</p>
+<ul>
+<li>Remove the user's display name</li>
+<li>Remove the user's avatar URL</li>
+<li>Mark the user as erased</li>
+</ul>
+<p>The following actions are <strong>NOT</strong> performed. The list may be incomplete.</p>
+<ul>
+<li>Remove mappings of SSO IDs</li>
+<li><a href="#delete-media-uploaded-by-a-user">Delete media uploaded</a> by user (included avatar images)</li>
+<li>Delete sent and received messages</li>
+<li>Remove the user's creation (registration) timestamp</li>
+<li><a href="#override-ratelimiting-for-users">Remove rate limit overrides</a></li>
+<li>Remove from monthly active users</li>
+<li>Remove user's consent information (consent version and timestamp)</li>
+</ul>
+<h2 id="reset-password"><a class="header" href="#reset-password">Reset password</a></h2>
+<p>Changes the password of another user. This will automatically log the user out of all their devices.</p>
+<p>The api is:</p>
+<pre><code>POST /_synapse/admin/v1/reset_password/&lt;user_id&gt;
+</code></pre>
+<p>with a body of:</p>
+<pre><code class="language-json">{
+   &quot;new_password&quot;: &quot;&lt;secret&gt;&quot;,
+   &quot;logout_devices&quot;: true
+}
+</code></pre>
+<p>The parameter <code>new_password</code> is required.
+The parameter <code>logout_devices</code> is optional and defaults to <code>true</code>.</p>
+<h2 id="get-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#get-whether-a-user-is-a-server-administrator-or-not">Get whether a user is a server administrator or not</a></h2>
+<p>The api is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/admin
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;admin&quot;: true
+}
+</code></pre>
+<h2 id="change-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#change-whether-a-user-is-a-server-administrator-or-not">Change whether a user is a server administrator or not</a></h2>
+<p>Note that you cannot demote yourself.</p>
+<p>The api is:</p>
+<pre><code>PUT /_synapse/admin/v1/users/&lt;user_id&gt;/admin
+</code></pre>
+<p>with a body of:</p>
+<pre><code class="language-json">{
+    &quot;admin&quot;: true
+}
+</code></pre>
+<h2 id="list-room-memberships-of-a-user"><a class="header" href="#list-room-memberships-of-a-user">List room memberships of a user</a></h2>
+<p>Gets a list of all <code>room_id</code> that a specific <code>user_id</code> is member.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/joined_rooms
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">    {
+        &quot;joined_rooms&quot;: [
+            &quot;!DuGcnbhHGaSZQoNQR:matrix.org&quot;,
+            &quot;!ZtSaPCawyWtxfWiIy:matrix.org&quot;
+        ],
+        &quot;total&quot;: 2
+    }
+</code></pre>
+<p>The server returns the list of rooms of which the user and the server
+are member. If the user is local, all the rooms of which the user is
+member are returned.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>joined_rooms</code> - An array of <code>room_id</code>.</li>
+<li><code>total</code> - Number of rooms.</li>
+</ul>
+<h2 id="account-data"><a class="header" href="#account-data">Account Data</a></h2>
+<p>Gets information about account data for a specific <code>user_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/accountdata
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;account_data&quot;: {
+        &quot;global&quot;: {
+            &quot;m.secret_storage.key.LmIGHTg5W&quot;: {
+                &quot;algorithm&quot;: &quot;m.secret_storage.v1.aes-hmac-sha2&quot;,
+                &quot;iv&quot;: &quot;fwjNZatxg==&quot;,
+                &quot;mac&quot;: &quot;eWh9kNnLWZUNOgnc=&quot;
+            },
+            &quot;im.vector.hide_profile&quot;: {
+                &quot;hide_profile&quot;: true
+            },
+            &quot;org.matrix.preview_urls&quot;: {
+                &quot;disable&quot;: false
+            },
+            &quot;im.vector.riot.breadcrumb_rooms&quot;: {
+                &quot;rooms&quot;: [
+                    &quot;!LxcBDAsDUVAfJDEo:matrix.org&quot;,
+                    &quot;!MAhRxqasbItjOqxu:matrix.org&quot;
+                ]
+            },
+            &quot;m.accepted_terms&quot;: {
+                &quot;accepted&quot;: [
+                    &quot;https://example.org/somewhere/privacy-1.2-en.html&quot;,
+                    &quot;https://example.org/somewhere/terms-2.0-en.html&quot;
+                ]
+            },
+            &quot;im.vector.setting.breadcrumbs&quot;: {
+                &quot;recent_rooms&quot;: [
+                    &quot;!MAhRxqasbItqxuEt:matrix.org&quot;,
+                    &quot;!ZtSaPCawyWtxiImy:matrix.org&quot;
+                ]
+            }
+        },
+        &quot;rooms&quot;: {
+            &quot;!GUdfZSHUJibpiVqHYd:matrix.org&quot;: {
+                &quot;m.fully_read&quot;: {
+                    &quot;event_id&quot;: &quot;$156334540fYIhZ:matrix.org&quot;
+                }
+            },
+            &quot;!tOZwOOiqwCYQkLhV:matrix.org&quot;: {
+                &quot;m.fully_read&quot;: {
+                    &quot;event_id&quot;: &quot;$xjsIyp4_NaVl2yPvIZs_k1Jl8tsC_Sp23wjqXPno&quot;
+                }
+            }
+        }
+    }
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>account_data</code> - A map containing the account data for the user
+<ul>
+<li><code>global</code> - A map containing the global account data for the user</li>
+<li><code>rooms</code> - A map containing the account data per room for the user</li>
+</ul>
+</li>
+</ul>
+<h2 id="user-media"><a class="header" href="#user-media">User media</a></h2>
+<h3 id="list-media-uploaded-by-a-user"><a class="header" href="#list-media-uploaded-by-a-user">List media uploaded by a user</a></h3>
+<p>Gets a list of all local media that a specific <code>user_id</code> has created.
+These are media that the user has uploaded themselves
+(<a href="../media_repository.html#local-media">local media</a>), as well as
+<a href="../media_repository.html#url-previews">URL preview images</a> requested by the user if the
+<a href="../usage/configuration/config_documentation.html#url_preview_enabled">feature is enabled</a>.</p>
+<p>By default, the response is ordered by descending creation date and ascending media ID.
+The newest media is on top. You can change the order with parameters
+<code>order_by</code> and <code>dir</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/media
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;media&quot;: [
+    {
+      &quot;created_ts&quot;: 100400,
+      &quot;last_access_ts&quot;: null,
+      &quot;media_id&quot;: &quot;qXhyRzulkwLsNHTbpHreuEgo&quot;,
+      &quot;media_length&quot;: 67,
+      &quot;media_type&quot;: &quot;image/png&quot;,
+      &quot;quarantined_by&quot;: null,
+      &quot;safe_from_quarantine&quot;: false,
+      &quot;upload_name&quot;: &quot;test1.png&quot;
+    },
+    {
+      &quot;created_ts&quot;: 200400,
+      &quot;last_access_ts&quot;: null,
+      &quot;media_id&quot;: &quot;FHfiSnzoINDatrXHQIXBtahw&quot;,
+      &quot;media_length&quot;: 67,
+      &quot;media_type&quot;: &quot;image/png&quot;,
+      &quot;quarantined_by&quot;: null,
+      &quot;safe_from_quarantine&quot;: false,
+      &quot;upload_name&quot;: &quot;test2.png&quot;
+    }
+  ],
+  &quot;next_token&quot;: 3,
+  &quot;total&quot;: 2
+}
+</code></pre>
+<p>To paginate, check for <code>next_token</code> and if present, call the endpoint again
+with <code>from</code> set to the value of <code>next_token</code>. This will return a new page.</p>
+<p>If the endpoint does not return a <code>next_token</code> then there are no more
+reports to paginate through.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li>
+<p><code>user_id</code> - string - fully qualified: for example, <code>@user:server.com</code>.</p>
+</li>
+<li>
+<p><code>limit</code>: string representing a positive integer - Is optional but is used for pagination,
+denoting the maximum number of items to return in this call. Defaults to <code>100</code>.</p>
+</li>
+<li>
+<p><code>from</code>: string representing a positive integer - Is optional but used for pagination,
+denoting the offset in the returned results. This should be treated as an opaque value and
+not explicitly set to anything other than the return value of <code>next_token</code> from a previous call.
+Defaults to <code>0</code>.</p>
+</li>
+<li>
+<p><code>order_by</code> - The method by which to sort the returned list of media.
+If the ordered field has duplicates, the second order is always by ascending <code>media_id</code>,
+which guarantees a stable ordering. Valid values are:</p>
+<ul>
+<li><code>media_id</code> - Media are ordered alphabetically by <code>media_id</code>.</li>
+<li><code>upload_name</code> - Media are ordered alphabetically by name the media was uploaded with.</li>
+<li><code>created_ts</code> - Media are ordered by when the content was uploaded in ms.
+Smallest to largest. This is the default.</li>
+<li><code>last_access_ts</code> - Media are ordered by when the content was last accessed in ms.
+Smallest to largest.</li>
+<li><code>media_length</code> - Media are ordered by length of the media in bytes.
+Smallest to largest.</li>
+<li><code>media_type</code> - Media are ordered alphabetically by MIME-type.</li>
+<li><code>quarantined_by</code> - Media are ordered alphabetically by the user ID that
+initiated the quarantine request for this media.</li>
+<li><code>safe_from_quarantine</code> - Media are ordered by the status if this media is safe
+from quarantining.</li>
+</ul>
+</li>
+<li>
+<p><code>dir</code> - Direction of media order. Either <code>f</code> for forwards or <code>b</code> for backwards.
+Setting this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</p>
+</li>
+</ul>
+<p>If neither <code>order_by</code> nor <code>dir</code> is set, the default order is newest media on top
+(corresponds to <code>order_by</code> = <code>created_ts</code> and <code>dir</code> = <code>b</code>).</p>
+<p>Caution. The database only has indexes on the columns <code>media_id</code>,
+<code>user_id</code> and <code>created_ts</code>. This means that if a different sort order is used
+(<code>upload_name</code>, <code>last_access_ts</code>, <code>media_length</code>, <code>media_type</code>,
+<code>quarantined_by</code> or <code>safe_from_quarantine</code>), this can cause a large load on the
+database, especially for large environments.</p>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>media</code> - An array of objects, each containing information about a media.
+Media objects contain the following fields:
+<ul>
+<li><code>created_ts</code> - integer - Timestamp when the content was uploaded in ms.</li>
+<li><code>last_access_ts</code> - integer - Timestamp when the content was last accessed in ms.</li>
+<li><code>media_id</code> - string - The id used to refer to the media. Details about the format
+are documented under
+<a href="../media_repository.html">media repository</a>.</li>
+<li><code>media_length</code> - integer - Length of the media in bytes.</li>
+<li><code>media_type</code> - string - The MIME-type of the media.</li>
+<li><code>quarantined_by</code> - string - The user ID that initiated the quarantine request
+for this media.</li>
+<li><code>safe_from_quarantine</code> - bool - Status if this media is safe from quarantining.</li>
+<li><code>upload_name</code> - string - The name the media was uploaded with.</li>
+</ul>
+</li>
+<li><code>next_token</code>: integer - Indication for pagination. See above.</li>
+<li><code>total</code> - integer - Total number of media.</li>
+</ul>
+<h3 id="delete-media-uploaded-by-a-user"><a class="header" href="#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></h3>
+<p>This API deletes the <em>local</em> media from the disk of your own server
+that a specific <code>user_id</code> has created. This includes any local thumbnails.</p>
+<p>This API will not affect media that has been uploaded to external
+media repositories (e.g https://github.com/turt2live/matrix-media-repo/).</p>
+<p>By default, the API deletes media ordered by descending creation date and ascending media ID.
+The newest media is deleted first. You can change the order with parameters
+<code>order_by</code> and <code>dir</code>. If no <code>limit</code> is set the API deletes <code>100</code> files per request.</p>
+<p>The API is:</p>
+<pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/media
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;deleted_media&quot;: [
+    &quot;abcdefghijklmnopqrstuvwx&quot;
+  ],
+  &quot;total&quot;: 1
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>deleted_media</code>: an array of strings - List of deleted <code>media_id</code></li>
+<li><code>total</code>: integer - Total number of deleted <code>media_id</code></li>
+</ul>
+<p><strong>Note</strong>: There is no <code>next_token</code>. This is not useful for deleting media, because
+after deleting media the remaining media have a new order.</p>
+<p><strong>Parameters</strong></p>
+<p>This API has the same parameters as
+<a href="#list-media-uploaded-by-a-user">List media uploaded by a user</a>.
+With the parameters you can for example limit the number of files to delete at once or
+delete largest/smallest or newest/oldest files first.</p>
+<h2 id="login-as-a-user"><a class="header" href="#login-as-a-user">Login as a user</a></h2>
+<p>Get an access token that can be used to authenticate as that user. Useful for
+when admins wish to do actions on behalf of a user.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/login
+{}
+</code></pre>
+<p>An optional <code>valid_until_ms</code> field can be specified in the request body as an
+integer timestamp that specifies when the token should expire. By default tokens
+do not expire.</p>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;access_token&quot;: &quot;&lt;opaque_access_token_string&gt;&quot;
+}
+</code></pre>
+<p>This API does <em>not</em> generate a new device for the user, and so will not appear
+their <code>/devices</code> list, and in general the target user should not be able to
+tell they have been logged in as.</p>
+<p>To expire the token call the standard <code>/logout</code> API with the token.</p>
+<p>Note: The token will expire if the <em>admin</em> user calls <code>/logout/all</code> from any
+of their devices, but the token will <em>not</em> expire if the target user does the
+same.</p>
+<h2 id="user-devices"><a class="header" href="#user-devices">User devices</a></h2>
+<h3 id="list-all-devices"><a class="header" href="#list-all-devices">List all devices</a></h3>
+<p>Gets information about all devices for a specific <code>user_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;devices&quot;: [
+    {
+      &quot;device_id&quot;: &quot;QBUAZIFURK&quot;,
+      &quot;display_name&quot;: &quot;android&quot;,
+      &quot;last_seen_ip&quot;: &quot;1.2.3.4&quot;,
+      &quot;last_seen_user_agent&quot;: &quot;Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0&quot;,
+      &quot;last_seen_ts&quot;: 1474491775024,
+      &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;
+    },
+    {
+      &quot;device_id&quot;: &quot;AUIECTSRND&quot;,
+      &quot;display_name&quot;: &quot;ios&quot;,
+      &quot;last_seen_ip&quot;: &quot;1.2.3.5&quot;,
+      &quot;last_seen_user_agent&quot;: &quot;Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0&quot;,
+      &quot;last_seen_ts&quot;: 1474491775025,
+      &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;
+    }
+  ],
+  &quot;total&quot;: 2
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li>
+<p><code>devices</code> - An array of objects, each containing information about a device.
+Device objects contain the following fields:</p>
+<ul>
+<li><code>device_id</code> - Identifier of device.</li>
+<li><code>display_name</code> - Display name set by the user for this device.
+Absent if no name has been set.</li>
+<li><code>last_seen_ip</code> - The IP address where this device was last seen.
+(May be a few minutes out of date, for efficiency reasons).</li>
+<li><code>last_seen_user_agent</code> - The user agent of the device when it was last seen.
+(May be a few minutes out of date, for efficiency reasons).</li>
+<li><code>last_seen_ts</code> - The timestamp (in milliseconds since the unix epoch) when this
+devices was last seen. (May be a few minutes out of date, for efficiency reasons).</li>
+<li><code>user_id</code> - Owner of  device.</li>
+</ul>
+</li>
+<li>
+<p><code>total</code> - Total number of user's devices.</p>
+</li>
+</ul>
+<h3 id="delete-multiple-devices"><a class="header" href="#delete-multiple-devices">Delete multiple devices</a></h3>
+<p>Deletes the given devices for a specific <code>user_id</code>, and invalidates
+any access token associated with them.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v2/users/&lt;user_id&gt;/delete_devices
+
+{
+  &quot;devices&quot;: [
+    &quot;QBUAZIFURK&quot;,
+    &quot;AUIECTSRND&quot;
+  ]
+}
+</code></pre>
+<p>An empty JSON dict is returned.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p>The following fields are required in the JSON request body:</p>
+<ul>
+<li><code>devices</code> - The list of device IDs to delete.</li>
+</ul>
+<h3 id="show-a-device"><a class="header" href="#show-a-device">Show a device</a></h3>
+<p>Gets information on a single device, by <code>device_id</code> for a specific <code>user_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices/&lt;device_id&gt;
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;device_id&quot;: &quot;&lt;device_id&gt;&quot;,
+  &quot;display_name&quot;: &quot;android&quot;,
+  &quot;last_seen_ip&quot;: &quot;1.2.3.4&quot;,
+  &quot;last_seen_user_agent&quot;: &quot;Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0&quot;,
+  &quot;last_seen_ts&quot;: 1474491775024,
+  &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+<li><code>device_id</code> - The device to retrieve.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>device_id</code> - Identifier of device.</li>
+<li><code>display_name</code> - Display name set by the user for this device.
+Absent if no name has been set.</li>
+<li><code>last_seen_ip</code> - The IP address where this device was last seen.
+(May be a few minutes out of date, for efficiency reasons).
+<ul>
+<li><code>last_seen_user_agent</code> - The user agent of the device when it was last seen.
+(May be a few minutes out of date, for efficiency reasons).</li>
+</ul>
+</li>
+<li><code>last_seen_ts</code> - The timestamp (in milliseconds since the unix epoch) when this
+devices was last seen. (May be a few minutes out of date, for efficiency reasons).</li>
+<li><code>user_id</code> - Owner of  device.</li>
+</ul>
+<h3 id="update-a-device"><a class="header" href="#update-a-device">Update a device</a></h3>
+<p>Updates the metadata on the given <code>device_id</code> for a specific <code>user_id</code>.</p>
+<p>The API is:</p>
+<pre><code>PUT /_synapse/admin/v2/users/&lt;user_id&gt;/devices/&lt;device_id&gt;
+
+{
+  &quot;display_name&quot;: &quot;My other phone&quot;
+}
+</code></pre>
+<p>An empty JSON dict is returned.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+<li><code>device_id</code> - The device to update.</li>
+</ul>
+<p>The following fields are required in the JSON request body:</p>
+<ul>
+<li><code>display_name</code> - The new display name for this device. If not given,
+the display name is unchanged.</li>
+</ul>
+<h3 id="delete-a-device"><a class="header" href="#delete-a-device">Delete a device</a></h3>
+<p>Deletes the given <code>device_id</code> for a specific <code>user_id</code>,
+and invalidates any access token associated with it.</p>
+<p>The API is:</p>
+<pre><code>DELETE /_synapse/admin/v2/users/&lt;user_id&gt;/devices/&lt;device_id&gt;
+
+{}
+</code></pre>
+<p>An empty JSON dict is returned.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+<li><code>device_id</code> - The device to delete.</li>
+</ul>
+<h2 id="list-all-pushers"><a class="header" href="#list-all-pushers">List all pushers</a></h2>
+<p>Gets information about all pushers for a specific <code>user_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/pushers
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;pushers&quot;: [
+    {
+      &quot;app_display_name&quot;:&quot;HTTP Push Notifications&quot;,
+      &quot;app_id&quot;:&quot;m.http&quot;,
+      &quot;data&quot;: {
+        &quot;url&quot;:&quot;example.com&quot;
+      },
+      &quot;device_display_name&quot;:&quot;pushy push&quot;,
+      &quot;kind&quot;:&quot;http&quot;,
+      &quot;lang&quot;:&quot;None&quot;,
+      &quot;profile_tag&quot;:&quot;&quot;,
+      &quot;pushkey&quot;:&quot;a@example.com&quot;
+    }
+  ],
+  &quot;total&quot;: 1
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li>
+<p><code>pushers</code> - An array containing the current pushers for the user</p>
+<ul>
+<li>
+<p><code>app_display_name</code> - string - A string that will allow the user to identify
+what application owns this pusher.</p>
+</li>
+<li>
+<p><code>app_id</code> - string - This is a reverse-DNS style identifier for the application.
+Max length, 64 chars.</p>
+</li>
+<li>
+<p><code>data</code> - A dictionary of information for the pusher implementation itself.</p>
+<ul>
+<li>
+<p><code>url</code> - string - Required if <code>kind</code> is <code>http</code>. The URL to use to send
+notifications to.</p>
+</li>
+<li>
+<p><code>format</code> - string - The format to use when sending notifications to the
+Push Gateway.</p>
+</li>
+</ul>
+</li>
+<li>
+<p><code>device_display_name</code> - string -  A string that will allow the user to identify
+what device owns this pusher.</p>
+</li>
+<li>
+<p><code>profile_tag</code> - string - This string determines which set of device specific rules
+this pusher executes.</p>
+</li>
+<li>
+<p><code>kind</code> - string -  The kind of pusher. &quot;http&quot; is a pusher that sends HTTP pokes.</p>
+</li>
+<li>
+<p><code>lang</code> - string - The preferred language for receiving notifications
+(e.g. 'en' or 'en-US')</p>
+</li>
+<li>
+<p><code>profile_tag</code> - string - This string determines which set of device specific rules
+this pusher executes.</p>
+</li>
+<li>
+<p><code>pushkey</code> - string - This is a unique identifier for this pusher.
+Max length, 512 bytes.</p>
+</li>
+</ul>
+</li>
+<li>
+<p><code>total</code> - integer - Number of pushers.</p>
+</li>
+</ul>
+<p>See also the
+<a href="https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers">Client-Server API Spec on pushers</a>.</p>
+<h2 id="controlling-whether-a-user-is-shadow-banned"><a class="header" href="#controlling-whether-a-user-is-shadow-banned">Controlling whether a user is shadow-banned</a></h2>
+<p>Shadow-banning is a useful tool for moderating malicious or egregiously abusive users.
+A shadow-banned users receives successful responses to their client-server API requests,
+but the events are not propagated into rooms. This can be an effective tool as it
+(hopefully) takes longer for the user to realise they are being moderated before
+pivoting to another account.</p>
+<p>Shadow-banning a user should be used as a tool of last resort and may lead to confusing
+or broken behaviour for the client. A shadow-banned user will not receive any
+notification and it is generally more appropriate to ban or kick abusive users.
+A shadow-banned user will be unable to contact anyone on the server.</p>
+<p>To shadow-ban a user the API is:</p>
+<pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
+</code></pre>
+<p>To un-shadow-ban a user the API is:</p>
+<pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
+</code></pre>
+<p>An empty JSON dict is returned in both cases.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - The fully qualified MXID: for example, <code>@user:server.com</code>. The user must
+be local.</li>
+</ul>
+<h2 id="override-ratelimiting-for-users"><a class="header" href="#override-ratelimiting-for-users">Override ratelimiting for users</a></h2>
+<p>This API allows to override or disable ratelimiting for a specific user.
+There are specific APIs to set, get and delete a ratelimit.</p>
+<h3 id="get-status-of-ratelimit"><a class="header" href="#get-status-of-ratelimit">Get status of ratelimit</a></h3>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;messages_per_second&quot;: 0,
+  &quot;burst_count&quot;: 0
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - The fully qualified MXID: for example, <code>@user:server.com</code>. The user must
+be local.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>messages_per_second</code> - integer - The number of actions that can
+be performed in a second. <code>0</code> mean that ratelimiting is disabled for this user.</li>
+<li><code>burst_count</code> - integer - How many actions that can be performed before
+being limited.</li>
+</ul>
+<p>If <strong>no</strong> custom ratelimit is set, an empty JSON dict is returned.</p>
+<pre><code class="language-json">{}
+</code></pre>
+<h3 id="set-ratelimit"><a class="header" href="#set-ratelimit">Set ratelimit</a></h3>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;messages_per_second&quot;: 0,
+  &quot;burst_count&quot;: 0
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - The fully qualified MXID: for example, <code>@user:server.com</code>. The user must
+be local.</li>
+</ul>
+<p>Body parameters:</p>
+<ul>
+<li><code>messages_per_second</code> - positive integer, optional. The number of actions that can
+be performed in a second. Defaults to <code>0</code>.</li>
+<li><code>burst_count</code> - positive integer, optional. How many actions that can be performed
+before being limited. Defaults to <code>0</code>.</li>
+</ul>
+<p>To disable users' ratelimit set both values to <code>0</code>.</p>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>messages_per_second</code> - integer - The number of actions that can
+be performed in a second.</li>
+<li><code>burst_count</code> - integer - How many actions that can be performed before
+being limited.</li>
+</ul>
+<h3 id="delete-ratelimit"><a class="header" href="#delete-ratelimit">Delete ratelimit</a></h3>
+<p>The API is:</p>
+<pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
+</code></pre>
+<p>An empty JSON dict is returned.</p>
+<pre><code class="language-json">{}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - The fully qualified MXID: for example, <code>@user:server.com</code>. The user must
+be local.</li>
+</ul>
+<h3 id="check-username-availability"><a class="header" href="#check-username-availability">Check username availability</a></h3>
+<p>Checks to see if a username is available, and valid, for the server. See <a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">the client-server 
+API</a>
+for more information.</p>
+<p>This endpoint will work even if registration is disabled on the server, unlike 
+<code>/_matrix/client/r0/register/available</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/username_available?username=$localpart
+</code></pre>
+<p>The request and response format is the same as the
+<a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">/_matrix/client/r0/register/available</a> API.</p>
+<h3 id="find-a-user-based-on-their-id-in-an-auth-provider"><a class="header" href="#find-a-user-based-on-their-id-in-an-auth-provider">Find a user based on their ID in an auth provider</a></h3>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/auth_providers/$provider/users/$external_id
+</code></pre>
+<p>When a user matched the given ID for the given provider, an HTTP code <code>200</code> with a response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;user_id&quot;: &quot;@hello:example.org&quot;
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>provider</code> - The ID of the authentication provider, as advertised by the <a href="https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login"><code>GET /_matrix/client/v3/login</code></a> API in the <code>m.login.sso</code> authentication method.</li>
+<li><code>external_id</code> - The user ID from the authentication provider. Usually corresponds to the <code>sub</code> claim for OIDC providers, or to the <code>uid</code> attestation for SAML2 providers.</li>
+</ul>
+<p>The <code>external_id</code> may have characters that are not URL-safe (typically <code>/</code>, <code>:</code> or <code>@</code>), so it is advised to URL-encode those parameters.</p>
+<p><strong>Errors</strong></p>
+<p>Returns a <code>404</code> HTTP status code if no user was found, with a response body like this:</p>
+<pre><code class="language-json">{
+    &quot;errcode&quot;:&quot;M_NOT_FOUND&quot;,
+    &quot;error&quot;:&quot;User not found&quot;
+}
+</code></pre>
+<p><em>Added in Synapse 1.68.0.</em></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../admin_api/statistics.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../admin_api/version_api.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../admin_api/statistics.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../admin_api/version_api.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>

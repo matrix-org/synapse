@@ -1,0 +1,263 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Reporting Homeserver Usage Statistics - Synapse</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../../../favicon.svg">
+        <link rel="shortcut icon" href="../../../favicon.png">
+        <link rel="stylesheet" href="../../../css/variables.css">
+        <link rel="stylesheet" href="../../../css/general.css">
+        <link rel="stylesheet" href="../../../css/chrome.css">
+        <link rel="stylesheet" href="../../../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../../highlight.css">
+        <link rel="stylesheet" href="../../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../../docs/website_files/table-of-contents.css">
+        <link rel="stylesheet" href="../../../docs/website_files/remove-nav-buttons.css">
+        <link rel="stylesheet" href="../../../docs/website_files/indent-section-headers.css">
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../../../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../../../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../../../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../../../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../../../setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="../../../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../../../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../../../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../../../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../usage/configuration/config_documentation.html">Configuration Manual</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../../../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../../../templates.html">Templates</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="../../../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../../../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../../../jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="../../../usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../../../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../../../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../../../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../../../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../../../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../../../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../../../modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/account_data_callbacks.html">Account data callbacks</a></li><li class="chapter-item expanded "><a href="../../../modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../../../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="../../../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../../../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../../../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../../../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="../../../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../../../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../../../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../../../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../../../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../../../admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="../../../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../../../metrics-howto.html">Monitoring</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../usage/administration/monitoring/reporting_homeserver_usage_statistics.html" class="active">Reporting Homeserver Usage Statistics</a></li></ol></li><li class="chapter-item expanded "><a href="../../../usage/administration/monthly_active_users.html">Monthly Active Users</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="../../../usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../../../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../../../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../../../development/reviews.html">Reviewing Code</a></li><li class="chapter-item expanded "><a href="../../../development/releases.html">Release Cycle</a></li><li class="chapter-item expanded "><a href="../../../development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../development/demo.html">Demo scripts</a></li></ol></li><li class="chapter-item expanded "><a href="../../../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../../../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="../../../development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><a href="../../../development/dependencies.html">Dependency management</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../development/synapse_architecture/cancellation.html">Cancellation</a></li><li class="chapter-item expanded "><a href="../../../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../../../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../../../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../../../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../../../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="../../../development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../../../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../../../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../../../deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="../../../other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/usage/administration/monitoring/reporting_homeserver_usage_statistics.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="reporting-homeserver-usage-statistics"><a class="header" href="#reporting-homeserver-usage-statistics">Reporting Homeserver Usage Statistics</a></h1>
+<p>When generating your Synapse configuration file, you are asked whether you
+would like to report usage statistics to Matrix.org. These statistics
+provide the foundation a glimpse into the number of Synapse homeservers
+participating in the network, as well as statistics such as the number of
+rooms being created and messages being sent. This feature is sometimes
+affectionately called &quot;phone home&quot; stats. Reporting
+<a href="../../configuration/config_documentation.html#report_stats">is optional</a>
+and the reporting endpoint
+<a href="../../configuration/config_documentation.html#report_stats_endpoint">can be configured</a>,
+in case you would like to instead report statistics from a set of homeservers
+to your own infrastructure.</p>
+<p>This documentation aims to define the statistics available and the
+homeserver configuration options that exist to tweak it.</p>
+<h2 id="available-statistics"><a class="header" href="#available-statistics">Available Statistics</a></h2>
+<p>The following statistics are sent to the configured reporting endpoint:</p>
+<table><thead><tr><th>Statistic Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>homeserver</code></td><td>string</td><td>The homeserver's server name.</td></tr>
+<tr><td><code>memory_rss</code></td><td>int</td><td>The memory usage of the process (in kilobytes on Unix-based systems, bytes on MacOS).</td></tr>
+<tr><td><code>cpu_average</code></td><td>int</td><td>CPU time in % of a single core (not % of all cores).</td></tr>
+<tr><td><code>server_context</code></td><td>string</td><td>An arbitrary string used to group statistics from a set of homeservers.</td></tr>
+<tr><td><code>timestamp</code></td><td>int</td><td>The current time, represented as the number of seconds since the epoch.</td></tr>
+<tr><td><code>uptime_seconds</code></td><td>int</td><td>The number of seconds since the homeserver was last started.</td></tr>
+<tr><td><code>python_version</code></td><td>string</td><td>The Python version number in use (e.g &quot;3.7.1&quot;). Taken from <code>sys.version_info</code>.</td></tr>
+<tr><td><code>total_users</code></td><td>int</td><td>The number of registered users on the homeserver.</td></tr>
+<tr><td><code>total_nonbridged_users</code></td><td>int</td><td>The number of users, excluding those created by an Application Service.</td></tr>
+<tr><td><code>daily_user_type_native</code></td><td>int</td><td>The number of native users created in the last 24 hours.</td></tr>
+<tr><td><code>daily_user_type_guest</code></td><td>int</td><td>The number of guest users created in the last 24 hours.</td></tr>
+<tr><td><code>daily_user_type_bridged</code></td><td>int</td><td>The number of users created by Application Services in the last 24 hours.</td></tr>
+<tr><td><code>total_room_count</code></td><td>int</td><td>The total number of rooms present on the homeserver.</td></tr>
+<tr><td><code>daily_active_users</code></td><td>int</td><td>The number of unique users<sup class="footnote-reference"><a href="#1">1</a></sup> that have used the homeserver in the last 24 hours.</td></tr>
+<tr><td><code>monthly_active_users</code></td><td>int</td><td>The number of unique users<sup class="footnote-reference"><a href="#1">1</a></sup> that have used the homeserver in the last 30 days.</td></tr>
+<tr><td><code>daily_active_rooms</code></td><td>int</td><td>The number of rooms that have had a (state) event with the type <code>m.room.message</code> sent in them in the last 24 hours.</td></tr>
+<tr><td><code>daily_active_e2ee_rooms</code></td><td>int</td><td>The number of rooms that have had a (state) event with the type <code>m.room.encrypted</code> sent in them in the last 24 hours.</td></tr>
+<tr><td><code>daily_messages</code></td><td>int</td><td>The number of (state) events with the type <code>m.room.message</code> seen in the last 24 hours.</td></tr>
+<tr><td><code>daily_e2ee_messages</code></td><td>int</td><td>The number of (state) events with the type <code>m.room.encrypted</code> seen in the last 24 hours.</td></tr>
+<tr><td><code>daily_sent_messages</code></td><td>int</td><td>The number of (state) events sent by a local user with the type <code>m.room.message</code> seen in the last 24 hours.</td></tr>
+<tr><td><code>daily_sent_e2ee_messages</code></td><td>int</td><td>The number of (state) events sent by a local user with the type <code>m.room.encrypted</code> seen in the last 24 hours.</td></tr>
+<tr><td><code>r30_users_all</code></td><td>int</td><td>The number of 30 day retained users, defined as users who have created their accounts more than 30 days ago, where they were last seen at most 30 days ago and where those two timestamps are over 30 days apart. Includes clients that do not fit into the below r30 client types.</td></tr>
+<tr><td><code>r30_users_android</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;Android&quot; in the user agent string.</td></tr>
+<tr><td><code>r30_users_ios</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;iOS&quot; in the user agent string.</td></tr>
+<tr><td><code>r30_users_electron</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;Electron&quot; in the user agent string.</td></tr>
+<tr><td><code>r30_users_web</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;Mozilla&quot; or &quot;Gecko&quot; in the user agent string.</td></tr>
+<tr><td><code>r30v2_users_all</code></td><td>int</td><td>The number of 30 day retained users, with a revised algorithm. Defined as users that appear more than once in the past 60 days, and have more than 30 days between the most and least recent appearances in the past 60 days. Includes clients that do not fit into the below r30 client types.</td></tr>
+<tr><td><code>r30v2_users_android</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with (&quot;riot&quot; or &quot;element&quot;) and &quot;android&quot; (case-insensitive) in the user agent string.</td></tr>
+<tr><td><code>r30v2_users_ios</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with (&quot;riot&quot; or &quot;element&quot;) and &quot;ios&quot; (case-insensitive) in the user agent string.</td></tr>
+<tr><td><code>r30v2_users_electron</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with (&quot;riot&quot; or &quot;element&quot;) and &quot;electron&quot; (case-insensitive) in the user agent string.</td></tr>
+<tr><td><code>r30v2_users_web</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;mozilla&quot; or &quot;gecko&quot; (case-insensitive) in the user agent string.</td></tr>
+<tr><td><code>cache_factor</code></td><td>int</td><td>The configured <a href="../../configuration/config_documentation.html#caching"><code>global factor</code></a> value for caching.</td></tr>
+<tr><td><code>event_cache_size</code></td><td>int</td><td>The configured <a href="../../configuration/config_documentation.html#caching"><code>event_cache_size</code></a> value for caching.</td></tr>
+<tr><td><code>database_engine</code></td><td>string</td><td>The database engine that is in use. Either &quot;psycopg2&quot; meaning PostgreSQL is in use, or &quot;sqlite3&quot; for SQLite3.</td></tr>
+<tr><td><code>database_server_version</code></td><td>string</td><td>The version of the database server. Examples being &quot;10.10&quot; for PostgreSQL server version 10.0, and &quot;3.38.5&quot; for SQLite 3.38.5 installed on the system.</td></tr>
+<tr><td><code>log_level</code></td><td>string</td><td>The log level in use. Examples are &quot;INFO&quot;, &quot;WARNING&quot;, &quot;ERROR&quot;, &quot;DEBUG&quot;, etc.</td></tr>
+</tbody></table>
+<div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
+<p>Native matrix users and guests are always counted. If the
+<a href="../../configuration/config_documentation.html#track_puppeted_user_ips"><code>track_puppeted_user_ips</code></a>
+option is set to <code>true</code>, &quot;puppeted&quot; users (users that an Application Service have performed
+<a href="https://spec.matrix.org/v1.3/application-service-api/#identity-assertion">an action on behalf of</a>)
+will also be counted. Note that an Application Service can &quot;puppet&quot; any user in their
+<a href="https://spec.matrix.org/v1.3/application-service-api/#registration">user namespace</a>,
+not only users that the Application Service has created. If this happens, the Application Service
+will additionally be counted as a user (irrespective of <code>track_puppeted_user_ips</code>).</p>
+</div>
+<h2 id="using-a-custom-statistics-collection-server"><a class="header" href="#using-a-custom-statistics-collection-server">Using a Custom Statistics Collection Server</a></h2>
+<p>If statistics reporting is enabled, the endpoint that Synapse sends metrics to is configured by the
+<a href="../../configuration/config_documentation.html#report_stats_endpoint"><code>report_stats_endpoint</code></a> config
+option. By default, statistics are sent to Matrix.org.</p>
+<p>If you would like to set up your own statistics collection server and send metrics there, you may
+consider using one of the following known implementations:</p>
+<ul>
+<li><a href="https://github.com/matrix-org/panopticon">Matrix.org's Panopticon</a></li>
+<li><a href="https://gitlab.com/famedly/company/devops/services/barad-dur">Famedly's Barad-dûr</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../../metrics-howto.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../../../usage/administration/monthly_active_users.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../../metrics-howto.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../../../usage/administration/monthly_active_users.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript" src="../../../docs/website_files/table-of-contents.js"></script>
+    </body>
+</html>
