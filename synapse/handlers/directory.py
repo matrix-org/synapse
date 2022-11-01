@@ -85,7 +85,9 @@ class DirectoryHandler:
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            servers = await self._get_servers_known_to_be_in_room(room_id)
+            servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+                room_id
+            )
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -93,21 +95,6 @@ class DirectoryHandler:
         await self.store.create_room_alias_association(
             room_alias, room_id, servers, creator=creator
         )
-
-    async def _get_servers_known_to_be_in_room(self, room_id: str) -> Set[str]:
-        if await self.store.is_partial_state_room(room_id):
-            # We don't have the full list of hosts in the room yet, but we do have
-            # some of them from the `/send_join` response. Use those to best-effort
-            # approximate the full list of servers in the room.
-            servers = set(await self.store.get_partial_state_servers_at_join(room_id))
-
-            # We are also in the room.
-            servers.add(self.server_name)
-        else:
-            servers = await self._storage_controllers.state.get_current_hosts_in_room(
-                room_id
-            )
-        return servers
 
     async def create_association(
         self,
@@ -303,7 +290,9 @@ class DirectoryHandler:
                 Codes.NOT_FOUND,
             )
 
-        extra_servers = await self._get_servers_known_to_be_in_room(room_id)
+        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+            room_id
+        )
         servers_set = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
