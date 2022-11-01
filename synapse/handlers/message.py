@@ -1462,17 +1462,9 @@ class EventCreationHandler:
             a room that has been un-partial stated.
         """
 
-        for event, context in events_and_context:
-            # Skip push notification actions for historical messages
-            # because we don't want to notify people about old history back in time.
-            # The historical messages also do not have the proper `context.current_state_ids`
-            # and `state_groups` because they have `prev_events` that aren't persisted yet
-            # (historical messages persisted in reverse-chronological order).
-            if not event.internal_metadata.is_historical():
-                with opentracing.start_active_span("calculate_push_actions"):
-                    await self._bulk_push_rule_evaluator.action_for_event_by_user(
-                        event, context
-                    )
+        await self._bulk_push_rule_evaluator.action_for_events_by_user(
+            events_and_context
+        )
 
         try:
             # If we're a worker we need to hit out to the master.

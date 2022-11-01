@@ -88,6 +88,34 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.71.0
+
+## Removal of the `generate_short_term_login_token` module API method
+
+As announced with the release of [Synapse 1.69.0](#deprecation-of-the-generate_short_term_login_token-module-api-method), the deprecated `generate_short_term_login_token` module method has been removed.
+
+Modules relying on it can instead use the `create_login_token` method.
+
+
+## Changes to the events received by application services (interest)
+
+To align with spec (changed in
+[MSC3905](https://github.com/matrix-org/matrix-spec-proposals/pull/3905)), Synapse now
+only considers local users to be interesting. In other words, the `users` namespace
+regex is only be applied against local users of the homeserver.
+
+Please note, this probably doesn't affect the expected behavior of your application
+service, since an interesting local user in a room still means all messages in the room
+(from local or remote users) will still be considered interesting. And matching a room
+with the `rooms` or `aliases` namespace regex will still consider all events sent in the
+room to be interesting to the application service.
+
+If one of your application service's `users` regex was intending to match a remote user,
+this will no longer match as you expect. The behavioral mismatch between matching all
+local users and some remote users is why the spec was changed/clarified and this
+caveat is no longer supported.
+
+
 # Upgrading to v1.69.0
 
 ## Changes to the receipts replication streams

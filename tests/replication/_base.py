@@ -371,7 +371,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             config=worker_hs.config.server.listeners[0],
             resource=resource,
             server_version_string="1",
-            max_request_body_size=4096,
+            max_request_body_size=8192,
             reactor=self.reactor,
         )
 

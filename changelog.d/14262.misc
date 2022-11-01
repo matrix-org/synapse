@@ -1,0 +1,1 @@
+Provide a specific error code when a `/sync` request provides a filter which doesn't represent a JSON object.

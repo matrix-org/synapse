@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import enum
 import functools
 import inspect
 import logging
@@ -144,109 +143,6 @@ class _CacheDescriptorBase:
         self.cache_key_builder = _get_cache_key_builder(
             self.arg_names, include_arg_in_cache_key, self.arg_defaults
         )
-
-
-class _LruCachedFunction(Generic[F]):
-    cache: LruCache[CacheKey, Any]
-    __call__: F
-
-
-def lru_cache(
-    *, max_entries: int = 1000, cache_context: bool = False
-) -> Callable[[F], _LruCachedFunction[F]]:
-    """A method decorator that applies a memoizing cache around the function.
-
-    This is more-or-less a drop-in equivalent to functools.lru_cache, although note
-    that the signature is slightly different.
-
-    The main differences with functools.lru_cache are:
-        (a) the size of the cache can be controlled via the cache_factor mechanism
-        (b) the wrapped function can request a "cache_context" which provides a
-            callback mechanism to indicate that the result is no longer valid
-        (c) prometheus metrics are exposed automatically.
-
-    The function should take zero or more arguments, which are used as the key for the
-    cache. Single-argument functions use that argument as the cache key; otherwise the
-    arguments are built into a tuple.
-
-    Cached functions can be "chained" (i.e. a cached function can call other cached
-    functions and get appropriately invalidated when they called caches are
-    invalidated) by adding a special "cache_context" argument to the function
-    and passing that as a kwarg to all caches called. For example:
-
-        @lru_cache(cache_context=True)
-        def foo(self, key, cache_context):
-            r1 = self.bar1(key, on_invalidate=cache_context.invalidate)
-            r2 = self.bar2(key, on_invalidate=cache_context.invalidate)
-            return r1 + r2
-
-    The wrapped function also has a 'cache' property which offers direct access to the
-    underlying LruCache.
-    """
-
-    def func(orig: F) -> _LruCachedFunction[F]:
-        desc = LruCacheDescriptor(
-            orig,
-            max_entries=max_entries,
-            cache_context=cache_context,
-        )
-        return cast(_LruCachedFunction[F], desc)
-
-    return func
-
-
-class LruCacheDescriptor(_CacheDescriptorBase):
-    """Helper for @lru_cache"""
-
-    class _Sentinel(enum.Enum):
-        sentinel = object()
-
-    def __init__(
-        self,
-        orig: Callable[..., Any],
-        max_entries: int = 1000,
-        cache_context: bool = False,
-    ):
-        super().__init__(
-            orig, num_args=None, uncached_args=None, cache_context=cache_context
-        )
-        self.max_entries = max_entries
-
-    def __get__(self, obj: Optional[Any], owner: Optional[Type]) -> Callable[..., Any]:
-        cache: LruCache[CacheKey, Any] = LruCache(
-            cache_name=self.name,
-            max_size=self.max_entries,
-        )
-
-        get_cache_key = self.cache_key_builder
-        sentinel = LruCacheDescriptor._Sentinel.sentinel
-
-        @functools.wraps(self.orig)
-        def _wrapped(*args: Any, **kwargs: Any) -> Any:
-            invalidate_callback = kwargs.pop("on_invalidate", None)
-            callbacks = (invalidate_callback,) if invalidate_callback else ()
-
-            cache_key = get_cache_key(args, kwargs)
-
-            ret = cache.get(cache_key, default=sentinel, callbacks=callbacks)
-            if ret != sentinel:
-                return ret
-
-            # Add our own `cache_context` to argument list if the wrapped function
-            # has asked for one
-            if self.add_cache_context:
-                kwargs["cache_context"] = _CacheContext.get_instance(cache, cache_key)
-
-            ret2 = self.orig(obj, *args, **kwargs)
-            cache.set(cache_key, ret2, callbacks=callbacks)
-
-            return ret2
-
-        wrapped = cast(CachedFunction, _wrapped)
-        wrapped.cache = cache
-        obj.__dict__[self.name] = wrapped
-
-        return wrapped
 
 
 class DeferredCacheDescriptor(_CacheDescriptorBase):
@@ -432,7 +328,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
         num_args = cached_method.num_args
 
         if num_args != self.num_args:
-            raise Exception(
+            raise TypeError(
                 "Number of args (%s) does not match underlying cache_method_name=%s (%s)."
                 % (self.num_args, self.cached_method_name, num_args)
             )
