@@ -29,7 +29,7 @@ from synapse.rest.client import (
     initial_sync,
     keys,
     knock,
-    login as v1_login,
+    login,
     login_token_request,
     logout,
     mutual_rooms,
@@ -96,7 +96,7 @@ class ClientRestResource(JsonResource):
         events.register_servlets(hs, client_resource)
 
         room.register_servlets(hs, client_resource)
-        v1_login.register_servlets(hs, client_resource)
+        login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
         if is_main_process:
