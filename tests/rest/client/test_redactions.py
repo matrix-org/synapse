@@ -264,6 +264,21 @@ class RedactionsTestCase(HomeserverTestCase):
         )
         threaded_event_id = res["event_id"]
 
+        # Also send a reaction, again with the same root.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Reaction,
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": root_event_id,
+                    "key": "👍",
+                }
+            },
+            tok=self.mod_access_token,
+        )
+        reaction_event_id = res["event_id"]
+
         # Redact the root event, specifying that we also want to delete events that
         # relate to it with m.replace.
         self._redact_event(
@@ -293,6 +308,12 @@ class RedactionsTestCase(HomeserverTestCase):
             self.room_id, threaded_event_id, self.mod_access_token
         )
         self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the reaction did not get redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, reaction_event_id, self.mod_access_token
+        )
+        self.assertNotIn("redacted_because", event_dict, event_dict)
 
     @override_config({"experimental_features": {"msc3912_enabled": True}})
     def test_redact_relations_no_perms(self) -> None:

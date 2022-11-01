@@ -52,6 +52,7 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
@@ -1078,7 +1079,8 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                 )
 
                 if with_relations:
-                    run_in_background(
+                    run_as_background_process(
+                        "redact_related_events",
                         self._relation_handler.redact_events_related_to,
                         requester=requester,
                         event_id=event_id,

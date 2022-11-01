@@ -315,18 +315,16 @@ class RelationsWorkerStore(SQLBaseStore):
         def get_all_relation_ids_for_event_with_types_txn(
             txn: LoggingTransaction,
         ) -> List[str]:
-            sql = """
-            SELECT event_id FROM event_relations
-            WHERE
-                relates_to_id = ?
-                AND relation_type IN (%s)
-            """ % (
-                ",".join(["?" for _ in relation_types]),
+            rows = self.db_pool.simple_select_many_txn(
+                txn=txn,
+                table="event_relations",
+                column="relation_type",
+                iterable=relation_types,
+                keyvalues={"relates_to_id": event_id},
+                retcols=["event_id"],
             )
 
-            txn.execute(sql, [event_id] + relation_types)
-
-            return [row[0] for row in txn]
+            return [row["event_id"] for row in rows]
 
         return await self.db_pool.runInteraction(
             desc="get_all_relation_ids_for_event_with_types",
