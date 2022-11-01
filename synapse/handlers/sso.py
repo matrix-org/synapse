@@ -715,6 +715,16 @@ class SsoHandler:
         return registered_user_id
 
     async def set_avatar(self, user_id: str, picture_https_url: str) -> None:
+        """Set avatar of the user.
+
+        This downloads the image file from the url provided, store that in
+        the media repository and then sets the avatar on user's profile.
+
+        Args:
+            user_id: matrix user ID in the form @localpart:domain as a string.
+
+            picture_https_url: HTTPS url for the picture image file.
+        """
         try:
             uid = UserID.from_string(user_id)
 
