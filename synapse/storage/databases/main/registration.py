@@ -1920,6 +1920,27 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             self._clock.time_msec(),
         )
 
+    async def invalidate_login_tokens_by_session_id(
+        self, auth_provider_id: str, auth_provider_session_id: str
+    ) -> None:
+        """Invalidate login tokens with the given IdP session ID.
+
+        Args:
+            auth_provider_id: The SSO Identity Provider that the user authenticated with
+                to get this token
+            auth_provider_session_id: The session ID advertised by the SSO Identity
+                Provider
+        """
+        await self.db_pool.simple_update(
+            table="login_tokens",
+            keyvalues={
+                "auth_provider_id": auth_provider_id,
+                "auth_provider_session_id": auth_provider_session_id,
+            },
+            updatevalues={"used_ts": self._clock.time_msec()},
+            desc="invalidate_login_tokens_by_session_id",
+        )
+
     @cached()
     async def is_guest(self, user_id: str) -> bool:
         res = await self.db_pool.simple_select_one_onecol(
