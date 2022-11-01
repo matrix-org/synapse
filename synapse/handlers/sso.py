@@ -198,7 +198,7 @@ class SsoHandler:
         self._error_template = hs.config.sso.sso_error_template
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
-        self.media_repo = hs.get_media_repository()
+        self._media_repo = hs.get_media_repository()
         self._http_client = hs.get_proxied_http_client()
 
         # The following template is shown after a successful user interactive
@@ -751,7 +751,7 @@ class SsoHandler:
             image = await make_deferred_yieldable(readBody(response))
 
             # store it in media repository
-            avatar_mxc_url = await self.media_repo.create_content(
+            avatar_mxc_url = await self._media_repo.create_content(
                 str(content_type),
                 None,
                 io.BytesIO(image),  # convert image into BytesIO
