@@ -737,12 +737,15 @@ class SsoHandler:
                     )
                 )
 
-            content_length = int(
-                response.headers.getRawHeaders(b"Content-Length")[0].decode("utf-8")
-            )
-            content_type = response.headers.getRawHeaders(b"Content-Type")[0].decode(
-                "utf-8"
-            )
+            # ensure http headers are present
+            if (
+                response.headers.getRawHeaders("Content-Length") is None
+                or response.headers.getRawHeaders("Content-Type") is None
+            ):
+                raise Exception("can not parse headers of sso avatar image file")
+
+            content_length = int(response.headers.getRawHeaders("Content-Length")[0])
+            content_type = response.headers.getRawHeaders("Content-Type")[0]
 
             # ensure picture size respects max_avatar_size defined in config
             if self._profile_handler.max_avatar_size is not None:
