@@ -1,2 +1,0 @@
-Fix a bug introduced in Synapse 1.60.0 which caused an error to be logged when Synapse received a SIGHUP signal, and debug logging was enabled.
-
