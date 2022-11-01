@@ -1398,9 +1398,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
         )
 
 
-def register_servlets(
-    hs: "HomeServer", http_server: HttpServer, is_worker: bool = False
-) -> None:
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
@@ -1425,7 +1423,7 @@ def register_servlets(
         TimestampLookupRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
-    if not is_worker:
+    if hs.config.worker.worker_app is None:
         RoomForgetRestServlet(hs).register(http_server)
 
 

@@ -194,8 +194,6 @@ class GenericWorkerServer(HomeServer):
                     KeyChangesServlet(self).register(resource)
                     OneTimeKeyServlet(self).register(resource)
 
-                    room.register_servlets(self, resource, is_worker=True)
-
                     resources[CLIENT_API_PREFIX] = resource
 
                     resources.update(build_synapse_client_resource_tree(self))
