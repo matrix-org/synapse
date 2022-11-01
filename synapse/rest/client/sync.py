@@ -146,12 +146,12 @@ class SyncRestServlet(RestServlet):
         elif filter_id.startswith("{"):
             try:
                 filter_object = json_decoder.decode(filter_id)
-                set_timeline_upper_limit(
-                    filter_object, self.hs.config.server.filter_timeline_limit
-                )
             except Exception:
-                raise SynapseError(400, "Invalid filter JSON")
+                raise SynapseError(400, "Invalid filter JSON", errcode=Codes.NOT_JSON)
             self.filtering.check_valid_filter(filter_object)
+            set_timeline_upper_limit(
+                filter_object, self.hs.config.server.filter_timeline_limit
+            )
             filter_collection = FilterCollection(self.hs, filter_object)
         else:
             try:

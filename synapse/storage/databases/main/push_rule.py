@@ -29,6 +29,7 @@ from typing import (
 )
 
 from synapse.api.errors import StoreError
+from synapse.config.homeserver import ExperimentalConfig
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -62,7 +63,9 @@ logger = logging.getLogger(__name__)
 
 
 def _load_rules(
-    rawrules: List[JsonDict], enabled_map: Dict[str, bool]
+    rawrules: List[JsonDict],
+    enabled_map: Dict[str, bool],
+    experimental_config: ExperimentalConfig,
 ) -> FilteredPushRules:
     """Take the DB rows returned from the DB and convert them into a full
     `FilteredPushRules` object.
@@ -80,7 +83,9 @@ def _load_rules(
 
     push_rules = PushRules(ruleslist)
 
-    filtered_rules = FilteredPushRules(push_rules, enabled_map)
+    filtered_rules = FilteredPushRules(
+        push_rules, enabled_map, msc3664_enabled=experimental_config.msc3664_enabled
+    )
 
     return filtered_rules
 
@@ -160,7 +165,7 @@ class PushRulesWorkerStore(
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
-        return _load_rules(rows, enabled_map)
+        return _load_rules(rows, enabled_map, self.hs.config.experimental)
 
     async def get_push_rules_enabled_for_user(self, user_id: str) -> Dict[str, bool]:
         results = await self.db_pool.simple_select_list(
@@ -219,7 +224,9 @@ class PushRulesWorkerStore(
         results: Dict[str, FilteredPushRules] = {}
 
         for user_id, rules in raw_rules.items():
-            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {}), self.hs.config.experimental
+            )
 
         return results
 
