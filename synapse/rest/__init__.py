@@ -110,14 +110,15 @@ class ClientRestResource(JsonResource):
         sync.register_servlets(hs, client_resource)
         if is_main_process:
             filter.register_servlets(hs, client_resource)
-            account.register_servlets(hs, client_resource)
-            register.register_servlets(hs, client_resource)
+        account.register_servlets(hs, client_resource)
+        register.register_servlets(hs, client_resource)
+        if is_main_process:
             auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
         room_keys.register_servlets(hs, client_resource)
+        keys.register_servlets(hs, client_resource)
         if is_main_process:
-            keys.register_servlets(hs, client_resource)
             tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
         account_data.register_servlets(hs, client_resource)
@@ -125,7 +126,8 @@ class ClientRestResource(JsonResource):
             report_event.register_servlets(hs, client_resource)
             openid.register_servlets(hs, client_resource)
             notifications.register_servlets(hs, client_resource)
-            devices.register_servlets(hs, client_resource)
+        devices.register_servlets(hs, client_resource)
+        if is_main_process:
             thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)

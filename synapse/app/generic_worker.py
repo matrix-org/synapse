@@ -44,20 +44,8 @@ from synapse.http.server import JsonResource, OptionsResource
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
+from synapse.rest import ClientRestResource
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client import room
-from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
-from synapse.rest.client.devices import DevicesRestServlet
-from synapse.rest.client.keys import (
-    KeyChangesServlet,
-    KeyQueryServlet,
-    KeyUploadServlet,
-    OneTimeKeyServlet,
-)
-from synapse.rest.client.register import (
-    RegisterRestServlet,
-    RegistrationTokenValidityRestServlet,
-)
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
@@ -180,19 +168,7 @@ class GenericWorkerServer(HomeServer):
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "client":
-                    resource = JsonResource(self, canonical_json=False)
-
-                    RegisterRestServlet(self).register(resource)
-                    RegistrationTokenValidityRestServlet(self).register(resource)
-                    ThreepidRestServlet(self).register(resource)
-                    WhoamiRestServlet(self).register(resource)
-                    DevicesRestServlet(self).register(resource)
-
-                    # Read-only
-                    KeyUploadServlet(self).register(resource)
-                    KeyQueryServlet(self).register(resource)
-                    KeyChangesServlet(self).register(resource)
-                    OneTimeKeyServlet(self).register(resource)
+                    resource: Resource = ClientRestResource(self)
 
                     resources[CLIENT_API_PREFIX] = resource
 
