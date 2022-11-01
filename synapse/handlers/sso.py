@@ -732,7 +732,7 @@ class SsoHandler:
             response = await self._http_client.request("HEAD", picture_https_url)
             if response.code != 200:
                 raise Exception(
-                    "error sending HEAD request to get image size, status code = {}".format(
+                    "HEAD request to check sso avatar image headers returned {}".format(
                         response.code
                     )
                 )
@@ -742,7 +742,7 @@ class SsoHandler:
                 response.headers.getRawHeaders("Content-Length") is None
                 or response.headers.getRawHeaders("Content-Type") is None
             ):
-                raise Exception("can not parse headers of sso avatar image file")
+                raise Exception("HTTP headers missing for sso avatar image")
 
             content_length = int(response.headers.getRawHeaders("Content-Length")[0])
             content_type = response.headers.getRawHeaders("Content-Type")[0]
@@ -751,7 +751,7 @@ class SsoHandler:
             if self._profile_handler.max_avatar_size is not None:
                 if content_length > self._profile_handler.max_avatar_size:
                     raise Exception(
-                        "sso avatar too big in size, size = {} but max size allowed = {}".format(
+                        "SSO avatar image {} should be less than {}".format(
                             content_length, self._profile_handler.max_avatar_size
                         )
                     )
@@ -762,14 +762,16 @@ class SsoHandler:
                 and content_type not in self._profile_handler.allowed_avatar_mimetypes
             ):
                 raise Exception(
-                    "mime type {} not allowed for sso avatar".format(content_type)
+                    "SSO avatar image does not allow mime type of {}".format(
+                        content_type
+                    )
                 )
 
             # download picture
             response = await self._http_client.request("GET", picture_https_url)
             if response.code != 200:
                 raise Exception(
-                    "error sending GET request to provided sso avatar image, status code = {}".format(
+                    "GET request to download sso avatar image returned {}".format(
                         response.code
                     )
                 )
