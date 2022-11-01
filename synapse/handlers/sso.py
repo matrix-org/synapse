@@ -790,7 +790,7 @@ class SsoHandler:
 
             logger.info("successfully saved the user avatar")
         except Exception:
-            logger.exception("failed to save the user avatar")
+            logger.warning("failed to save the user avatar")
 
     async def complete_sso_ui_auth_request(
         self,
