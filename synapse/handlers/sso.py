@@ -731,7 +731,11 @@ class SsoHandler:
             # HEAD request to find image size & mime type before download
             response = await self._http_client.request("HEAD", picture_https_url)
             if response.code != 200:
-                raise Exception("error sending HEAD request to get image size")
+                raise Exception(
+                    "error sending HEAD request to get image size, status code = {}".format(
+                        response.code
+                    )
+                )
 
             content_length = int(
                 response.headers.getRawHeaders(b"Content-Length")[0].decode("utf-8")
@@ -743,20 +747,28 @@ class SsoHandler:
             # ensure picture size respects max_avatar_size defined in config
             if self._profile_handler.max_avatar_size is not None:
                 if content_length > self._profile_handler.max_avatar_size:
-                    raise Exception("sso avatar too big in size")
+                    raise Exception(
+                        "sso avatar too big in size, size = {} but max size allowed = {}".format(
+                            content_length, self._profile_handler.max_avatar_size
+                        )
+                    )
 
             # ensure picture is of allowed mime type
             if (
                 self._profile_handler.allowed_avatar_mimetypes
                 and content_type not in self._profile_handler.allowed_avatar_mimetypes
             ):
-                raise Exception("mime type not allowed for sso avatar")
+                raise Exception(
+                    "mime type {} not allowed for sso avatar".format(content_type)
+                )
 
             # download picture
             response = await self._http_client.request("GET", picture_https_url)
             if response.code != 200:
                 raise Exception(
-                    "error sending GET request to provided sso avatar image"
+                    "error sending GET request to provided sso avatar image, status code = {}".format(
+                        response.code
+                    )
                 )
             image = await make_deferred_yieldable(readBody(response))
 
