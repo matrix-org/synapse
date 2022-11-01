@@ -1,1 +1,0 @@
-Improve aesthetics of HTML templates. Note that these changes do not retroactively apply to templates which have been [customised](https://matrix-org.github.io/synapse/latest/templates.html#templates) by server admins.
