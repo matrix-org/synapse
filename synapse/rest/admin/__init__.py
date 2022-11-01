@@ -292,9 +292,11 @@ def register_servlets_for_client_rest_resource(
     """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
-    DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
-    ResetPasswordRestServlet(hs).register(http_server)
+    # The following resources can only be run on the main process.
+    if hs.config.worker.worker_app is None:
+        DeactivateAccountRestServlet(hs).register(http_server)
+        ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
