@@ -237,6 +237,10 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     """
     Register all the admin servlets.
     """
+    # Admin servlets aren't registered on workers.
+    if hs.config.worker.worker_app is not None:
+        return
+
     register_servlets_for_client_rest_resource(hs, http_server)
     BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
@@ -275,15 +279,13 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomTimestampToEventRestServlet(hs).register(http_server)
     UserByExternalId(hs).register(http_server)
 
-    # Some servlets only get registered for the main process.
-    if hs.config.worker.worker_app is None:
-        DeviceRestServlet(hs).register(http_server)
-        DevicesRestServlet(hs).register(http_server)
-        DeleteDevicesRestServlet(hs).register(http_server)
-        SendServerNoticeServlet(hs).register(http_server)
-        BackgroundUpdateEnabledRestServlet(hs).register(http_server)
-        BackgroundUpdateRestServlet(hs).register(http_server)
-        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    DeviceRestServlet(hs).register(http_server)
+    DevicesRestServlet(hs).register(http_server)
+    DeleteDevicesRestServlet(hs).register(http_server)
+    SendServerNoticeServlet(hs).register(http_server)
+    BackgroundUpdateEnabledRestServlet(hs).register(http_server)
+    BackgroundUpdateRestServlet(hs).register(http_server)
+    BackgroundUpdateStartJobRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(

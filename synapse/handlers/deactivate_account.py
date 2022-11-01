@@ -33,10 +33,7 @@ class DeactivateAccountHandler:
         self.store = hs.get_datastores().main
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
-        # This can only be instantiated on the main process.
-        device_handler = hs.get_device_handler()
-        assert isinstance(device_handler, DeviceHandler)
-        self._device_handler = device_handler
+        self._device_handler = hs.get_device_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._identity_handler = hs.get_identity_handler()
         self._profile_handler = hs.get_profile_handler()
@@ -79,6 +76,9 @@ class DeactivateAccountHandler:
         Returns:
             True if identity server supports removing threepids, otherwise False.
         """
+
+        # This can only be called on the main process.
+        assert isinstance(self._device_handler, DeviceHandler)
 
         # Check if this user can be deactivated
         if not await self._third_party_rules.check_can_deactivate_user(
