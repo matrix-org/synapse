@@ -1064,9 +1064,6 @@ class RoomCreationHandler:
         # created (but not persisted to the db) to determine state for future created events
         # (as this info can't be pulled from the db)
         state_map: MutableStateMap[str] = {}
-        # current_state_group of last event created. Used for computing event context of
-        # events to be batched
-        current_state_group = None
 
         def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
@@ -1094,7 +1091,6 @@ class RoomCreationHandler:
                 depth=depth,
                 state_map=state_map,
                 for_batch=for_batch,
-                current_state_group=current_state_group,
             )
             depth += 1
             prev_event = [new_event.event_id]
@@ -1164,8 +1160,8 @@ class RoomCreationHandler:
             power_event, power_context = await create_event(
                 EventTypes.PowerLevels, pl_content, False
             )
-            current_state_group = power_context._state_group
             await send(power_event, power_context, creator)
+            current_state_group = power_context._state_group
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1213,15 +1209,14 @@ class RoomCreationHandler:
                 power_level_content,
                 False,
             )
-            current_state_group = pl_context._state_group
             await send(pl_event, pl_context, creator)
+            current_state_group = pl_context._state_group
 
         events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             room_alias_event, room_alias_context = await create_event(
                 EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True
             )
-            current_state_group = room_alias_context._state_group
             events_to_send.append((room_alias_event, room_alias_context))
 
         if (EventTypes.JoinRules, "") not in initial_state:
@@ -1230,7 +1225,6 @@ class RoomCreationHandler:
                 {"join_rule": config["join_rules"]},
                 True,
             )
-            current_state_group = join_rules_context._state_group
             events_to_send.append((join_rules_event, join_rules_context))
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
@@ -1239,7 +1233,6 @@ class RoomCreationHandler:
                 {"history_visibility": config["history_visibility"]},
                 True,
             )
-            current_state_group = visibility_context._state_group
             events_to_send.append((visibility_event, visibility_context))
 
         if config["guest_can_join"]:
@@ -1249,14 +1242,12 @@ class RoomCreationHandler:
                     {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                     True,
                 )
-                current_state_group = guest_access_context._state_group
                 events_to_send.append((guest_access_event, guest_access_context))
 
         for (etype, state_key), content in initial_state.items():
             event, context = await create_event(
                 etype, content, True, state_key=state_key
             )
-            current_state_group = context._state_group
             events_to_send.append((event, context))
 
         if config["encrypted"]:
@@ -1267,6 +1258,16 @@ class RoomCreationHandler:
                 state_key="",
             )
             events_to_send.append((encryption_event, encryption_context))
+
+        assert self.hs.datastores is not None
+        state_groups = await self.hs.datastores.state.store_state_deltas_for_batched(
+            events_to_send, room_id, prev_group=current_state_group
+        )
+
+        index = 0
+        for _, context in events_to_send:
+            context._state_group = state_groups[index]
+            index += 1
 
         last_event = await self.event_creation_handler.handle_new_client_event(
             creator, events_to_send, ignore_shadow_ban=True
