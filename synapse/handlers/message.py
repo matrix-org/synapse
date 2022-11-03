@@ -573,15 +573,14 @@ class EventCreationHandler:
         depth: Optional[int] = None,
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
-        current_state_group: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
-        the event using the parameters state_map and current_state_group, thus these parameters
-        must be provided in this case if for_batch is True. The subsequently created event
-        and context are suitable for being batched up and bulk persisted to the database
-        with other similarly created events.
+        the event using the parameter state_map, thus this parameter must be provided
+        if for_batch is True. The subsequently created event and context are suitable
+        for being batched up and bulk persisted to the database with other similarly
+        created events. todo: must batch state groups
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
         etc.
@@ -637,9 +636,6 @@ class EventCreationHandler:
                 for batch persisting
 
             for_batch: whether the event is being created for batch persisting to the db
-
-            current_state_group: the current state group, used only for creating events for
-                batch persisting
 
         Raises:
             ResourceLimitError if server is blocked to some resource being
@@ -718,7 +714,6 @@ class EventCreationHandler:
             depth=depth,
             state_map=state_map,
             for_batch=for_batch,
-            current_state_group=current_state_group,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -1040,14 +1035,13 @@ class EventCreationHandler:
         depth: Optional[int] = None,
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
-        current_state_group: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client. If bool for_batch is true, will
-        create an event using the prev_event_ids, and will create an event context for
-        the event using the parameters state_map and current_state_group, thus these parameters
-        must be provided in this case if for_batch is True. The subsequently created event
-        and context are suitable for being batched up and bulk persisted to the database
-        with other similarly created events.
+        create an event using the prev_event_ids, and will create an event context todo: note that event context has not state group?
+        for
+        the event using the parameters state_map, thus this parameter if for_batch is True.
+        The subsequently created event and context are suitable for being batched up
+        and bulk persisted to the database with other similarly created events.
 
         Args:
             builder:
@@ -1084,9 +1078,6 @@ class EventCreationHandler:
                 for batch persisting
 
             for_batch: whether the event is being created for batch persisting to the db
-
-            current_state_group: the current state group, used only for creating events for
-                batch persisting
 
         Returns:
             Tuple of created event, context
@@ -1143,14 +1134,11 @@ class EventCreationHandler:
         if for_batch:
             assert prev_event_ids is not None
             assert state_map is not None
-            assert current_state_group is not None
             auth_ids = self._event_auth_handler.compute_auth_events(builder, state_map)
             event = await builder.build(
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
-            context = await self.state.compute_event_context_for_batched(
-                event, state_map, current_state_group
-            )
+            context = EventContext(self._storage_controllers)
         else:
             event = await builder.build(
                 prev_event_ids=prev_event_ids,
@@ -1215,7 +1203,7 @@ class EventCreationHandler:
             context.app_service = requester.app_service
 
         res, new_content = await self.third_party_event_rules.check_event_allowed(
-            event, context
+            event, context, for_batch=for_batch, state_map=state_map
         )
         if res is False:
             logger.info(
