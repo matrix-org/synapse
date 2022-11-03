@@ -1145,7 +1145,7 @@ class RoomCreationHandler:
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
             power_event, power_context = await create_event(
-                EventTypes.PowerLevels, pl_content, False
+                EventTypes.PowerLevels, pl_content, True
             )
             current_state_group = power_context._state_group
             events_to_send.append((power_event, power_context))
@@ -1194,7 +1194,7 @@ class RoomCreationHandler:
             pl_event, pl_context = await create_event(
                 EventTypes.PowerLevels,
                 power_level_content,
-                False,
+                True,
             )
             current_state_group = pl_context._state_group
             events_to_send.append((pl_event, pl_context))
