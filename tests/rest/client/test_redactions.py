@@ -248,7 +248,7 @@ class RedactionsTestCase(HomeserverTestCase):
         )
         edit_event_id = res["event_id"]
 
-        # Also send a threaded message which root is the same as the edit.
+        # Also send a threaded message whose root is the same as the edit's.
         res = self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
