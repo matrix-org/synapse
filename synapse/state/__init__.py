@@ -424,7 +424,6 @@ class StateHandler:
         self,
         event: EventBase,
         state_ids_before_event: StateMap[str],
-        current_state_group: int,
     ) -> EventContext:
         """
         Generate an event context for an event that has not yet been persisted to the
@@ -438,14 +437,10 @@ class StateHandler:
         state_group_before_event_prev_group = None
         deltas_to_state_group_before_event = None
 
-        state_group_before_event = current_state_group
-
         # if the event is not state, we are set
         if not event.is_state():
-            return EventContext.with_state(
+            return EventContext.without_state_group(
                 storage=self._storage_controllers,
-                state_group_before_event=state_group_before_event,
-                state_group=state_group_before_event,
                 state_delta_due_to_event={},
                 prev_group=state_group_before_event_prev_group,
                 delta_ids=deltas_to_state_group_before_event,
@@ -463,25 +458,13 @@ class StateHandler:
 
         delta_ids = {key: event.event_id}
 
-        state_group_after_event = (
-            await self._state_storage_controller.store_state_group(
-                event.event_id,
-                event.room_id,
-                prev_group=state_group_before_event,
-                delta_ids=delta_ids,
-                current_state_ids=None,
-            )
-        )
-
-        return EventContext.with_state(
+        context = EventContext.without_state_group(
             storage=self._storage_controllers,
-            state_group=state_group_after_event,
-            state_group_before_event=state_group_before_event,
             state_delta_due_to_event=delta_ids,
-            prev_group=state_group_before_event,
             delta_ids=delta_ids,
             partial_state=False,
         )
+        return context
 
     @measure_func()
     async def resolve_state_groups_for_events(
