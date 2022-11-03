@@ -71,4 +71,4 @@ class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # should not raise
-        self.get_success(bulk_evaluator.action_for_event_by_user(event, context))
+        self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))

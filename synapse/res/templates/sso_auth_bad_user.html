@@ -1,27 +1,25 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Authentication failed</title>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style type="text/css">
-            {% include "sso.css" without context %}
-        </style>
-    </head>
-    <body class="error_page">
-        <header>
-            <h1>That doesn't look right</h1>
-            <p>
-                <strong>We were unable to validate your {{ server_name }} account</strong>
-                via single&nbsp;sign&#8209;on&nbsp;(SSO), because the SSO Identity
-                Provider returned different details than when you logged in.
-            </p>
-            <p>
-                Try the operation again, and ensure that you use the same details on
-                the Identity Provider as when you log into your account.
-            </p>
-        </header>
-        {% include "sso_footer.html" without context %}
-    </body>
-</html>
+{% block title %}Authentication failed{% endblock %}
+
+{% block header %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="error_page">
+    <header>
+        <h1>That doesn't look right</h1>
+        <p>
+            <strong>We were unable to validate your {{ server_name }} account</strong>
+            via single&nbsp;sign&#8209;on&nbsp;(SSO), because the SSO Identity
+            Provider returned different details than when you logged in.
+        </p>
+        <p>
+            Try the operation again, and ensure that you use the same details on
+            the Identity Provider as when you log into your account.
+        </p>
+    </header>
+</div>
+{% include "sso_footer.html" without context %}
+{% endblock %}

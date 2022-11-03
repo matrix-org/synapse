@@ -1,11 +1,10 @@
-<html lang="en">
-<head>
-<title>Authentication</title>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% block title %}Authentication{% endblock %}
+
+{% block header %}
 <link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-</head>
-<body>
+{% endblock %}
+
+{% block body %}
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
         {% if error is defined %}
@@ -19,5 +18,4 @@
         <input type="submit" value="Authenticate" />
     </div>
 </form>
-</body>
-</html>
+{% endblock %}

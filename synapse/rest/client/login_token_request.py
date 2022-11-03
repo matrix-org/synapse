@@ -57,7 +57,6 @@ class LoginTokenRequestServlet(RestServlet):
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.config.server.server_name
-        self.macaroon_gen = hs.get_macaroon_generator()
         self.auth_handler = hs.get_auth_handler()
         self.token_timeout = hs.config.experimental.msc3882_token_timeout
         self.ui_auth = hs.config.experimental.msc3882_ui_auth
@@ -76,10 +75,10 @@ class LoginTokenRequestServlet(RestServlet):
                 can_skip_ui_auth=False,  # Don't allow skipping of UI auth
             )
 
-        login_token = self.macaroon_gen.generate_short_term_login_token(
+        login_token = await self.auth_handler.create_login_token_for_user_id(
             user_id=requester.user.to_string(),
             auth_provider_id="org.matrix.msc3882.login_token_request",
-            duration_in_ms=self.token_timeout,
+            duration_ms=self.token_timeout,
         )
 
         return (

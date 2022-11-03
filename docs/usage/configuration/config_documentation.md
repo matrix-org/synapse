@@ -99,7 +99,7 @@ modules:
     config: {}
 ```
 ---
-## Server ##
+## Server
 
 Define your homeserver name and other base options.
 
@@ -159,7 +159,7 @@ including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
 reverse proxy, this should be the URL to reach Synapse via the proxy.
 Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
-'listeners' below).
+['listeners'](#listeners) below).
 
 Defaults to `https://<server_name>/`.
 
@@ -570,7 +570,7 @@ Example configuration:
 delete_stale_devices_after: 1y
 ```
 
-## Homeserver blocking ##
+## Homeserver blocking
 Useful options for Synapse admins.
 
 ---
@@ -922,7 +922,7 @@ retention:
       interval: 1d
 ```
 ---
-## TLS ##
+## TLS
 
 Options related to TLS.
 
@@ -1012,7 +1012,7 @@ federation_custom_ca_list:
   - myCA3.pem
 ```
 ---
-## Federation ##
+## Federation
 
 Options related to federation.
 
@@ -1071,7 +1071,7 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
-## Caching ##
+## Caching
 
 Options related to caching.
 
@@ -1185,7 +1185,7 @@ file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
 `systemctl reload matrix-synapse`.
 
 ---
-## Database ##
+## Database
 Config options related to database settings.
 
 ---
@@ -1332,20 +1332,21 @@ databases:
       cp_max: 10
 ```
 ---
-## Logging ##
+## Logging
 Config options related to logging.
 
 ---
 ### `log_config`
 
-This option specifies a yaml python logging config file as described [here](https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema).
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
 
 Example configuration:
 ```yaml
 log_config: "CONFDIR/SERVERNAME.log.config"
 ```
 ---
-## Ratelimiting ##
+## Ratelimiting
 Options related to ratelimiting in Synapse.
 
 Each ratelimiting configuration is made of two parameters:
@@ -1576,7 +1577,7 @@ Example configuration:
 federation_rr_transactions_per_room_per_second: 40
 ```
 ---
-## Media Store ##
+## Media Store
 Config options related to Synapse's media store.
 
 ---
@@ -1766,7 +1767,7 @@ url_preview_ip_range_blacklist:
   - 'ff00::/8'
   - 'fec0::/10'
 ```
-----
+---
 ### `url_preview_ip_range_whitelist`
 
 This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
@@ -1860,7 +1861,7 @@ Example configuration:
    - 'fr;q=0.8'
    - '*;q=0.7'
 ```
-----
+---
 ### `oembed`
 
 oEmbed allows for easier embedding content from a website. It can be
@@ -1877,7 +1878,7 @@ oembed:
     - oembed/my_providers.json
 ```
 ---
-## Captcha ##
+## Captcha
 
 See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 
@@ -1926,7 +1927,7 @@ Example configuration:
 recaptcha_siteverify_api: "https://my.recaptcha.site"
 ```
 ---
-## TURN ##
+## TURN
 Options related to adding a TURN server to Synapse.
 
 ---
@@ -1947,7 +1948,7 @@ Example configuration:
 ```yaml
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
-----
+---
 ### `turn_username` and `turn_password`
 
 The Username and password if the TURN server needs them and does not use a token.
@@ -2366,7 +2367,7 @@ Example configuration:
 ```yaml
 session_lifetime: 24h
 ```
-----
+---
 ### `refresh_access_token_lifetime`
 
 Time that an access token remains valid for, if the session is using refresh tokens.
@@ -2422,7 +2423,7 @@ nonrefreshable_access_token_lifetime: 24h
 ```
 
 ---
-## Metrics ###
+## Metrics
 Config options related to metrics.
 
 ---
@@ -2519,7 +2520,7 @@ Example configuration:
 report_stats_endpoint: https://example.com/report-usage-stats/push
 ```
 ---
-## API Configuration ##
+## API Configuration
 Config settings related to the client/server API
 
 ---
@@ -2619,7 +2620,7 @@ Example configuration:
 form_secret: <PRIVATE STRING>
 ```
 ---
-## Signing Keys ##
+## Signing Keys
 Config options relating to signing keys
 
 ---
@@ -2680,6 +2681,12 @@ is still supported for backwards-compatibility, but it is deprecated.
 warning on start-up. To suppress this warning, set
 `suppress_key_server_warning` to true.
 
+If the use of a trusted key server has to be deactivated, e.g. in a private
+federation or for privacy reasons, this can be realised by setting
+an empty array (`trusted_key_servers: []`). Then Synapse will request the keys
+directly from the server that owns the keys. If Synapse does not get keys directly
+from the server, the events of this server will be rejected.
+
 Options for each entry in the list include:
 * `server_name`: the name of the server. Required.
 * `verify_keys`: an optional map from key id to base64-encoded public key.
@@ -2728,7 +2735,7 @@ Example configuration:
 key_server_signing_keys_path: "key_server_signing_keys.key"
 ```
 ---
-## Single sign-on integration ##
+## Single sign-on integration
 
 The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.
@@ -3014,6 +3021,15 @@ Options for each entry include:
      which is set to the claims returned by the UserInfo Endpoint and/or
      in the ID Token.
 
+* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications. 
+  Those notifications are expected to be received on `/_synapse/client/oidc/backchannel_logout`.
+  Defaults to `false`.
+
+* `backchannel_logout_ignore_sub`: by default, the OIDC Back-Channel Logout feature checks that the
+  `sub` claim matches the subject claim received during login. This check can be disabled by setting
+  this to `true`. Defaults to `false`.
+
+  You might want to disable this if the `subject_claim` returned by the mapping provider is not `sub`.
 
 It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under
@@ -3348,7 +3364,7 @@ email:
     email_validation: "[%(server_name)s] Validate your email"
 ```
 ---
-## Push ##
+## Push
 Configuration settings related to push notifications
 
 ---
@@ -3381,7 +3397,7 @@ push:
   group_unread_count_by_room: false
 ```
 ---
-## Rooms ##
+## Rooms
 Config options relating to rooms.
 
 ---
@@ -3627,7 +3643,7 @@ default_power_level_content_override:
 ```
 
 ---
-## Opentracing ##
+## Opentracing
 Configuration options related to Opentracing support.
 
 ---
@@ -3670,14 +3686,71 @@ opentracing:
         false
 ```
 ---
-## Workers ##
-Configuration options related to workers.
+## Coordinating workers
+Configuration options related to workers which belong in the main config file
+(usually called `homeserver.yaml`).
+A Synapse deployment can scale horizontally by running multiple Synapse processes
+called _workers_. Incoming requests are distributed between workers to handle higher
+loads. Some workers are privileged and can accept requests from other workers.
 
+As a result, the worker configuration is divided into two parts.
+
+1. The first part (in this section of the manual) defines which shardable tasks
+   are delegated to privileged workers. This allows unprivileged workers to make
+   request a privileged worker to act on their behalf.
+1. [The second part](#individual-worker-configuration)
+   controls the behaviour of individual workers in isolation.
+
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
+
+---
+### `worker_replication_secret`
+
+A shared secret used by the replication APIs on the main process to authenticate
+HTTP requests from workers.
+
+The default, this value is omitted (equivalently `null`), which means that 
+traffic between the workers and the main process is not authenticated.
+
+Example configuration:
+```yaml
+worker_replication_secret: "secret_secret"
+```
+---
+### `start_pushers`
+
+Controls sending of push notifications on the main process. Set to `false`
+if using a [pusher worker](../../workers.md#synapseapppusher). Defaults to `true`.
+
+Example configuration:
+```yaml
+start_pushers: false
+```
+---
+### `pusher_instances`
+
+It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
+in which case the work is balanced across them. Use this setting to list the pushers by
+[`worker_name`](#worker_name). Ensure the main process and all pusher workers are
+restarted after changing this option.
+
+If no or only one pusher worker is configured, this setting is not necessary.
+The main process will send out push notifications by default if you do not disable
+it by setting [`start_pushers: false`](#start_pushers).
+
+Example configuration:
+```yaml
+start_pushers: false
+pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+```
 ---
 ### `send_federation`
 
 Controls sending of outbound federation transactions on the main process.
-Set to false if using a federation sender worker. Defaults to true.
+Set to `false` if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
+Defaults to `true`.
 
 Example configuration:
 ```yaml
@@ -3686,8 +3759,9 @@ send_federation: false
 ---
 ### `federation_sender_instances`
 
-It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders.
+It is possible to run multiple
+[federation sender worker](../../workers.md#synapseappfederation_sender), in which
+case the work is balanced across them. Use this setting to list the senders.
 
 This configuration setting must be shared between all federation sender workers, and if
 changed all federation sender workers must be stopped at the same time and then
@@ -3696,14 +3770,19 @@ events may be dropped).
 
 Example configuration:
 ```yaml
+send_federation: false
 federation_sender_instances:
   - federation_sender1
 ```
 ---
 ### `instance_map`
 
-When using workers this should be a map from worker name to the
+When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
+Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs 
+a HTTP replication listener, and that listener should be included in the `instance_map`.
+(The main process also needs an HTTP replication listener, but it should not be 
+listed in the `instance_map`.)
 
 Example configuration:
 ```yaml
@@ -3716,8 +3795,11 @@ instance_map:
 ### `stream_writers`
 
 Experimental: When using workers you can define which workers should
-handle event persistence and typing notifications. Any worker
-specified here must also be in the `instance_map`.
+handle writing to streams such as event persistence and typing notifications.
+Any worker specified here must also be in the [`instance_map`](#instance_map).
+
+See the list of available streams in the
+[worker documentation](../../workers.md#stream-writers).
 
 Example configuration:
 ```yaml
@@ -3728,29 +3810,18 @@ stream_writers:
 ---
 ### `run_background_tasks_on`
 
-The worker that is used to run background tasks (e.g. cleaning up expired
-data). If not provided this defaults to the main process.
+The [worker](../../workers.md#background-tasks) that is used to run
+background tasks (e.g. cleaning up expired data). If not provided this
+defaults to the main process.
 
 Example configuration:
 ```yaml
 run_background_tasks_on: worker1
 ```
 ---
-### `worker_replication_secret`
-
-A shared secret used by the replication APIs to authenticate HTTP requests
-from workers.
-
-By default this is unused and traffic is not authenticated.
-
-Example configuration:
-```yaml
-worker_replication_secret: "secret_secret"
-```
 ### `redis`
 
-Configuration for Redis when using workers. This *must* be enabled when
-using workers (unless using old style direct TCP configuration).
+Configuration for Redis when using workers. This *must* be enabled when using workers.
 This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
@@ -3765,7 +3836,123 @@ redis:
   port: 6379
   password: <secret_password>
 ```
-## Background Updates ##
+---
+## Individual worker configuration
+These options configure an individual worker, in its worker configuration file.
+They should be not be provided when configuring the main process.
+
+Note also the configuration above for
+[coordinating a cluster of workers](#coordinating-workers).
+
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
+
+---
+### `worker_app`
+
+The type of worker. The currently available worker applications are listed
+in [worker documentation](../../workers.md#available-worker-applications).
+
+The most common worker is the
+[`synapse.app.generic_worker`](../../workers.md#synapseappgeneric_worker).
+
+Example configuration:
+```yaml
+worker_app: synapse.app.generic_worker
+```
+---
+### `worker_name`
+
+A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files. We strongly recommend
+giving each worker a unique `worker_name`.
+
+Example configuration:
+```yaml
+worker_name: generic_worker1
+```
+---
+### `worker_replication_host`
+
+The HTTP replication endpoint that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_host: 127.0.0.1
+```
+---
+### `worker_replication_http_port`
+
+The HTTP replication port that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_http_port: 9093
+```
+---
+### `worker_listeners`
+
+A worker can handle HTTP requests. To do so, a `worker_listeners` option 
+must be declared, in the same way as the [`listeners` option](#listeners) 
+in the shared config.
+
+Workers declared in [`stream_writers`](#stream_writers) will need to include a
+`replication` listener here, in order to accept internal HTTP requests from
+other workers.
+
+Example configuration:
+```yaml
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+```
+---
+### `worker_daemonize`
+
+Specifies whether the worker should be started as a daemon process.
+If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option 
+must be omitted or set to `false`.
+
+Defaults to `false`.
+
+Example configuration:
+```yaml
+worker_daemonize: true
+```
+---
+### `worker_pid_file`
+
+When running a worker as a daemon, we need a place to store the 
+[PID](https://en.wikipedia.org/wiki/Process_identifier) of the worker.
+This option defines the location of that "pid file".
+
+This option is required if `worker_daemonize` is `true` and ignored 
+otherwise. It has no default.
+
+See also the [`pid_file` option](#pid_file) option for the main Synapse process.
+
+Example configuration:
+```yaml
+worker_pid_file: DATADIR/generic_worker1.pid
+```
+---
+### `worker_log_config`
+
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
+See also the [`log_config` option](#log_config) option for the main Synapse process.
+
+Example configuration:
+```yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+```
+---
+## Background Updates
 Configuration settings related to background updates.
 
 ---

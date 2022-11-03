@@ -558,7 +558,7 @@ def reload_cache_config(config: HomeServerConfig) -> None:
             logger.warning(f)
     else:
         logger.debug(
-            "New cache config. Was:\n %s\nNow:\n",
+            "New cache config. Was:\n %s\nNow:\n %s",
             previous_cache_config.__dict__,
             config.caches.__dict__,
         )
