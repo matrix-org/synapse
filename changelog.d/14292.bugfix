@@ -1,0 +1,1 @@
+Faster joins: do not block creation of or queries for room aliases during the resync.

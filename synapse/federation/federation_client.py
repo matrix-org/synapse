@@ -465,7 +465,7 @@ class FederationClient(FederationBase):
                     pdu_attempts[destination] = now
 
                     logger.info(
-                        "get_pdu(event_id=): Failed to get PDU from %s because %s",
+                        "get_pdu(event_id=%s): Failed to get PDU from %s because %s",
                         event_id,
                         destination,
                         e,
