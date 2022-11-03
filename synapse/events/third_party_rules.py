@@ -231,7 +231,11 @@ class ThirdPartyEventRules:
             self._on_threepid_bind_callbacks.append(on_threepid_bind)
 
     async def check_event_allowed(
-        self, event: EventBase, context: EventContext
+        self,
+        event: EventBase,
+        context: EventContext,
+        for_batch: bool = False,
+        state_map: Optional[StateMap[str]] = None,
     ) -> Tuple[bool, Optional[dict]]:
         """Check if a provided event should be allowed in the given context.
 
@@ -253,7 +257,11 @@ class ThirdPartyEventRules:
         if len(self._check_event_allowed_callbacks) == 0:
             return True, None
 
-        prev_state_ids = await context.get_prev_state_ids()
+        if for_batch:
+            assert state_map is not None
+            prev_state_ids = state_map
+        else:
+            prev_state_ids = await context.get_prev_state_ids()
 
         # Retrieve the state events from the database.
         events = await self.store.get_events(prev_state_ids.values())
