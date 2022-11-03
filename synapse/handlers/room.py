@@ -1260,6 +1260,7 @@ class RoomCreationHandler:
             events_to_send.append((encryption_event, encryption_context))
 
         assert self.hs.datastores is not None
+        assert current_state_group is not None
         state_groups = await self.hs.datastores.state.store_state_deltas_for_batched(
             events_to_send, room_id, prev_group=current_state_group
         )

@@ -399,7 +399,11 @@ class StateStorageController:
             The state group ID
         """
         return await self.stores.state.store_state_group(
-            event_id, room_id, prev_group, delta_ids, current_state_ids
+            event_id,
+            room_id,
+            prev_group,
+            delta_ids,
+            current_state_ids,
         )
 
     @cancellable
