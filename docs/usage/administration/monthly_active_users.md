@@ -73,12 +73,12 @@ When a request is blocked, the response will have the `errcode` `M_RESOURCE_LIMI
 
 Synapse records several different prometheus metrics for MAU.
 
-`synapse_admin_mau:current` records the current MAU figure for native (non-application-service) users.
+`synapse_admin_mau_current` records the current MAU figure for native (non-application-service) users.
 
-`synapse_admin_mau:max` records the maximum MAU as dictated by the `max_mau_value` config value.
+`synapse_admin_mau_max` records the maximum MAU as dictated by the `max_mau_value` config value.
 
 `synapse_admin_mau_current_mau_by_service` records the current MAU including application service users. The label `app_service` can be used
 to filter by a specific service ID. This *also* includes non-application-service users under `app_service=native` .
 
-`synapse_admin_mau:registered_reserved_users` records the number of users specified in `mau_limits_reserved_threepids` which have
+`synapse_admin_mau_registered_reserved_users` records the number of users specified in `mau_limits_reserved_threepids` which have
 registered accounts on the homeserver.
