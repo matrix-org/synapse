@@ -118,9 +118,9 @@ class EventContext:
     @staticmethod
     def without_state_group(
         storage: "StorageControllers",
-        state_group_before_event: Optional[int],
-        state_delta_due_to_event: Optional[StateMap[str]],
-        partial_state: bool,
+        partial_state: bool = False,
+        state_group_before_event: Optional[int] = None,
+        state_delta_due_to_event: Optional[StateMap[str]] = None,
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
     ) -> "EventContext":
