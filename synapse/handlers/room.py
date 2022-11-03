@@ -1139,6 +1139,10 @@ class RoomCreationHandler:
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
+        # we need the state group of the membership event as it is the current state group
+        event_to_state = await self._storage_controllers.state.get_state_group_for_events([member_event_id])
+        current_state_group = event_to_state[member_event_id]
+
         events_to_send = []
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
