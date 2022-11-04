@@ -150,4 +150,4 @@ On other platforms, `eturnal` is [built from source](https://github.com/processo
 
 ### eturnalctl opterations script
 
-`eturnal` offers a handy [operations script](https://eturnal.net/documentation/#Operation) which can be called e.g. to check, whether the service is up, to restart the service, to querrz how many active sessions exist, to change logging behaviour and so on.
+`eturnal` offers a handy [operations script](https://eturnal.net/documentation/#Operation) which can be called e.g. to check, whether the service is up, to restart the service, to query how many active sessions exist, to change logging behaviour and so on.
