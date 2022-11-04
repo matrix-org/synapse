@@ -771,50 +771,11 @@ class ModuleApi:
             auth_provider_session_id: The session ID got during login from the SSO IdP,
                 if any.
         """
-        # The deprecated `generate_short_term_login_token` method defaulted to an empty
-        # string for the `auth_provider_id` because of how the underlying macaroon was
-        # generated. This will change to a proper NULL-able field when the tokens get
-        # moved to the database.
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
+        return await self._hs.get_auth_handler().create_login_token_for_user_id(
             user_id,
-            auth_provider_id or "",
-            auth_provider_session_id,
             duration_in_ms,
-        )
-
-    def generate_short_term_login_token(
-        self,
-        user_id: str,
-        duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: str = "",
-        auth_provider_session_id: Optional[str] = None,
-    ) -> str:
-        """Generate a login token suitable for m.login.token authentication
-
-        Added in Synapse v1.9.0.
-
-        This was deprecated in Synapse v1.69.0 in favor of create_login_token, and will
-        be removed in Synapse 1.71.0.
-
-        Args:
-            user_id: gives the ID of the user that the token is for
-
-            duration_in_ms: the time that the token will be valid for
-
-            auth_provider_id: the ID of the SSO IdP that the user used to authenticate
-               to get this token, if any. This is encoded in the token so that
-               /login can report stats on number of successful logins by IdP.
-        """
-        logger.warn(
-            "A module configured on this server uses ModuleApi.generate_short_term_login_token(), "
-            "which is deprecated in favor of ModuleApi.create_login_token(), and will be removed in "
-            "Synapse 1.71.0",
-        )
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
-            user_id,
             auth_provider_id,
             auth_provider_session_id,
-            duration_in_ms,
         )
 
     @defer.inlineCallbacks

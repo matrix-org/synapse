@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing_extensions import Protocol
+
 try:
     from importlib import metadata
 except ImportError:
@@ -52,7 +54,11 @@ def get_sample_labels_value(sample):
 
 class TestMauLimit(unittest.TestCase):
     def test_basic(self):
-        gauge = InFlightGauge(
+        class MetricEntry(Protocol):
+            foo: int
+            bar: int
+
+        gauge: InFlightGauge[MetricEntry] = InFlightGauge(
             "test1", "", labels=["test_label"], sub_metrics=["foo", "bar"]
         )
 
@@ -146,7 +152,7 @@ class CacheMetricsTests(unittest.HomeserverTestCase):
         Caches produce metrics reflecting their state when scraped.
         """
         CACHE_NAME = "cache_metrics_test_fgjkbdfg"
-        cache = DeferredCache(CACHE_NAME, max_entries=777)
+        cache: DeferredCache[str, str] = DeferredCache(CACHE_NAME, max_entries=777)
 
         items = {
             x.split(b"{")[0].decode("ascii"): x.split(b" ")[1].decode("ascii")
