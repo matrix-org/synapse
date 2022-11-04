@@ -1642,6 +1642,16 @@ room to be interesting to the application service.</p>
 this will no longer match as you expect. The behavioral mismatch between matching all
 local users and some remote users is why the spec was changed/clarified and this
 caveat is no longer supported.</p>
+<h2 id="legacy-prometheus-metric-names-are-now-disabled-by-default"><a class="header" href="#legacy-prometheus-metric-names-are-now-disabled-by-default">Legacy Prometheus metric names are now disabled by default</a></h2>
+<p>Synapse v1.71.0 disables legacy Prometheus metric names by default.
+For administrators that still rely on them and have not yet had chance to update their
+uses of the metrics, it's still possible to specify <code>enable_legacy_metrics: true</code> in
+the configuration to re-enable them temporarily.</p>
+<p>Synapse v1.73.0 will <strong>remove legacy metric names altogether</strong> and at that point,
+it will no longer be possible to re-enable them.</p>
+<p>If you do not use metrics or you have already updated your Grafana dashboard(s),
+Prometheus console(s) and alerting rule(s), there is no action needed.</p>
+<p>See <a href="upgrade.html#deprecation-of-legacy-prometheus-metric-names">v1.69.0: Deprecation of legacy Prometheus metric names</a>.</p>
 <h1 id="upgrading-to-v1690"><a class="header" href="#upgrading-to-v1690">Upgrading to v1.69.0</a></h1>
 <h2 id="changes-to-the-receipts-replication-streams"><a class="header" href="#changes-to-the-receipts-replication-streams">Changes to the receipts replication streams</a></h2>
 <p>Synapse now includes information indicating if a receipt applies to a thread when
@@ -5265,8 +5275,8 @@ Defaults to false.</p>
 <h3 id="enable_legacy_metrics"><a class="header" href="#enable_legacy_metrics"><code>enable_legacy_metrics</code></a></h3>
 <p>Set to <code>true</code> to publish both legacy and non-legacy Prometheus metric names,
 or to <code>false</code> to only publish non-legacy Prometheus metric names.
-Defaults to <code>true</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
-<strong>In Synapse v1.71.0, this will default to <code>false</code> before being removed in Synapse v1.73.0.</strong></p>
+Defaults to <code>false</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
+<strong>In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to <code>true</code>.</strong></p>
 <p>Legacy metric names include:</p>
 <ul>
 <li>metrics containing colons in the name, such as <code>synapse_util_caches_response_cache:hits</code>, because colons are supposed to be reserved for user-defined recording rules;</li>
@@ -14118,6 +14128,9 @@ altogether in Synapse v1.73.0.</strong></p>
 <tr><td>synapse_http_httppusher_http_pushes_failed_total</td><td>synapse_http_httppusher_http_pushes_failed</td></tr>
 <tr><td>synapse_http_httppusher_badge_updates_processed_total</td><td>synapse_http_httppusher_badge_updates_processed</td></tr>
 <tr><td>synapse_http_httppusher_badge_updates_failed_total</td><td>synapse_http_httppusher_badge_updates_failed</td></tr>
+<tr><td>synapse_admin_mau_current</td><td>synapse_admin_mau:current</td></tr>
+<tr><td>synapse_admin_mau_max</td><td>synapse_admin_mau:max</td></tr>
+<tr><td>synapse_admin_mau_registered_reserved_users</td><td>synapse_admin_mau:registered_reserved_users</td></tr>
 </tbody></table>
 <h2 id="removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310"><a class="header" href="#removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310">Removal of deprecated metrics &amp; time based counters becoming histograms in 0.31.0</a></h2>
 <p>The duplicated metrics deprecated in Synapse 0.27.0 have been removed.</p>
@@ -14330,11 +14343,11 @@ config value.</p>
 <p>When a request is blocked, the response will have the <code>errcode</code> <code>M_RESOURCE_LIMIT_EXCEEDED</code>.</p>
 <h2 id="metrics-1"><a class="header" href="#metrics-1">Metrics</a></h2>
 <p>Synapse records several different prometheus metrics for MAU.</p>
-<p><code>synapse_admin_mau:current</code> records the current MAU figure for native (non-application-service) users.</p>
-<p><code>synapse_admin_mau:max</code> records the maximum MAU as dictated by the <code>max_mau_value</code> config value.</p>
+<p><code>synapse_admin_mau_current</code> records the current MAU figure for native (non-application-service) users.</p>
+<p><code>synapse_admin_mau_max</code> records the maximum MAU as dictated by the <code>max_mau_value</code> config value.</p>
 <p><code>synapse_admin_mau_current_mau_by_service</code> records the current MAU including application service users. The label <code>app_service</code> can be used
 to filter by a specific service ID. This <em>also</em> includes non-application-service users under <code>app_service=native</code> .</p>
-<p><code>synapse_admin_mau:registered_reserved_users</code> records the number of users specified in <code>mau_limits_reserved_threepids</code> which have
+<p><code>synapse_admin_mau_registered_reserved_users</code> records the number of users specified in <code>mau_limits_reserved_threepids</code> which have
 registered accounts on the homeserver.</p>
 <div style="break-before: page; page-break-before: always;"></div><h2 id="understanding-synapse-through-grafana-graphs"><a class="header" href="#understanding-synapse-through-grafana-graphs">Understanding Synapse through Grafana graphs</a></h2>
 <p>It is possible to monitor much of the internal state of Synapse using <a href="https://prometheus.io">Prometheus</a> 

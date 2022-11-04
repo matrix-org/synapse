@@ -2115,8 +2115,8 @@ Defaults to false.</p>
 <h3 id="enable_legacy_metrics"><a class="header" href="#enable_legacy_metrics"><code>enable_legacy_metrics</code></a></h3>
 <p>Set to <code>true</code> to publish both legacy and non-legacy Prometheus metric names,
 or to <code>false</code> to only publish non-legacy Prometheus metric names.
-Defaults to <code>true</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
-<strong>In Synapse v1.71.0, this will default to <code>false</code> before being removed in Synapse v1.73.0.</strong></p>
+Defaults to <code>false</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
+<strong>In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to <code>true</code>.</strong></p>
 <p>Legacy metric names include:</p>
 <ul>
 <li>metrics containing colons in the name, such as <code>synapse_util_caches_response_cache:hits</code>, because colons are supposed to be reserved for user-defined recording rules;</li>
