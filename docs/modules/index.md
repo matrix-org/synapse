@@ -1,5 +1,3 @@
-Heyo this is a test!
-
 # Modules
 
 Synapse supports extending its functionality by configuring external modules.
