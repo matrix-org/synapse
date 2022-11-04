@@ -536,7 +536,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 
 class RefreshTokenServlet(RestServlet):
-    PATTERNS = (re.compile("^/_matrix/client/v1/refresh$"),)
+    PATTERNS = client_patterns("/refresh$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
