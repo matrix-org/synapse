@@ -1134,7 +1134,11 @@ class RoomCreationHandler:
         # through a different code path
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
-        event_to_state_group = await self._storage_controllers.state.get_state_group_for_events([member_event_id])
+        event_to_state_group = (
+            await self._storage_controllers.state.get_state_group_for_events(
+                [member_event_id]
+            )
+        )
         current_state_group = event_to_state_group[member_event_id]
 
         events_to_send = []
@@ -1243,14 +1247,9 @@ class RoomCreationHandler:
 
         assert self.hs.datastores is not None
         assert current_state_group is not None
-        state_groups = await self.hs.datastores.state.store_state_deltas_for_batched(
+        await self.hs.datastores.state.store_state_deltas_for_batched(
             events_to_send, room_id, prev_group=current_state_group
         )
-
-        index = 0
-        for _, context in events_to_send:
-            context._state_group = state_groups[index]
-            index += 1
 
         last_event = await self.event_creation_handler.handle_new_client_event(
             creator,

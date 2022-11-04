@@ -520,8 +520,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         current_state_ids: Optional[StateMap[str]],
     ) -> int:
         """Store a new set of state, returning a newly assigned state group.
+
         At least one of `current_state_ids` and `prev_group` must be provided. Whenever
         `prev_group` is not None, `delta_ids` must also not be None.
+
         Args:
             event_id: The event ID for which the state was calculated
             room_id
@@ -531,6 +533,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 `current_state_ids`.
             current_state_ids: The state to store. Map of (type, state_key)
                 to event_id.
+
         Returns:
             The state group ID
         """
@@ -545,7 +548,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             txn: LoggingTransaction, prev_group: int, delta_ids: StateMap[str]
         ) -> Optional[int]:
             """Try and persist the new group as a delta.
+
             Requires that we have the state as a delta from a previous state group.
+
             Returns:
                 The state group if successfully created, or None if the state
                 needs to be persisted as a full state.

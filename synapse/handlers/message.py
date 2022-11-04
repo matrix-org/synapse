@@ -580,7 +580,7 @@ class EventCreationHandler:
         the event using the parameter state_map, thus this parameter must be provided
         if for_batch is True. The subsequently created event and context are suitable
         for being batched up and bulk persisted to the database with other similarly
-        created events. todo: must batch state groups
+        created events. todo: remind must batch state groups if for_batch?
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
         etc.
@@ -1066,9 +1066,9 @@ class EventCreationHandler:
         for_batch: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client. If bool for_batch is true, will
-        create an event using the prev_event_ids, and will create an event context todo: note that event context has not state group?
-        for
-        the event using the parameters state_map, thus this parameter if for_batch is True.
+        create an event using the prev_event_ids, and will create an event context
+        (todo: note that event context has not state group if batched?)
+        for the event using the parameters state_map, thus this parameter if for_batch is True.
         The subsequently created event and context are suitable for being batched up
         and bulk persisted to the database with other similarly created events.
 
@@ -1167,7 +1167,9 @@ class EventCreationHandler:
             event = await builder.build(
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
-            context = EventContext(self._storage_controllers)
+            context = await self.state.compute_event_context_for_batched(
+                event, state_map
+            )
         else:
             event = await builder.build(
                 prev_event_ids=prev_event_ids,
