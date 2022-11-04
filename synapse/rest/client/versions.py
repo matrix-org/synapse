@@ -119,6 +119,8 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for simple HTTP rendezvous as per MSC3886
                     "org.matrix.msc3886": self.config.experimental.msc3886_endpoint
                     is not None,
+                    # Adds support for relation-based redactions as per MSC3912.
+                    "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
                 },
             },
         )

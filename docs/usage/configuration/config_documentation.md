@@ -2441,8 +2441,8 @@ enable_metrics: true
 
 Set to `true` to publish both legacy and non-legacy Prometheus metric names,
 or to `false` to only publish non-legacy Prometheus metric names.
-Defaults to `true`. Has no effect if `enable_metrics` is `false`.
-**In Synapse v1.71.0, this will default to `false` before being removed in Synapse v1.73.0.**
+Defaults to `false`. Has no effect if `enable_metrics` is `false`.
+**In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to `true`.**
 
 Legacy metric names include:
 - metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
@@ -3021,6 +3021,15 @@ Options for each entry include:
      which is set to the claims returned by the UserInfo Endpoint and/or
      in the ID Token.
 
+* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications. 
+  Those notifications are expected to be received on `/_synapse/client/oidc/backchannel_logout`.
+  Defaults to `false`.
+
+* `backchannel_logout_ignore_sub`: by default, the OIDC Back-Channel Logout feature checks that the
+  `sub` claim matches the subject claim received during login. This check can be disabled by setting
+  this to `true`. Defaults to `false`.
+
+  You might want to disable this if the `subject_claim` returned by the mapping provider is not `sub`.
 
 It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under

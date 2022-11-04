@@ -128,3 +128,6 @@ class ExperimentalConfig(Config):
         self.msc3886_endpoint: Optional[str] = experimental.get(
             "msc3886_endpoint", None
         )
+
+        # MSC3912: Relation-based redactions.
+        self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)

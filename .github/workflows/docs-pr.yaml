@@ -1,0 +1,34 @@
+name: Prepare documentation PR preview
+
+on:
+  pull_request:
+    paths:
+      - docs
+
+jobs:
+  pages:
+    name: GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup mdbook
+        uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
+        with:
+          mdbook-version: '0.4.17'
+
+      - name: Build the documentation
+        # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
+        # However, we're using docs/README.md for other purposes and need to pick a new page
+        # as the default. Let's opt for the welcome page instead.
+        run: |
+          mdbook build
+          cp book/welcome_and_overview.html book/index.html
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: book
+          path: book
+          # We'll only use this in a workflow_run, then we're done with it
+          retention-days: 1

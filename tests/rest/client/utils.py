@@ -410,6 +410,43 @@ class RestHelper:
 
         return channel.json_body
 
+    def get_event(
+        self,
+        room_id: str,
+        event_id: str,
+        tok: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+    ) -> JsonDict:
+        """Request a specific event from the server.
+
+        Args:
+            room_id: the room in which the event was sent.
+            event_id: the event's ID.
+            tok: the token to request the event with.
+            expect_code: the expected HTTP status for the response.
+
+        Returns:
+            The event as a dict.
+        """
+        path = f"/_matrix/client/v3/rooms/{room_id}/event/{event_id}"
+        if tok:
+            path = path + f"?access_token={tok}"
+
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            path,
+        )
+
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            channel.code,
+            channel.result["body"],
+        )
+
+        return channel.json_body
+
     def _read_write_state(
         self,
         room_id: str,
@@ -553,6 +590,34 @@ class RestHelper:
 
         return channel.json_body
 
+    def whoami(
+        self,
+        access_token: str,
+        expect_code: Literal[HTTPStatus.OK, HTTPStatus.UNAUTHORIZED] = HTTPStatus.OK,
+    ) -> JsonDict:
+        """Perform a 'whoami' request, which can be a quick way to check for access
+        token validity
+
+        Args:
+            access_token: The user token to use during the request
+            expect_code: The return code to expect from attempting the whoami request
+        """
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            "account/whoami",
+            access_token=access_token,
+        )
+
+        assert channel.code == expect_code, "Exepcted: %d, got %d, resp: %r" % (
+            expect_code,
+            channel.code,
+            channel.result["body"],
+        )
+
+        return channel.json_body
+
     def fake_oidc_server(self, issuer: str = TEST_OIDC_ISSUER) -> FakeOidcServer:
         """Create a ``FakeOidcServer``.
 
@@ -572,6 +637,7 @@ class RestHelper:
         fake_server: FakeOidcServer,
         remote_user_id: str,
         with_sid: bool = False,
+        idp_id: Optional[str] = None,
         expected_status: int = 200,
     ) -> Tuple[JsonDict, FakeAuthorizationGrant]:
         """Log in (as a new user) via OIDC
@@ -588,7 +654,11 @@ class RestHelper:
         client_redirect_url = "https://x"
         userinfo = {"sub": remote_user_id}
         channel, grant = self.auth_via_oidc(
-            fake_server, userinfo, client_redirect_url, with_sid=with_sid
+            fake_server,
+            userinfo,
+            client_redirect_url,
+            with_sid=with_sid,
+            idp_id=idp_id,
         )
 
         # expect a confirmation page
@@ -623,6 +693,7 @@ class RestHelper:
         client_redirect_url: Optional[str] = None,
         ui_auth_session_id: Optional[str] = None,
         with_sid: bool = False,
+        idp_id: Optional[str] = None,
     ) -> Tuple[FakeChannel, FakeAuthorizationGrant]:
         """Perform an OIDC authentication flow via a mock OIDC provider.
 
@@ -648,6 +719,7 @@ class RestHelper:
             ui_auth_session_id: if set, we will perform a UI Auth flow. The session id
                 of the UI auth.
             with_sid: if True, generates a random `sid` (OIDC session ID)
+            idp_id: if set, explicitely chooses one specific IDP
 
         Returns:
             A FakeChannel containing the result of calling the OIDC callback endpoint.
@@ -665,7 +737,9 @@ class RestHelper:
                 oauth_uri = self.initiate_sso_ui_auth(ui_auth_session_id, cookies)
             else:
                 # otherwise, hit the login redirect endpoint
-                oauth_uri = self.initiate_sso_login(client_redirect_url, cookies)
+                oauth_uri = self.initiate_sso_login(
+                    client_redirect_url, cookies, idp_id=idp_id
+                )
 
         # we now have a URI for the OIDC IdP, but we skip that and go straight
         # back to synapse's OIDC callback resource. However, we do need the "state"
@@ -742,7 +816,10 @@ class RestHelper:
         return channel, grant
 
     def initiate_sso_login(
-        self, client_redirect_url: Optional[str], cookies: MutableMapping[str, str]
+        self,
+        client_redirect_url: Optional[str],
+        cookies: MutableMapping[str, str],
+        idp_id: Optional[str] = None,
     ) -> str:
         """Make a request to the login-via-sso redirect endpoint, and return the target
 
@@ -753,6 +830,7 @@ class RestHelper:
             client_redirect_url: the client redirect URL to pass to the login redirect
                 endpoint
             cookies: any cookies returned will be added to this dict
+            idp_id: if set, explicitely chooses one specific IDP
 
         Returns:
             the URI that the client gets redirected to (ie, the SSO server)
@@ -761,6 +839,12 @@ class RestHelper:
         if client_redirect_url:
             params["redirectUrl"] = client_redirect_url
 
+        uri = "/_matrix/client/r0/login/sso/redirect"
+        if idp_id is not None:
+            uri = f"{uri}/{idp_id}"
+
+        uri = f"{uri}?{urllib.parse.urlencode(params)}"
+
         # hit the redirect url (which should redirect back to the redirect url. This
         # is the easiest way of figuring out what the Host header ought to be set to
         # to keep Synapse happy.
@@ -768,7 +852,7 @@ class RestHelper:
             self.hs.get_reactor(),
             self.site,
             "GET",
-            "/_matrix/client/r0/login/sso/redirect?" + urllib.parse.urlencode(params),
+            uri,
         )
         assert channel.code == 302
 
