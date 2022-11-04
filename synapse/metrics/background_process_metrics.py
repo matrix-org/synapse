@@ -174,8 +174,10 @@ class _BackgroundProcess:
             diff = new_stats - self._reported_stats
         self._reported_stats = new_stats
 
-        _background_process_ru_utime.labels(self.desc).inc(diff.ru_utime)
-        _background_process_ru_stime.labels(self.desc).inc(diff.ru_stime)
+        # For unknown reasons, the difference in times can be negative. See comment in
+        # synapse.http.request_metrics.RequestMetrics.update_metrics.
+        _background_process_ru_utime.labels(self.desc).inc(max(diff.ru_utime, 0))
+        _background_process_ru_stime.labels(self.desc).inc(max(diff.ru_stime, 0))
         _background_process_db_txn_count.labels(self.desc).inc(diff.db_txn_count)
         _background_process_db_txn_duration.labels(self.desc).inc(
             diff.db_txn_duration_sec

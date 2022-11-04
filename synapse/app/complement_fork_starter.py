@@ -55,13 +55,13 @@ import os
 import signal
 import sys
 from types import FrameType
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from twisted.internet.main import installReactor
 
 # a list of the original signal handlers, before we installed our custom ones.
 # We restore these in our child processes.
-_original_signal_handlers: dict[int, Any] = {}
+_original_signal_handlers: Dict[int, Any] = {}
 
 
 class ProxiedReactor:

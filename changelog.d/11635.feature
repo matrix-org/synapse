@@ -1,1 +1,0 @@
-Allow use of postgres and sqllite full-text search operators in search queries.

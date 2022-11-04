@@ -50,7 +50,7 @@ class SQLBaseStore(metaclass=ABCMeta):
 
         self.external_cached_functions: Dict[str, CachedFunction] = {}
 
-    def process_replication_rows(
+    def process_replication_rows(  # noqa: B027 (no-op by design)
         self,
         stream_name: str,
         instance_name: str,
