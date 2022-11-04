@@ -3,7 +3,7 @@ name: Prepare documentation PR preview
 on:
   pull_request:
     paths:
-      - docs
+      - docs/**
 
 jobs:
   pages:
