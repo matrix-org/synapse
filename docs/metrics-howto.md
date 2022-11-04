@@ -209,6 +209,9 @@ altogether in Synapse v1.73.0.**
 | synapse_http_httppusher_http_pushes_failed_total                             | synapse_http_httppusher_http_pushes_failed                             |
 | synapse_http_httppusher_badge_updates_processed_total                        | synapse_http_httppusher_badge_updates_processed                        |
 | synapse_http_httppusher_badge_updates_failed_total                           | synapse_http_httppusher_badge_updates_failed                           |
+| synapse_admin_mau_current                                                    | synapse_admin_mau:current                                              |
+| synapse_admin_mau_max                                                        | synapse_admin_mau:max                                                  |
+| synapse_admin_mau_registered_reserved_users                                  | synapse_admin_mau:registered_reserved_users                            |
 
 Removal of deprecated metrics & time based counters becoming histograms in 0.31.0
 ---------------------------------------------------------------------------------

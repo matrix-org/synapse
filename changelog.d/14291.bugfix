@@ -1,1 +1,0 @@
-Prevent history insertion ([MSC2716](https://github.com/matrix-org/matrix-spec-proposals/pull/2716)) during an partial join ([MSC3706](https://github.com/matrix-org/matrix-spec-proposals/pull/3706)).

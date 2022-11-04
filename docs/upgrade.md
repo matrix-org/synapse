@@ -116,6 +116,22 @@ local users and some remote users is why the spec was changed/clarified and this
 caveat is no longer supported.
 
 
+## Legacy Prometheus metric names are now disabled by default
+
+Synapse v1.71.0 disables legacy Prometheus metric names by default.
+For administrators that still rely on them and have not yet had chance to update their
+uses of the metrics, it's still possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and at that point,
+it will no longer be possible to re-enable them.
+
+If you do not use metrics or you have already updated your Grafana dashboard(s),
+Prometheus console(s) and alerting rule(s), there is no action needed.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names).
+
+
 # Upgrading to v1.69.0
 
 ## Changes to the receipts replication streams
