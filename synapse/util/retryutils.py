@@ -51,7 +51,7 @@ class NotRetryingDestination(Exception):
             destination: the domain in question
         """
 
-        msg = "Not retrying server %s." % (destination,)
+        msg = f"Not retrying server {destination} because we tried it recently retry_last_ts={retry_last_ts} and we won't check for another retry_interval={retry_interval}ms."
         super().__init__(msg)
 
         self.retry_last_ts = retry_last_ts

@@ -267,6 +267,8 @@ pub enum Condition {
 #[serde(tag = "kind")]
 pub enum KnownCondition {
     EventMatch(EventMatchCondition),
+    #[serde(rename = "im.nheko.msc3664.related_event_match")]
+    RelatedEventMatch(RelatedEventMatchCondition),
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -297,6 +299,20 @@ pub struct EventMatchCondition {
     pub pattern: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_type: Option<Cow<'static, str>>,
+}
+
+/// The body of a [`Condition::RelatedEventMatch`]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RelatedEventMatchCondition {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<Cow<'static, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<Cow<'static, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_type: Option<Cow<'static, str>>,
+    pub rel_type: Cow<'static, str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_fallbacks: Option<bool>,
 }
 
 /// The collection of push rules for a user.
@@ -391,15 +407,21 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
+    msc3664_enabled: bool,
 }
 
 #[pymethods]
 impl FilteredPushRules {
     #[new]
-    pub fn py_new(push_rules: PushRules, enabled_map: BTreeMap<String, bool>) -> Self {
+    pub fn py_new(
+        push_rules: PushRules,
+        enabled_map: BTreeMap<String, bool>,
+        msc3664_enabled: bool,
+    ) -> Self {
         Self {
             push_rules,
             enabled_map,
+            msc3664_enabled,
         }
     }
 
@@ -414,13 +436,25 @@ impl FilteredPushRules {
     /// Iterates over all the rules and their enabled state, including base
     /// rules, in the order they should be executed in.
     fn iter(&self) -> impl Iterator<Item = (&PushRule, bool)> {
-        self.push_rules.iter().map(|r| {
-            let enabled = *self
-                .enabled_map
-                .get(&*r.rule_id)
-                .unwrap_or(&r.default_enabled);
-            (r, enabled)
-        })
+        self.push_rules
+            .iter()
+            .filter(|rule| {
+                // Ignore disabled experimental push rules
+                if !self.msc3664_enabled
+                    && rule.rule_id == "global/override/.im.nheko.msc3664.reply"
+                {
+                    return false;
+                }
+
+                true
+            })
+            .map(|r| {
+                let enabled = *self
+                    .enabled_map
+                    .get(&*r.rule_id)
+                    .unwrap_or(&r.default_enabled);
+                (r, enabled)
+            })
     }
 }
 
@@ -444,6 +478,17 @@ fn test_deserialize_condition() {
     let json = r#"{"kind":"event_match","key":"content.body","pattern":"coffee"}"#;
 
     let _: Condition = serde_json::from_str(json).unwrap();
+}
+
+#[test]
+fn test_deserialize_unstable_msc3664_condition() {
+    let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern":"coffee","rel_type":"m.in_reply_to"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RelatedEventMatch(_))
+    ));
 }
 
 #[test]

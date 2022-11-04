@@ -98,6 +98,9 @@ class ExperimentalConfig(Config):
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
 
+        # MSC3664: Pushrules to match on related events
+        self.msc3664_enabled: bool = experimental.get("msc3664_enabled", False)
+
         # MSC3848: Introduce errcodes for specific event sending failures
         self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
 
@@ -125,3 +128,6 @@ class ExperimentalConfig(Config):
         self.msc3886_endpoint: Optional[str] = experimental.get(
             "msc3886_endpoint", None
         )
+
+        # MSC3912: Relation-based redactions.
+        self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
