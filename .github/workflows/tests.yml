@@ -393,7 +393,7 @@ jobs:
           - python-version: "3.7"
             postgres-version: "10"
 
-          - python-version: "3.10"
+          - python-version: "3.11"
             postgres-version: "14"
 
     services:
