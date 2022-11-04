@@ -1134,7 +1134,8 @@ class RoomCreationHandler:
         # through a different code path
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
-        current_state_group = await self._storage_controllers.state.get_state_group_for_events([member_event_id]).value
+        event_to_state_group = await self._storage_controllers.state.get_state_group_for_events([member_event_id])
+        current_state_group = event_to_state_group[member_event_id]
 
         events_to_send = []
         # We treat the power levels override specially as this needs to be one
@@ -1142,7 +1143,7 @@ class RoomCreationHandler:
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
             power_event, power_context = await create_event(
-                EventTypes.PowerLevels, pl_content, False
+                EventTypes.PowerLevels, pl_content, True
             )
             events_to_send.append((power_event, power_context))
         else:
@@ -1190,7 +1191,7 @@ class RoomCreationHandler:
             pl_event, pl_context = await create_event(
                 EventTypes.PowerLevels,
                 power_level_content,
-                False,
+                True,
             )
             events_to_send.append((pl_event, pl_context))
 
