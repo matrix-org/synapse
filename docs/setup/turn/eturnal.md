@@ -105,14 +105,12 @@ On other platforms, `eturnal` is [built from source](https://github.com/processo
 
     ```yaml
         listen:
-            -
-            ip: "::"
-            port: 3478
-            transport: udp
-            -
-            ip: "::"
-            port: 3478
-            transport: tcp
+            - ip: "::"
+              port: 3478
+              transport: udp
+            - ip: "::"
+              port: 3478
+              transport: tcp
             #-
             #  ip: "::"
             #  port: 5349
