@@ -1,3 +1,25 @@
+Synapse 1.71.0rc2 (2022-11-04)
+==============================
+
+Improved Documentation
+----------------------
+
+- Replace references to legacy metrics `synapse_admin_mau` with new metric names. ([\#14358](https://github.com/matrix-org/synapse/issues/14358))
+- Include monthly active user metrics in the list of legacy metrics names. ([\#14360](https://github.com/matrix-org/synapse/issues/14360))
+
+
+Deprecations and Removals
+-------------------------
+
+- Disable legacy Prometheus metric names by default. They can still be re-enabled for now, but they will be removed altogether in Synapse 1.73.0. ([\#14353](https://github.com/matrix-org/synapse/issues/14353))
+
+
+Internal Changes
+----------------
+
+- Run unit tests against Python 3.11. ([\#13812](https://github.com/matrix-org/synapse/issues/13812))
+
+
 Synapse (Next) (2022-11-01)
 =========================
 
