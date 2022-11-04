@@ -1080,6 +1080,13 @@ class RoomCreationHandler:
             for_batch: bool,
             **kwargs: Any,
         ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+            """
+            Creates an event and associated event context.
+            Args:
+                etype: the type of event to be created
+                content: content of the event
+                for_batch: whether the event is being created for batch persisting
+            """
             nonlocal depth
             nonlocal prev_event
 
