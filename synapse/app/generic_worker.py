@@ -48,7 +48,6 @@ from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
@@ -99,6 +98,7 @@ from synapse.storage.databases.main.appservice import (
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
+from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.directory import DirectoryWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
 from synapse.storage.databases.main.lock import LockStore
@@ -232,7 +232,7 @@ class GenericWorkerSlavedStore(
     EndToEndRoomKeyStore,
     PresenceStore,
     DeviceInboxWorkerStore,
-    SlavedDeviceStore,
+    DeviceWorkerStore,
     TagsWorkerStore,
     AccountDataWorkerStore,
     CensorEventsStore,

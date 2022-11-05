@@ -28,7 +28,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.server import HomeServer
@@ -39,6 +38,7 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceWorkerStore,
 )
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
+from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
@@ -54,7 +54,7 @@ logger = logging.getLogger("synapse.app.admin_cmd")
 class AdminCmdSlavedStore(
     SlavedFilteringStore,
     SlavedEventStore,
-    SlavedDeviceStore,
+    DeviceWorkerStore,
     TagsWorkerStore,
     DeviceInboxWorkerStore,
     AccountDataWorkerStore,
