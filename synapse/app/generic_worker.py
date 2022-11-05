@@ -48,7 +48,6 @@ from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.rest.admin import register_servlets_for_media_repo
@@ -101,6 +100,11 @@ from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
 from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.directory import DirectoryWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
+from synapse.storage.databases.main.event_push_actions import (
+    EventPushActionsWorkerStore,
+)
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.lock import LockStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
@@ -113,15 +117,21 @@ from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.room_batch import RoomBatchStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
+from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
+from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
 from synapse.types import JsonDict
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.httpresourcetree import create_resource_tree
@@ -237,7 +247,6 @@ class GenericWorkerSlavedStore(
     AccountDataWorkerStore,
     CensorEventsStore,
     ClientIpWorkerStore,
-    SlavedEventStore,
     SlavedKeyStore,
     RoomWorkerStore,
     RoomBatchStore,
@@ -251,7 +260,16 @@ class GenericWorkerSlavedStore(
     MediaRepositoryStore,
     ServerMetricsStore,
     PusherWorkerStore,
+    RoomMemberWorkerStore,
+    RelationsWorkerStore,
+    EventFederationWorkerStore,
+    EventPushActionsWorkerStore,
+    StateGroupWorkerStore,
+    SignatureWorkerStore,
+    UserErasureWorkerStore,
     ReceiptsWorkerStore,
+    StreamWorkerStore,
+    EventsWorkerStore,
     RegistrationWorkerStore,
     SearchStore,
     TransactionWorkerStore,

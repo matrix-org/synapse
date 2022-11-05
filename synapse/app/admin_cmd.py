@@ -28,7 +28,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.server import HomeServer
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
@@ -39,11 +38,22 @@ from synapse.storage.databases.main.appservice import (
 )
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
 from synapse.storage.databases.main.devices import DeviceWorkerStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
+from synapse.storage.databases.main.event_push_actions import (
+    EventPushActionsWorkerStore,
+)
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.storage.databases.main.state import StateGroupWorkerStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
+from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
 from synapse.types import StateMap
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.logcontext import LoggingContext
@@ -53,7 +63,6 @@ logger = logging.getLogger("synapse.app.admin_cmd")
 
 class AdminCmdSlavedStore(
     SlavedFilteringStore,
-    SlavedEventStore,
     DeviceWorkerStore,
     TagsWorkerStore,
     DeviceInboxWorkerStore,
@@ -61,8 +70,17 @@ class AdminCmdSlavedStore(
     PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
-    RegistrationWorkerStore,
+    RoomMemberWorkerStore,
+    RelationsWorkerStore,
+    EventFederationWorkerStore,
+    EventPushActionsWorkerStore,
+    StateGroupWorkerStore,
+    SignatureWorkerStore,
+    UserErasureWorkerStore,
     ReceiptsWorkerStore,
+    StreamWorkerStore,
+    EventsWorkerStore,
+    RegistrationWorkerStore,
     RoomWorkerStore,
 ):
     def __init__(
