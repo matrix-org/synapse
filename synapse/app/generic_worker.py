@@ -52,7 +52,6 @@ from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
-from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
@@ -111,6 +110,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
@@ -233,7 +233,6 @@ class GenericWorkerSlavedStore(
     PresenceStore,
     DeviceInboxWorkerStore,
     SlavedDeviceStore,
-    SlavedPushRuleStore,
     TagsWorkerStore,
     AccountDataWorkerStore,
     SlavedPusherStore,
@@ -244,6 +243,7 @@ class GenericWorkerSlavedStore(
     RoomWorkerStore,
     RoomBatchStore,
     DirectoryWorkerStore,
+    PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
     ProfileWorkerStore,
