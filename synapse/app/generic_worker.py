@@ -48,7 +48,6 @@ from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
@@ -105,6 +104,7 @@ from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.filtering import FilteringWorkerStore
 from synapse.storage.databases.main.lock import LockStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
@@ -255,7 +255,7 @@ class GenericWorkerSlavedStore(
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
     ProfileWorkerStore,
-    SlavedFilteringStore,
+    FilteringWorkerStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
     ServerMetricsStore,
