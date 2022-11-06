@@ -37,7 +37,7 @@ This will install and start a systemd service called `coturn`.
 
     ```sh
     make
-    make install
+    sudo make install
     ```
 
 ### Configuration
