@@ -178,7 +178,7 @@ This will install and start a systemd service called `coturn`.
 
     * If you used the Debian package (or have set up a systemd unit yourself):
       ```sh
-      systemctl restart coturn
+      sudo systemctl restart coturn
       ```
 
     * If you installed from source:
