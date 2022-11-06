@@ -8,7 +8,7 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 
 The TURN daemon `coturn` is available from a variety of sources such as native package managers, or installation from source.
 
-#### Debian installation
+#### Debian and Ubuntu based distributions
 
 Just install the debian package:
 
