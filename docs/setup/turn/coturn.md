@@ -181,7 +181,7 @@ This will install and start a systemd service called `coturn`.
       sudo systemctl restart coturn
       ```
 
-    * If you installed from source:
+    * If you built from source:
 
       ```sh
       bin/turnserver -o
