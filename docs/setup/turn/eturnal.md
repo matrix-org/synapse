@@ -92,7 +92,7 @@ On other platforms, `eturnal` is [built from source](https://github.com/processo
         blacklist:                # This is the default blacklist.
             - "127.0.0.0/8"         # IPv4 loopback.
             - "::1"                 # IPv6 loopback.
-            #- recommended          # Expands to a number of networks recommended to be
+            - recommended          # Expands to a number of networks recommended to be
                                     # blocked, but includes private networks. Those
                                     # would have to be 'whitelist'ed if eturnal serves
                                     # local clients/peers within such networks.
