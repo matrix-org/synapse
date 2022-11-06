@@ -13,7 +13,7 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
 Just install the debian package:
 
 ```sh
-apt install coturn
+sudo apt install coturn
 ```
 
 This will install and start a systemd service called `coturn`.
