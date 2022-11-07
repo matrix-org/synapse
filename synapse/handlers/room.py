@@ -1085,7 +1085,13 @@ class RoomCreationHandler:
             Args:
                 etype: the type of event to be created
                 content: content of the event
-                for_batch: whether the event is being created for batch persisting
+                for_batch: whether the event is being created for batch persisting. If
+                bool for_batch is true, this will create an event using the prev_event_ids,
+                and will create an event context for the event using the parameters state_map
+                and current_state_group, thus these parameters must be provided in this
+                case if for_batch is True. The subsequently created event and context
+                are suitable for being batched up and bulk persisted to the database
+                with other similarly created events.
             """
             nonlocal depth
             nonlocal prev_event
