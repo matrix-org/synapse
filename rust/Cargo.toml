@@ -23,7 +23,7 @@ name = "synapse.synapse_rust"
 anyhow = "1.0.66"
 lazy_static = "1.4.0"
 log = "0.4.17"
-pyo3 = { version = "0.17.1", features = ["extension-module", "macros", "anyhow", "abi3", "abi3-py37"] }
+pyo3 = { version = "0.17.3", features = ["extension-module", "macros", "anyhow", "abi3", "abi3-py37"] }
 pyo3-log = "0.7.0"
 pythonize = "0.17.0"
 regex = "1.6.0"
