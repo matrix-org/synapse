@@ -201,7 +201,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-        order_by: str = UserSortOrder.USER_ID.value,
+        order_by: str = UserSortOrder.NAME.value,
         direction: str = "f",
         approved: bool = True,
     ) -> Tuple[List[JsonDict], int]:
@@ -261,6 +261,7 @@ class DataStore(
             sql_base = f"""
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                LEFT JOIN erased_users AS eu ON u.name = eu.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -269,7 +270,8 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
+                eu.user_id is not null as erased
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
@@ -277,6 +279,13 @@ class DataStore(
             args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)
+
+            # some of those boolean values are returned as integers when we're on SQLite
+            columns_to_boolify = ["erased"]
+            for user in users:
+                for column in columns_to_boolify:
+                    user[column] = bool(user[column])
+
             return users, count
 
         return await self.db_pool.runInteraction(

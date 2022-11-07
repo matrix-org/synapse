@@ -230,22 +230,17 @@ upstream {upstream_worker_type} {{
 
 # Utility functions
 def log(txt: str) -> None:
-    """Log something to the stdout.
-
-    Args:
-        txt: The text to log.
-    """
     print(txt)
 
 
 def error(txt: str) -> NoReturn:
-    """Log something and exit with an error code.
-
-    Args:
-        txt: The text to log in error.
-    """
-    log(txt)
+    print(txt, file=sys.stderr)
     sys.exit(2)
+
+
+def flush_buffers() -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def convert(src: str, dst: str, **template_vars: object) -> None:
@@ -328,7 +323,7 @@ def generate_base_homeserver_config() -> None:
     # start.py already does this for us, so just call that.
     # note that this script is copied in in the official, monolith dockerfile
     os.environ["SYNAPSE_HTTP_PORT"] = str(MAIN_PROCESS_HTTP_LISTENER_PORT)
-    subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
+    subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"], check=True)
 
 
 def generate_worker_files(
@@ -642,6 +637,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
     log("Starting supervisord")
+    flush_buffers()
     os.execle(
         "/usr/local/bin/supervisord",
         "supervisord",

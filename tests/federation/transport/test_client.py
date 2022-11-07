@@ -15,8 +15,11 @@
 import json
 from unittest.mock import Mock
 
+import ijson.common
+
 from synapse.api.room_versions import RoomVersions
 from synapse.federation.transport.client import SendJoinParser
+from synapse.util import ExceptionBundle
 
 from tests.unittest import TestCase
 
@@ -116,15 +119,22 @@ class SendJoinParserTestCase(TestCase):
         coro_3 = Mock()
         coro_3.close = Mock(side_effect=RuntimeError("Couldn't close coro 3"))
 
+        original_coros = parser._coros
         parser._coros = [coro_1, coro_2, coro_3]
+
+        # Close the original coroutines. If we don't, when we garbage collect them
+        # they will throw, failing the test. (Oddly, this only started in CPython 3.11).
+        for coro in original_coros:
+            try:
+                coro.close()
+            except ijson.common.IncompleteJSONError:
+                pass
 
         # Send half of the data to the parser
         parser.write(serialisation[: len(serialisation) // 2])
 
-        # Close the parser. There should be _some_ kind of exception, but it need not
-        # be that RuntimeError directly. E.g. we might want to raise a wrapper
-        # encompassing multiple errors from multiple coroutines.
-        with self.assertRaises(Exception):
+        # Close the parser. There should be _some_ kind of exception.
+        with self.assertRaises(ExceptionBundle):
             parser.finish()
 
         # In any case, we should have tried to close both coros.

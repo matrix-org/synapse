@@ -18,10 +18,9 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
-            toolchain: stable
-            override: true
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -44,10 +43,9 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
-            toolchain: stable
-            override: true
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -84,10 +82,9 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
         with:
-            toolchain: stable
-            override: true
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Patch dependencies
@@ -151,12 +148,11 @@ jobs:
         run: |
           set -x
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -yqq python3 pipx
-          pipx install poetry==1.1.14
+          pipx install poetry==1.2.0
 
           poetry remove -n twisted
           poetry add -n --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry lock --no-update
-          # NOT IN 1.1.14 poetry lock --check
         working-directory: synapse
 
       - run: |

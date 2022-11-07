@@ -2028,25 +2028,37 @@ class PersistEventsStore:
             redacted_event_id: The event that was redacted.
         """
 
-        # Fetch the current relation of the event being redacted.
-        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
+        # Fetch the relation of the event being redacted.
+        row = self.db_pool.simple_select_one_txn(
             txn,
             table="event_relations",
             keyvalues={"event_id": redacted_event_id},
-            retcol="relates_to_id",
+            retcols=("relates_to_id", "relation_type"),
             allow_none=True,
         )
+        # Nothing to do if no relation is found.
+        if row is None:
+            return
+
+        redacted_relates_to = row["relates_to_id"]
+        rel_type = row["relation_type"]
+        self.db_pool.simple_delete_txn(
+            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
+        )
+
         # Any relation information for the related event must be cleared.
-        if redacted_relates_to is not None:
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_relations_for_event, (redacted_relates_to,)
-            )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_relations_for_event, (redacted_relates_to,)
+        )
+        if rel_type == RelationTypes.ANNOTATION:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
             )
+        if rel_type == RelationTypes.REPLACE:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_applicable_edit, (redacted_relates_to,)
             )
+        if rel_type == RelationTypes.THREAD:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_summary, (redacted_relates_to,)
             )
@@ -2057,9 +2069,38 @@ class PersistEventsStore:
                 txn, self.store.get_threads, (room_id,)
             )
 
-        self.db_pool.simple_delete_txn(
-            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
-        )
+            # Find the new latest event in the thread.
+            sql = """
+            SELECT event_id, topological_ordering, stream_ordering
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND relation_type = ?
+            ORDER BY topological_ordering DESC, stream_ordering DESC
+            LIMIT 1
+            """
+            txn.execute(sql, (redacted_relates_to, RelationTypes.THREAD))
+
+            # If a latest event is found, update the threads table, this might
+            # be the same current latest event (if an earlier event in the thread
+            # was redacted).
+            latest_event_row = txn.fetchone()
+            if latest_event_row:
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="threads",
+                    keyvalues={"room_id": room_id, "thread_id": redacted_relates_to},
+                    values={
+                        "latest_event_id": latest_event_row[0],
+                        "topological_ordering": latest_event_row[1],
+                        "stream_ordering": latest_event_row[2],
+                    },
+                )
+
+            # Otherwise, delete the thread: it no longer exists.
+            else:
+                self.db_pool.simple_delete_one_txn(
+                    txn, table="threads", keyvalues={"thread_id": redacted_relates_to}
+                )
 
     def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase) -> None:
         if isinstance(event.content.get("topic"), str):

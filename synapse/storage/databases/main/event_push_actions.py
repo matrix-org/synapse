@@ -294,6 +294,44 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             self._background_backfill_thread_id,
         )
 
+        # Indexes which will be used to quickly make the thread_id column non-null.
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_thread_id_null",
+            index_name="event_push_actions_thread_id_null",
+            table="event_push_actions",
+            columns=["thread_id"],
+            where_clause="thread_id IS NULL",
+        )
+        self.db_pool.updates.register_background_index_update(
+            "event_push_summary_thread_id_null",
+            index_name="event_push_summary_thread_id_null",
+            table="event_push_summary",
+            columns=["thread_id"],
+            where_clause="thread_id IS NULL",
+        )
+
+        # Check ASAP (and then later, every 1s) to see if we have finished
+        # background updates the event_push_actions and event_push_summary tables.
+        self._clock.call_later(0.0, self._check_event_push_backfill_thread_id)
+        self._event_push_backfill_thread_id_done = False
+
+    @wrap_as_background_process("check_event_push_backfill_thread_id")
+    async def _check_event_push_backfill_thread_id(self) -> None:
+        """
+        Has thread_id finished backfilling?
+
+        If not, we need to just-in-time update it so the queries work.
+        """
+        done = await self.db_pool.updates.has_completed_background_update(
+            "event_push_backfill_thread_id"
+        )
+
+        if done:
+            self._event_push_backfill_thread_id_done = True
+        else:
+            # Reschedule to run.
+            self._clock.call_later(15.0, self._check_event_push_backfill_thread_id)
+
     async def _background_backfill_thread_id(
         self, progress: JsonDict, batch_size: int
     ) -> int:
@@ -525,6 +563,25 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             "receipt_type",
             (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
         )
+
+        # First ensure that the existing rows have an updated thread_id field.
+        if not self._event_push_backfill_thread_id_done:
+            txn.execute(
+                """
+                UPDATE event_push_summary
+                SET thread_id = ?
+                WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                """,
+                (MAIN_TIMELINE, room_id, user_id),
+            )
+            txn.execute(
+                """
+                UPDATE event_push_actions
+                SET thread_id = ?
+                WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                """,
+                (MAIN_TIMELINE, room_id, user_id),
+            )
 
         # First we pull the counts from the summary table.
         #
@@ -1341,6 +1398,25 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 (room_id, user_id, stream_ordering, *thread_args),
             )
 
+            # First ensure that the existing rows have an updated thread_id field.
+            if not self._event_push_backfill_thread_id_done:
+                txn.execute(
+                    """
+                    UPDATE event_push_summary
+                    SET thread_id = ?
+                    WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                    """,
+                    (MAIN_TIMELINE, room_id, user_id),
+                )
+                txn.execute(
+                    """
+                    UPDATE event_push_actions
+                    SET thread_id = ?
+                    WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                    """,
+                    (MAIN_TIMELINE, room_id, user_id),
+                )
+
             # Fetch the notification counts between the stream ordering of the
             # latest receipt and what was previously summarised.
             unread_counts = self._get_notif_unread_count_for_user_room(
@@ -1475,6 +1551,19 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             rotate_to_stream_ordering: The new maximum event stream ordering to summarise.
         """
 
+        # Ensure that any new actions have an updated thread_id.
+        if not self._event_push_backfill_thread_id_done:
+            txn.execute(
+                """
+                UPDATE event_push_actions
+                SET thread_id = ?
+                WHERE ? < stream_ordering AND stream_ordering <= ? AND thread_id IS NULL
+                """,
+                (MAIN_TIMELINE, old_rotate_stream_ordering, rotate_to_stream_ordering),
+            )
+
+        # XXX Do we need to update summaries here too?
+
         # Calculate the new counts that should be upserted into event_push_summary
         sql = """
             SELECT user_id, room_id, thread_id,
@@ -1536,6 +1625,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
+
+        # Ensure that any updated threads have the proper thread_id.
+        if not self._event_push_backfill_thread_id_done:
+            txn.execute_batch(
+                """
+                UPDATE event_push_summary
+                SET thread_id = ?
+                WHERE room_id = ? AND user_id = ? AND thread_id is NULL
+                """,
+                [
+                    (MAIN_TIMELINE, room_id, user_id)
+                    for user_id, room_id, _ in summaries
+                ],
+            )
 
         self.db_pool.simple_upsert_many_txn(
             txn,

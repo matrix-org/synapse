@@ -159,7 +159,13 @@ class RedirectException(CodeMessageException):
 
 class SynapseError(CodeMessageException):
     """A base exception type for matrix errors which have an errcode and error
-    message (as well as an HTTP status code).
+    message (as well as an HTTP status code). These often bubble all the way up to the
+    client API response so the error code and status often reach the client directly as
+    defined here. If the error doesn't make sense to present to a client, then it
+    probably shouldn't be a `SynapseError`. For example, if we contact another
+    homeserver over federation, we shouldn't automatically ferry response errors back to
+    the client on our end (a 500 from a remote server does not make sense to a client
+    when our server did not experience a 500).
 
     Attributes:
         errcode: Matrix error code e.g 'M_FORBIDDEN'
@@ -604,8 +610,20 @@ def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
 
 
 class FederationError(RuntimeError):
-    """This class is used to inform remote homeservers about erroneous
-    PDUs they sent us.
+    """
+    Raised when we process an erroneous PDU.
+
+    There are two kinds of scenarios where this exception can be raised:
+
+    1. We may pull an invalid PDU from a remote homeserver (e.g. during backfill). We
+       raise this exception to signal an error to the rest of the application.
+    2. We may be pushed an invalid PDU as part of a `/send` transaction from a remote
+       homeserver. We raise so that we can respond to the transaction and include the
+       error string in the "PDU Processing Result". The message which will likely be
+       ignored by the remote homeserver and is not machine parse-able since it's just a
+       string.
+
+    TODO: In the future, we should split these usage scenarios into their own error types.
 
     FATAL: The remote server could not interpret the source event.
         (e.g., it was missing a required field)
