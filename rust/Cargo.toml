@@ -26,7 +26,7 @@ log = "0.4.17"
 pyo3 = { version = "0.17.1", features = ["extension-module", "macros", "anyhow", "abi3", "abi3-py37"] }
 pyo3-log = "0.7.0"
 pythonize = "0.17.0"
-regex = "1.6.0"
+regex = "1.7.0"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0.87"
 
