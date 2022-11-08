@@ -204,11 +204,11 @@ config value.</p>
 <p>When a request is blocked, the response will have the <code>errcode</code> <code>M_RESOURCE_LIMIT_EXCEEDED</code>.</p>
 <h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
 <p>Synapse records several different prometheus metrics for MAU.</p>
-<p><code>synapse_admin_mau:current</code> records the current MAU figure for native (non-application-service) users.</p>
-<p><code>synapse_admin_mau:max</code> records the maximum MAU as dictated by the <code>max_mau_value</code> config value.</p>
+<p><code>synapse_admin_mau_current</code> records the current MAU figure for native (non-application-service) users.</p>
+<p><code>synapse_admin_mau_max</code> records the maximum MAU as dictated by the <code>max_mau_value</code> config value.</p>
 <p><code>synapse_admin_mau_current_mau_by_service</code> records the current MAU including application service users. The label <code>app_service</code> can be used
 to filter by a specific service ID. This <em>also</em> includes non-application-service users under <code>app_service=native</code> .</p>
-<p><code>synapse_admin_mau:registered_reserved_users</code> records the number of users specified in <code>mau_limits_reserved_threepids</code> which have
+<p><code>synapse_admin_mau_registered_reserved_users</code> records the number of users specified in <code>mau_limits_reserved_threepids</code> which have
 registered accounts on the homeserver.</p>
 
                     </main>

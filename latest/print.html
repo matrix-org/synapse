@@ -1624,6 +1624,34 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1710"><a class="header" href="#upgrading-to-v1710">Upgrading to v1.71.0</a></h1>
+<h2 id="removal-of-the-generate_short_term_login_token-module-api-method"><a class="header" href="#removal-of-the-generate_short_term_login_token-module-api-method">Removal of the <code>generate_short_term_login_token</code> module API method</a></h2>
+<p>As announced with the release of <a href="upgrade.html#deprecation-of-the-generate_short_term_login_token-module-api-method">Synapse 1.69.0</a>, the deprecated <code>generate_short_term_login_token</code> module method has been removed.</p>
+<p>Modules relying on it can instead use the <code>create_login_token</code> method.</p>
+<h2 id="changes-to-the-events-received-by-application-services-interest"><a class="header" href="#changes-to-the-events-received-by-application-services-interest">Changes to the events received by application services (interest)</a></h2>
+<p>To align with spec (changed in
+<a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3905">MSC3905</a>), Synapse now
+only considers local users to be interesting. In other words, the <code>users</code> namespace
+regex is only be applied against local users of the homeserver.</p>
+<p>Please note, this probably doesn't affect the expected behavior of your application
+service, since an interesting local user in a room still means all messages in the room
+(from local or remote users) will still be considered interesting. And matching a room
+with the <code>rooms</code> or <code>aliases</code> namespace regex will still consider all events sent in the
+room to be interesting to the application service.</p>
+<p>If one of your application service's <code>users</code> regex was intending to match a remote user,
+this will no longer match as you expect. The behavioral mismatch between matching all
+local users and some remote users is why the spec was changed/clarified and this
+caveat is no longer supported.</p>
+<h2 id="legacy-prometheus-metric-names-are-now-disabled-by-default"><a class="header" href="#legacy-prometheus-metric-names-are-now-disabled-by-default">Legacy Prometheus metric names are now disabled by default</a></h2>
+<p>Synapse v1.71.0 disables legacy Prometheus metric names by default.
+For administrators that still rely on them and have not yet had chance to update their
+uses of the metrics, it's still possible to specify <code>enable_legacy_metrics: true</code> in
+the configuration to re-enable them temporarily.</p>
+<p>Synapse v1.73.0 will <strong>remove legacy metric names altogether</strong> and at that point,
+it will no longer be possible to re-enable them.</p>
+<p>If you do not use metrics or you have already updated your Grafana dashboard(s),
+Prometheus console(s) and alerting rule(s), there is no action needed.</p>
+<p>See <a href="upgrade.html#deprecation-of-legacy-prometheus-metric-names">v1.69.0: Deprecation of legacy Prometheus metric names</a>.</p>
 <h1 id="upgrading-to-v1690"><a class="header" href="#upgrading-to-v1690">Upgrading to v1.69.0</a></h1>
 <h2 id="changes-to-the-receipts-replication-streams"><a class="header" href="#changes-to-the-receipts-replication-streams">Changes to the receipts replication streams</a></h2>
 <p>Synapse now includes information indicating if a receipt applies to a thread when
@@ -3407,7 +3435,7 @@ including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
 reverse proxy, this should be the URL to reach Synapse via the proxy.
 Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
-'listeners' below).</p>
+<a href="usage/configuration/config_documentation.html#listeners">'listeners'</a> below).</p>
 <p>Defaults to <code>https://&lt;server_name&gt;/</code>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">public_baseurl: https://example.com/
@@ -4401,7 +4429,8 @@ when Synapse is started.</p>
 <p>Config options related to logging.</p>
 <hr />
 <h3 id="log_config"><a class="header" href="#log_config"><code>log_config</code></a></h3>
-<p>This option specifies a yaml python logging config file as described <a href="https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema">here</a>.</p>
+<p>This option specifies a yaml python logging config file as described
+<a href="https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema">here</a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">log_config: &quot;CONFDIR/SERVERNAME.log.config&quot;
 </code></pre>
@@ -5246,8 +5275,8 @@ Defaults to false.</p>
 <h3 id="enable_legacy_metrics"><a class="header" href="#enable_legacy_metrics"><code>enable_legacy_metrics</code></a></h3>
 <p>Set to <code>true</code> to publish both legacy and non-legacy Prometheus metric names,
 or to <code>false</code> to only publish non-legacy Prometheus metric names.
-Defaults to <code>true</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
-<strong>In Synapse v1.71.0, this will default to <code>false</code> before being removed in Synapse v1.73.0.</strong></p>
+Defaults to <code>false</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
+<strong>In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to <code>true</code>.</strong></p>
 <p>Legacy metric names include:</p>
 <ul>
 <li>metrics containing colons in the name, such as <code>synapse_util_caches_response_cache:hits</code>, because colons are supposed to be reserved for user-defined recording rules;</li>
@@ -5431,6 +5460,11 @@ is still supported for backwards-compatibility, but it is deprecated.</p>
 <p><code>trusted_key_servers</code> defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
 <code>suppress_key_server_warning</code> to true.</p>
+<p>If the use of a trusted key server has to be deactivated, e.g. in a private
+federation or for privacy reasons, this can be realised by setting
+an empty array (<code>trusted_key_servers: []</code>). Then Synapse will request the keys
+directly from the server that owns the keys. If Synapse does not get keys directly
+from the server, the events of this server will be rejected.</p>
 <p>Options for each entry in the list include:</p>
 <ul>
 <li><code>server_name</code>: the name of the server. Required.</li>
@@ -5792,6 +5826,17 @@ without modifications.</p>
 <p>When rendering, the Jinja2 templates are given a 'user' variable,
 which is set to the claims returned by the UserInfo Endpoint and/or
 in the ID Token.</p>
+</li>
+<li>
+<p><code>backchannel_logout_enabled</code>: set to <code>true</code> to process OIDC Back-Channel Logout notifications. 
+Those notifications are expected to be received on <code>/_synapse/client/oidc/backchannel_logout</code>.
+Defaults to <code>false</code>.</p>
+</li>
+<li>
+<p><code>backchannel_logout_ignore_sub</code>: by default, the OIDC Back-Channel Logout feature checks that the
+<code>sub</code> claim matches the subject claim received during login. This check can be disabled by setting
+this to <code>true</code>. Defaults to <code>false</code>.</p>
+<p>You might want to disable this if the <code>subject_claim</code> returned by the mapping provider is not <code>sub</code>.</p>
 </li>
 </ul>
 <p>It is possible to configure Synapse to only allow logins if certain attributes
@@ -6163,7 +6208,7 @@ of unread messages.</li>
 <h2 id="rooms"><a class="header" href="#rooms">Rooms</a></h2>
 <p>Config options relating to rooms.</p>
 <hr />
-<h3 id="encryption_enabled_by_default"><a class="header" href="#encryption_enabled_by_default"><code>encryption_enabled_by_default</code></a></h3>
+<h3 id="encryption_enabled_by_default_for_room_type"><a class="header" href="#encryption_enabled_by_default_for_room_type"><code>encryption_enabled_by_default_for_room_type</code></a></h3>
 <p>Controls whether locally-created rooms should be end-to-end encrypted by
 default.</p>
 <p>Possible options are &quot;all&quot;, &quot;invite&quot;, and &quot;off&quot;. They are defined as:</p>
@@ -6421,31 +6466,82 @@ mostly related to trace sampling which is documented <a href="https://www.jaeger
         false
 </code></pre>
 <hr />
-<h2 id="workers"><a class="header" href="#workers">Workers</a></h2>
-<p>Configuration options related to workers.</p>
+<h2 id="coordinating-workers"><a class="header" href="#coordinating-workers">Coordinating workers</a></h2>
+<p>Configuration options related to workers which belong in the main config file
+(usually called <code>homeserver.yaml</code>).
+A Synapse deployment can scale horizontally by running multiple Synapse processes
+called <em>workers</em>. Incoming requests are distributed between workers to handle higher
+loads. Some workers are privileged and can accept requests from other workers.</p>
+<p>As a result, the worker configuration is divided into two parts.</p>
+<ol>
+<li>The first part (in this section of the manual) defines which shardable tasks
+are delegated to privileged workers. This allows unprivileged workers to make
+request a privileged worker to act on their behalf.</li>
+<li><a href="usage/configuration/config_documentation.html#individual-worker-configuration">The second part</a>
+controls the behaviour of individual workers in isolation.</li>
+</ol>
+<p>For guidance on setting up workers, see the <a href="usage/configuration/../../workers.html">worker documentation</a>.</p>
+<hr />
+<h3 id="worker_replication_secret"><a class="header" href="#worker_replication_secret"><code>worker_replication_secret</code></a></h3>
+<p>A shared secret used by the replication APIs on the main process to authenticate
+HTTP requests from workers.</p>
+<p>The default, this value is omitted (equivalently <code>null</code>), which means that 
+traffic between the workers and the main process is not authenticated.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_replication_secret: &quot;secret_secret&quot;
+</code></pre>
+<hr />
+<h3 id="start_pushers"><a class="header" href="#start_pushers"><code>start_pushers</code></a></h3>
+<p>Controls sending of push notifications on the main process. Set to <code>false</code>
+if using a <a href="usage/configuration/../../workers.html#synapseapppusher">pusher worker</a>. Defaults to <code>true</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">start_pushers: false
+</code></pre>
+<hr />
+<h3 id="pusher_instances"><a class="header" href="#pusher_instances"><code>pusher_instances</code></a></h3>
+<p>It is possible to run multiple <a href="usage/configuration/../../workers.html#synapseapppusher">pusher workers</a>,
+in which case the work is balanced across them. Use this setting to list the pushers by
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>. Ensure the main process and all pusher workers are
+restarted after changing this option.</p>
+<p>If no or only one pusher worker is configured, this setting is not necessary.
+The main process will send out push notifications by default if you do not disable
+it by setting <a href="usage/configuration/config_documentation.html#start_pushers"><code>start_pushers: false</code></a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">start_pushers: false
+pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+</code></pre>
 <hr />
 <h3 id="send_federation"><a class="header" href="#send_federation"><code>send_federation</code></a></h3>
 <p>Controls sending of outbound federation transactions on the main process.
-Set to false if using a federation sender worker. Defaults to true.</p>
+Set to <code>false</code> if using a <a href="usage/configuration/../../workers.html#synapseappfederation_sender">federation sender worker</a>.
+Defaults to <code>true</code>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">send_federation: false
 </code></pre>
 <hr />
 <h3 id="federation_sender_instances"><a class="header" href="#federation_sender_instances"><code>federation_sender_instances</code></a></h3>
-<p>It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders.</p>
+<p>It is possible to run multiple
+<a href="usage/configuration/../../workers.html#synapseappfederation_sender">federation sender worker</a>, in which
+case the work is balanced across them. Use this setting to list the senders.</p>
 <p>This configuration setting must be shared between all federation sender workers, and if
 changed all federation sender workers must be stopped at the same time and then
 started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">federation_sender_instances:
+<pre><code class="language-yaml">send_federation: false
+federation_sender_instances:
   - federation_sender1
 </code></pre>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
-<p>When using workers this should be a map from worker name to the
-HTTP replication listener of the worker, if configured.</p>
+<p>When using workers this should be a map from <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a> to the
+HTTP replication listener of the worker, if configured.
+Each worker declared under <a href="usage/configuration/../../workers.html#stream-writers"><code>stream_writers</code></a> needs 
+a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
+(The main process also needs an HTTP replication listener, but it should not be 
+listed in the <code>instance_map</code>.)</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
   worker1:
@@ -6455,8 +6551,10 @@ HTTP replication listener of the worker, if configured.</p>
 <hr />
 <h3 id="stream_writers"><a class="header" href="#stream_writers"><code>stream_writers</code></a></h3>
 <p>Experimental: When using workers you can define which workers should
-handle event persistence and typing notifications. Any worker
-specified here must also be in the <code>instance_map</code>.</p>
+handle writing to streams such as event persistence and typing notifications.
+Any worker specified here must also be in the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>.</p>
+<p>See the list of available streams in the
+<a href="usage/configuration/../../workers.html#stream-writers">worker documentation</a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">stream_writers:
   events: worker1
@@ -6464,22 +6562,15 @@ specified here must also be in the <code>instance_map</code>.</p>
 </code></pre>
 <hr />
 <h3 id="run_background_tasks_on"><a class="header" href="#run_background_tasks_on"><code>run_background_tasks_on</code></a></h3>
-<p>The worker that is used to run background tasks (e.g. cleaning up expired
-data). If not provided this defaults to the main process.</p>
+<p>The <a href="usage/configuration/../../workers.html#background-tasks">worker</a> that is used to run
+background tasks (e.g. cleaning up expired data). If not provided this
+defaults to the main process.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">run_background_tasks_on: worker1
 </code></pre>
 <hr />
-<h3 id="worker_replication_secret"><a class="header" href="#worker_replication_secret"><code>worker_replication_secret</code></a></h3>
-<p>A shared secret used by the replication APIs to authenticate HTTP requests
-from workers.</p>
-<p>By default this is unused and traffic is not authenticated.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_secret: &quot;secret_secret&quot;
-</code></pre>
 <h3 id="redis"><a class="header" href="#redis"><code>redis</code></a></h3>
-<p>Configuration for Redis when using workers. This <em>must</em> be enabled when
-using workers (unless using old style direct TCP configuration).
+<p>Configuration for Redis when using workers. This <em>must</em> be enabled when using workers.
 This setting has the following sub-options:</p>
 <ul>
 <li><code>enabled</code>: whether to use Redis support. Defaults to false.</li>
@@ -6494,6 +6585,90 @@ localhost and 6379</li>
   port: 6379
   password: &lt;secret_password&gt;
 </code></pre>
+<hr />
+<h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>
+<p>These options configure an individual worker, in its worker configuration file.
+They should be not be provided when configuring the main process.</p>
+<p>Note also the configuration above for
+<a href="usage/configuration/config_documentation.html#coordinating-workers">coordinating a cluster of workers</a>.</p>
+<p>For guidance on setting up workers, see the <a href="usage/configuration/../../workers.html">worker documentation</a>.</p>
+<hr />
+<h3 id="worker_app"><a class="header" href="#worker_app"><code>worker_app</code></a></h3>
+<p>The type of worker. The currently available worker applications are listed
+in <a href="usage/configuration/../../workers.html#available-worker-applications">worker documentation</a>.</p>
+<p>The most common worker is the
+<a href="usage/configuration/../../workers.html#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+</code></pre>
+<hr />
+<h3 id="worker_name"><a class="header" href="#worker_name"><code>worker_name</code></a></h3>
+<p>A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files. We strongly recommend
+giving each worker a unique <code>worker_name</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_name: generic_worker1
+</code></pre>
+<hr />
+<h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
+<p>The HTTP replication endpoint that it should talk to on the main Synapse process.
+The main Synapse process defines this with a <code>replication</code> resource in
+<a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_replication_host: 127.0.0.1
+</code></pre>
+<hr />
+<h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
+<p>The HTTP replication port that it should talk to on the main Synapse process.
+The main Synapse process defines this with a <code>replication</code> resource in
+<a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_replication_http_port: 9093
+</code></pre>
+<hr />
+<h3 id="worker_listeners"><a class="header" href="#worker_listeners"><code>worker_listeners</code></a></h3>
+<p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option 
+must be declared, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a> 
+in the shared config.</p>
+<p>Workers declared in <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a> will need to include a
+<code>replication</code> listener here, in order to accept internal HTTP requests from
+other workers.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+</code></pre>
+<hr />
+<h3 id="worker_daemonize"><a class="header" href="#worker_daemonize"><code>worker_daemonize</code></a></h3>
+<p>Specifies whether the worker should be started as a daemon process.
+If Synapse is being managed by <a href="usage/configuration/../../systemd-with-workers/README.html">systemd</a>, this option 
+must be omitted or set to <code>false</code>.</p>
+<p>Defaults to <code>false</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_daemonize: true
+</code></pre>
+<hr />
+<h3 id="worker_pid_file"><a class="header" href="#worker_pid_file"><code>worker_pid_file</code></a></h3>
+<p>When running a worker as a daemon, we need a place to store the 
+<a href="https://en.wikipedia.org/wiki/Process_identifier">PID</a> of the worker.
+This option defines the location of that &quot;pid file&quot;.</p>
+<p>This option is required if <code>worker_daemonize</code> is <code>true</code> and ignored 
+otherwise. It has no default.</p>
+<p>See also the <a href="usage/configuration/config_documentation.html#pid_file"><code>pid_file</code> option</a> option for the main Synapse process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_pid_file: DATADIR/generic_worker1.pid
+</code></pre>
+<hr />
+<h3 id="worker_log_config"><a class="header" href="#worker_log_config"><code>worker_log_config</code></a></h3>
+<p>This option specifies a yaml python logging config file as described
+<a href="https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema">here</a>.
+See also the <a href="usage/configuration/config_documentation.html#log_config"><code>log_config</code> option</a> option for the main Synapse process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+</code></pre>
+<hr />
 <h2 id="background-updates"><a class="header" href="#background-updates">Background Updates</a></h2>
 <p>Configuration settings related to background updates.</p>
 <hr />
@@ -6591,7 +6766,7 @@ It should be named <code>&lt;SERVERNAME&gt;.log.config</code> by default.</p>
 # Synapse also supports structured logging for machine readable logs which can
 # be ingested by ELK stacks. See [2] for details.
 #
-# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [1]: https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema
 # [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
@@ -7071,6 +7246,10 @@ maintainer.</p>
 setting in your configuration file.
 See the <a href="usage/configuration/config_documentation.html#oidc_providers">configuration manual</a> for some sample settings, as well as
 the text below for example configurations for specific providers.</p>
+<h2 id="oidc-back-channel-logout"><a class="header" href="#oidc-back-channel-logout">OIDC Back-Channel Logout</a></h2>
+<p>Synapse supports receiving <a href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout</a> notifications.</p>
+<p>This lets the OpenID Connect Provider notify Synapse when a user logs out, so that Synapse can end that user session.
+This feature can be enabled by setting the <code>backchannel_logout_enabled</code> property to <code>true</code> in the provider configuration, and setting the following URL as destination for Back-Channel Logout notifications in your OpenID Connect Provider: <code>[synapse public baseurl]/_synapse/client/oidc/backchannel_logout</code></p>
 <h2 id="sample-configs"><a class="header" href="#sample-configs">Sample configs</a></h2>
 <p>Here are a few configs for providers that should work with Synapse.</p>
 <h3 id="microsoft-azure-active-directory"><a class="header" href="#microsoft-azure-active-directory">Microsoft Azure Active Directory</a></h3>
@@ -7128,6 +7307,8 @@ to install Dex.</p>
 </code></pre>
 <h3 id="keycloak"><a class="header" href="#keycloak">Keycloak</a></h3>
 <p><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a> is an opensource IdP maintained by Red Hat.</p>
+<p>Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
+This can be optionally enabled by setting <code>backchannel_logout_enabled</code> to <code>true</code> in the Synapse configuration, and by setting the &quot;Backchannel Logout URL&quot; in Keycloak.</p>
 <p>Follow the <a href="https://www.keycloak.org/getting-started">Getting Started Guide</a> to install Keycloak and set up a realm.</p>
 <ol>
 <li>
@@ -7151,6 +7332,8 @@ to install Dex.</p>
 <tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
 <tr><td>Access Type</td><td><code>confidential</code></td></tr>
 <tr><td>Valid Redirect URIs</td><td><code>[synapse public baseurl]/_synapse/client/oidc/callback</code></td></tr>
+<tr><td>Backchannel Logout URL (optional)</td><td> <code>[synapse public baseurl]/_synapse/client/oidc/backchannel_logout</code></td></tr>
+<tr><td>Backchannel Logout Session Required (optional)</td><td> <code>On</code></td></tr>
 </tbody></table>
 <ol start="5">
 <li>Click <code>Save</code></li>
@@ -7174,6 +7357,7 @@ to install Dex.</p>
       config:
         localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
+    backchannel_logout_enabled: true # Optional
 </code></pre>
 <h3 id="auth0"><a class="header" href="#auth0">Auth0</a></h3>
 <p><a href="https://auth0.com/">Auth0</a> is a hosted SaaS IdP solution.</p>
@@ -9869,10 +10053,12 @@ need its own configuration file and can take all of its configuration from the
 shared configuration file.</p>
 <h3 id="shared-configuration"><a class="header" href="#shared-configuration">Shared configuration</a></h3>
 <p>Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an &quot;HTTP replication
-listener&quot; for the main process; and secondly, you need to enable redis-based
-replication. Optionally, a shared secret can be used to authenticate HTTP
-traffic between workers. For example:</p>
+file suitable for use with workers. First, you need to enable an
+<a href="usage/configuration/config_documentation.html#listeners">&quot;HTTP replication listener&quot;</a>
+for the main process; and secondly, you need to enable
+<a href="usage/configuration/config_documentation.html#redis">redis-based replication</a>.
+Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
+can be used to authenticate HTTP traffic between workers. For example:</p>
 <pre><code class="language-yaml"># extend the existing `listeners` section. This defines the ports that the
 # main process will listen on.
 listeners:
@@ -9889,23 +10075,26 @@ worker_replication_secret: &quot;&quot;
 redis:
     enabled: true
 </code></pre>
-<p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a> for the full documentation of each option.</p>
+<p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a>
+for the full documentation of each option.</p>
 <p>Under <strong>no circumstances</strong> should the replication listener be exposed to the
 public internet; replication traffic is:</p>
 <ul>
 <li>always unencrypted</li>
-<li>unauthenticated, unless <code>worker_replication_secret</code> is configured</li>
+<li>unauthenticated, unless <a href="usage/configuration/config_documentation.html#worker_replication_secret"><code>worker_replication_secret</code></a>
+is configured</li>
 </ul>
 <h3 id="worker-configuration"><a class="header" href="#worker-configuration">Worker configuration</a></h3>
 <p>In the config file for each worker, you must specify:</p>
 <ul>
-<li>The type of worker (<code>worker_app</code>). The currently available worker applications are listed below.</li>
-<li>A unique name for the worker (<code>worker_name</code>).</li>
+<li>The type of worker (<a href="usage/configuration/config_documentation.html#worker_app"><code>worker_app</code></a>).
+The currently available worker applications are listed <a href="workers.html#available-worker-applications">below</a>.</li>
+<li>A unique name for the worker (<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>).</li>
 <li>The HTTP replication endpoint that it should talk to on the main synapse process
-(<code>worker_replication_host</code> and <code>worker_replication_http_port</code>)</li>
-<li>If handling HTTP requests, a <code>worker_listeners</code> option with an <code>http</code>
-listener, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code></a>
-option in the shared config.</li>
+(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
+<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>).</li>
+<li>If handling HTTP requests, a <a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a> option
+with an <code>http</code> listener.</li>
 <li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>).</li>
 </ul>
@@ -10063,7 +10252,8 @@ For multiple workers not handling the SSO endpoints properly, see
 <a href="https://github.com/matrix-org/synapse/issues/7530">#7530</a> and
 <a href="https://github.com/matrix-org/synapse/issues/9427">#9427</a>.</p>
 <p>Note that a <a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a>
-with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the <code>worker_listeners</code>
+with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the
+<a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a>
 option in the worker config.</p>
 <h4 id="load-balancing"><a class="header" href="#load-balancing">Load balancing</a></h4>
 <p>It is possible to run multiple instances of this worker app, with incoming requests
@@ -10096,9 +10286,10 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 of the main process to a particular worker.</p>
 <p>To enable this, the worker must have a
 <a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
-have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
-can handle multiple streams, but unless otherwise documented, each stream can only
-have a single writer.</p>
+have a <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
+and be listed in the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>
+config. The same worker can handle multiple streams, but unless otherwise documented,
+each stream can only have a single writer.</p>
 <p>For example, to move event persistence off to a dedicated worker, the shared
 configuration would include:</p>
 <pre><code class="language-yaml">instance_map:
@@ -10138,9 +10329,24 @@ worker_log_config: /etc/matrix-synapse/event-persister-log.yaml
 be routed to the workers handling that stream. See below for the currently supported
 streams and the endpoints associated with them:</p>
 <h5 id="the-events-stream"><a class="header" href="#the-events-stream">The <code>events</code> stream</a></h5>
-<p>The <code>events</code> stream experimentally supports having multiple writers, where work
-is sharded between them by room ID. Note that you <em>must</em> restart all worker
-instances when adding or removing event persisters. An example <code>stream_writers</code>
+<p>The <code>events</code> stream experimentally supports having multiple writer workers, where load
+is sharded between them by room ID. Each writer is called an <em>event persister</em>. They are
+responsible for</p>
+<ul>
+<li>receiving new events,</li>
+<li>linking them to those already in the room <a href="development/room-dag-concepts.html">DAG</a>,</li>
+<li>persisting them to the DB, and finally</li>
+<li>updating the events stream.</li>
+</ul>
+<p>Because load is sharded in this way, you <em>must</em> restart all worker instances when 
+adding or removing event persisters.</p>
+<p>An <code>event_persister</code> should not be mistaken for an <code>event_creator</code>.
+An <code>event_creator</code> listens for requests from clients to create new events and does
+so. It will then pass those events over HTTP replication to any configured event
+persisters (or the main process if none are configured).</p>
+<p>Note that <code>event_creator</code>s and <code>event_persister</code>s are implemented using the same
+<a href="workers.html#synapse.app.generic_worker"><code>synapse.app.generic_worker</code></a>.</p>
+<p>An example <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a>
 configuration with multiple writers:</p>
 <pre><code class="language-yaml">stream_writers:
     events:
@@ -10179,13 +10385,15 @@ the stream writer for the <code>presence</code> stream:</p>
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled). This worker doesn't handle any REST endpoints itself.</p>
-<p>To enable this, the worker must have a <code>worker_name</code> and can be configured to run
-background tasks. For example, to move background tasks to a dedicated worker,
-the shared configuration would include:</p>
+<p>To enable this, the worker must have a unique
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
+and can be configured to run background tasks. For example, to move background tasks
+to a dedicated worker, the shared configuration would include:</p>
 <pre><code class="language-yaml">run_background_tasks_on: background_worker
 </code></pre>
-<p>You might also wish to investigate the <code>update_user_directory_from_worker</code> and
-<code>media_instance_running_background_jobs</code> settings.</p>
+<p>You might also wish to investigate the
+<a href="workers.html#updating-the-user-directory"><code>update_user_directory_from_worker</code></a> and
+<a href="workers.html#synapseappmedia_repository"><code>media_instance_running_background_jobs</code></a> settings.</p>
 <p>An example for a dedicated background worker instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: background_worker
@@ -10223,11 +10431,15 @@ after setting this option in the shared configuration!</p>
 worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
-REST endpoints itself, but you should set <code>start_pushers: False</code> in the
+REST endpoints itself, but you should set
+<a href="usage/configuration/config_documentation.html#start_pushers"><code>start_pushers: false</code></a> in the
 shared configuration file to stop the main synapse sending push notifications.</p>
-<p>To run multiple instances at once the <code>pusher_instances</code> option should list all
-pusher instances by their worker name, e.g.:</p>
-<pre><code class="language-yaml">pusher_instances:
+<p>To run multiple instances at once the
+<a href="usage/configuration/config_documentation.html#pusher_instances"><code>pusher_instances</code></a>
+option should list all pusher instances by their
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>, e.g.:</p>
+<pre><code class="language-yaml">start_pushers: false
+pusher_instances:
     - pusher_worker1
     - pusher_worker2
 </code></pre>
@@ -10250,13 +10462,18 @@ shared configuration file to stop the main synapse sending appservice notificati
 <p>Note this worker cannot be load-balanced: only one instance should be active.</p>
 <h3 id="synapseappfederation_sender"><a class="header" href="#synapseappfederation_sender"><code>synapse.app.federation_sender</code></a></h3>
 <p>Handles sending federation traffic to other servers. Doesn't handle any
-REST endpoints itself, but you should set <code>send_federation: False</code> in the
-shared configuration file to stop the main synapse sending this traffic.</p>
+REST endpoints itself, but you should set
+<a href="usage/configuration/config_documentation.html#send_federation"><code>send_federation: false</code></a>
+in the shared configuration file to stop the main synapse sending this traffic.</p>
 <p>If running multiple federation senders then you must list each
-instance in the <code>federation_sender_instances</code> option by their <code>worker_name</code>.
+instance in the
+<a href="usage/configuration/config_documentation.html#federation_sender_instances"><code>federation_sender_instances</code></a>
+option by their
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>.
 All instances must be stopped and started when adding or removing instances.
 For example:</p>
-<pre><code class="language-yaml">federation_sender_instances:
+<pre><code class="language-yaml">send_federation: false
+federation_sender_instances:
     - federation_sender1
     - federation_sender2
 </code></pre>
@@ -10282,7 +10499,9 @@ worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
 ^/_synapse/admin/v1/quarantine_media/.*$
 ^/_synapse/admin/v1/users/.*/media$
 </code></pre>
-<p>You should also set <code>enable_media_repo: False</code> in the shared configuration
+<p>You should also set
+<a href="usage/configuration/config_documentation.html#enable_media_repo"><code>enable_media_repo: False</code></a>
+in the shared configuration
 file to stop the main synapse running background jobs related to managing the
 media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.</p>
@@ -12474,6 +12693,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api">Ad
     &quot;is_guest&quot;: 0,
     &quot;admin&quot;: 0,
     &quot;deactivated&quot;: 0,
+    &quot;erased&quot;: false,
     &quot;shadow_banned&quot;: 0,
     &quot;creation_ts&quot;: 1560432506,
     &quot;appservice_id&quot;: null,
@@ -12594,6 +12814,7 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;admin&quot;: 0,
             &quot;user_type&quot;: null,
             &quot;deactivated&quot;: 0,
+            &quot;erased&quot;: false,
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User One&gt;&quot;,
             &quot;avatar_url&quot;: null,
@@ -12604,6 +12825,7 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;admin&quot;: 1,
             &quot;user_type&quot;: null,
             &quot;deactivated&quot;: 0,
+            &quot;erased&quot;: false,
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User Two&gt;&quot;,
             &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
@@ -12685,6 +12907,7 @@ User objects contain the following fields:</p>
 <li><code>user_type</code> - string - Type of the user. Normal users are type <code>None</code>.
 This allows user type specific behaviour. There are also types <code>support</code> and <code>bot</code>. </li>
 <li><code>deactivated</code> - bool - Status if that user has been marked as deactivated.</li>
+<li><code>erased</code> - bool - Status if that user has been marked as erased.</li>
 <li><code>shadow_banned</code> - bool - Status if that user has been marked as shadow banned.</li>
 <li><code>displayname</code> - string - The user's display name if they have set one.</li>
 <li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>
@@ -13905,6 +14128,9 @@ altogether in Synapse v1.73.0.</strong></p>
 <tr><td>synapse_http_httppusher_http_pushes_failed_total</td><td>synapse_http_httppusher_http_pushes_failed</td></tr>
 <tr><td>synapse_http_httppusher_badge_updates_processed_total</td><td>synapse_http_httppusher_badge_updates_processed</td></tr>
 <tr><td>synapse_http_httppusher_badge_updates_failed_total</td><td>synapse_http_httppusher_badge_updates_failed</td></tr>
+<tr><td>synapse_admin_mau_current</td><td>synapse_admin_mau:current</td></tr>
+<tr><td>synapse_admin_mau_max</td><td>synapse_admin_mau:max</td></tr>
+<tr><td>synapse_admin_mau_registered_reserved_users</td><td>synapse_admin_mau:registered_reserved_users</td></tr>
 </tbody></table>
 <h2 id="removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310"><a class="header" href="#removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310">Removal of deprecated metrics &amp; time based counters becoming histograms in 0.31.0</a></h2>
 <p>The duplicated metrics deprecated in Synapse 0.27.0 have been removed.</p>
@@ -14117,11 +14343,11 @@ config value.</p>
 <p>When a request is blocked, the response will have the <code>errcode</code> <code>M_RESOURCE_LIMIT_EXCEEDED</code>.</p>
 <h2 id="metrics-1"><a class="header" href="#metrics-1">Metrics</a></h2>
 <p>Synapse records several different prometheus metrics for MAU.</p>
-<p><code>synapse_admin_mau:current</code> records the current MAU figure for native (non-application-service) users.</p>
-<p><code>synapse_admin_mau:max</code> records the maximum MAU as dictated by the <code>max_mau_value</code> config value.</p>
+<p><code>synapse_admin_mau_current</code> records the current MAU figure for native (non-application-service) users.</p>
+<p><code>synapse_admin_mau_max</code> records the maximum MAU as dictated by the <code>max_mau_value</code> config value.</p>
 <p><code>synapse_admin_mau_current_mau_by_service</code> records the current MAU including application service users. The label <code>app_service</code> can be used
 to filter by a specific service ID. This <em>also</em> includes non-application-service users under <code>app_service=native</code> .</p>
-<p><code>synapse_admin_mau:registered_reserved_users</code> records the number of users specified in <code>mau_limits_reserved_threepids</code> which have
+<p><code>synapse_admin_mau_registered_reserved_users</code> records the number of users specified in <code>mau_limits_reserved_threepids</code> which have
 registered accounts on the homeserver.</p>
 <div style="break-before: page; page-break-before: always;"></div><h2 id="understanding-synapse-through-grafana-graphs"><a class="header" href="#understanding-synapse-through-grafana-graphs">Understanding Synapse through Grafana graphs</a></h2>
 <p>It is possible to monitor much of the internal state of Synapse using <a href="https://prometheus.io">Prometheus</a> 

@@ -176,6 +176,7 @@ for a server admin: see <a href="../usage/administration/admin_api">Admin API</a
     &quot;is_guest&quot;: 0,
     &quot;admin&quot;: 0,
     &quot;deactivated&quot;: 0,
+    &quot;erased&quot;: false,
     &quot;shadow_banned&quot;: 0,
     &quot;creation_ts&quot;: 1560432506,
     &quot;appservice_id&quot;: null,
@@ -296,6 +297,7 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;admin&quot;: 0,
             &quot;user_type&quot;: null,
             &quot;deactivated&quot;: 0,
+            &quot;erased&quot;: false,
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User One&gt;&quot;,
             &quot;avatar_url&quot;: null,
@@ -306,6 +308,7 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;admin&quot;: 1,
             &quot;user_type&quot;: null,
             &quot;deactivated&quot;: 0,
+            &quot;erased&quot;: false,
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User Two&gt;&quot;,
             &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
@@ -387,6 +390,7 @@ User objects contain the following fields:</p>
 <li><code>user_type</code> - string - Type of the user. Normal users are type <code>None</code>.
 This allows user type specific behaviour. There are also types <code>support</code> and <code>bot</code>. </li>
 <li><code>deactivated</code> - bool - Status if that user has been marked as deactivated.</li>
+<li><code>erased</code> - bool - Status if that user has been marked as erased.</li>
 <li><code>shadow_banned</code> - bool - Status if that user has been marked as shadow banned.</li>
 <li><code>displayname</code> - string - The user's display name if they have set one.</li>
 <li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>

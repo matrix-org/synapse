@@ -210,10 +210,12 @@ need its own configuration file and can take all of its configuration from the
 shared configuration file.</p>
 <h3 id="shared-configuration"><a class="header" href="#shared-configuration">Shared configuration</a></h3>
 <p>Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an &quot;HTTP replication
-listener&quot; for the main process; and secondly, you need to enable redis-based
-replication. Optionally, a shared secret can be used to authenticate HTTP
-traffic between workers. For example:</p>
+file suitable for use with workers. First, you need to enable an
+<a href="usage/configuration/config_documentation.html#listeners">&quot;HTTP replication listener&quot;</a>
+for the main process; and secondly, you need to enable
+<a href="usage/configuration/config_documentation.html#redis">redis-based replication</a>.
+Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
+can be used to authenticate HTTP traffic between workers. For example:</p>
 <pre><code class="language-yaml"># extend the existing `listeners` section. This defines the ports that the
 # main process will listen on.
 listeners:
@@ -230,23 +232,26 @@ worker_replication_secret: &quot;&quot;
 redis:
     enabled: true
 </code></pre>
-<p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a> for the full documentation of each option.</p>
+<p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a>
+for the full documentation of each option.</p>
 <p>Under <strong>no circumstances</strong> should the replication listener be exposed to the
 public internet; replication traffic is:</p>
 <ul>
 <li>always unencrypted</li>
-<li>unauthenticated, unless <code>worker_replication_secret</code> is configured</li>
+<li>unauthenticated, unless <a href="usage/configuration/config_documentation.html#worker_replication_secret"><code>worker_replication_secret</code></a>
+is configured</li>
 </ul>
 <h3 id="worker-configuration"><a class="header" href="#worker-configuration">Worker configuration</a></h3>
 <p>In the config file for each worker, you must specify:</p>
 <ul>
-<li>The type of worker (<code>worker_app</code>). The currently available worker applications are listed below.</li>
-<li>A unique name for the worker (<code>worker_name</code>).</li>
+<li>The type of worker (<a href="usage/configuration/config_documentation.html#worker_app"><code>worker_app</code></a>).
+The currently available worker applications are listed <a href="#available-worker-applications">below</a>.</li>
+<li>A unique name for the worker (<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>).</li>
 <li>The HTTP replication endpoint that it should talk to on the main synapse process
-(<code>worker_replication_host</code> and <code>worker_replication_http_port</code>)</li>
-<li>If handling HTTP requests, a <code>worker_listeners</code> option with an <code>http</code>
-listener, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code></a>
-option in the shared config.</li>
+(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
+<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>).</li>
+<li>If handling HTTP requests, a <a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a> option
+with an <code>http</code> listener.</li>
 <li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>).</li>
 </ul>
@@ -404,7 +409,8 @@ For multiple workers not handling the SSO endpoints properly, see
 <a href="https://github.com/matrix-org/synapse/issues/7530">#7530</a> and
 <a href="https://github.com/matrix-org/synapse/issues/9427">#9427</a>.</p>
 <p>Note that a <a href="usage/configuration/config_documentation.html#listeners">HTTP listener</a>
-with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the <code>worker_listeners</code>
+with <code>client</code> and <code>federation</code> <code>resources</code> must be configured in the
+<a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a>
 option in the worker config.</p>
 <h4 id="load-balancing"><a class="header" href="#load-balancing">Load balancing</a></h4>
 <p>It is possible to run multiple instances of this worker app, with incoming requests
@@ -437,9 +443,10 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 of the main process to a particular worker.</p>
 <p>To enable this, the worker must have a
 <a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
-have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
-can handle multiple streams, but unless otherwise documented, each stream can only
-have a single writer.</p>
+have a <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
+and be listed in the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>
+config. The same worker can handle multiple streams, but unless otherwise documented,
+each stream can only have a single writer.</p>
 <p>For example, to move event persistence off to a dedicated worker, the shared
 configuration would include:</p>
 <pre><code class="language-yaml">instance_map:
@@ -479,9 +486,24 @@ worker_log_config: /etc/matrix-synapse/event-persister-log.yaml
 be routed to the workers handling that stream. See below for the currently supported
 streams and the endpoints associated with them:</p>
 <h5 id="the-events-stream"><a class="header" href="#the-events-stream">The <code>events</code> stream</a></h5>
-<p>The <code>events</code> stream experimentally supports having multiple writers, where work
-is sharded between them by room ID. Note that you <em>must</em> restart all worker
-instances when adding or removing event persisters. An example <code>stream_writers</code>
+<p>The <code>events</code> stream experimentally supports having multiple writer workers, where load
+is sharded between them by room ID. Each writer is called an <em>event persister</em>. They are
+responsible for</p>
+<ul>
+<li>receiving new events,</li>
+<li>linking them to those already in the room <a href="development/room-dag-concepts.html">DAG</a>,</li>
+<li>persisting them to the DB, and finally</li>
+<li>updating the events stream.</li>
+</ul>
+<p>Because load is sharded in this way, you <em>must</em> restart all worker instances when 
+adding or removing event persisters.</p>
+<p>An <code>event_persister</code> should not be mistaken for an <code>event_creator</code>.
+An <code>event_creator</code> listens for requests from clients to create new events and does
+so. It will then pass those events over HTTP replication to any configured event
+persisters (or the main process if none are configured).</p>
+<p>Note that <code>event_creator</code>s and <code>event_persister</code>s are implemented using the same
+<a href="#synapse.app.generic_worker"><code>synapse.app.generic_worker</code></a>.</p>
+<p>An example <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a>
 configuration with multiple writers:</p>
 <pre><code class="language-yaml">stream_writers:
     events:
@@ -520,13 +542,15 @@ the stream writer for the <code>presence</code> stream:</p>
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled). This worker doesn't handle any REST endpoints itself.</p>
-<p>To enable this, the worker must have a <code>worker_name</code> and can be configured to run
-background tasks. For example, to move background tasks to a dedicated worker,
-the shared configuration would include:</p>
+<p>To enable this, the worker must have a unique
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
+and can be configured to run background tasks. For example, to move background tasks
+to a dedicated worker, the shared configuration would include:</p>
 <pre><code class="language-yaml">run_background_tasks_on: background_worker
 </code></pre>
-<p>You might also wish to investigate the <code>update_user_directory_from_worker</code> and
-<code>media_instance_running_background_jobs</code> settings.</p>
+<p>You might also wish to investigate the
+<a href="#updating-the-user-directory"><code>update_user_directory_from_worker</code></a> and
+<a href="#synapseappmedia_repository"><code>media_instance_running_background_jobs</code></a> settings.</p>
 <p>An example for a dedicated background worker instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: background_worker
@@ -564,11 +588,15 @@ after setting this option in the shared configuration!</p>
 worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
-REST endpoints itself, but you should set <code>start_pushers: False</code> in the
+REST endpoints itself, but you should set
+<a href="usage/configuration/config_documentation.html#start_pushers"><code>start_pushers: false</code></a> in the
 shared configuration file to stop the main synapse sending push notifications.</p>
-<p>To run multiple instances at once the <code>pusher_instances</code> option should list all
-pusher instances by their worker name, e.g.:</p>
-<pre><code class="language-yaml">pusher_instances:
+<p>To run multiple instances at once the
+<a href="usage/configuration/config_documentation.html#pusher_instances"><code>pusher_instances</code></a>
+option should list all pusher instances by their
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>, e.g.:</p>
+<pre><code class="language-yaml">start_pushers: false
+pusher_instances:
     - pusher_worker1
     - pusher_worker2
 </code></pre>
@@ -591,13 +619,18 @@ shared configuration file to stop the main synapse sending appservice notificati
 <p>Note this worker cannot be load-balanced: only one instance should be active.</p>
 <h3 id="synapseappfederation_sender"><a class="header" href="#synapseappfederation_sender"><code>synapse.app.federation_sender</code></a></h3>
 <p>Handles sending federation traffic to other servers. Doesn't handle any
-REST endpoints itself, but you should set <code>send_federation: False</code> in the
-shared configuration file to stop the main synapse sending this traffic.</p>
+REST endpoints itself, but you should set
+<a href="usage/configuration/config_documentation.html#send_federation"><code>send_federation: false</code></a>
+in the shared configuration file to stop the main synapse sending this traffic.</p>
 <p>If running multiple federation senders then you must list each
-instance in the <code>federation_sender_instances</code> option by their <code>worker_name</code>.
+instance in the
+<a href="usage/configuration/config_documentation.html#federation_sender_instances"><code>federation_sender_instances</code></a>
+option by their
+<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>.
 All instances must be stopped and started when adding or removing instances.
 For example:</p>
-<pre><code class="language-yaml">federation_sender_instances:
+<pre><code class="language-yaml">send_federation: false
+federation_sender_instances:
     - federation_sender1
     - federation_sender2
 </code></pre>
@@ -623,7 +656,9 @@ worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
 ^/_synapse/admin/v1/quarantine_media/.*$
 ^/_synapse/admin/v1/users/.*/media$
 </code></pre>
-<p>You should also set <code>enable_media_repo: False</code> in the shared configuration
+<p>You should also set
+<a href="usage/configuration/config_documentation.html#enable_media_repo"><code>enable_media_repo: False</code></a>
+in the shared configuration
 file to stop the main synapse running background jobs related to managing the
 media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.</p>
