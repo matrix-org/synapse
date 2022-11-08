@@ -464,9 +464,7 @@ class StateHandler:
             # the context should have been updated when storing the state groups but let's
             # be sure - if it does not have a state group there is a problem
             if context._state_group is None:
-                raise RuntimeError(
-                    f"Event {event.event_id} is missing a state group."
-                )
+                raise RuntimeError(f"Event {event.event_id} is missing a state group.")
             current_state_group = context._state_group
 
             key = (event.type, event.state_key)
