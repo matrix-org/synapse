@@ -330,6 +330,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
     A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
     See the [worker documentation](../workers.md) for additional information on workers.
+
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
 SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
