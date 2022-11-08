@@ -81,7 +81,6 @@ class PostgresEngine(
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
-        import pdb; pdb.set_trace()
         if not allow_outdated_version and self._version < 110000:
             raise RuntimeError("Synapse requires PostgreSQL 11 or above.")
 
