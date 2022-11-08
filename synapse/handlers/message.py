@@ -576,11 +576,12 @@ class EventCreationHandler:
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event. If bool for_batch is true, will
-        create an event using the prev_event_ids, and will create an event context for
+        create an event using the prev_event_ids, and will create an event empty context for
         the event using the parameter state_map, thus this parameter must be provided
-        if for_batch is True. The subsequently created event and context are suitable
-        for being batched up and bulk persisted to the database with other similarly
-        created events. todo: remind must batch state groups if for_batch?
+        if for_batch is True. Please note that the caller is then responsible for updating
+        the state group info in the event context (by calling compute_event_context_for_batched).
+        The subsequently created event and context are suitable for being batched up and
+        bulk persisted to the database with other similarly created events.
 
         Creates an FrozenEvent object, filling out auth_events, prev_events,
         etc.
@@ -635,7 +636,8 @@ class EventCreationHandler:
             state_map: A state map of previously created events, used only when creating events
                 for batch persisting
 
-            for_batch: whether the event is being created for batch persisting to the db
+            for_batch: whether the event is being created for batch persisting to the db.
+            If true, both prev_event_ids and state map must be provided
 
         Raises:
             ResourceLimitError if server is blocked to some resource being
@@ -1066,9 +1068,9 @@ class EventCreationHandler:
         for_batch: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client. If bool for_batch is true, will
-        create an event using the prev_event_ids, and will create an event context
-        (todo: note that event context has not state group if batched?)
-        for the event using the parameters state_map, thus this parameter if for_batch is True.
+        create an event using the prev_event_ids, and will create an empty event context.
+        Please note that the caller is then responsible for updating the event context
+        with state group information (by calling compute_event_context_for_batched).
         The subsequently created event and context are suitable for being batched up
         and bulk persisted to the database with other similarly created events.
 
@@ -1106,7 +1108,8 @@ class EventCreationHandler:
             state_map: A state map of previously created events, used only when creating events
                 for batch persisting
 
-            for_batch: whether the event is being created for batch persisting to the db
+            for_batch: whether the event is being created for batch persisting to the db.
+            If for batch is true, both prev_event_ids and state_map must be provided
 
         Returns:
             Tuple of created event, context
@@ -1167,9 +1170,7 @@ class EventCreationHandler:
             event = await builder.build(
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
-            context = await self.state.compute_event_context_for_batched(
-                event, state_map
-            )
+            context = EventContext(self._storage_controllers)
         else:
             event = await builder.build(
                 prev_event_ids=prev_event_ids,
