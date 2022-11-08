@@ -768,20 +768,22 @@ class SsoHandler:
                 )
 
             # download picture
-            response = await self._http_client.request("GET", picture_https_url)
-            if response.code != 200:
+            picture = io.BytesIO()
+            response = await self._http_client.get_file(
+                picture_https_url, picture, self._profile_handler.max_avatar_size
+            )
+            if response[3] != 200:
                 raise Exception(
                     "GET request to download sso avatar image returned {}".format(
                         response.code
                     )
                 )
-            image = await make_deferred_yieldable(readBody(response))
 
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
                 str(content_type),
                 None,
-                io.BytesIO(image),  # convert image into BytesIO
+                picture,
                 content_length,
                 uid,
             )
