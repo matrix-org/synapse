@@ -342,18 +342,18 @@ def check_state_dependent_auth_rules(
 
 
 def _check_size_limits(event: "EventBase") -> None:
-    if len(event.user_id) > 255:
-        raise EventSizeError("'user_id' too large")
-    if len(event.room_id) > 255:
-        raise EventSizeError("'room_id' too large")
-    if event.is_state() and len(event.state_key) > 255:
-        raise EventSizeError("'state_key' too large")
-    if len(event.type) > 255:
-        raise EventSizeError("'type' too large")
-    if len(event.event_id) > 255:
-        raise EventSizeError("'event_id' too large")
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
-        raise EventSizeError("event too large")
+        raise EventSizeError("event too large", strict=True)
+    if len(event.user_id.encode("utf-8")) > 255:
+        raise EventSizeError("'user_id' too large", strict=False)
+    if len(event.room_id.encode("utf-8")) > 255:
+        raise EventSizeError("'room_id' too large", strict=False)
+    if event.is_state() and len(event.state_key.encode("utf-8")) > 255:
+        raise EventSizeError("'state_key' too large", strict=False)
+    if len(event.type.encode("utf-8")) > 255:
+        raise EventSizeError("'type' too large", strict=False)
+    if len(event.event_id.encode("utf-8")) > 255:
+        raise EventSizeError("'event_id' too large", strict=False)
 
 
 def _check_create(event: "EventBase") -> None:
