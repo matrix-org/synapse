@@ -54,7 +54,7 @@ trial_postgres_tests = [
     {
         "python-version": "3.7",
         "database": "postgres",
-        "postgres-version": "10",
+        "postgres-version": "11",
         "extras": "all",
     }
 ]
