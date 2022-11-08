@@ -354,6 +354,8 @@ class MessageSearchTest(HomeserverTestCase):
         """
         Test searching for phrases using typical web search syntax, as per postgres' websearch_to_tsquery.
         This test is skipped unless the postgres instance supports websearch_to_tsquery.
+
+        See https://www.postgresql.org/docs/current/textsearch-controls.html
         """
 
         store = self.hs.get_datastores().main
