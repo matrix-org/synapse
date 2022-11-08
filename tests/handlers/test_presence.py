@@ -15,6 +15,7 @@
 from typing import Optional
 from unittest.mock import Mock, call
 
+from parameterized import parameterized
 from signedjson.key import generate_signing_key
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
@@ -37,6 +38,7 @@ from synapse.rest.client import room
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest
+from tests.replication._base import BaseMultiWorkerStreamTestCase
 
 
 class PresenceUpdateTestCase(unittest.HomeserverTestCase):
@@ -505,7 +507,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(state, new_state)
 
 
-class PresenceHandlerTestCase(unittest.HomeserverTestCase):
+class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
     def prepare(self, reactor, clock, hs):
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
@@ -716,6 +718,7 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
         # our status message should be the same as it was before
         self.assertEqual(state.status_msg, status_msg)
 
+    @parameterized.expand([(False,), (True,)])
     @unittest.override_config(
         {
             "experimental_features": {
@@ -723,16 +726,33 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
             },
         }
     )
-    def test_set_presence_from_syncing_keeps_busy(self):
+    def test_set_presence_from_syncing_keeps_busy(self, test_with_workers: bool):
         """Test that presence set by syncing doesn't affect busy status"""
         user_id = "@test:server"
         status_msg = "I'm busy!"
 
+        worker_hs = None
+        if test_with_workers:
+            # Create a worker that will handle /sync traffic
+            worker_hs = self.make_worker_hs(
+                "synapse.app.generic_worker", {"worker_name": "presence_writer"}
+            )
+
         self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
 
-        self.get_success(
-            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
-        )
+        if test_with_workers and worker_hs is not None:
+            # Sync against a worker instead of the main process. Busy state should still
+            # be preserved in this instance.
+            self.get_success(
+                worker_hs.get_presence_handler().user_syncing(
+                    user_id, True, PresenceState.ONLINE
+                )
+            )
+        else:
+            # Sync against the main process.
+            self.get_success(
+                self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+            )
 
         state = self.get_success(
             self.presence_handler.get_state(UserID.from_string(user_id))
