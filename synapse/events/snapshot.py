@@ -116,25 +116,6 @@ class EventContext:
         )
 
     @staticmethod
-    def without_state_group(
-        storage: "StorageControllers",
-        partial_state: bool = False,
-        state_group_before_event: Optional[int] = None,
-        state_delta_due_to_event: Optional[StateMap[str]] = None,
-        prev_group: Optional[int] = None,
-        delta_ids: Optional[StateMap[str]] = None,
-    ) -> "EventContext":
-        return EventContext(
-            storage=storage,
-            state_group=None,
-            state_group_before_event=state_group_before_event,
-            state_delta_due_to_event=state_delta_due_to_event,
-            prev_group=prev_group,
-            delta_ids=delta_ids,
-            partial_state=partial_state,
-        )
-
-    @staticmethod
     def for_outlier(
         storage: "StorageControllers",
     ) -> "EventContext":
