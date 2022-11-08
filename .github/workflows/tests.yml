@@ -409,7 +409,7 @@ jobs:
       matrix:
         include:
           - python-version: "3.7"
-            postgres-version: "10"
+            postgres-version: "11"
 
           - python-version: "3.11"
             postgres-version: "14"
