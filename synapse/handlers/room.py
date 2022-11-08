@@ -1077,6 +1077,19 @@ class RoomCreationHandler:
             for_batch: bool,
             **kwargs: Any,
         ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+            """
+            Creates an event and associated event context.
+            Args:
+                etype: the type of event to be created
+                content: content of the event
+                for_batch: whether the event is being created for batch persisting. If
+                bool for_batch is true, this will create an event using the prev_event_ids,
+                and will create an event context for the event using the parameters state_map
+                and current_state_group, thus these parameters must be provided in this
+                case if for_batch is True. The subsequently created event and context
+                are suitable for being batched up and bulk persisted to the database
+                with other similarly created events.
+            """
             nonlocal depth
             nonlocal prev_event
 
@@ -1140,6 +1153,14 @@ class RoomCreationHandler:
             )
         )
         current_state_group = event_to_state_group[member_event_id]
+
+        # we need the state group of the membership event as it is the current state group
+        event_to_state = (
+            await self._storage_controllers.state.get_state_group_for_events(
+                [member_event_id]
+            )
+        )
+        current_state_group = event_to_state[member_event_id]
 
         events_to_send = []
         # We treat the power levels override specially as this needs to be one
