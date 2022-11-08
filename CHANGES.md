@@ -1,17 +1,16 @@
 Synapse 1.71.0 (2022-11-08)
 ===========================
 
-No significant changes since 1.71.0rc2.
-
-
-Synapse 1.71.0rc2 (2022-11-04)
-==============================
-
 Please note that, as announced in the release notes for Synapse 1.69.0, legacy Prometheus metric names are now disabled by default.
 They will be removed altogether in Synapse 1.73.0.
 If not already done, server administrators should update their dashboards and alerting rules to avoid using the deprecated metric names.
 See the [upgrade notes](https://matrix-org.github.io/synapse/v1.71/upgrade.html#upgrading-to-v1710) for more details.
 
+No significant changes since 1.71.0rc2.
+
+
+Synapse 1.71.0rc2 (2022-11-04)
+==============================
 
 Improved Documentation
 ----------------------
