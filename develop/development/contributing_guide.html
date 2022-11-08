@@ -355,7 +355,16 @@ Here is how to run your local Synapse checkout against your local Complement che
 <p>The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:</p>
 <ul>
 <li>Passing <code>POSTGRES=1</code> as an environment variable to use the Postgres database instead.</li>
-<li>Passing <code>WORKERS=1</code> as an environment variable to use a workerised setup instead. This option implies the use of Postgres.</li>
+<li>Passing <code>WORKERS=1</code> as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+<ul>
+<li>If setting <code>WORKERS=1</code>, optionally set <code>WORKER_TYPES=</code> to declare which worker
+types you wish to test. A simple comma-delimited string containing the worker types
+defined from the <code>WORKERS_CONFIG</code> template in
+<a href="https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54">here</a>.
+A safe example would be <code>WORKER_TYPES=&quot;federation_inbound, federation_sender, synchrotron&quot;</code>.
+See the <a href="../workers.html">worker documentation</a> for additional information on workers.</li>
+</ul>
+</li>
 </ul>
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>, e.g:</p>
 <pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
