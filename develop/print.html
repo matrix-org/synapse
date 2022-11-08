@@ -1624,6 +1624,11 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1720"><a class="header" href="#upgrading-to-v1720">Upgrading to v1.72.0</a></h1>
+<h2 id="dropping-support-for-postgresql-10"><a class="header" href="#dropping-support-for-postgresql-10">Dropping support for PostgreSQL 10</a></h2>
+<p>In line with our <a href="deprecation_policy.html">deprecation policy</a>, we've dropped
+support for PostgreSQL 10, as it is no longer supported upstream.</p>
+<p>This release of Synapse requires PostgreSQL 11+.</p>
 <h1 id="upgrading-to-v1710"><a class="header" href="#upgrading-to-v1710">Upgrading to v1.71.0</a></h1>
 <h2 id="removal-of-the-generate_short_term_login_token-module-api-method"><a class="header" href="#removal-of-the-generate_short_term_login_token-module-api-method">Removal of the <code>generate_short_term_login_token</code> module API method</a></h2>
 <p>As announced with the release of <a href="upgrade.html#deprecation-of-the-generate_short_term_login_token-module-api-method">Synapse 1.69.0</a>, the deprecated <code>generate_short_term_login_token</code> module method has been removed.</p>
