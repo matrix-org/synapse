@@ -1245,10 +1245,10 @@ class RoomCreationHandler:
             )
             events_to_send.append((encryption_event, encryption_context))
 
-        assert self.hs.datastores is not None
-        assert current_state_group is not None
-        await self.hs.datastores.state.store_state_deltas_for_batched(
-            events_to_send, room_id, prev_group=current_state_group
+        # update event contexts with state group information
+        state = self.hs.get_state_handler()
+        events_to_send = await state.compute_event_context_for_batched(
+            events_to_send, current_state_group, state_map
         )
 
         last_event = await self.event_creation_handler.handle_new_client_event(
