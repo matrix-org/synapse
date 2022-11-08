@@ -499,6 +499,8 @@ class SsoHandler:
                         await self._profile_handler.set_displayname(
                             user_id_obj, requester, attributes.display_name, True
                         )
+                if attributes.picture:
+                    await self.set_avatar(user_id, attributes.picture)
 
         await self._auth_handler.complete_sso_login(
             user_id,
