@@ -716,11 +716,15 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
         # our status message should be the same as it was before
         self.assertEqual(state.status_msg, status_msg)
 
+    @unittest.override_config(
+        {
+            "experimental_features": {
+                "msc3026_enabled": True,
+            },
+        }
+    )
     def test_set_presence_from_syncing_keeps_busy(self):
         """Test that presence set by syncing doesn't affect busy status"""
-        # while this isn't the default
-        self.presence_handler._busy_presence_enabled = True
-
         user_id = "@test:server"
         status_msg = "I'm busy!"
 
