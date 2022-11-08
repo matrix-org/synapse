@@ -426,8 +426,17 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, msg: str):
+    def __init__(self, msg: str, strict: bool):
+        """
+        strict:
+            if True, the PDU must not be persisted, not even as a rejected PDU
+            when received over federation.
+            This is notably true when the entire PDU exceeds the size limit for a PDU,
+            (as opposed to an individual key's size limit being exceeded).
+        """
+
         super().__init__(413, msg, Codes.TOO_LARGE)
+        self.strict = strict
 
 
 class LoginError(SynapseError):
