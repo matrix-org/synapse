@@ -421,6 +421,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             room_id: the id of the room the events were created for
             prev_group: the state group of the last event persisted before the batched events
             were created
+        Returns: list of state groups that correspond to the events in `events_and_context`
         """
 
         def insert_deltas_group_txn(

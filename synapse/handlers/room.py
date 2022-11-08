@@ -1147,12 +1147,6 @@ class RoomCreationHandler:
         # through a different code path
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
-        event_to_state_group = (
-            await self._storage_controllers.state.get_state_group_for_events(
-                [member_event_id]
-            )
-        )
-        current_state_group = event_to_state_group[member_event_id]
 
         # we need the state group of the membership event as it is the current state group
         event_to_state = (
