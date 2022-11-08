@@ -43,6 +43,7 @@ from synapse.api.constants import (
 from synapse.api.errors import (
     AuthError,
     Codes,
+    EventSizeError,
     FederationError,
     FederationPullAttemptBackoffError,
     HttpResponseException,
@@ -1781,6 +1782,17 @@ class FederationEventHandler:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
             context.rejected = RejectedReason.AUTH_ERROR
+            return
+        except EventSizeError as e:
+            if e.strict:
+                # A strict event size error means the event is completely
+                # unpersistable.
+                raise e
+            # Otherwise, for non-strict errors, we just persist the event
+            # as rejected, for moderate compatibility with older Synapse
+            # versions.
+            logger.warning("While validating received event %r: %s", event, e)
+            context.rejected = RejectedReason.OVERSIZED_EVENT
             return
 
         # next, check that we have all of the event's auth events.
