@@ -1738,6 +1738,16 @@ class FederationEventHandler:
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
+                except EventSizeError as e:
+                    if e.strict:
+                        # A strict event size error means the event is completely
+                        # unpersistable.
+                        raise e
+                    # Otherwise, for non-strict errors, we just persist the event
+                    # as rejected, for moderate compatibility with older Synapse
+                    # versions.
+                    logger.warning("While validating received event %r: %s", event, e)
+                    context.rejected = RejectedReason.OVERSIZED_EVENT
 
             events_and_contexts_to_persist.append((event, context))
 
