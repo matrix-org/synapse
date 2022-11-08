@@ -762,7 +762,7 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
 
 
 def _test_sending_local_online_presence_to_local_user(
-    test_case: HomeserverTestCase, test_with_workers: bool = False
+    test_case: BaseMultiWorkerStreamTestCase, test_with_workers: bool = False
 ):
     """Tests that send_local_presence_to_users sends local online presence to local users.
 
