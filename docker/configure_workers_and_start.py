@@ -20,7 +20,7 @@
 #   * SYNAPSE_SERVER_NAME: The desired server_name of the homeserver.
 #   * SYNAPSE_REPORT_STATS: Whether to report stats.
 #   * SYNAPSE_WORKER_TYPES: A comma separated list of worker names as specified in WORKER_CONFIG
-#         below. Leave empty for no workers, or set to '*' for all possible workers.
+#         below. Leave empty for no workers.
 #   * SYNAPSE_AS_REGISTRATION_DIR: If specified, a directory in which .yaml and .yml files
 #         will be treated as Application Service registration files.
 #   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
@@ -58,10 +58,10 @@ MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 #   have to attach by instance_map to the master process and have client endpoints.
 WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     "pusher": {
-        "app": "synapse.app.pusher",
+        "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"start_pushers": False},
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "user_dir": {
@@ -84,7 +84,11 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_synapse/admin/v1/media/.*$",
             "^/_synapse/admin/v1/quarantine_media/.*$",
         ],
-        "shared_extra_conf": {"enable_media_repo": False},
+        # The first configured media worker will run the media background jobs
+        "shared_extra_conf": {
+            "enable_media_repo": False,
+            "media_instance_running_background_jobs": "media_repository1",
+        },
         "worker_extra_conf": "enable_media_repo: true",
     },
     "appservice": {
@@ -95,10 +99,10 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "",
     },
     "federation_sender": {
-        "app": "synapse.app.federation_sender",
+        "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"send_federation": False},
+        "shared_extra_conf": {},
         "worker_extra_conf": "",
     },
     "synchrotron": {
@@ -205,7 +209,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "",
     },
     "frontend_proxy": {
-        "app": "synapse.app.frontend_proxy",
+        "app": "synapse.app.generic_worker",
         "listener_resources": ["client", "replication"],
         "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload"],
         "shared_extra_conf": {},
@@ -326,7 +330,7 @@ def add_worker_roles_to_shared_config(
     worker_port: int,
 ) -> None:
     """Given a dictionary representing a config file shared across all workers,
-    append sharded worker information to it for the current worker_type instance.
+    append appropriate worker information to it for the current worker_type instance.
 
     Args:
         shared_config: The config dict that all worker instances share (after being converted to YAML)
@@ -359,7 +363,7 @@ def add_worker_roles_to_shared_config(
 
     elif worker_type in ["account_data", "presence", "receipts", "to_device", "typing"]:
         # Update the list of stream writers
-        # It's convienent that the name of the worker type is the same as the event stream
+        # It's convenient that the name of the worker type is the same as the stream to write
         shared_config.setdefault("stream_writers", {}).setdefault(
             worker_type, []
         ).append(worker_name)
@@ -370,10 +374,6 @@ def add_worker_roles_to_shared_config(
             "host": "localhost",
             "port": worker_port,
         }
-
-    elif worker_type == "media_repository":
-        # The first configured media worker will run the media background jobs
-        shared_config.setdefault("media_instance_running_background_jobs", worker_name)
 
 
 def generate_base_homeserver_config() -> None:
@@ -483,8 +483,7 @@ def generate_worker_files(
         if worker_config:
             worker_config = worker_config.copy()
         else:
-            log(worker_type + " is an unknown worker type! It will be ignored")
-            continue
+            error(worker_type + " is an unknown worker type! Please fix!")
 
         new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
         worker_type_counter[worker_type] = new_worker_count
