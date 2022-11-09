@@ -10,19 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import io
+from typing import BinaryIO, Callable, Dict, List, Optional, Tuple
+from unittest.mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.client import readBody
+from twisted.web.http_headers import Headers
 
 from synapse.http.client import RawHeaders
-from tests import unittest
-from unittest.mock import Mock
-from twisted.test.proto_helpers import MemoryReactor
-from synapse.util import Clock
-from synapse.server import HomeServer
-from tests.test_utils import SMALL_PNG
-from tests.test_utils import FakeResponse, simple_async_mock
-from twisted.web.http_headers import Headers
-from typing import BinaryIO, Optional, Callable, Tuple, Dict, List
 from synapse.logging.context import make_deferred_yieldable
-from twisted.web.client import readBody
+from synapse.server import HomeServer
+from synapse.util import Clock
+
+from tests import unittest
+from tests.test_utils import SMALL_PNG, FakeResponse, simple_async_mock
 
 
 class TestSSOHandler(unittest.HomeserverTestCase):
