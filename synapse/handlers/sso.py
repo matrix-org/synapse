@@ -772,13 +772,13 @@ class SsoHandler:
 
             # download picture
             picture = io.BytesIO()
-            response = await self._http_client.get_file(
+            download_response = await self._http_client.get_file(
                 picture_https_url, picture, self._profile_handler.max_avatar_size
             )
-            if response[3] != 200:
+            if download_response[3] != 200:
                 raise Exception(
                     "GET request to download sso avatar image returned {}".format(
-                        response.code
+                        download_response[3]
                     )
                 )
 
