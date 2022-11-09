@@ -557,7 +557,6 @@ class RoomCreationHandler:
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
-            ratelimit=False,
         )
 
         # Transfer membership events
@@ -751,6 +750,10 @@ class RoomCreationHandler:
                 )
 
         if ratelimit:
+            # Rate limit once in advance, but don't rate limit the individual
+            # events in the room — room creation isn't atomic and it's very
+            # janky if half the events in the initial state don't make it because
+            # of rate limiting.
             await self.request_ratelimiter.ratelimit(requester)
 
         room_version_id = config.get(
@@ -911,7 +914,6 @@ class RoomCreationHandler:
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
-            ratelimit=ratelimit,
         )
 
         if "name" in config:
@@ -1035,7 +1037,6 @@ class RoomCreationHandler:
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
-        ratelimit: bool = True,
     ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room. Sends the room creation, membership,
         and power level events into the room sequentially, then creates and batches up the
@@ -1043,6 +1044,8 @@ class RoomCreationHandler:
 
         `power_level_content_override` doesn't apply when initial state has
         power level state event content.
+
+        Rate limiting should already have been applied by this point.
 
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
@@ -1077,6 +1080,19 @@ class RoomCreationHandler:
             for_batch: bool,
             **kwargs: Any,
         ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+            """
+            Creates an event and associated event context.
+            Args:
+                etype: the type of event to be created
+                content: content of the event
+                for_batch: whether the event is being created for batch persisting. If
+                bool for_batch is true, this will create an event using the prev_event_ids,
+                and will create an event context for the event using the parameters state_map
+                and current_state_group, thus these parameters must be provided in this
+                case if for_batch is True. The subsequently created event and context
+                are suitable for being batched up and bulk persisted to the database
+                with other similarly created events.
+            """
             nonlocal depth
             nonlocal prev_event
 
@@ -1123,7 +1139,7 @@ class RoomCreationHandler:
             creator.user,
             room_id,
             "join",
-            ratelimit=ratelimit,
+            ratelimit=False,
             content=creator_join_profile,
             new_room=True,
             prev_event_ids=[last_sent_event_id],
@@ -1136,13 +1152,21 @@ class RoomCreationHandler:
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
+        # we need the state group of the membership event as it is the current state group
+        event_to_state = (
+            await self._storage_controllers.state.get_state_group_for_events(
+                [member_event_id]
+            )
+        )
+        current_state_group = event_to_state[member_event_id]
+
         events_to_send = []
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
             power_event, power_context = await create_event(
-                EventTypes.PowerLevels, pl_content, False
+                EventTypes.PowerLevels, pl_content, True
             )
             current_state_group = power_context._state_group
             events_to_send.append((power_event, power_context))
@@ -1191,7 +1215,7 @@ class RoomCreationHandler:
             pl_event, pl_context = await create_event(
                 EventTypes.PowerLevels,
                 power_level_content,
-                False,
+                True,
             )
             current_state_group = pl_context._state_group
             events_to_send.append((pl_event, pl_context))
@@ -1248,7 +1272,10 @@ class RoomCreationHandler:
             events_to_send.append((encryption_event, encryption_context))
 
         last_event = await self.event_creation_handler.handle_new_client_event(
-            creator, events_to_send, ignore_shadow_ban=True
+            creator,
+            events_to_send,
+            ignore_shadow_ban=True,
+            ratelimit=False,
         )
         assert last_event.internal_metadata.stream_ordering is not None
         return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
