@@ -9,6 +9,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import io
+
+from synapse.http.client import RawHeaders
 from tests import unittest
 from unittest.mock import Mock
 from twisted.test.proto_helpers import MemoryReactor
@@ -17,11 +20,9 @@ from synapse.server import HomeServer
 from tests.test_utils import SMALL_PNG
 from tests.test_utils import FakeResponse, simple_async_mock
 from twisted.web.http_headers import Headers
-from typing import BinaryIO, Optional, Callable, Union, Mapping, Tuple, Dict, List
+from typing import BinaryIO, Optional, Callable, Tuple, Dict, List
 from synapse.logging.context import make_deferred_yieldable
 from twisted.web.client import readBody
-
-RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValue"]]
 
 
 class TestSSOHandler(unittest.HomeserverTestCase):
@@ -122,6 +123,10 @@ async def mock_get_file(
     is_allowed_content_type: Optional[Callable[[str], bool]] = None,
 ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
     response = await mock_request("GET", url)
-    output_stream = await make_deferred_yieldable(readBody(response))
+    body = await make_deferred_yieldable(readBody(response))
+    output_stream = io.BytesIO(body)
 
-    return (67, [], "", 200)
+    resp_headers = dict()
+    resp_headers[b"Content-Type"] = [b"image/png"]
+
+    return (67, resp_headers, "", 200)
