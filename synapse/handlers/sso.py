@@ -32,7 +32,6 @@ from urllib.parse import urlencode
 import attr
 from typing_extensions import NoReturn, Protocol
 
-from twisted.web.client import readBody
 from twisted.web.iweb import IRequest
 from twisted.web.server import Request
 
@@ -44,7 +43,6 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable
 from synapse.types import (
     JsonDict,
     UserID,
