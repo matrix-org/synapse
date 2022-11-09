@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Tuple
 from twisted.web.server import Request
 
 from synapse.http.server import HttpServer
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict
 
@@ -78,5 +79,55 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
         return 200, user_devices
 
 
+class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
+    """Ask master to upload keys for the user and send them out over federation to
+    update other servers.
+
+    This must happen on master so that the results can be correctly cached in
+    the database and streamed to workers.( Is this accurate?)
+
+    Calls to e2e_keys_handler.upload_keys_for_user(user_id, device_id, keys) on
+    master to accomplish this.
+    """
+
+    NAME = "upload_keys_for_user"
+    PATH_ARGS = ()
+    CACHE = False
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+
+        self.e2e_keys_handler = hs.get_e2e_keys_handler()
+        self.store = hs.get_datastores().main
+        self.clock = hs.get_clock()
+
+    @staticmethod
+    async def _serialize_payload(  # type: ignore[override]
+        user_id: str, device_id: str, keys: JsonDict
+    ) -> JsonDict:
+
+        return {
+            "user_id": user_id,
+            "device_id": device_id,
+            "keys": keys,
+        }
+
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request
+    ) -> Tuple[int, JsonDict]:
+        content = parse_json_object_from_request(request)
+
+        user_id = content["user_id"]
+        device_id = content["device_id"]
+        keys = content["keys"]
+
+        results = await self.e2e_keys_handler.upload_keys_for_user(
+            user_id, device_id, keys
+        )
+
+        return 200, results
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationUserDevicesResyncRestServlet(hs).register(http_server)
+    ReplicationUploadKeysForUserRestServlet(hs).register(http_server)
