@@ -484,7 +484,6 @@ def generate_worker_files(
             worker_config = worker_config.copy()
         else:
             error(worker_type + " is an unknown worker type! Please fix!")
-            continue
 
         new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
         worker_type_counter[worker_type] = new_worker_count
