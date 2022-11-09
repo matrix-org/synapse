@@ -155,8 +155,6 @@ class WorkerConfig(Config):
         self.worker_name = config.get("worker_name", self.worker_app)
         self.instance_name = self.worker_name or "master"
 
-        self.worker_main_http_uri = config.get("worker_main_http_uri", None)
-
         # This option is really only here to support `--manhole` command line
         # argument.
         manhole = config.get("worker_manhole")
