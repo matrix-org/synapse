@@ -43,7 +43,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         # user_id = "@sso-user:test"
 
         with self.assertLogs() as cm:
-            await handler.set_avatar(user_id, "http://my.server/me.png")
+            self.get_success(set_avatar(user_id, "http://my.server/me.png"))
         self.assertEqual(
             cm.output, ["INFO:synapse.handlers.sso:successfully saved the user avatar"]
         )
