@@ -204,9 +204,8 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
         process to to so, calling the per_item_callback for each item.
 
         Args:
-            room_id (str):
-            task (_EventPersistQueueTask): A _PersistEventsTask or
-                _UpdateCurrentStateTask to process.
+            room_id:
+            task: A _PersistEventsTask or _UpdateCurrentStateTask to process.
 
         Returns:
             the result returned by the `_per_item_callback` passed to

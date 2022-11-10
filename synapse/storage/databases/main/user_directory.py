@@ -185,9 +185,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         - who should be in the user_directory.
 
         Args:
-            progress (dict)
-            batch_size (int): Maximum number of state events to process
-                per cycle.
+            progress
+            batch_size: Maximum number of state events to process per cycle.
 
         Returns:
             number of events processed.

@@ -117,8 +117,7 @@ class ContextResourceUsage:
         """Create a new ContextResourceUsage
 
         Args:
-            copy_from (ContextResourceUsage|None): if not None, an object to
-                copy stats from
+            copy_from: if not None, an object to copy stats from
         """
         if copy_from is None:
             self.reset()
@@ -162,7 +161,7 @@ class ContextResourceUsage:
         """Add another ContextResourceUsage's stats to this one's.
 
         Args:
-            other (ContextResourceUsage): the other resource usage object
+            other: the other resource usage object
         """
         self.ru_utime += other.ru_utime
         self.ru_stime += other.ru_stime
@@ -898,13 +897,12 @@ def defer_to_thread(
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked, and whose threadpool we should use for the
-            function.
+        reactor: The reactor in whose main thread the Deferred will be invoked,
+            and whose threadpool we should use for the function.
 
             Normally this will be hs.get_reactor().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
@@ -939,13 +937,13 @@ def defer_to_threadpool(
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked. Normally this will be hs.get_reactor().
+        reactor: The reactor in whose main thread the Deferred will be invoked.
+            Normally this will be hs.get_reactor().
 
-        threadpool (twisted.python.threadpool.ThreadPool): The threadpool to use for
-            running `f`. Normally this will be hs.get_reactor().getThreadPool().
+        threadpool: The threadpool to use for running `f`. Normally this will be
+            hs.get_reactor().getThreadPool().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 

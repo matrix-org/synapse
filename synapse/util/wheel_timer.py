@@ -90,7 +90,7 @@ class WheelTimer(Generic[T]):
         """Fetch any objects that have timed out
 
         Args:
-            now (ms): Current time in msec
+            now: Current time in msec
 
         Returns:
             list: List of objects that have timed out

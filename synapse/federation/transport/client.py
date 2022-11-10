@@ -280,12 +280,11 @@ class TransportLayerClient:
         Note that this does not append any events to any graphs.
 
         Args:
-            destination (str): address of remote homeserver
-            room_id (str): room to join/leave
-            user_id (str): user to be joined/left
-            membership (str): one of join/leave
-            params (dict[str, str|Iterable[str]]): Query parameters to include in the
-                request.
+            destination: address of remote homeserver
+            room_id: room to join/leave
+            user_id: user to be joined/left
+            membership: one of join/leave
+            params: Query parameters to include in the request.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The result

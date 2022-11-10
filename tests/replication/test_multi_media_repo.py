@@ -246,8 +246,6 @@ def _build_test_server(connection_creator):
     Args:
         connection_creator (IOpenSSLServerConnectionCreator): thing to build
             SSL connections
-        sanlist (list[bytes]): list of the SAN entries for the cert returned
-            by the server
 
     Returns:
         TLSMemoryBIOProtocol
