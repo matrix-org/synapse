@@ -563,7 +563,8 @@ def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
 
 async def filter_events_for_server(
     storage: StorageControllers,
-    server_name: str,
+    target_server_name: str,
+    local_server_name: str,
     events: List[EventBase],
     redact: bool = True,
     check_history_visibility_only: bool = False,
@@ -603,7 +604,7 @@ async def filter_events_for_server(
         # if the server is either in the room or has been invited
         # into the room.
         for ev in memberships.values():
-            assert get_domain_from_id(ev.state_key) == server_name
+            assert get_domain_from_id(ev.state_key) == target_server_name
 
             memtype = ev.membership
             if memtype == Membership.JOIN:
@@ -636,7 +637,7 @@ async def filter_events_for_server(
             if event_to_history_vis[e.event_id]
             not in (HistoryVisibility.SHARED, HistoryVisibility.WORLD_READABLE)
         ],
-        server_name,
+        target_server_name,
     )
 
     to_return = []
@@ -645,6 +646,17 @@ async def filter_events_for_server(
         visible = check_event_is_visible(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
         )
+
+        # Filter out non-local events when we are in the middle of a partial join,
+        # since our servers list can be out of date and we could leak events
+        # to servers not in the room anymore.
+        # This can also be true for local events but we consider it to be
+        # an acceptable risk in this case.
+        if e.origin != local_server_name and await storage.main.is_partial_state_room(
+            e.room_id
+        ):
+            visible = False
+
         if visible and not erased:
             to_return.append(e)
         elif redact:

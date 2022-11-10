@@ -379,6 +379,7 @@ class FederationHandler:
             filtered_extremities = await filter_events_for_server(
                 self._storage_controllers,
                 self.server_name,
+                self.server_name,
                 events_to_check,
                 redact=False,
                 check_history_visibility_only=True,
@@ -1252,7 +1253,7 @@ class FederationHandler:
         )
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, events
+            self._storage_controllers, origin, self.server_name, events
         )
 
         return events
@@ -1283,7 +1284,7 @@ class FederationHandler:
         await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, [event]
+            self._storage_controllers, origin, self.server_name, [event]
         )
         event = events[0]
         return event
@@ -1309,7 +1310,7 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self._storage_controllers, origin, missing_events
+            self._storage_controllers, origin, self.server_name, missing_events
         )
 
         return missing_events
