@@ -51,8 +51,8 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         )
 
         # TODO: ensure avatar returned via user's profile is SMALL_PNG
-        profile_handler = self.hs.get_profile_handler()
-        profile = await profile_handler.get_profile(user_id)
+        # profile_handler = self.hs.get_profile_handler()
+        # profile = await profile_handler.get_profile(user_id)
         # profile["avatar_url"]
 
     @unittest.override_config({"max_avatar_size": 99})
@@ -127,7 +127,4 @@ async def mock_get_file(
     body = await make_deferred_yieldable(readBody(response))
     output_stream = io.BytesIO(body)
 
-    resp_headers = dict()
-    resp_headers[b"Content-Type"] = [b"image/png"]
-
-    return (67, resp_headers, "", 200)
+    return 67, {b"Content-Type": [b"image/png"]}, "", 200
