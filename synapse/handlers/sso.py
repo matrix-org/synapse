@@ -721,6 +721,14 @@ class SsoHandler:
         This downloads the image file from the url provided, store that in
         the media repository and then sets the avatar on user's profile.
 
+        Currently, it only supports server configurations which runs media repository
+        within the same process.
+
+        It silently fails and log a warning by raising exception & catching it internally
+        if it is unable to fetch the image itself (non 200 status code) or
+        if the image supplied is bigger than max allowed size or
+        if the image type is not one of the allowed image types.
+
         Args:
             user_id: matrix user ID in the form @localpart:domain as a string.
 
@@ -768,7 +776,7 @@ class SsoHandler:
                     )
                 )
 
-            # download picture
+            # download picture, enforcing size limit
             picture = io.BytesIO()
             download_response = await self._http_client.get_file(
                 picture_https_url, picture, self._profile_handler.max_avatar_size
