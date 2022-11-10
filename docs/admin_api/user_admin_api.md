@@ -1235,4 +1235,4 @@ Returns a `404` HTTP status code if no user was found, with a response body like
 }
 ```
 
-_Added in Synapse 1.XX.X._
+_Added in Synapse 1.72.0._
