@@ -832,7 +832,7 @@ class ModuleApi:
             **kwargs: named args to be passed to func
 
         Returns:
-            Deferred[object]: result of func
+            Result of func
         """
         # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
@@ -924,8 +924,7 @@ class ModuleApi:
                 to represent 'any') of the room state to acquire.
 
         Returns:
-            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
-                The filtered state events in the room.
+            The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
             self._storage_controllers.state.get_current_state_ids(

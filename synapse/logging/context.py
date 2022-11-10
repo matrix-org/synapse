@@ -341,7 +341,7 @@ class LoggingContext:
         called directly.
 
         Returns:
-            LoggingContext: the current logging context
+            The current logging context
         """
         warnings.warn(
             "synapse.logging.context.LoggingContext.current_context() is deprecated "
@@ -473,8 +473,7 @@ class LoggingContext:
         """Get resources used by this logcontext so far.
 
         Returns:
-            ContextResourceUsage: a *copy* of the object tracking resource
-                usage so far
+            A *copy* of the object tracking resource usage so far
         """
         # we always return a copy, for consistency
         res = self._resource_usage.copy()
@@ -699,7 +698,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
         suffix: suffix to add to the parent context's 'name'.
 
     Returns:
-        LoggingContext: new logging context.
+        A new logging context.
     """
     curr_context = current_context()
     if not curr_context:
@@ -909,7 +908,7 @@ def defer_to_thread(
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     return defer_to_threadpool(reactor, reactor.getThreadPool(), f, *args, **kwargs)
@@ -950,7 +949,7 @@ def defer_to_threadpool(
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     curr_context = current_context()

@@ -153,7 +153,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         argument list.
 
         Returns:
-            dict: If POST/PUT request then dictionary must be JSON serialisable,
+            If POST/PUT request then dictionary must be JSON serialisable,
             otherwise must be appropriate for adding as query args.
         """
         return {}

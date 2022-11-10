@@ -93,7 +93,7 @@ class WheelTimer(Generic[T]):
             now: Current time in msec
 
         Returns:
-            list: List of objects that have timed out
+            List of objects that have timed out
         """
         now_key = int(now / self.bucket_size)
 

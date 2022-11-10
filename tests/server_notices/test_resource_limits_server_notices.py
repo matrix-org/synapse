@@ -356,9 +356,10 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         about it, then joins the system notices room with one of the users created.
 
         Returns:
-            user_id: The ID of the user that joined the room.
-            tok: The access token of the user that joined the room.
-            room_id: The ID of the room that's been joined.
+            A tuple of:
+                user_id: The ID of the user that joined the room.
+                tok: The access token of the user that joined the room.
+                room_id: The ID of the room that's been joined.
         """
         user_id = None
         tok = None

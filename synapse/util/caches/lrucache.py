@@ -796,7 +796,7 @@ class LruCache(Generic[KT, VT]):
         items from the cache.
 
         Returns:
-            bool: Whether the cache changed size or not.
+            Whether the cache changed size or not.
         """
         if not self.apply_cache_factor_from_config:
             return False

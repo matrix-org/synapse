@@ -72,7 +72,7 @@ class StreamChangeCache:
         items from the cache.
 
         Returns:
-            bool: Whether the cache changed size or not.
+            Whether the cache changed size or not.
         """
         new_size = math.floor(self._original_max_size * factor)
         if new_size != self._max_size:
