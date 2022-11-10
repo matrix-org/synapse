@@ -184,5 +184,5 @@ This will install and start a systemd service called `coturn`.
     * If you built from source:
 
       ```sh
-      bin/turnserver -o
+      /usr/local/bin/turnserver -o
       ```
