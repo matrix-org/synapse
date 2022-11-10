@@ -39,7 +39,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
 
         # TODO: Create a new user to set avatar for
         reg_handler = self.hs.get_registration_handler()
-        user_id = await reg_handler.register_user(approved=True)
+        user_id = self.get_success(reg_handler.register_user(approved=True))
         # user_id = "@sso-user:test"
 
         with self.assertLogs() as cm:
