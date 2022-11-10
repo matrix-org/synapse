@@ -401,7 +401,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         add the user to the monthly active tables
 
         Args:
-            user_id(str): the user_id to query
+            user_id: the user_id to query
         """
         assert (
             self._update_on_this_worker

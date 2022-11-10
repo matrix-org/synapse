@@ -361,7 +361,8 @@ class LoggingContext:
         called directly.
 
         Args:
-            context(LoggingContext): The context to activate.
+            context: The context to activate.
+
         Returns:
             The context that was previously active
         """
@@ -661,7 +662,8 @@ def current_context() -> LoggingContextOrSentinel:
 def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSentinel:
     """Set the current logging context in thread local storage
     Args:
-        context(LoggingContext): The context to activate.
+        context: The context to activate.
+
     Returns:
         The context that was previously active
     """

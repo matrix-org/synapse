@@ -377,8 +377,8 @@ class E2eRoomKeysHandler:
         """Deletes a given version of the user's e2e_room_keys backup
 
         Args:
-            user_id(str): the user whose current backup version we're deleting
-            version(str): the version id of the backup being deleted
+            user_id: the user whose current backup version we're deleting
+            version: the version id of the backup being deleted
         Raises:
             NotFoundError: if this backup version doesn't exist
         """

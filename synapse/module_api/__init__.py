@@ -787,7 +787,7 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            access_token(str): access token
+            access_token: access token
 
         Returns:
             twisted.internet.defer.Deferred - resolves once the access token
