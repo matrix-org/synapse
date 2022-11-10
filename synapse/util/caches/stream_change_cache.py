@@ -72,7 +72,7 @@ class StreamChangeCache:
         items from the cache.
 
         Returns:
-            bool: Whether the cache changed size or not.
+            Whether the cache changed size or not.
         """
         new_size = math.floor(self._original_max_size * factor)
         if new_size != self._max_size:
@@ -197,7 +197,6 @@ class StreamChangeCache:
                 self._entity_to_key.pop(entity, None)
 
     def get_max_pos_of_last_change(self, entity: EntityType) -> int:
-
         """Returns an upper bound of the stream id of the last change to an
         entity.
         """
