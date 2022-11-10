@@ -256,7 +256,7 @@ class BasePresenceHandler(abc.ABC):
         with the app.
         """
 
-    async def update_external_syncs_row(
+    async def update_external_syncs_row(  # noqa: B027 (no-op by design)
         self, process_id: str, user_id: str, is_syncing: bool, sync_time_msec: int
     ) -> None:
         """Update the syncing users for an external process as a delta.
@@ -272,7 +272,9 @@ class BasePresenceHandler(abc.ABC):
             sync_time_msec: Time in ms when the user was last syncing
         """
 
-    async def update_external_syncs_clear(self, process_id: str) -> None:
+    async def update_external_syncs_clear(  # noqa: B027 (no-op by design)
+        self, process_id: str
+    ) -> None:
         """Marks all users that had been marked as syncing by a given process
         as offline.
 

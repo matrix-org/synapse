@@ -52,6 +52,7 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
@@ -1029,6 +1030,8 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
+        self._relation_handler = hs.get_relations_handler()
+        self._msc3912_enabled = hs.config.experimental.msc3912_enabled
 
     def register(self, http_server: HttpServer) -> None:
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)"
@@ -1045,20 +1048,46 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         content = parse_json_object_from_request(request)
 
         try:
-            (
-                event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                {
-                    "type": EventTypes.Redaction,
-                    "content": content,
-                    "room_id": room_id,
-                    "sender": requester.user.to_string(),
-                    "redacts": event_id,
-                },
-                txn_id=txn_id,
-            )
+            with_relations = None
+            if self._msc3912_enabled and "org.matrix.msc3912.with_relations" in content:
+                with_relations = content["org.matrix.msc3912.with_relations"]
+                del content["org.matrix.msc3912.with_relations"]
+
+            # Check if there's an existing event for this transaction now (even though
+            # create_and_send_nonmember_event also does it) because, if there's one,
+            # then we want to skip the call to redact_events_related_to.
+            event = None
+            if txn_id:
+                event = await self.event_creation_handler.get_event_from_transaction(
+                    requester, txn_id, room_id
+                )
+
+            if event is None:
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester,
+                    {
+                        "type": EventTypes.Redaction,
+                        "content": content,
+                        "room_id": room_id,
+                        "sender": requester.user.to_string(),
+                        "redacts": event_id,
+                    },
+                    txn_id=txn_id,
+                )
+
+                if with_relations:
+                    run_as_background_process(
+                        "redact_related_events",
+                        self._relation_handler.redact_events_related_to,
+                        requester=requester,
+                        event_id=event_id,
+                        initial_redaction_event=event,
+                        relation_types=with_relations,
+                    )
+
             event_id = event.event_id
         except ShadowBanError:
             event_id = "$" + random_string(43)

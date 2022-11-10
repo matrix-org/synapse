@@ -463,18 +463,17 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         if isinstance(self.database_engine, PostgresEngine):
             search_query = search_term
-            tsquery_func = self.database_engine.tsquery_func
-            sql = f"""
-            SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) AS rank,
+            sql = """
+            SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) AS rank,
             room_id, event_id
             FROM event_search
-            WHERE vector @@  {tsquery_func}('english', ?)
+            WHERE vector @@  websearch_to_tsquery('english', ?)
             """
             args = [search_query, search_query] + args
 
-            count_sql = f"""
+            count_sql = """
             SELECT room_id, count(*) as count FROM event_search
-            WHERE vector @@ {tsquery_func}('english', ?)
+            WHERE vector @@ websearch_to_tsquery('english', ?)
             """
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
@@ -523,9 +522,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = await self._find_highlights_in_postgres(
-                search_query, events, tsquery_func
-            )
+            highlights = await self._find_highlights_in_postgres(search_query, events)
 
         count_sql += " GROUP BY room_id"
 
@@ -604,18 +601,17 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         if isinstance(self.database_engine, PostgresEngine):
             search_query = search_term
-            tsquery_func = self.database_engine.tsquery_func
-            sql = f"""
-            SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) as rank,
+            sql = """
+            SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) as rank,
             origin_server_ts, stream_ordering, room_id, event_id
             FROM event_search
-            WHERE vector @@ {tsquery_func}('english', ?) AND
+            WHERE vector @@ websearch_to_tsquery('english', ?) AND
             """
             args = [search_query, search_query] + args
 
-            count_sql = f"""
+            count_sql = """
             SELECT room_id, count(*) as count FROM event_search
-            WHERE vector @@ {tsquery_func}('english', ?) AND
+            WHERE vector @@ websearch_to_tsquery('english', ?) AND
             """
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
@@ -686,9 +682,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = await self._find_highlights_in_postgres(
-                search_query, events, tsquery_func
-            )
+            highlights = await self._find_highlights_in_postgres(search_query, events)
 
         count_sql += " GROUP BY room_id"
 
@@ -714,7 +708,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         }
 
     async def _find_highlights_in_postgres(
-        self, search_query: str, events: List[EventBase], tsquery_func: str
+        self, search_query: str, events: List[EventBase]
     ) -> Set[str]:
         """Given a list of events and a search term, return a list of words
         that match from the content of the event.
@@ -725,7 +719,6 @@ class SearchStore(SearchBackgroundUpdateStore):
         Args:
             search_query
             events: A list of events
-            tsquery_func: The tsquery_* function to use when making queries
 
         Returns:
             A set of strings.
@@ -758,13 +751,16 @@ class SearchStore(SearchBackgroundUpdateStore):
                 while stop_sel in value:
                     stop_sel += ">"
 
-                query = f"SELECT ts_headline(?, {tsquery_func}('english', ?), %s)" % (
-                    _to_postgres_options(
-                        {
-                            "StartSel": start_sel,
-                            "StopSel": stop_sel,
-                            "MaxFragments": "50",
-                        }
+                query = (
+                    "SELECT ts_headline(?, websearch_to_tsquery('english', ?), %s)"
+                    % (
+                        _to_postgres_options(
+                            {
+                                "StartSel": start_sel,
+                                "StopSel": stop_sel,
+                                "MaxFragments": "50",
+                            }
+                        )
                     )
                 )
                 txn.execute(query, (value, search_query))
