@@ -9,16 +9,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import io
 from typing import BinaryIO, Callable, Dict, List, Optional, Tuple
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
-from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
-from synapse.http.client import RawHeaders
-from synapse.logging.context import make_deferred_yieldable
+from synapse.http.client import RawHeaders, read_body_with_max_size
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -124,7 +121,6 @@ async def mock_get_file(
     is_allowed_content_type: Optional[Callable[[str], bool]] = None,
 ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
     response = await mock_request("GET", url)
-    body = await make_deferred_yieldable(readBody(response))
-    output_stream = io.BytesIO(body)
+    read_body_with_max_size(response, output_stream, max_size)
 
     return 67, {b"Content-Type": [b"image/png"]}, "", 200
