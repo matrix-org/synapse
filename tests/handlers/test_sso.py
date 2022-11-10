@@ -14,6 +14,7 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.http_headers import Headers
+from twisted.web.iweb import IResponse
 
 from synapse.http.client import RawHeaders, read_body_with_max_size
 from synapse.server import HomeServer
@@ -32,7 +33,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
         return hs
 
-    async def test_set_avatar(self):
+    async def test_set_avatar(self) -> None:
         """Tests successfully setting the avatar of a newly created user"""
         handler = self.hs.get_sso_handler()
 
@@ -53,7 +54,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         # profile["avatar_url"]
 
     @unittest.override_config({"max_avatar_size": 99})
-    async def test_set_avatar_too_big_image(self):
+    async def test_set_avatar_too_big_image(self) -> None:
         """Tests saving of avatar failed when image size is too big"""
         handler = self.hs.get_sso_handler()
 
@@ -67,7 +68,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         )
 
     @unittest.override_config({"allowed_avatar_mimetypes": ["image/jpeg"]})
-    async def test_set_avatar_incorrect_mime_type(self):
+    async def test_set_avatar_incorrect_mime_type(self) -> None:
         """Tests saving of avatar failed when not allowed mimetype of image was used"""
         handler = self.hs.get_sso_handler()
 
@@ -81,7 +82,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         )
 
 
-async def mock_request(method: str, url: str):
+async def mock_request(method: str, url: str) -> IResponse:
     # for the purpose of test returning GET request body for HEAD request is fine
     if url == "http://my.server/me.png":
         if method == "HEAD":
