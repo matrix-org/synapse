@@ -1166,6 +1166,30 @@ for more information.</p>
 }
 </code></pre>
 <p><em>Added in Synapse 1.68.0.</em></p>
+<h3 id="find-a-user-based-on-their-third-party-id-threepid-or-3pid"><a class="header" href="#find-a-user-based-on-their-third-party-id-threepid-or-3pid">Find a user based on their Third Party ID (ThreePID or 3PID)</a></h3>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/threepid/$medium/users/$address
+</code></pre>
+<p>When a user matched the given address for the given medium, an HTTP code <code>200</code> with a response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;user_id&quot;: &quot;@hello:example.org&quot;
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>medium</code> - Kind of third-party ID, either <code>email</code> or <code>msisdn</code>.</li>
+<li><code>address</code> - Value of the third-party ID.</li>
+</ul>
+<p>The <code>address</code> may have characters that are not URL-safe, so it is advised to URL-encode those parameters.</p>
+<p><strong>Errors</strong></p>
+<p>Returns a <code>404</code> HTTP status code if no user was found, with a response body like this:</p>
+<pre><code class="language-json">{
+    &quot;errcode&quot;:&quot;M_NOT_FOUND&quot;,
+    &quot;error&quot;:&quot;User not found&quot;
+}
+</code></pre>
+<p><em>Added in Synapse 1.72.0.</em></p>
 
                     </main>
 
