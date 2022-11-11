@@ -737,50 +737,25 @@ class SsoHandler:
         try:
             uid = UserID.from_string(user_id)
 
-            # HEAD request to find image size & mime type before download
-            response = await self._http_client.request("HEAD", picture_https_url)
-            if response.code != 200:
-                raise Exception(
-                    "HEAD request to check sso avatar image headers returned {}".format(
-                        response.code
-                    )
-                )
+            def allowed_mime_type(content_type: str) -> bool:
+                if (
+                    self._profile_handler.allowed_avatar_mimetypes
+                    and content_type
+                    not in self._profile_handler.allowed_avatar_mimetypes
+                ):
+                    return False
+                return True
 
-            # ensure http headers are present
-            if (
-                response.headers.getRawHeaders("Content-Length") is None
-                or response.headers.getRawHeaders("Content-Type") is None
-            ):
-                raise Exception("HTTP headers missing for sso avatar image")
-
-            content_length = int(response.headers.getRawHeaders("Content-Length")[0])
-            content_type = response.headers.getRawHeaders("Content-Type")[0]
-
-            # ensure picture size respects max_avatar_size defined in config
-            if self._profile_handler.max_avatar_size is not None:
-                if content_length > self._profile_handler.max_avatar_size:
-                    raise Exception(
-                        "SSO avatar image {} should be less than {}".format(
-                            content_length, self._profile_handler.max_avatar_size
-                        )
-                    )
-
-            # ensure picture is of allowed mime type
-            if (
-                self._profile_handler.allowed_avatar_mimetypes
-                and content_type not in self._profile_handler.allowed_avatar_mimetypes
-            ):
-                raise Exception(
-                    "SSO avatar image does not allow mime type of {}".format(
-                        content_type
-                    )
-                )
-
-            # download picture, enforcing size limit
+            # download picture, enforcing size limit & mime type check
             picture = io.BytesIO()
+
             download_response = await self._http_client.get_file(
-                picture_https_url, picture, self._profile_handler.max_avatar_size
+                url=picture_https_url,
+                output_stream=picture,
+                max_size=self._profile_handler.max_avatar_size,
+                is_allowed_content_type=allowed_mime_type,
             )
+
             if download_response[3] != 200:
                 raise Exception(
                     "GET request to download sso avatar image returned {}".format(
@@ -790,11 +765,11 @@ class SsoHandler:
 
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
-                content_type,
-                None,
-                picture,
-                content_length,
-                uid,
+                media_type=download_response[1][b"Content-Type"][0].decode("utf-8"),
+                upload_name=None,
+                content=picture,
+                content_length=download_response[0],
+                auth_user=uid,
             )
 
             # save it as user avatar
