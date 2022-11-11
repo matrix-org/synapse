@@ -1,0 +1,1 @@
+Concisely log a failure to resolve state due to missing `prev_events`.
