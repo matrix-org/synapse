@@ -2235,7 +2235,15 @@ class EventsWorkerStore(SQLBaseStore):
         return result is not None
 
     async def get_partial_state_events_batch(self, room_id: str) -> List[str]:
-        """Get a list of events in the given room that have partial state"""
+        """
+        Get a list of events in the given room that:
+        - have partial state; and
+        - are ready to be resynced (because they have no prev_events that are
+          partial-stated)
+
+        See the docstring on `_get_partial_state_events_batch_txn` for more
+        information.
+        """
         return await self.db_pool.runInteraction(
             "get_partial_state_events_batch",
             self._get_partial_state_events_batch_txn,
