@@ -48,12 +48,6 @@ from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.slave.storage.devices import SlavedDeviceStore
-from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.replication.slave.storage.filtering import SlavedFilteringStore
-from synapse.replication.slave.storage.keys import SlavedKeyStore
-from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
-from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
     account_data,
@@ -101,8 +95,16 @@ from synapse.storage.databases.main.appservice import (
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
+from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.directory import DirectoryWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
+from synapse.storage.databases.main.event_push_actions import (
+    EventPushActionsWorkerStore,
+)
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.keys import KeyStore
 from synapse.storage.databases.main.lock import LockStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
@@ -111,17 +113,25 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
+from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.room_batch import RoomBatchStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
+from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
+from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
 from synapse.types import JsonDict
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.httpresourcetree import create_resource_tree
@@ -232,26 +242,36 @@ class GenericWorkerSlavedStore(
     EndToEndRoomKeyStore,
     PresenceStore,
     DeviceInboxWorkerStore,
-    SlavedDeviceStore,
-    SlavedPushRuleStore,
+    DeviceWorkerStore,
     TagsWorkerStore,
     AccountDataWorkerStore,
-    SlavedPusherStore,
     CensorEventsStore,
     ClientIpWorkerStore,
-    SlavedEventStore,
-    SlavedKeyStore,
+    # KeyStore isn't really safe to use from a worker, but for now we do so and hope that
+    # the races it creates aren't too bad.
+    KeyStore,
     RoomWorkerStore,
     RoomBatchStore,
     DirectoryWorkerStore,
+    PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
     ProfileWorkerStore,
-    SlavedFilteringStore,
+    FilteringWorkerStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
     ServerMetricsStore,
+    PusherWorkerStore,
+    RoomMemberWorkerStore,
+    RelationsWorkerStore,
+    EventFederationWorkerStore,
+    EventPushActionsWorkerStore,
+    StateGroupWorkerStore,
+    SignatureWorkerStore,
+    UserErasureWorkerStore,
     ReceiptsWorkerStore,
+    StreamWorkerStore,
+    EventsWorkerStore,
     RegistrationWorkerStore,
     SearchStore,
     TransactionWorkerStore,
