@@ -790,7 +790,7 @@ class SsoHandler:
 
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
-                str(content_type),
+                content_type,
                 None,
                 picture,
                 content_length,
