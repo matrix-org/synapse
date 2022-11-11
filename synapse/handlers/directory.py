@@ -85,7 +85,7 @@ class DirectoryHandler:
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            servers = await self._storage_controllers.state.get_current_hosts_in_room(
+            servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
                 room_id
             )
 
@@ -290,7 +290,7 @@ class DirectoryHandler:
                 Codes.NOT_FOUND,
             )
 
-        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room(
+        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
         servers_set = set(extra_servers) | set(servers)

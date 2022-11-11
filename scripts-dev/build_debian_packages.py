@@ -27,6 +27,7 @@ DISTS = (
     "debian:sid",
     "ubuntu:focal",  # 20.04 LTS (our EOL forced by Py38 on 2024-10-14)
     "ubuntu:jammy",  # 22.04 LTS (EOL 2027-04)
+    "ubuntu:kinetic",  # 22.10 (EOL 2023-07-20)
 )
 
 DESC = """\

@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.64.0rc1 which could cause log spam when fetching events from other homeservers.

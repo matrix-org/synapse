@@ -1,0 +1,1 @@
+Fix a background database update, introduced in Synapse 1.64.0, which could cause poor database performance.
