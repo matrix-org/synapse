@@ -82,6 +82,28 @@ class TestSSOHandler(unittest.HomeserverTestCase):
             cm.output, ["WARNING:synapse.handlers.sso:failed to save the user avatar"]
         )
 
+    async def test_skip_saving_avatar_when_not_changed(self) -> None:
+        """Tests whether saving of avatar correctly skips if the avatar hasn't changed"""
+        handler = self.hs.get_sso_handler()
+
+        # Create a new user to set avatar for
+        reg_handler = self.hs.get_registration_handler()
+        user_id = self.get_success(reg_handler.register_user(approved=True))
+
+        with self.assertLogs() as cm:
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        self.assertEqual(
+            cm.output[-1],
+            "INFO:synapse.handlers.sso:successfully saved the user avatar",
+        )
+
+        with self.assertLogs() as cm:
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        self.assertEqual(
+            cm.output[-1],
+            "INFO:synapse.handlers.sso:skipping saving the user avatar",
+        )
+
 
 async def mock_get_file(
     url: str,

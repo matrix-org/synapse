@@ -722,6 +722,9 @@ class SsoHandler:
         This downloads the image file from the url provided, store that in
         the media repository and then sets the avatar on user's profile.
 
+        It can detect if the same image is being saved again and bails early by storing
+        hash of the file in upload_name of the avatar image.
+
         Currently, it only supports server configurations which runs media repository
         within the same process.
 
@@ -767,6 +770,16 @@ class SsoHandler:
             # upload name includes hash of the image file's content so that we can
             # easily check if it requires an update or not, the next time user logs in
             upload_name = "sso_avatar_" + hashlib.md5(picture.read()).hexdigest()
+
+            # bail if user already has the same avatar
+            profile = await self._profile_handler.get_profile(user_id)
+            if profile["avatar_url"] is not None:
+                media_id = profile["avatar_url"].split("/")[-1]
+                media = await self._media_repo.store.get_local_media(media_id)
+                if media is not None and upload_name == media["upload_name"]:
+                    logger.info("skipping saving the user avatar")
+                    return
+
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
                 media_type=download_response[1][b"Content-Type"][0].decode("utf-8"),
