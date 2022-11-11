@@ -113,24 +113,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
             prefilled_cache=receipts_stream_prefill,
         )
 
-        self.db_pool.updates.register_background_index_update(
-            "receipts_linearized_unique_index",
-            index_name="receipts_linearized_unique_index",
-            table="receipts_linearized",
-            columns=["room_id", "receipt_type", "user_id"],
-            where_clause="thread_id IS NULL",
-            unique=True,
-        )
-
-        self.db_pool.updates.register_background_index_update(
-            "receipts_graph_unique_index",
-            index_name="receipts_graph_unique_index",
-            table="receipts_graph",
-            columns=["room_id", "receipt_type", "user_id"],
-            where_clause="thread_id IS NULL",
-            unique=True,
-        )
-
     def get_max_receipt_stream_id(self) -> int:
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
@@ -864,6 +846,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
 class ReceiptsBackgroundUpdateStore(SQLBaseStore):
     POPULATE_RECEIPT_EVENT_STREAM_ORDERING = "populate_event_stream_ordering"
+    RECEIPTS_LINEARIZED_UNIQUE_INDEX_UPDATE_NAME = "receipts_linearized_unique_index"
+    RECEIPTS_GRAPH_UNIQUE_INDEX_UPDATE_NAME = "receipts_graph_unique_index"
 
     def __init__(
         self,
@@ -876,6 +860,14 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             self.POPULATE_RECEIPT_EVENT_STREAM_ORDERING,
             self._populate_receipt_event_stream_ordering,
+        )
+        self.db_pool.updates.register_background_update_handler(
+            self.RECEIPTS_LINEARIZED_UNIQUE_INDEX_UPDATE_NAME,
+            self._background_receipts_linearized_unique_index,
+        )
+        self.db_pool.updates.register_background_update_handler(
+            self.RECEIPTS_GRAPH_UNIQUE_INDEX_UPDATE_NAME,
+            self._background_receipts_graph_unique_index,
         )
 
     async def _populate_receipt_event_stream_ordering(
@@ -931,6 +923,87 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             )
 
         return batch_size
+
+    async def _background_receipts_unique_index(
+        self, update_name: str, index_name: str, table: str
+    ) -> int:
+        """Adds a unique index on `(room_id, receipt_type, user_id)` to the given
+        receipts table, for non-thread receipts.
+        """
+
+        def _receipts_unique_index_txn(txn: LoggingTransaction) -> None:
+            # Identify any duplicate receipts arising from
+            # https://github.com/matrix-org/synapse/issues/14406.
+            # We expect the following query to use the per-thread receipt index and take
+            # less than a minute.
+            sql = f"""
+                SELECT room_id, receipt_type, user_id FROM {table}
+                WHERE thread_id IS NULL
+                GROUP BY room_id, receipt_type, user_id
+                HAVING COUNT(*) > 1
+            """
+            txn.execute(sql)
+            duplicate_keys = cast(List[Tuple[str, str, str]], list(txn))
+
+            # Then remove all duplicate receipts.
+            # We could be clever and try to keep the latest receipt out of every set of
+            # duplicates, but it's far simpler to remove them all.
+            for room_id, receipt_type, user_id in duplicate_keys:
+                sql = f"""
+                    DELETE FROM {table}
+                    WHERE
+                        room_id = ? AND
+                        receipt_type = ? AND
+                        user_id = ? AND
+                        thread_id IS NULL
+                """
+                txn.execute(sql, (room_id, receipt_type, user_id))
+
+            # Now that the duplicates are gone, we can create the index.
+            concurrently = (
+                "CONCURRENTLY"
+                if isinstance(self.database_engine, PostgresEngine)
+                else ""
+            )
+            sql = f"""
+                CREATE UNIQUE INDEX {concurrently} {index_name}
+                ON {table}(room_id, receipt_type, user_id)
+                WHERE thread_id IS NULL
+            """
+            txn.execute(sql)
+
+        await self.db_pool.runInteraction(
+            update_name,
+            _receipts_unique_index_txn,
+        )
+
+        await self.db_pool.updates._end_background_update(update_name)
+
+        return 1
+
+    async def _background_receipts_linearized_unique_index(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """Adds a unique index on `(room_id, receipt_type, user_id)` to
+        `receipts_linearized`, for non-thread receipts.
+        """
+        return await self._background_receipts_unique_index(
+            self.RECEIPTS_LINEARIZED_UNIQUE_INDEX_UPDATE_NAME,
+            "receipts_linearized_unique_index",
+            "receipts_linearized",
+        )
+
+    async def _background_receipts_graph_unique_index(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """Adds a unique index on `(room_id, receipt_type, user_id)` to
+        `receipts_graph`, for non-thread receipts.
+        """
+        return await self._background_receipts_unique_index(
+            self.RECEIPTS_GRAPH_UNIQUE_INDEX_UPDATE_NAME,
+            "receipts_graph_unique_index",
+            "receipts_graph",
+        )
 
 
 class ReceiptsStore(ReceiptsWorkerStore, ReceiptsBackgroundUpdateStore):
