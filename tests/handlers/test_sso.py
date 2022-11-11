@@ -21,7 +21,7 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import SMALL_PNG, FakeResponse, simple_async_mock
+from tests.test_utils import SMALL_PNG, FakeResponse
 
 
 class TestSSOHandler(unittest.HomeserverTestCase):
@@ -81,6 +81,8 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         )
 
 
+# FakeResponse intends to implement IResponse interface but still doesn't completely
+# implement it, hence why the return type is such
 async def mock_request(method: str, url: str) -> IResponse:
     # for the purpose of test returning GET request body for HEAD request is fine
     if url == "http://my.server/me.png":
@@ -100,7 +102,7 @@ async def mock_request(method: str, url: str) -> IResponse:
                 body=SMALL_PNG,
             )
         else:
-            return simple_async_mock(return_value=FakeResponse(code=400))
+            return FakeResponse(code=400)
     elif url == "http://my.server/big.png":
         if method == "HEAD":
             return FakeResponse(
@@ -110,7 +112,7 @@ async def mock_request(method: str, url: str) -> IResponse:
                 ),
             )
 
-    return simple_async_mock(return_value=FakeResponse(code=404))
+    return FakeResponse(code=404)
 
 
 async def mock_get_file(
