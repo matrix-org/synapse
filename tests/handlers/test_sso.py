@@ -37,10 +37,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         """Tests successfully setting the avatar of a newly created user"""
         handler = self.hs.get_sso_handler()
 
-        # TODO: Create a new user to set avatar for
+        # Create a new user to set avatar for
         reg_handler = self.hs.get_registration_handler()
         user_id = self.get_success(reg_handler.register_user(approved=True))
-        # user_id = "@sso-user:test"
 
         with self.assertLogs() as cm:
             self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
