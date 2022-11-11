@@ -82,7 +82,6 @@ server {
 	
 	# Synapse responses may be chunked, which is an HTTP/1.1 feature.
 	proxy_http_version 1.1;
-        proxy_buffering off;
     }
 }
 ```
