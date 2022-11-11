@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import hashlib
 import io
 import logging
 from typing import (
@@ -763,10 +764,13 @@ class SsoHandler:
                     )
                 )
 
+            # upload name includes hash of the image file's content so that we can
+            # easily check if it requires an update or not, the next time user logs in
+            upload_name = "sso_avatar_" + hashlib.md5(picture.read()).hexdigest()
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
                 media_type=download_response[1][b"Content-Type"][0].decode("utf-8"),
-                upload_name=None,
+                upload_name=upload_name,
                 content=picture,
                 content_length=download_response[0],
                 auth_user=uid,
