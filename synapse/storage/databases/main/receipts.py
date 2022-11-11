@@ -702,9 +702,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "data": json_encoder.encode(data),
             },
             where_clause=where_clause,
-            # receipts_linearized has a unique constraint on
-            # (user_id, room_id, receipt_type), so no need to lock
-            lock=False,
         )
 
         return rx_ts
@@ -862,9 +859,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "data": json_encoder.encode(data),
             },
             where_clause=where_clause,
-            # receipts_graph has a unique constraint on
-            # (user_id, room_id, receipt_type), so no need to lock
-            lock=False,
         )
 
 
