@@ -48,10 +48,11 @@ class TestSSOHandler(unittest.HomeserverTestCase):
             "INFO:synapse.handlers.sso:successfully saved the user avatar",
         )
 
-        # TODO: ensure avatar returned via user's profile is SMALL_PNG
-        # profile_handler = self.hs.get_profile_handler()
-        # profile = await profile_handler.get_profile(user_id)
-        # profile["avatar_url"]
+        # Ensure avatar is set on this newly created user,
+        # so no need to compare for the exact image
+        profile_handler = self.hs.get_profile_handler()
+        profile = self.get_success(profile_handler.get_profile(user_id))
+        self.assertIsNot(profile["avatar_url"], None)
 
     @unittest.override_config({"max_avatar_size": 65})
     async def test_set_avatar_too_big_image(self) -> None:
