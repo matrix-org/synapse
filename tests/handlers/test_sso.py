@@ -123,6 +123,6 @@ async def mock_get_file(
     is_allowed_content_type: Optional[Callable[[str], bool]] = None,
 ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
     response = await mock_request("GET", url)
-    read_body_with_max_size(response, output_stream, max_size)
+    await read_body_with_max_size(response, output_stream, max_size)
 
     return 67, {b"Content-Type": [b"image/png"]}, "", 200
