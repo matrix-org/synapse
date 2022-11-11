@@ -73,7 +73,7 @@ must be edited:
 
 1.  Logging
 
-    If eturnal was started by systemd, log files are written into the
+    If `eturnal` was started by systemd, log files are written into the
     `/var/log/eturnal` directory by default. In order to log to the [journal](https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html)
     instead, the `log_dir` option can be set to `stdout` in the configuration file.
 
@@ -166,3 +166,5 @@ must be edited:
 `eturnal` offers a handy [operations script](https://eturnal.net/documentation/#Operation) 
 which can be called e.g. to check, whether the service is up, to restart the service, 
 to query how many active sessions exist, to change logging behaviour and so on.
+
+Hint: If `eturnalctl` is not part of your `$PATH`, consider either sym-linking it (e.g. ´ln -s /opt/eturnal/bin/eturnalctl /usr/local/bin/eturnalctl´) or call it from the default `eturnal` directory directly: e.g. `/opt/eturnal/bin/eturnalctl info`
