@@ -210,7 +210,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "frontend_proxy": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": ["client", "replication"],
+        "listener_resources": ["client"],
         "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload"],
         "shared_extra_conf": {},
         "worker_extra_conf": (
