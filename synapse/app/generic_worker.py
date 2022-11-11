@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 import sys
+import time
 from typing import Dict, List, Optional, Tuple
 
 from twisted.internet import address
@@ -393,6 +394,7 @@ class GenericWorkerServer(HomeServer):
         logger.info("Synapse worker now listening on port %d", port)
 
     def start_listening(self) -> None:
+        start = time.time()
         for listener in self.config.worker.worker_listeners:
             if listener.type == "http":
                 self._listen_http(listener)
@@ -417,6 +419,9 @@ class GenericWorkerServer(HomeServer):
                     )
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
+
+        end = time.time()
+        logger.error("TIMING start_listening %.6f", end - start)
 
         self.get_replication_command_handler().start_replication(self)
 
