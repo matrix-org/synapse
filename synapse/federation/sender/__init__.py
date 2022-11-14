@@ -437,7 +437,7 @@ class FederationSender(AbstractFederationSender):
                     elif await self.store.is_partial_state_room(event.room_id):
                         # During partial join we use the set of servers that we got
                         # when beginning the join. It's still possible that we send
-                        # events to servers that leaved the room in the meantine but
+                        # events to servers that left the room in the meantime, but
                         # we consider that an acceptable risk since it is only our own
                         # events that we leak and not other server's ones.
                         destinations = (
