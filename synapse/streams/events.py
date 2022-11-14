@@ -45,9 +45,7 @@ class _EventSourcesInner:
 class EventSources:
     def __init__(self, hs: "HomeServer"):
         self.sources = _EventSourcesInner(
-            # mypy thinks attribute.type is `Optional`, but we know it's never `None` here since
-            # all the attributes of `_EventSourcesInner` are annotated.
-            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))  # type: ignore[misc]
+            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))
         )
         self.store = hs.get_datastores().main
 
