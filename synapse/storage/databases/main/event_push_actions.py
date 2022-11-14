@@ -335,6 +335,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # There are rooms with push actions in them but you don't have a read receipt in
         # them e.g. rooms you've been invited to, so get push actions for rooms which do
         # not have read receipts in them too.
+
+        # BUG https://github.com/matrix-org/synapse/issues/12880#
+        # OR rooms that have read receipt but the event pointed by the read receipt has been purged
+
         def get_no_receipt(
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, int, str, bool]]:
@@ -344,18 +348,27 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 " FROM event_push_actions AS ep"
                 " INNER JOIN events AS e USING (room_id, event_id)"
                 " WHERE"
+                " ("
                 "   ep.room_id NOT IN ("
                 "     SELECT room_id FROM receipts_linearized"
                 "       WHERE receipt_type = 'm.read' AND user_id = ?"
                 "       GROUP BY room_id"
                 "   )"
+                "   OR ep.room_id IN ("                   	
+                "     SELECT room_id FROM receipts_linearized rli" 
+                "      LEFT JOIN events as rlievt USING (room_id, event_id)"
+                "      WHERE rlievt.event_id is null"  
+                "            AND rli.receipt_type = 'm.read'"
+                "            AND rli.user_id = ?"
+                "   )"
+				" )"  
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
                 "   AND ep.notif = 1"
                 " ORDER BY ep.stream_ordering ASC LIMIT ?"
             )
-            args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
+            args = [user_id, user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
             return cast(List[Tuple[str, str, int, str, bool]], txn.fetchall())
 
