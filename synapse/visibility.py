@@ -623,6 +623,21 @@ async def filter_events_for_server(
         # to no users having been erased.
         erased_senders = {}
 
+    # Filter out non-local events when we are in the middle of a partial join, since our servers
+    # list can be out of date and we could leak events to servers not in the room anymore.
+    # This can also be true for local events but we consider it to be an acceptable risk.
+
+    # We do this check as a first step and before retrieving membership events because
+    # otherwise a room could be fully joined after we retrieve those, which would then bypass
+    # this check but would base the filtering on an outdated view of the membership events.
+
+    partial_state_invisible_events = set()
+    for e in events:
+        if e.origin != local_server_name and await storage.main.is_partial_state_room(
+            e.room_id
+        ):
+            partial_join_invisible_events.add(e)
+
     # Let's check to see if all the events have a history visibility
     # of "shared" or "world_readable". If that's the case then we don't
     # need to check membership (as we know the server is in the room).
@@ -647,14 +662,7 @@ async def filter_events_for_server(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
         )
 
-        # Filter out non-local events when we are in the middle of a partial join,
-        # since our servers list can be out of date and we could leak events
-        # to servers not in the room anymore.
-        # This can also be true for local events but we consider it to be
-        # an acceptable risk in this case.
-        if e.origin != local_server_name and await storage.main.is_partial_state_room(
-            e.room_id
-        ):
+        if e in partial_state_invisible_events:
             visible = False
 
         if visible and not erased:
