@@ -51,6 +51,8 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         # return True, whether it's a known entity or not.
         self.assertTrue(cache.has_entity_changed("user@foo.com", 0))
         self.assertTrue(cache.has_entity_changed("not@here.website", 0))
+        self.assertTrue(cache.has_entity_changed("user@foo.com", 3))
+        self.assertTrue(cache.has_entity_changed("not@here.website", 3))
 
     def test_entity_has_changed_pops_off_start(self):
         """
