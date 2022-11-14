@@ -44,24 +44,48 @@ class KeyUploadServlet(RestServlet):
     Content-Type: application/json
 
     {
-      "device_keys": {
-        "user_id": "<user_id>",
-        "device_id": "<device_id>",
-        "valid_until_ts": <millisecond_timestamp>,
-        "algorithms": [
-          "m.olm.curve25519-aes-sha2",
-        ]
-        "keys": {
-          "<algorithm>:<device_id>": "<key_base64>",
+        "device_keys": {
+            "user_id": "<user_id>",
+            "device_id": "<device_id>",
+            "valid_until_ts": <millisecond_timestamp>,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+            ]
+            "keys": {
+                "<algorithm>:<device_id>": "<key_base64>",
+            },
+            "signatures:" {
+                "<user_id>" {
+                    "<algorithm>:<device_id>": "<signature_base64>"
+                }
+            }
         },
-        "signatures:" {
-          "<user_id>" {
-            "<algorithm>:<device_id>": "<signature_base64>"
-      } } },
-      "one_time_keys": {
-        "<algorithm>:<key_id>": "<key_base64>"
-      },
+        "fallback_keys": {
+            "<algorithm>:<device_id>": "<key_base64>",
+            "signed_<algorithm>:<device_id>": {
+                "fallback": true,
+                "key": "<key_base64>",
+                "signatures": {
+                    "<user_id>": {
+                        "<algorithm>:<device_id>": "<key_base64>"
+                    }
+                }
+            }
+        }
+        "one_time_keys": {
+            "<algorithm>:<key_id>": "<key_base64>"
+        },
     }
+
+    response, e.g.:
+
+    {
+        "one_time_key_counts": {
+            "curve25519": 10,
+            "signed_curve25519": 20
+        }
+    }
+
     """
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")

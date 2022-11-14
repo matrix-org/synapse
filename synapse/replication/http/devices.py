@@ -87,7 +87,7 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
     the database and streamed to workers.( Is this accurate?)
 
     Calls to e2e_keys_handler.upload_keys_for_user(user_id, device_id, keys) on
-    master to accomplish this.
+    the main process to accomplish this.
 
     Defined in https://spec.matrix.org/v1.4/client-server-api/#post_matrixclientv3keysupload
     Request format(borrowed and expanded from KeyUploadServlet):
@@ -98,48 +98,12 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
         "user_id": "<user_id>",
         "device_id": "<device_id>",
         "keys": {
-            "device_keys": {
-                "user_id": "<user_id>",
-                "device_id": "<device_id>",
-                "valid_until_ts": <millisecond_timestamp>,
-                "algorithms": [
-                    "m.olm.curve25519-aes-sha2",
-                ]
-                "keys": {
-                    "<algorithm>:<device_id>": "<key_base64>",
-                },
-                "signatures:" {
-                    "<user_id>" {
-                        "<algorithm>:<device_id>": "<signature_base64>"
-                    }
-                }
-            },
-            "fallback_keys": {
-                "<algorithm>:<device_id>": "<key_base64>",
-                "signed_<algorithm>:<device_id>": {
-                    "fallback": true,
-                    "key": "<key_base64>",
-                    "signatures": {
-                        "<user_id>": {
-                            "<algorithm>:<device_id>": "<key_base64>"
-                        }
-                    }
-                }
-            }
-            "one_time_keys": {
-                "<algorithm>:<key_id>": "<key_base64>"
-            },
+            ....this part can be found in KeyUploadServlet in rest/client/keys.py....
         }
     }
-    Response is equivalent to ` /_matrix/client/v3/keys/upload`
-    response, e.g.:
 
-    {
-        "one_time_key_counts": {
-            "curve25519": 10,
-            "signed_curve25519": 20
-        }
-    }
+    Response is equivalent to ` /_matrix/client/v3/keys/upload` found in KeyUploadServlet
+
     """
 
     NAME = "upload_keys_for_user"
