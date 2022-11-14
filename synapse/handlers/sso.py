@@ -199,7 +199,7 @@ class SsoHandler:
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
         self._media_repo = hs.get_media_repository()
-        self._http_client = hs.get_proxied_http_client()
+        self._http_client = hs.get_proxied_blacklisted_http_client()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
