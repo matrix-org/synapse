@@ -133,6 +133,50 @@ class AccountDataHandler:
             )
             return response["max_stream_id"]
 
+    async def remove_account_data_for_room(
+        self, user_id: str, room_id: str, account_data_type: str
+    ) -> Optional[int]:
+        """
+        Deletes the room account data for the given user and account data type.
+
+        "Deleting" account data merely means setting the content of the account data
+        to an empty JSON object: {}.
+
+        Args:
+            user_id: The user ID to remove room account data for.
+            room_id: The room ID to target.
+            account_data_type: The account data type to remove.
+
+        Returns:
+            The maximum stream ID, or None if the room account data item did not exist.
+        """
+        if self._instance_name in self._account_data_writers:
+            max_stream_id = await self._store.remove_account_data_for_room(
+                user_id, room_id, account_data_type
+            )
+            if max_stream_id is None:
+                # The referenced account data did not exist, so no delete occurred.
+                return None
+
+            self._notifier.on_new_event(
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
+            )
+
+            # Notify Synapse modules that the content of the type has changed to an
+            # empty dictionary.
+            await self._notify_modules(user_id, room_id, account_data_type, {})
+
+            return max_stream_id
+        else:
+            response = await self._remove_room_data_client(
+                instance_name=random.choice(self._account_data_writers),
+                user_id=user_id,
+                room_id=room_id,
+                account_data_type=account_data_type,
+                content={},
+            )
+            return response["max_stream_id"]
+
     async def add_account_data_for_user(
         self, user_id: str, account_data_type: str, content: JsonDict
     ) -> int:
@@ -165,6 +209,45 @@ class AccountDataHandler:
                 user_id=user_id,
                 account_data_type=account_data_type,
                 content=content,
+            )
+            return response["max_stream_id"]
+
+    async def remove_account_data_for_user(
+        self, user_id: str, account_data_type: str
+    ) -> Optional[int]:
+        """Removes a piece of global account_data for a user.
+
+        Args:
+            user_id: The user to remove account data for.
+            account_data_type: The type of account_data to remove.
+
+        Returns:
+            The maximum stream ID, or None if the room account data item did not exist.
+        """
+
+        if self._instance_name in self._account_data_writers:
+            max_stream_id = await self._store.remove_account_data_for_user(
+                user_id, account_data_type
+            )
+            if max_stream_id is None:
+                # The referenced account data did not exist, so no delete occurred.
+                return None
+
+            self._notifier.on_new_event(
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
+            )
+
+            # Notify Synapse modules that the content of the type has changed to an
+            # empty dictionary.
+            await self._notify_modules(user_id, None, account_data_type, {})
+
+            return max_stream_id
+        else:
+            response = await self._remove_user_data_client(
+                instance_name=random.choice(self._account_data_writers),
+                user_id=user_id,
+                account_data_type=account_data_type,
+                content={},
             )
             return response["max_stream_id"]
 

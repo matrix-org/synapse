@@ -75,6 +75,41 @@ class AccountDataServlet(RestServlet):
         return 200, event
 
 
+class UnstableAccountDataServlet(RestServlet):
+    """
+    Contains an unstable endpoint for removing user account data, as specified by
+    MSC3391. If that MSC is accepted, this code should have unstable prefixes removed
+    and become incorporated into AccountDataServlet above.
+    """
+
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3391/user/(?P<user_id>[^/]*)"
+        "/account_data/(?P<account_data_type>[^/]*)",
+        unstable=True,
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
+        self.handler = hs.get_account_data_handler()
+
+    async def on_DELETE(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        account_data_type: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot delete account data for other users.")
+
+        await self.handler.remove_account_data_for_user(user_id, account_data_type)
+
+        return 200, {}
+
+
 class RoomAccountDataServlet(RestServlet):
     """
     PUT /user/{user_id}/rooms/{room_id}/account_data/{account_dataType} HTTP/1.1
@@ -155,6 +190,56 @@ class RoomAccountDataServlet(RestServlet):
         return 200, event
 
 
+class UnstableRoomAccountDataServlet(RestServlet):
+    """
+    Contains an unstable endpoint for removing room account data, as specified by
+    MSC3391. If that MSC is accepted, this code should have unstable prefixes removed
+    and become incorporated into RoomAccountDataServlet above.
+    """
+
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3391/user/(?P<user_id>[^/]*)"
+        "/rooms/(?P<room_id>[^/]*)"
+        "/account_data/(?P<account_data_type>[^/]*)",
+        unstable=True,
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
+        self.handler = hs.get_account_data_handler()
+
+    async def on_DELETE(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot delete account data for other users.")
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                400,
+                f"{room_id} is not a valid room ID",
+                Codes.INVALID_PARAM,
+            )
+
+        await self.handler.remove_account_data_for_room(
+            user_id, room_id, account_data_type
+        )
+
+        return 200, {}
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AccountDataServlet(hs).register(http_server)
     RoomAccountDataServlet(hs).register(http_server)
+
+    if hs.config.experimental.msc3391_enabled:
+        UnstableAccountDataServlet(hs).register(http_server)
+        UnstableRoomAccountDataServlet(hs).register(http_server)
