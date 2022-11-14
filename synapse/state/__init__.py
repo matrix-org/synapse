@@ -201,6 +201,9 @@ class StateHandler:
         Args:
             room_id: the room_id containing the given events.
             event_ids: the events whose state should be fetched and resolved.
+            await_full_state: if `True`, will block if we do not yet have complete state
+                at the given `event_id`s, regardless of whether `state_filter` is
+                satisfied by partial state.
 
         Returns:
             the state dict (a mapping from (event_type, state_key) -> event_id) which
