@@ -41,6 +41,7 @@ class AccountDataServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
@@ -53,6 +54,16 @@ class AccountDataServlet(RestServlet):
             raise AuthError(403, "Cannot add account data for other users.")
 
         body = parse_json_object_from_request(request)
+
+        # If experimental support for MSC3391 is enabled, then providing an empty dict
+        # as the value for an account data type should be functionally equivalent to
+        # calling the DELETE method on the same type.
+        if self._hs.config.experimental.msc3391_enabled:
+            if body == {}:
+                await self.handler.remove_account_data_for_user(
+                    user_id, account_data_type
+                )
+                return 200, {}
 
         await self.handler.add_account_data_for_user(user_id, account_data_type, body)
 
@@ -124,6 +135,7 @@ class RoomAccountDataServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
@@ -155,6 +167,16 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
                 Codes.BAD_JSON,
             )
+
+        # If experimental support for MSC3391 is enabled, then providing an empty dict
+        # as the value for an account data type should be functionally equivalent to
+        # calling the DELETE method on the same type.
+        if self._hs.config.experimental.msc3391_enabled:
+            if body == {}:
+                await self.handler.remove_account_data_for_room(
+                    user_id, room_id, account_data_type
+                )
+                return 200, {}
 
         await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, body
