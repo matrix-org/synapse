@@ -158,7 +158,10 @@ class WorkerConfig(Config):
         # FIXME: Remove this check after a suitable amount of time.
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)
         if self.worker_main_http_uri is not None:
-            logger.warning("The config option worker_main_http_uri is unused since Synapse 1.72. It can be safely removed from your configuration.")
+            logger.warning(
+                "The config option worker_main_http_uri is unused since Synapse 1.72. "
+                "It can be safely removed from your configuration."
+            )
 
         # This option is really only here to support `--manhole` command line
         # argument.
