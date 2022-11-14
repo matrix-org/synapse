@@ -198,6 +198,7 @@ class SsoHandler:
         self._error_template = hs.config.sso.sso_error_template
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
+        self._can_load_media_repo = hs.config.media.can_load_media_repo
         self._media_repo = hs.get_media_repository()
         self._http_client = hs.get_proxied_blacklisted_http_client()
 
@@ -738,6 +739,9 @@ class SsoHandler:
 
             picture_https_url: HTTPS url for the picture image file.
         """
+        if not self._can_load_media_repo:
+            return
+
         try:
             uid = UserID.from_string(user_id)
 
