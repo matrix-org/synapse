@@ -1615,7 +1615,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if email:
             emails.append(email)
 
-        picture = userinfo.get("picture", "")
+        picture = userinfo.get("picture")
 
         return UserAttributeDict(
             localpart=localpart,
