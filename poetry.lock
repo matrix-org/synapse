@@ -91,7 +91,7 @@ dev = ["Sphinx (==4.3.2)", "black (==22.3.0)", "build (==0.8.0)", "flake8 (==4.0
 
 [[package]]
 name = "canonicaljson"
-version = "1.6.3"
+version = "1.6.4"
 description = "Canonical JSON"
 category = "main"
 optional = false
@@ -1704,8 +1704,8 @@ bleach = [
     {file = "bleach-5.0.1.tar.gz", hash = "sha256:0d03255c47eb9bd2f26aa9bb7f2107732e7e8fe195ca2f64709fcf3b0a4a085c"},
 ]
 canonicaljson = [
-    {file = "canonicaljson-1.6.3-py3-none-any.whl", hash = "sha256:6ba3cf1702fa3d209b3e915a4e9a3e4ef194f1e8fca189c1f0b7a2a7686a27e6"},
-    {file = "canonicaljson-1.6.3.tar.gz", hash = "sha256:ca59760bc274a899a0da75809d6909ae43e5123381fd6ef040a44d1952c0b448"},
+    {file = "canonicaljson-1.6.4-py3-none-any.whl", hash = "sha256:55d282853b4245dbcd953fe54c39b91571813d7c44e1dbf66e3c4f97ff134a48"},
+    {file = "canonicaljson-1.6.4.tar.gz", hash = "sha256:6c09b2119511f30eb1126cfcd973a10824e20f1cfd25039cde3d1218dd9c8d8f"},
 ]
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
