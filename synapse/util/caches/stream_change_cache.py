@@ -85,7 +85,7 @@ class StreamChangeCache:
         """Returns True if the entity may have been updated since stream_pos"""
         assert isinstance(stream_pos, int)
 
-        if stream_pos < self._earliest_known_stream_pos:
+        if stream_pos <= self._earliest_known_stream_pos:
             self.metrics.inc_misses()
             return True
 
