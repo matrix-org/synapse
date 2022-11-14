@@ -27,10 +27,10 @@ Afterwards, the homeserver needs some further configuration.
 
 Your homeserver configuration file needs the following extra keys:
 
-1.  [`turn_uris`](../../usage/configuration/config_documentation.md#turn_uris)
-2.  [`turn_shared_secret`](../../usage/configuration/config_documentation.md#turn_shared_secret)
-3.  [`turn_user_lifetime`](../../usage/configuration/config_documentation.md#turn_user_lifetime)
-4.  [`turn_allow_guests`](../../usage/configuration/config_documentation.md#turn_allow_guests)
+1.  [`turn_uris`](usage/configuration/config_documentation.md#turn_uris)
+2.  [`turn_shared_secret`](usage/configuration/config_documentation.md#turn_shared_secret)
+3.  [`turn_user_lifetime`](usage/configuration/config_documentation.md#turn_user_lifetime)
+4.  [`turn_allow_guests`](usage/configuration/config_documentation.md#turn_allow_guests)
 
 As an example, here is the relevant section of the config file for `matrix.org`. The
 `turn_uris` are appropriate for TURN servers listening on the default ports, with no TLS.
