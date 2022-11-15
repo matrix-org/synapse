@@ -251,10 +251,12 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern: Some(Cow::Borrowed("m.reaction")),
                 pattern_type: None,
             })),
-            Condition::Known(KnownCondition::InverseRelatedEventMatch(EventMatchCondition {
-                key: Cow::Borrowed("sender"),
+            Condition::Known(KnownCondition::InverseRelatedEventMatch(RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.annotation"),
+                include_fallbacks: None,
             })),
         ]),
         actions: Cow::Borrowed(&[Action::DontNotify]),
@@ -430,10 +432,12 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
             Condition::Known(KnownCondition::RoomMemberCount {
                 is: Some(Cow::Borrowed("<20")),
             }),
-            Condition::Known(KnownCondition::RelatedEventMatch(EventMatchCondition {
-                key: Cow::Borrowed("sender"),
+            Condition::Known(KnownCondition::RelatedEventMatch(RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.annotation"),
+                include_fallbacks: None,
             })),
         ]),
         actions: Cow::Borrowed(&[Action::DontNotify]),

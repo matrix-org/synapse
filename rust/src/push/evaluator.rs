@@ -171,6 +171,9 @@ impl PushRuleEvaluator {
             KnownCondition::RelatedEventMatch(event_match) => {
                 self.match_related_event_match(event_match, user_id)?
             }
+            KnownCondition::InverseRelatedEventMatch(event_match) => {
+                !self.match_related_event_match(event_match, user_id)?
+            }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
                     if !dn.is_empty() {

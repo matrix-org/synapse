@@ -269,6 +269,8 @@ pub enum KnownCondition {
     EventMatch(EventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
+    #[serde(rename = "im.nheko.msc3664.inverse_related_event_match")]
+    InverseRelatedEventMatch(RelatedEventMatchCondition),
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
