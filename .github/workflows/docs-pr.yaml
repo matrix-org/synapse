@@ -26,7 +26,7 @@ jobs:
           cp book/welcome_and_overview.html book/index.html
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: book
           path: book

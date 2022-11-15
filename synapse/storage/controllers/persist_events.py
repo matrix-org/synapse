@@ -715,8 +715,6 @@ class EventsPersistenceStorageController:
                             )
                             if not is_still_joined:
                                 logger.info("Server no longer in room %s", room_id)
-                                latest_event_ids = set()
-                                current_state = {}
                                 delta.no_longer_in_room = True
 
                             state_delta_for_room[room_id] = delta

@@ -355,9 +355,9 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         *,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
-        inhibit_local_membership_updates: bool = False,
-        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
-        new_forward_extremities: Optional[Dict[str, Set[str]]] = None,
+        inhibit_local_membership_updates: bool,
+        state_delta_for_room: Dict[str, DeltaState],
+        new_forward_extremities: Dict[str, Set[str]],
     ) -> None:
         """Insert some number of room events into the necessary database tables.
 
@@ -384,9 +384,6 @@ class PersistEventsStore:
             PartialStateConflictError: if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
-        state_delta_for_room = state_delta_for_room or {}
-        new_forward_extremities = new_forward_extremities or {}
-
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering

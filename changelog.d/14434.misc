@@ -1,0 +1,1 @@
+Make Dependabot only bump Rust deps in the lock file.
