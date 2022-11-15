@@ -94,7 +94,7 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "event_search": "event_search_event_id_idx",
     "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
     "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
-    "event_push_summary": "event_push_summary_unique_index",
+    "event_push_summary": "event_push_summary_unique_index2",
     "receipts_linearized": "receipts_linearized_unique_index",
     "receipts_graph": "receipts_graph_unique_index",
 }
@@ -1658,7 +1658,7 @@ class DatabasePool:
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
             retcol: string giving the name of the column to return
-            allow_none: If true, return None instead of failing if the SELECT
+            allow_none: If true, return None instead of raising StoreError if the SELECT
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """

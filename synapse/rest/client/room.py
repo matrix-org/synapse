@@ -729,7 +729,9 @@ class RoomInitialSyncRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        pagination_config = await PaginationConfig.from_request(self.store, request)
+        pagination_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
         )

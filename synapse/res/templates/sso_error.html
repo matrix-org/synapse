@@ -1,19 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Authentication failed</title>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style type="text/css">
-            {% include "sso.css" without context %}
+{% block title %}Authentication failed{% endblock %}
 
-            #error_code {
-                margin-top: 56px;
-            }
-        </style>
-    </head>
-    <body class="error_page">
+{% block header %}
+{% if error == "unauthorised" %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+
+    #error_code {
+        margin-top: 56px;
+    }
+</style>
+{% endif %}
+{% endblock %}
+
+{% block body %}
+<div class="error_page">
 {# If an error of unauthorised is returned it means we have actively rejected their login #}
 {% if error == "unauthorised" %}
         <header>
@@ -66,5 +66,5 @@
             }
         </script>
 {% endif %}
-</body>
-</html>
+</div>
+{% endblock %}

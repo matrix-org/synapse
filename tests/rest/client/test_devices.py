@@ -200,3 +200,37 @@ class DevicesTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(43200)
         self.get_success(self.handler.get_device(user_id, "abc"))
         self.get_failure(self.handler.get_device(user_id, "def"), NotFoundError)
+
+
+class DehydratedDeviceTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        register.register_servlets,
+        devices.register_servlets,
+    ]
+
+    def test_PUT(self) -> None:
+        """Sanity-check that we can PUT a dehydrated device.
+
+        Detects https://github.com/matrix-org/synapse/issues/14334.
+        """
+        alice = self.register_user("alice", "correcthorse")
+        token = self.login(alice, "correcthorse")
+
+        # Have alice update their device list
+        channel = self.make_request(
+            "PUT",
+            "_matrix/client/unstable/org.matrix.msc2697.v2/dehydrated_device",
+            {
+                "device_data": {
+                    "algorithm": "org.matrix.msc2697.v1.dehydration.v1.olm",
+                    "account": "dehydrated_device",
+                }
+            },
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        device_id = channel.json_body.get("device_id")
+        self.assertIsInstance(device_id, str)

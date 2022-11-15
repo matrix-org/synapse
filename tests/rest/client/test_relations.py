@@ -1523,6 +1523,26 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
+    def _get_threads(self) -> List[Tuple[str, str]]:
+        """Request the threads in the room and returns a list of thread ID and latest event ID."""
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        threads = channel.json_body["chunk"]
+        return [
+            (
+                t["event_id"],
+                t["unsigned"]["m.relations"][RelationTypes.THREAD]["latest_event"][
+                    "event_id"
+                ],
+            )
+            for t in threads
+        ]
+
     def test_redact_relation_annotation(self) -> None:
         """
         Test that annotations of an event are properly handled after the
@@ -1567,58 +1587,82 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         The redacted event should not be included in bundled aggregations or
         the response to relations.
         """
-        channel = self._send_relation(
-            RelationTypes.THREAD,
-            EventTypes.Message,
-            content={"body": "reply 1", "msgtype": "m.text"},
-        )
-        unredacted_event_id = channel.json_body["event_id"]
+        # Create a thread with a few events in it.
+        thread_replies = []
+        for i in range(3):
+            channel = self._send_relation(
+                RelationTypes.THREAD,
+                EventTypes.Message,
+                content={"body": f"reply {i}", "msgtype": "m.text"},
+            )
+            thread_replies.append(channel.json_body["event_id"])
 
-        # Note that the *last* event in the thread is redacted, as that gets
-        # included in the bundled aggregation.
-        channel = self._send_relation(
-            RelationTypes.THREAD,
-            EventTypes.Message,
-            content={"body": "reply 2", "msgtype": "m.text"},
-        )
-        to_redact_event_id = channel.json_body["event_id"]
-
-        # Both relations exist.
-        event_ids = self._get_related_events()
+        ##################################################
+        # Check the test data is configured as expected. #
+        ##################################################
+        self.assertEquals(self._get_related_events(), list(reversed(thread_replies)))
         relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [to_redact_event_id, unredacted_event_id])
         self.assertDictContainsSubset(
-            {
-                "count": 2,
-                "current_user_participated": True,
-            },
+            {"count": 3, "current_user_participated": True},
             relations[RelationTypes.THREAD],
         )
-        # And the latest event returned is the event that will be redacted.
+        # The latest event is the last sent event.
         self.assertEqual(
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
-            to_redact_event_id,
+            thread_replies[-1],
         )
 
-        # Redact one of the reactions.
-        self._redact(to_redact_event_id)
+        # There should be one thread, the latest event is the event that will be redacted.
+        self.assertEqual(self._get_threads(), [(self.parent_id, thread_replies[-1])])
 
-        # The unredacted relation should still exist.
-        event_ids = self._get_related_events()
+        ##########################
+        # Redact the last event. #
+        ##########################
+        self._redact(thread_replies.pop())
+
+        # The thread should still exist, but the latest event should be updated.
+        self.assertEquals(self._get_related_events(), list(reversed(thread_replies)))
         relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [unredacted_event_id])
         self.assertDictContainsSubset(
-            {
-                "count": 1,
-                "current_user_participated": True,
-            },
+            {"count": 2, "current_user_participated": True},
             relations[RelationTypes.THREAD],
         )
-        # And the latest event is now the unredacted event.
+        # And the latest event is the last unredacted event.
         self.assertEqual(
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
-            unredacted_event_id,
+            thread_replies[-1],
         )
+        self.assertEqual(self._get_threads(), [(self.parent_id, thread_replies[-1])])
+
+        ###########################################
+        # Redact the *first* event in the thread. #
+        ###########################################
+        self._redact(thread_replies.pop(0))
+
+        # Nothing should have changed (except the thread count).
+        self.assertEquals(self._get_related_events(), thread_replies)
+        relations = self._get_bundled_aggregations()
+        self.assertDictContainsSubset(
+            {"count": 1, "current_user_participated": True},
+            relations[RelationTypes.THREAD],
+        )
+        # And the latest event is the last unredacted event.
+        self.assertEqual(
+            relations[RelationTypes.THREAD]["latest_event"]["event_id"],
+            thread_replies[-1],
+        )
+        self.assertEqual(self._get_threads(), [(self.parent_id, thread_replies[-1])])
+
+        ####################################
+        # Redact the last remaining event. #
+        ####################################
+        self._redact(thread_replies.pop(0))
+        self.assertEquals(thread_replies, [])
+
+        # The event should no longer be considered a thread.
+        self.assertEquals(self._get_related_events(), [])
+        self.assertEquals(self._get_bundled_aggregations(), {})
+        self.assertEqual(self._get_threads(), [])
 
     def test_redact_parent_edit(self) -> None:
         """Test that edits of an event are redacted when the original event
@@ -1677,7 +1721,6 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             {"chunk": [{"type": "m.reaction", "key": "👍", "count": 1}]},
         )
 
-    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_redact_parent_thread(self) -> None:
         """
         Test that thread replies are still available when the root event is redacted.
@@ -1707,3 +1750,165 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
             related_event_id,
         )
+
+
+class ThreadsTestCase(BaseRelationsTestCase):
+    def _get_threads(self, body: JsonDict) -> List[Tuple[str, str]]:
+        return [
+            (
+                ev["event_id"],
+                ev["unsigned"]["m.relations"]["m.thread"]["latest_event"]["event_id"],
+            )
+            for ev in body["chunk"]
+        ]
+
+    def test_threads(self) -> None:
+        """Create threads and ensure the ordering is due to their latest event."""
+        # Create 2 threads.
+        thread_1 = self.parent_id
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
+        thread_2 = res["event_id"]
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_1 = channel.json_body["event_id"]
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", parent_id=thread_2
+        )
+        reply_2 = channel.json_body["event_id"]
+
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_2, reply_2), (thread_1, reply_1)])
+
+        # Update the first thread, the ordering should swap.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_3 = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        # Tuple of (thread ID, latest event ID) for each thread.
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_1, reply_3), (thread_2, reply_2)])
+
+    def test_pagination(self) -> None:
+        """Create threads and paginate through them."""
+        # Create 2 threads.
+        thread_1 = self.parent_id
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
+        thread_2 = res["event_id"]
+
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2])
+
+        # Make sure next_batch has something in it that looks like it could be a
+        # valid token.
+        next_batch = channel.json_body.get("next_batch")
+        self.assertIsInstance(next_batch, str, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1&from={next_batch}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_1], channel.json_body)
+
+        self.assertNotIn("next_batch", channel.json_body, channel.json_body)
+
+    def test_include(self) -> None:
+        """Filtering threads to all or participated in should work."""
+        # Thread 1 has the user as the root event.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 has the user replying.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Thread 3 has the user not participating in.
+        res = self.helper.send(self.room, body="Another thread!", tok=self.user2_token)
+        thread_3 = res["event_id"]
+        self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.test",
+            access_token=self.user2_token,
+            parent_id=thread_3,
+        )
+
+        # All threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(
+            thread_roots, [thread_3, thread_2, thread_1], channel.json_body
+        )
+
+        # Only participated threads.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?include=participated",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2, thread_1], channel.json_body)
+
+    def test_ignored_user(self) -> None:
+        """Events from ignored users should be ignored."""
+        # Thread 1 has a reply from an ignored user.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 is created by an ignored user.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Ignore user2.
+        self.get_success(
+            self.store.add_account_data_for_user(
+                self.user_id,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {"ignored_users": {self.user2_id: {}}},
+            )
+        )
+
+        # Only thread 1 is returned.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_1], channel.json_body)
