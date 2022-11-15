@@ -45,10 +45,13 @@ class StreamChangeCache:
     ) -> None:
         self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
-        self._entity_to_key: Dict[EntityType, int] = {}
 
-        # map from stream id to the a set of entities which changed at that stream id.
+        # map from stream id to the set of entities which changed at that stream id.
         self._cache: SortedDict[int, Set[EntityType]] = SortedDict()
+        # map from entity to the stream ID of the latest change for that entity.
+        #
+        # Must be kept in sync with _cache.
+        self._entity_to_key: Dict[EntityType, int] = {}
 
         # the earliest stream_pos for which we can reliably answer
         # get_all_entities_changed. In other words, one less than the earliest
@@ -85,19 +88,25 @@ class StreamChangeCache:
         """Returns True if the entity may have been updated since stream_pos"""
         assert isinstance(stream_pos, int)
 
+        # _cache is not valid at or before the earliest known stream position, so
+        # return that the entity has changed.
         if stream_pos <= self._earliest_known_stream_pos:
             self.metrics.inc_misses()
             return True
 
+        # If the entity is unknown, it hasn't changed.
         latest_entity_change_pos = self._entity_to_key.get(entity, None)
         if latest_entity_change_pos is None:
             self.metrics.inc_hits()
             return False
 
+        # This is a known entity, return true if the stream position is earlier
+        # than the last change.
         if stream_pos < latest_entity_change_pos:
             self.metrics.inc_misses()
             return True
 
+        # Otherwise, the stream position is after the latest change: return false.
         self.metrics.inc_hits()
         return False
 
@@ -105,15 +114,18 @@ class StreamChangeCache:
         self, entities: Collection[EntityType], stream_pos: int
     ) -> Union[Set[EntityType], FrozenSet[EntityType]]:
         """
-        Returns subset of entities that have had new things since the given
-        position.  Entities unknown to the cache will be returned.  If the
-        position is too old it will just return the given list.
+        Returns the subset of given entities that have had changes since the given
+        position.
+
+        Entities unknown to the cache will be returned.
+
+        If the position is too old it will just return the given list.
         """
         changed_entities = self.get_all_entities_changed(stream_pos)
         if changed_entities is not None:
             # We now do an intersection, trying to do so in the most efficient
             # way possible (some of these sets are *large*). First check in the
-            # given iterable is already set that we can reuse, otherwise we
+            # given iterable is already a set that we can reuse, otherwise we
             # create a set of the *smallest* of the two iterables and call
             # `intersection(..)` on it (this can be twice as fast as the reverse).
             if isinstance(entities, (set, frozenset)):
@@ -130,7 +142,7 @@ class StreamChangeCache:
         return result
 
     def has_any_entity_changed(self, stream_pos: int) -> bool:
-        """Returns if any entity has changed"""
+        """Returns true if any entity has changed"""
         assert isinstance(stream_pos, int)
 
         if not self._cache:
@@ -145,13 +157,15 @@ class StreamChangeCache:
             return True
 
     def get_all_entities_changed(self, stream_pos: int) -> Optional[List[EntityType]]:
-        """Returns all entities that have had new things since the given
+        """Returns all entities that have had changes since the given
         position. If the position is too old it will return None.
 
         Returns the entities in the order that they were changed.
         """
         assert isinstance(stream_pos, int)
 
+        # _cache is not valid before the earliest known stream position, so
+        # return that no known entities have changed.
         if stream_pos < self._earliest_known_stream_pos:
             return None
 
@@ -167,6 +181,8 @@ class StreamChangeCache:
         """
         assert isinstance(stream_pos, int)
 
+        # For a change before _cache is valid (e.g. at or before the earliest known
+        # stream position) there's nothing to do.
         if stream_pos <= self._earliest_known_stream_pos:
             return
 
