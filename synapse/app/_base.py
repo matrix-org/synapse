@@ -365,7 +365,7 @@ def listen_http(
     version_string: str,
     max_request_body_size: int,
     context_factory: IOpenSSLContextFactory,
-    reactor: IReactorSSL = reactor,
+    reactor: ISynapseReactor = reactor,
 ) -> List[Port]:
     port = listener_config.port
     bind_addresses = listener_config.bind_addresses

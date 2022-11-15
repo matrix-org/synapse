@@ -389,6 +389,9 @@ class GenericWorkerServer(HomeServer):
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
+        # tls_server_context_factory is set by `refresh_certificate`, not in the
+        # homeserver constructor. Reassure mypy that we have set a context factory.
+        assert self.tls_server_context_factory is not None
         _base.listen_http(
             listener_config,
             root_resource,
