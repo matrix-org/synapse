@@ -1,0 +1,1 @@
+Update docstring to clarify that `get_partial_state_events_batch` does not just give you completely arbitrary partial-state events.
