@@ -1,4 +1,4 @@
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from synapse.types import JsonDict
 
