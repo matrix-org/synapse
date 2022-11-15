@@ -169,8 +169,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 counts.main_timeline,
                 NotifCounts(
                     notify_count=noitf_count,
-                    # Beeper change: we always count unreads currently, so just override this
-                    unread_count=noitf_count,
+                    unread_count=0,
                     highlight_count=highlight_count,
                 ),
             )

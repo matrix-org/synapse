@@ -373,16 +373,17 @@ class BulkPushRuleEvaluator:
 
             # Beeper: Need to calculate this per user as whether it should count as unread or not
             # depends on who the current user is.
-            count_as_unread_by_user[uid] = _should_count_as_unread(
-                event, context, non_bot_room_member_count, uid, related_events
-            )
+            if self.hs.config.experimental.msc2654_enabled:
+                count_as_unread_by_user[uid] = _should_count_as_unread(
+                    event, context, non_bot_room_member_count, uid, related_events
+                )
 
-            if count_as_unread_by_user[uid]:
-                # Add an element for the current user if the event needs to be marked as
-                # unread, so that add_push_actions_to_staging iterates over it.
-                # If the event shouldn't be marked as unread but should notify the
-                # current user, it'll be added to the dict later.
-                actions_by_user[uid] = []
+                if count_as_unread_by_user[uid]:
+                    # Add an element for the current user if the event needs to be marked as
+                    # unread, so that add_push_actions_to_staging iterates over it.
+                    # If the event shouldn't be marked as unread but should notify the
+                    # current user, it'll be added to the dict later.
+                    actions_by_user[uid] = []
 
             actions = evaluator.run(rules, uid, display_name)
             if "notify" in actions:

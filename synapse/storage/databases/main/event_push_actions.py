@@ -1098,7 +1098,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 _serialize_action(actions, bool(is_highlight)),  # actions column
                 notif,  # notif column
                 is_highlight,  # highlight column
-                int(count_as_unread_by_user[user_id]),  # unread column
+                int(count_as_unread_by_user.get(user_id, 0)),  # unread column
                 thread_id,  # thread_id column
                 self._clock.time_msec(),  # inserted_ts column
             )
@@ -1347,7 +1347,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
 
         sql = """
-            SELECT stream_id, room_id, user_id, thread_id, stream_ordering
+            SELECT stream_id, room_id, user_id, thread_id, event_stream_ordering
             FROM receipts_linearized
             WHERE ? < stream_id AND stream_id <= ? AND user_id LIKE ?
             ORDER BY stream_id ASC
