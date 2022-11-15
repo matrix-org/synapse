@@ -1540,8 +1540,4 @@ def _get_event_ids_for_partial_state_join(
             if membership_event_id:
                 state_event_ids.add(membership_event_id)
 
-    # TODO: return a few more members:
-    #   - those with invites
-    #   - those that are kicked? / banned
-
     return state_event_ids
