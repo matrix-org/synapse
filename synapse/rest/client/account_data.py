@@ -83,6 +83,11 @@ class AccountDataServlet(RestServlet):
         if event is None:
             raise NotFoundError("Account data not found")
 
+        # If experimental support for MSC3391 is enabled, then this endpoint should
+        # return a 404 if the content for an account data type is an empty dict.
+        if self._hs.config.experimental.msc3391_enabled and event == {}:
+            raise NotFoundError("Account data not found")
+
         return 200, event
 
 
@@ -207,6 +212,11 @@ class RoomAccountDataServlet(RestServlet):
         )
 
         if event is None:
+            raise NotFoundError("Room account data not found")
+
+        # If experimental support for MSC3391 is enabled, then this endpoint should
+        # return a 404 if the content for an account data type is an empty dict.
+        if self._hs.config.experimental.msc3391_enabled and event == {}:
             raise NotFoundError("Room account data not found")
 
         return 200, event
