@@ -342,8 +342,44 @@ def check_state_dependent_auth_rules(
 
 
 def _check_size_limits(event: "EventBase") -> None:
+    """
+    Checks the size limits in a PDU.
+
+    The entire size limit of the PDU is checked first.
+    Then the size of fields is checked, first in codepoints and then in bytes.
+
+    The codepoint size limits are only for Synapse compatibility.
+
+    Raises:
+        EventSizeError:
+            when a size limit has been violated.
+
+            strict=True if Synapse never would have accepted the event and
+                the PDU must NOT be persisted.
+
+            strict=False if a prior version of Synapse would have accepted the
+                event and so the PDU must be persisted as rejected to avoid
+                breaking the room.
+    """
+
+    # Whole PDU check
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
         raise EventSizeError("event too large", strict=True)
+
+    # Codepoint size check: Synapse always enforced these limits, so apply
+    # them strictly.
+    if len(event.user_id) > 255:
+        raise EventSizeError("'user_id' too large", strict=True)
+    if len(event.room_id) > 255:
+        raise EventSizeError("'room_id' too large", strict=True)
+    if event.is_state() and len(event.state_key) > 255:
+        raise EventSizeError("'state_key' too large", strict=True)
+    if len(event.type) > 255:
+        raise EventSizeError("'type' too large", strict=True)
+    if len(event.event_id) > 255:
+        raise EventSizeError("'event_id' too large", strict=True)
+
+    # Byte size check: if these fail, then be lenient to avoid breaking rooms.
     if len(event.user_id.encode("utf-8")) > 255:
         raise EventSizeError("'user_id' too large", strict=False)
     if len(event.room_id.encode("utf-8")) > 255:
