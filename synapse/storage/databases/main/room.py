@@ -2057,7 +2057,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         Args:
             report_id: ID of reported event in database
         Returns:
-            json list of information from event report
+            JSON dict of information from an event report or None if the
+            report does not exist.
         """
 
         def _get_event_report_txn(
