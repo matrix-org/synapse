@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -45,10 +45,22 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
         update_name: str,
         index_name: str,
         table: str,
-        values: Dict[str, Any],
+        receipts: Dict[Tuple[str, str, str], Sequence[Dict[str, Any]]],
+        expected_unique_receipts: Dict[Tuple[str, str, str], Optional[Dict[str, Any]]],
     ):
         """Test that the background update to uniqueify non-thread receipts in
         the given receipts table works properly.
+
+        Args:
+            update_name: The name of the background update to test.
+            index_name: The name of the index that the background update creates.
+            table: The table of receipts that the background update fixes.
+            receipts: The test data containing duplicate receipts.
+                A list of receipt rows to insert, grouped by
+                `(room_id, receipt_type, user_id)`.
+            expected_unique_receipts: A dictionary of `(room_id, receipt_type, user_id)`
+                keys and expected receipt key-values after duplicate receipts have been
+                removed.
         """
         # First, undo the background update.
         def drop_receipts_unique_index(txn: LoggingTransaction) -> None:
@@ -61,36 +73,22 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
             )
         )
 
-        # Add duplicate receipts for `room_id`.
-        for _ in range(2):
-            self.get_success(
-                self.store.db_pool.simple_insert(
-                    table,
-                    {
-                        "room_id": self.room_id,
-                        "receipt_type": "m.read",
-                        "user_id": self.user_id,
-                        "thread_id": None,
-                        "data": "{}",
-                        **values,
-                    },
+        # Populate the receipts table, including duplicates.
+        for (room_id, receipt_type, user_id), rows in receipts.items():
+            for row in rows:
+                self.get_success(
+                    self.store.db_pool.simple_insert(
+                        table,
+                        {
+                            "room_id": room_id,
+                            "receipt_type": receipt_type,
+                            "user_id": user_id,
+                            "thread_id": None,
+                            "data": "{}",
+                            **row,
+                        },
+                    )
                 )
-            )
-
-        # Add a unique receipt for `other_room_id`.
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                table,
-                {
-                    "room_id": self.other_room_id,
-                    "receipt_type": "m.read",
-                    "user_id": self.user_id,
-                    "thread_id": None,
-                    "data": "{}",
-                    **values,
-                },
-            )
-        )
 
         # Insert and run the background update.
         self.get_success(
@@ -107,39 +105,54 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         self.wait_for_background_updates()
 
-        # Check that the background task deleted the duplicate receipts.
-        res = self.get_success(
-            self.store.db_pool.simple_select_onecol(
-                table=table,
-                keyvalues={
-                    "room_id": self.room_id,
-                    "receipt_type": "m.read",
-                    "user_id": self.user_id,
-                    # `simple_select_onecol` does not support NULL filters,
-                    # so skip the filter on `thread_id`.
-                },
-                retcol="room_id",
-                desc="get_receipt",
-            )
-        )
-        self.assertEqual(0, len(res))
+        # Check that the remaining receipts match expectations.
+        for (
+            room_id,
+            receipt_type,
+            user_id,
+        ), expected_row in expected_unique_receipts.items():
+            # Include the receipt key in the returned columns, for more informative
+            # assertion messages.
+            columns = ["room_id", "receipt_type", "user_id"]
+            if expected_row is not None:
+                columns += expected_row.keys()
 
-        # Check that the background task did not delete the unique receipts.
-        res = self.get_success(
-            self.store.db_pool.simple_select_onecol(
-                table=table,
-                keyvalues={
-                    "room_id": self.other_room_id,
-                    "receipt_type": "m.read",
-                    "user_id": self.user_id,
-                    # `simple_select_onecol` does not support NULL filters,
-                    # so skip the filter on `thread_id`.
-                },
-                retcol="room_id",
-                desc="get_receipt",
+            rows = self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table=table,
+                    keyvalues={
+                        "room_id": room_id,
+                        "receipt_type": receipt_type,
+                        "user_id": user_id,
+                        # `simple_select_onecol` does not support NULL filters,
+                        # so skip the filter on `thread_id`.
+                    },
+                    retcols=columns,
+                    desc="get_receipt",
+                )
             )
-        )
-        self.assertEqual(1, len(res))
+
+            if expected_row is not None:
+                self.assertEqual(
+                    len(rows),
+                    1,
+                    f"Background update did not leave behind latest receipt in {table}",
+                )
+                self.assertEqual(
+                    rows[0],
+                    {
+                        "room_id": room_id,
+                        "receipt_type": receipt_type,
+                        "user_id": user_id,
+                        **expected_row,
+                    },
+                )
+            else:
+                self.assertEqual(
+                    len(rows),
+                    0,
+                    f"Background update did not remove all duplicate receipts from {table}",
+                )
 
     def test_background_receipts_linearized_unique_index(self):
         """Test that the background update to uniqueify non-thread receipts in
@@ -149,9 +162,18 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
             "receipts_linearized_unique_index",
             "receipts_linearized_unique_index",
             "receipts_linearized",
-            {
-                "stream_id": 5,
-                "event_id": "$some_event",
+            receipts={
+                (self.room_id, "m.read", self.user_id): [
+                    {"stream_id": 5, "event_id": "$some_event"},
+                    {"stream_id": 6, "event_id": "$some_event"},
+                ],
+                (self.other_room_id, "m.read", self.user_id): [
+                    {"stream_id": 7, "event_id": "$some_event"}
+                ],
+            },
+            expected_unique_receipts={
+                (self.room_id, "m.read", self.user_id): {"stream_id": 6},
+                (self.other_room_id, "m.read", self.user_id): {"stream_id": 7},
             },
         )
 
@@ -163,7 +185,25 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
             "receipts_graph_unique_index",
             "receipts_graph_unique_index",
             "receipts_graph",
-            {
-                "event_ids": '["$some_event"]',
+            receipts={
+                (self.room_id, "m.read", self.user_id): [
+                    {
+                        "event_ids": '["$some_event"]',
+                    },
+                    {
+                        "event_ids": '["$some_event"]',
+                    },
+                ],
+                (self.other_room_id, "m.read", self.user_id): [
+                    {
+                        "event_ids": '["$some_event"]',
+                    }
+                ],
+            },
+            expected_unique_receipts={
+                (self.room_id, "m.read", self.user_id): None,
+                (self.other_room_id, "m.read", self.user_id): {
+                    "event_ids": '["$some_event"]'
+                },
             },
         )
