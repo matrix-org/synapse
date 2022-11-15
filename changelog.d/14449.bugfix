@@ -1,1 +1,0 @@
-Fix a bug introduced in 0.34.0 that prevented Synapse from correctly ignoring blank commands sent over TCP replication.
