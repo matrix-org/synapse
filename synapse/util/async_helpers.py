@@ -217,7 +217,8 @@ async def concurrently_execute(
         limit: Maximum number of conccurent executions.
 
     Returns:
-        Resolved when all function invocations have finished.
+        None, when all function invocations have finished. The return values
+        from those functions are discarded.
     """
     it = iter(args)
 
