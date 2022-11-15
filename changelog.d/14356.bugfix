@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.66 which would not send certain pushrules to clients. Contributed by Nico.
