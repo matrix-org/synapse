@@ -131,7 +131,7 @@ class StreamChangeCache:
 
     def has_any_entity_changed(self, stream_pos: int) -> bool:
         """Returns if any entity has changed"""
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if not self._cache:
             # If the cache is empty, nothing can have changed.
@@ -150,7 +150,7 @@ class StreamChangeCache:
 
         Returns the entities in the order that they were changed.
         """
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if stream_pos < self._earliest_known_stream_pos:
             return None
@@ -165,7 +165,7 @@ class StreamChangeCache:
         """Informs the cache that the entity has been changed at the given
         position.
         """
-        assert type(stream_pos) is int
+        assert isinstance(stream_pos, int)
 
         if stream_pos <= self._earliest_known_stream_pos:
             return
