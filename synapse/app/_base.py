@@ -364,7 +364,7 @@ def listen_http(
     root_resource: Resource,
     version_string: str,
     max_request_body_size: int,
-    context_factory: IOpenSSLContextFactory,
+    context_factory: Optional[IOpenSSLContextFactory],
     reactor: ISynapseReactor = reactor,
 ) -> List[Port]:
     port = listener_config.port

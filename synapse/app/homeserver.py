@@ -136,9 +136,6 @@ class SynapseHomeServer(HomeServer):
         else:
             root_resource = OptionsResource()
 
-        # tls_server_context_factory is set by `refresh_certificate`, not in the
-        # homeserver constructor. Reassure mypy that we have set a context factory.
-        assert self.tls_server_context_factory is not None
         ports = listen_http(
             listener_config,
             create_resource_tree(resources, root_resource),
