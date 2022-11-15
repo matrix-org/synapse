@@ -52,6 +52,7 @@ from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
     RoomVersion,
+    RoomVersions,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import MutableStateMap, StateMap, UserID, get_domain_from_id
@@ -341,6 +342,26 @@ def check_state_dependent_auth_rules(
     logger.debug("Allowing! %s", event)
 
 
+# Set of room versions where Synapse did not apply event key size limits
+# in bytes, but rather in codepoints.
+# In these room versions, we are more lenient with event size validation.
+LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS = {
+    RoomVersions.V1,
+    RoomVersions.V2,
+    RoomVersions.V3,
+    RoomVersions.V4,
+    RoomVersions.V5,
+    RoomVersions.V6,
+    RoomVersions.MSC2176,
+    RoomVersions.V7,
+    RoomVersions.V8,
+    RoomVersions.V9,
+    RoomVersions.MSC3787,
+    RoomVersions.V10,
+    RoomVersions.MSC2716v4,
+}
+
+
 def _check_size_limits(event: "EventBase") -> None:
     """
     Checks the size limits in a PDU.
@@ -379,17 +400,21 @@ def _check_size_limits(event: "EventBase") -> None:
     if len(event.event_id) > 255:
         raise EventSizeError("'event_id' too large", strict=True)
 
+    strict_byte_limits = (
+        event.room_version not in LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS
+    )
+
     # Byte size check: if these fail, then be lenient to avoid breaking rooms.
     if len(event.user_id.encode("utf-8")) > 255:
-        raise EventSizeError("'user_id' too large", strict=False)
+        raise EventSizeError("'user_id' too large", strict=strict_byte_limits)
     if len(event.room_id.encode("utf-8")) > 255:
-        raise EventSizeError("'room_id' too large", strict=False)
+        raise EventSizeError("'room_id' too large", strict=strict_byte_limits)
     if event.is_state() and len(event.state_key.encode("utf-8")) > 255:
-        raise EventSizeError("'state_key' too large", strict=False)
+        raise EventSizeError("'state_key' too large", strict=strict_byte_limits)
     if len(event.type.encode("utf-8")) > 255:
-        raise EventSizeError("'type' too large", strict=False)
+        raise EventSizeError("'type' too large", strict=strict_byte_limits)
     if len(event.event_id.encode("utf-8")) > 255:
-        raise EventSizeError("'event_id' too large", strict=False)
+        raise EventSizeError("'event_id' too large", strict=strict_byte_limits)
 
 
 def _check_create(event: "EventBase") -> None:
