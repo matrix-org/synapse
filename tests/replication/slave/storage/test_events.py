@@ -282,7 +282,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         j2, j2ctx = self.build_event(
             type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
         )
-        assert j2.internal_metadata.stream_ordering is not None
         msg, msgctx = self.build_event()
         self.get_success(
             self._storage_controllers.persistence.persist_events(
@@ -290,6 +289,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             )
         )
         self.replicate()
+        assert j2.internal_metadata.stream_ordering is not None
 
         event_source = RoomEventSource(self.hs)
         event_source.store = self.slaved_store
