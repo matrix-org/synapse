@@ -1339,7 +1339,6 @@ class SyncHandler:
 
         # Note: we get the users room list *before* we get the current token, this
         # avoids checking back in history if rooms are joined after the token is fetched.
-        token_before_rooms = self.event_sources.get_current_token()
         mutable_joined_room_ids = set(await self.store.get_rooms_for_user(user_id))
 
         # NB: The now_token gets changed by some of the generate_sync_* methods,

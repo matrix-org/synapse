@@ -28,7 +28,13 @@ from typing import (
 
 from prometheus_client import Counter
 
-from synapse.api.constants import MAIN_TIMELINE, EventContentFields, EventTypes, Membership, RelationTypes
+from synapse.api.constants import (
+    MAIN_TIMELINE,
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+)
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -60,12 +66,13 @@ STATE_EVENT_TYPES_TO_MARK_UNREAD = {
     EventTypes.Tombstone,
 }
 
+
 def _should_count_as_unread(
     event: EventBase,
     context: EventContext,
     non_bot_room_members_count: int,
     current_user: str,
-    related_event: Optional[EventBase],
+    related_events: Dict[str, Dict[str, str]],
 ) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
@@ -85,9 +92,11 @@ def _should_count_as_unread(
             return isinstance(body, str) and bool(body)
         # Beeper: We want reactions to only count as unread if they're reactions to the current user in rooms that
         # have fewer than 20 users.
-        elif event.type == "m.reaction" and related_event:
+        elif event.type == "m.reaction" and related_events["m.annotation"]:
+
             return (
-                related_event.sender == current_user and non_bot_room_members_count < 20
+                related_events["m.annotation"]["sender"] == current_user
+                and non_bot_room_members_count < 20
             )
 
     return False
@@ -365,7 +374,7 @@ class BulkPushRuleEvaluator:
             # Beeper: Need to calculate this per user as whether it should count as unread or not
             # depends on who the current user is.
             count_as_unread_by_user[uid] = _should_count_as_unread(
-                event, context, non_bot_room_member_count, uid, related_event
+                event, context, non_bot_room_member_count, uid, related_events
             )
 
             if count_as_unread_by_user[uid]:
