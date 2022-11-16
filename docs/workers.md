@@ -135,8 +135,8 @@ In the config file for each worker, you must specify:
    [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)).
  * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners) option
    with an `http` listener.
- * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
-   the main process (`worker_main_http_uri`).
+ * **Synapse 1.71 and older:** if handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
+   the main process (`worker_main_http_uri`). This config option is no longer required and is ignored when running Synapse 1.72 and newer.
 
 For example:
 
@@ -221,7 +221,6 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
-    # Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
     ^/_matrix/client/(r0|v3|unstable)/keys/changes$
     ^/_matrix/client/(r0|v3|unstable)/keys/claim$
@@ -376,7 +375,7 @@ responsible for
 - persisting them to the DB, and finally
 - updating the events stream.
 
-Because load is sharded in this way, you *must* restart all worker instances when 
+Because load is sharded in this way, you *must* restart all worker instances when
 adding or removing event persisters.
 
 An `event_persister` should not be mistaken for an `event_creator`.

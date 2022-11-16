@@ -213,10 +213,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "listener_resources": ["client", "replication"],
         "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload"],
         "shared_extra_conf": {},
-        "worker_extra_conf": (
-            "worker_main_http_uri: http://127.0.0.1:%d"
-            % (MAIN_PROCESS_HTTP_LISTENER_PORT,)
-        ),
+        "worker_extra_conf": "",
     },
     "account_data": {
         "app": "synapse.app.generic_worker",
