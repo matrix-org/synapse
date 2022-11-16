@@ -99,7 +99,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 "stream_id",
                 extra_tables=[
                     ("room_tags_revisions", "stream_id"),
-                    ("account_data", "instance_name", "stream_id"),
+                    ("account_data", "stream_id"),
                 ],
                 is_writer=self._instance_name in hs.config.worker.writers.account_data,
             )
