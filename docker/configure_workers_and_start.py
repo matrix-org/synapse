@@ -164,7 +164,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/federation/(v1|v2)/invite/",
             "^/_matrix/federation/(v1|v2)/query_auth/",
             "^/_matrix/federation/(v1|v2)/event_auth/",
-            "^/_matrix/federation/(v1|v2)/timestamp_to_event",
+            "^/_matrix/federation/v1/timestamp_to_event/",
             "^/_matrix/federation/(v1|v2)/exchange_third_party_invite/",
             "^/_matrix/federation/(v1|v2)/user/devices/",
             "^/_matrix/federation/(v1|v2)/get_groups_publicised$",
