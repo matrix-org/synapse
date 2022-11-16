@@ -51,6 +51,13 @@ class RoomDisposition:
     UNSTABLE = "unstable"
 
 
+class PushRuleRoomFlag:
+    """Enum for listing possible MSC3931 room version feature flags, for push rules"""
+
+    # MSC3932: Room version supports MSC1767 Extensible Events.
+    EXTENSIBLE_EVENTS = "org.matrix.msc3932.extensible_events"
+
+
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class RoomVersion:
     """An object which describes the unique attributes of a room version."""
@@ -96,7 +103,7 @@ class RoomVersion:
     # is not enough to mark it "supported": the push rule evaluator also needs to
     # support the flag. Unknown flags are ignored by the evaluator, making conditions
     # fail if used.
-    msc3931_push_features: List[str]
+    msc3931_push_features: List[str]  # values from PushRuleRoomFlag
 
 
 class RoomVersions:
@@ -365,6 +372,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,
+        msc3931_push_features=[PushRuleRoomFlag.EXTENSIBLE_EVENTS],
     )
 
 

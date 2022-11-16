@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use crate::push::{PushRule, PushRules};
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -32,7 +34,30 @@ lazy_static! {
 
     /// Used to determine which MSC3931 room version feature flags are actually known to
     /// the push evaluator.
-    static ref KNOWN_RVER_FLAGS: Vec<String> = vec![];
+    static ref KNOWN_RVER_FLAGS: Vec<String> = vec![
+        RoomVersionFeatures::ExtensibleEvents.as_str().to_string(),
+    ];
+
+    /// The "safe" rule IDs which are not affected by MSC3932's behaviour (room versions which
+    /// declare Extensible Events support ultimately *disable* push rules which do not declare
+    /// *any* MSC3931 room_version_supports condition).
+    static ref SAFE_EXTENSIBLE_EVENTS_RULE_IDS: Vec<String> = vec![
+        "global/override/.m.rule.master".to_string(),
+        "global/override/.m.rule.roomnotif".to_string(),
+        "global/content/.m.rule.contains_user_name".to_string(),
+    ];
+}
+
+enum RoomVersionFeatures {
+    ExtensibleEvents,
+}
+
+impl RoomVersionFeatures {
+    fn as_str(&self) -> &'static str {
+        match self {
+            RoomVersionFeatures::ExtensibleEvents => "org.matrix.msc3932.extensible_events",
+        }
+    }
 }
 
 /// Allows running a set of push rules against a particular event.
@@ -121,7 +146,22 @@ impl PushRuleEvaluator {
                 continue;
             }
 
+            let rule_id = &push_rule.rule_id().to_string();
+            let extev_flag = &RoomVersionFeatures::ExtensibleEvents.as_str().to_string();
+            let supports_extensible_events = self.room_version_feature_flags.contains(extev_flag);
+            let safe_from_rver_condition = SAFE_EXTENSIBLE_EVENTS_RULE_IDS.contains(rule_id);
+            let mut has_rver_condition = false;
+
             for condition in push_rule.conditions.iter() {
+                has_rver_condition = has_rver_condition
+                    || match condition {
+                        Condition::Known(known) => match known {
+                            // per MSC3932, we just need *any* room version condition to match
+                            KnownCondition::RoomVersionSupports { feature: _ } => true,
+                            _ => false,
+                        },
+                        _ => false,
+                    };
                 match self.match_condition(condition, user_id, display_name) {
                     Ok(true) => {}
                     Ok(false) => continue 'outer,
@@ -130,6 +170,13 @@ impl PushRuleEvaluator {
                         continue 'outer;
                     }
                 }
+            }
+
+            // MSC3932: Disable push rules in extensible event-supporting room versions if they
+            // don't describe *any* MSC3931 room version condition, unless the rule is on the
+            // safe list.
+            if !has_rver_condition && !safe_from_rver_condition && supports_extensible_events {
+                continue;
             }
 
             let actions = push_rule
@@ -393,4 +440,52 @@ fn push_rule_evaluator() {
 
     let result = evaluator.run(&FilteredPushRules::default(), None, Some("bob"));
     assert_eq!(result.len(), 3);
+}
+
+#[test]
+fn test_requires_room_version_supports_condition() {
+    let mut flattened_keys = BTreeMap::new();
+    flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
+    let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
+    let evaluator = PushRuleEvaluator::py_new(
+        flattened_keys,
+        10,
+        Some(0),
+        BTreeMap::new(),
+        BTreeMap::new(),
+        false,
+        flags,
+        true,
+    )
+    .unwrap();
+
+    // first test: are the master and contains_user_name rules excluded from the "requires room
+    // version condition" check?
+    let mut result = evaluator.run(
+        &FilteredPushRules::default(),
+        Some("@bob:example.org"),
+        None,
+    );
+    assert_eq!(result.len(), 3);
+
+    // second test: if an appropriate push rule is in play, does it get handled?
+    let custom_rule = PushRule {
+        rule_id: Cow::from("global/underride/.org.example.extensible"),
+        priority_class: 1, // underride
+        conditions: Cow::from(vec![Condition::Known(
+            KnownCondition::RoomVersionSupports {
+                feature: Cow::from(RoomVersionFeatures::ExtensibleEvents.as_str().to_string()),
+            },
+        )]),
+        actions: Cow::from(vec![Action::Notify]),
+        default: false,
+        default_enabled: true,
+    };
+    let rules = PushRules::new(vec![custom_rule]);
+    result = evaluator.run(
+        &FilteredPushRules::py_new(rules, BTreeMap::new(), true),
+        None,
+        None,
+    );
+    assert_eq!(result.len(), 1);
 }
