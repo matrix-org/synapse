@@ -1,3 +1,98 @@
+Synapse 1.72.0rc1 (2022-11-16)
+==============================
+
+Features
+--------
+
+- Add experimental support for [MSC3912](https://github.com/matrix-org/matrix-spec-proposals/pull/3912): Relation-based redactions. ([\#14260](https://github.com/matrix-org/synapse/issues/14260))
+- Build Debian packages for Ubuntu 22.10 (Kinetic Kudu). ([\#14396](https://github.com/matrix-org/synapse/issues/14396))
+- Add an [Admin API](https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/index.html) endpoint for user lookup based on third-party ID (3PID). Contributed by @ashfame. ([\#14405](https://github.com/matrix-org/synapse/issues/14405))
+- Faster joins: include heroes' membership events in the partial join response, for rooms without a name or canonical alias. ([\#14442](https://github.com/matrix-org/synapse/issues/14442))
+
+
+Bugfixes
+--------
+
+- Faster joins: do not block creation of or queries for room aliases during the resync. ([\#14292](https://github.com/matrix-org/synapse/issues/14292))
+- Fix a bug introduced in Synapse 1.64.0rc1 which could cause log spam when fetching events from other homeservers. ([\#14347](https://github.com/matrix-org/synapse/issues/14347))
+- Fix a bug introduced in 1.66 which would not send certain pushrules to clients. Contributed by Nico. ([\#14356](https://github.com/matrix-org/synapse/issues/14356))
+- Fix a bug introduced in v1.71.0rc1 where the power level event was incorrectly created during initial room creation. ([\#14361](https://github.com/matrix-org/synapse/issues/14361))
+- Fix refresh token endpoint to be under /r0 and /v3 instead of /v1. Contributed by Tulir @ Beeper. ([\#14364](https://github.com/matrix-org/synapse/issues/14364))
+- Fix a long-standing bug where Synapse would raise an error when encountering an unrecognised field in a `/sync` filter, instead of ignoring it for forward compatibility. ([\#14369](https://github.com/matrix-org/synapse/issues/14369))
+- Fix a background database update, introduced in Synapse 1.64.0, which could cause poor database performance. ([\#14374](https://github.com/matrix-org/synapse/issues/14374))
+- Fix PostgreSQL sometimes using table scans for queries against the `event_search` table, taking a long time and a large amount of IO. ([\#14409](https://github.com/matrix-org/synapse/issues/14409))
+- Fix rendering of some HTML templates (including emails). Introduced in v1.71.0. ([\#14448](https://github.com/matrix-org/synapse/issues/14448))
+- Fix a bug introduced in Synapse 1.70.0 where the background updates to add non-thread unique indexes on receipts could fail when upgrading from 1.67.0 or earlier. ([\#14453](https://github.com/matrix-org/synapse/issues/14453))
+
+
+Updates to the Docker image
+---------------------------
+
+- Add all Stream Writer worker types to configure_workers_and_start.py. ([\#14197](https://github.com/matrix-org/synapse/issues/14197))
+- Remove references to legacy worker types in the multi-worker Dockerfile. ([\#14294](https://github.com/matrix-org/synapse/issues/14294))
+
+
+Improved Documentation
+----------------------
+
+- Upload documentation PRs to Netlify. ([\#12947](https://github.com/matrix-org/synapse/issues/12947), [\#14370](https://github.com/matrix-org/synapse/issues/14370))
+- Add addtional TURN server configuration example based on [eturnal](https://github.com/processone/eturnal) and adjust general TURN server doc structure. ([\#14293](https://github.com/matrix-org/synapse/issues/14293))
+- Add example on how to load balance /sync requests. Contributed by [aceArt](https://aceart.de). ([\#14297](https://github.com/matrix-org/synapse/issues/14297))
+- Edit sample Nginx reverse proxy configuration to use HTTP/1.1. Contributed by Brad Jones. ([\#14414](https://github.com/matrix-org/synapse/issues/14414))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove support for PostgreSQL 10. ([\#14392](https://github.com/matrix-org/synapse/issues/14392), [\#14397](https://github.com/matrix-org/synapse/issues/14397))
+
+
+Internal Changes
+----------------
+
+- Run unit tests against Python 3.11. ([\#13812](https://github.com/matrix-org/synapse/issues/13812))
+- Add TLS support for generic worker endpoints. ([\#14128](https://github.com/matrix-org/synapse/issues/14128), [\#14455](https://github.com/matrix-org/synapse/issues/14455))
+- Switch to a maintained action for installing Rust in CI. ([\#14313](https://github.com/matrix-org/synapse/issues/14313))
+- Add override ability to `complement.sh` command line script to request certain types of workers. ([\#14324](https://github.com/matrix-org/synapse/issues/14324))
+- Bump flake8-bugbear from 22.9.23 to 22.10.27. ([\#14329](https://github.com/matrix-org/synapse/issues/14329))
+- Enabling testing of [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874) (filtering of `/messages` by relation type) in complement. ([\#14339](https://github.com/matrix-org/synapse/issues/14339))
+- Bump twisted from 22.8.0 to 22.10.0. ([\#14340](https://github.com/matrix-org/synapse/issues/14340))
+- Concisely log a failure to resolve state due to missing `prev_events`. ([\#14346](https://github.com/matrix-org/synapse/issues/14346))
+- Use a maintained Github action to install Rust. ([\#14351](https://github.com/matrix-org/synapse/issues/14351))
+- Cleanup old worker datastore classes. Contributed by Nick @ Beeper (@fizzadar). ([\#14375](https://github.com/matrix-org/synapse/issues/14375))
+- Bump dawidd6/action-download-artifact from 2.15.0 to 2.24.0. ([\#14378](https://github.com/matrix-org/synapse/issues/14378))
+- Bump peaceiris/actions-mdbook from 1.1.14 to 1.2.0. ([\#14379](https://github.com/matrix-org/synapse/issues/14379))
+- Bump regex from 1.6.0 to 1.7.0. ([\#14380](https://github.com/matrix-org/synapse/issues/14380))
+- Bump pyo3 from 0.17.2 to 0.17.3. ([\#14381](https://github.com/matrix-org/synapse/issues/14381))
+- Bump types-setuptools from 65.5.0.1 to 65.5.0.2. ([\#14382](https://github.com/matrix-org/synapse/issues/14382))
+- Bump pillow from 9.2.0 to 9.3.0. ([\#14383](https://github.com/matrix-org/synapse/issues/14383))
+- Bump cryptography from 36.0.1 to 38.0.3. ([\#14384](https://github.com/matrix-org/synapse/issues/14384))
+- Bump types-pyyaml from 6.0.12 to 6.0.12.1. ([\#14385](https://github.com/matrix-org/synapse/issues/14385))
+- Bump types-jsonschema from 4.4.6 to 4.17.0.0. ([\#14386](https://github.com/matrix-org/synapse/issues/14386))
+- Test against PostgreSQL 15 in CI. ([\#14394](https://github.com/matrix-org/synapse/issues/14394))
+- Bump dawidd6/action-download-artifact from 2.24.0 to 2.24.1. ([\#14398](https://github.com/matrix-org/synapse/issues/14398))
+- Remove unreachable code. ([\#14410](https://github.com/matrix-org/synapse/issues/14410))
+- Clean-up event persistence code. ([\#14411](https://github.com/matrix-org/synapse/issues/14411))
+- Update docstring to clarify that `get_partial_state_events_batch` does not just give you completely arbitrary partial-state events. ([\#14417](https://github.com/matrix-org/synapse/issues/14417))
+- Bump dawidd6/action-download-artifact from 2.24.1 to 2.24.2. ([\#14424](https://github.com/matrix-org/synapse/issues/14424))
+- Bump actions/upload-artifact from 2 to 3. ([\#14425](https://github.com/matrix-org/synapse/issues/14425))
+- Bump blake2 from 0.10.4 to 0.10.5. ([\#14426](https://github.com/matrix-org/synapse/issues/14426))
+- Bump attrs from 21.4.0 to 22.1.0. ([\#14427](https://github.com/matrix-org/synapse/issues/14427))
+- Bump types-pyyaml from 6.0.12.1 to 6.0.12.2. ([\#14428](https://github.com/matrix-org/synapse/issues/14428))
+- Bump gitpython from 3.1.27 to 3.1.29. ([\#14429](https://github.com/matrix-org/synapse/issues/14429))
+- Bump types-jsonschema from 4.17.0.0 to 4.17.0.1. ([\#14430](https://github.com/matrix-org/synapse/issues/14430))
+- Bump flake8 from 4.0.1 to 5.0.4. ([\#14431](https://github.com/matrix-org/synapse/issues/14431))
+- Fix mypy errors introduced by bumping the locked version of `attrs` and `gitpython`. ([\#14433](https://github.com/matrix-org/synapse/issues/14433))
+- Make Dependabot only bump Rust deps in the lock file. ([\#14434](https://github.com/matrix-org/synapse/issues/14434))
+- Bump types-setuptools from 65.5.0.2 to 65.5.0.3. ([\#14436](https://github.com/matrix-org/synapse/issues/14436))
+- Bump types-pyopenssl from 22.0.10 to 22.1.0.2. ([\#14437](https://github.com/matrix-org/synapse/issues/14437))
+- Bump flake8-comprehensions from 3.8.0 to 3.10.1. ([\#14438](https://github.com/matrix-org/synapse/issues/14438))
+- Bump jsonschema from 4.16.0 to 4.17.0. ([\#14439](https://github.com/matrix-org/synapse/issues/14439))
+- Bump canonicaljson from 1.6.3 to 1.6.4. ([\#14440](https://github.com/matrix-org/synapse/issues/14440))
+- Fix an incorrect stub return type for `PushRuleEvaluator.run`. ([\#14451](https://github.com/matrix-org/synapse/issues/14451))
+- Improve performance of `/context` in large rooms. ([\#14461](https://github.com/matrix-org/synapse/issues/14461))
+
+
 Synapse 1.71.0 (2022-11-08)
 ===========================
 
