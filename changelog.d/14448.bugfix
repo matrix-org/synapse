@@ -1,0 +1,1 @@
+Fix rendering of some HTML templates (including emails). Introduced in v1.71.0.
