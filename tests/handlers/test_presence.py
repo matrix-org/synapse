@@ -740,7 +740,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
         self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
 
-        if test_with_workers and worker_hs is not None:
+        if worker_hs is not None:
             # Sync against a worker instead of the main process. Busy state should still
             # be preserved in this instance.
             self.get_success(
