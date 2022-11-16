@@ -1843,9 +1843,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 "creator": room_creator,
                 "has_auth_chain_index": has_auth_chain_index,
             },
-            # rooms has a unique constraint on room_id, so no need to lock when doing an
-            # emulated upsert.
-            lock=False,
         )
 
     async def store_partial_state_room(
@@ -1966,9 +1963,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 "creator": "",
                 "has_auth_chain_index": has_auth_chain_index,
             },
-            # rooms has a unique constraint on room_id, so no need to lock when doing an
-            # emulated upsert.
-            lock=False,
         )
 
     async def set_room_is_public(self, room_id: str, is_public: bool) -> None:

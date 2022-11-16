@@ -331,14 +331,11 @@ class PusherWorkerStore(SQLBaseStore):
     async def set_throttle_params(
         self, pusher_id: str, room_id: str, params: ThrottleParams
     ) -> None:
-        # no need to lock because `pusher_throttle` has a primary key on
-        # (pusher, room_id) so simple_upsert will retry
         await self.db_pool.simple_upsert(
             "pusher_throttle",
             {"pusher": pusher_id, "room_id": room_id},
             {"last_sent_ts": params.last_sent_ts, "throttle_ms": params.throttle_ms},
             desc="set_throttle_params",
-            lock=False,
         )
 
     async def _remove_deactivated_pushers(self, progress: dict, batch_size: int) -> int:
@@ -595,8 +592,6 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
         device_id: Optional[str] = None,
     ) -> None:
         async with self._pushers_id_gen.get_next() as stream_id:
-            # no need to lock because `pushers` has a unique key on
-            # (app_id, pushkey, user_name) so simple_upsert will retry
             await self.db_pool.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
@@ -615,7 +610,6 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
                     "device_id": device_id,
                 },
                 desc="add_pusher",
-                lock=False,
             )
 
             user_has_pusher = self.get_if_user_has_pusher.cache.get_immediate(

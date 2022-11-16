@@ -481,7 +481,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 table="user_directory",
                 keyvalues={"user_id": user_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
-                lock=False,  # We're only inserter
             )
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -511,7 +510,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     table="user_directory_search",
                     keyvalues={"user_id": user_id},
                     values={"value": value},
-                    lock=False,  # We're only inserter
                 )
             else:
                 # This should be unreachable.
