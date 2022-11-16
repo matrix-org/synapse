@@ -10251,8 +10251,8 @@ The currently available worker applications are listed <a href="workers.html#ava
 <a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>).</li>
 <li>If handling HTTP requests, a <a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a> option
 with an <code>http</code> listener.</li>
-<li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
-the main process (<code>worker_main_http_uri</code>).</li>
+<li><strong>Synapse 1.71 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
+the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.72 and newer.</li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -10341,7 +10341,6 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
 # Encryption requests
-# Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
 ^/_matrix/client/(r0|v3|unstable)/keys/query$
 ^/_matrix/client/(r0|v3|unstable)/keys/changes$
 ^/_matrix/client/(r0|v3|unstable)/keys/claim$
@@ -10495,7 +10494,7 @@ responsible for</p>
 <li>persisting them to the DB, and finally</li>
 <li>updating the events stream.</li>
 </ul>
-<p>Because load is sharded in this way, you <em>must</em> restart all worker instances when 
+<p>Because load is sharded in this way, you <em>must</em> restart all worker instances when
 adding or removing event persisters.</p>
 <p>An <code>event_persister</code> should not be mistaken for an <code>event_creator</code>.
 An <code>event_creator</code> listens for requests from clients to create new events and does
