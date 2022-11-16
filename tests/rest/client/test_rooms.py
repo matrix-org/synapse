@@ -3546,11 +3546,6 @@ class TimestampLookupTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self) -> JsonDict:
-        config = super().default_config()
-        config["experimental_features"] = {"msc3030_enabled": True}
-        return config
-
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self._storage_controllers = self.hs.get_storage_controllers()
 
