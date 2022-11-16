@@ -470,11 +470,6 @@ class PaginationHandler:
             # `/messages` should still works with live tokens when manually provided.
             assert from_token.room_key.topological is not None
 
-        if pagin_config.limit is None:
-            # This shouldn't happen as we've set a default limit before this
-            # gets called.
-            raise Exception("limit not set")
-
         room_token = from_token.room_key
 
         async with self.pagination_lock.read(room_id):

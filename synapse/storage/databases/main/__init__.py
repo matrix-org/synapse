@@ -201,7 +201,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-        order_by: str = UserSortOrder.USER_ID.value,
+        order_by: str = UserSortOrder.NAME.value,
         direction: str = "f",
         approved: bool = True,
         appservice: Optional[str] = None,
@@ -252,11 +252,10 @@ class DataStore(
             if not deactivated:
                 filters.append("deactivated = 0")
 
+            # Beeper: allow "null" as a magic value tox only grab non-appservice users
             if appservice == "null":
                 filters.append("appservice_id is null")
-            elif appservice:
-                filters.append("appservice_id = ?")
-                args.append(appservice)
+
             if not approved:
                 # We ignore NULL values for the approved flag because these should only
                 # be already existing users that we consider as already approved.
@@ -267,6 +266,7 @@ class DataStore(
             sql_base = f"""
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                LEFT JOIN erased_users AS eu ON u.name = eu.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -275,7 +275,8 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved, appservice_id
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
+                eu.user_id is not null as erased
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
@@ -283,6 +284,13 @@ class DataStore(
             args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)
+
+            # some of those boolean values are returned as integers when we're on SQLite
+            columns_to_boolify = ["erased"]
+            for user in users:
+                for column in columns_to_boolify:
+                    user[column] = bool(user[column])
+
             return users, count
 
         return await self.db_pool.runInteraction(

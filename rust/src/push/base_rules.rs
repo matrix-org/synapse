@@ -25,6 +25,7 @@ use crate::push::Action;
 use crate::push::Condition;
 use crate::push::EventMatchCondition;
 use crate::push::PushRule;
+use crate::push::RelatedEventMatchCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 
@@ -178,6 +179,22 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
+        rule_id: Cow::Borrowed("global/override/.im.nheko.msc3664.reply"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatch(
+            RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
+                pattern: None,
+                pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.in_reply_to"),
+                include_fallbacks: None,
+            },
+        ))]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.contains_display_name"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::ContainsDisplayName)]),
@@ -234,10 +251,12 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern: Some(Cow::Borrowed("m.reaction")),
                 pattern_type: None,
             })),
-            Condition::Known(KnownCondition::InverseRelatedEventMatch(EventMatchCondition {
-                key: Cow::Borrowed("sender"),
+            Condition::Known(KnownCondition::InverseRelatedEventMatch(RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.annotation"),
+                include_fallbacks: None,
             })),
         ]),
         actions: Cow::Borrowed(&[Action::DontNotify]),
@@ -245,7 +264,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3786.rule.room.server_acl"),
+        rule_id: Cow::Borrowed("global/override/.m.rule.room.server_acl"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
@@ -347,19 +366,6 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3772.thread_reply"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelationMatch {
-            rel_type: Cow::Borrowed("m.thread"),
-            event_type_pattern: None,
-            sender: None,
-            sender_type: Some(Cow::Borrowed("user_id")),
-        })]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
         rule_id: Cow::Borrowed("global/underride/.m.rule.message"),
         priority_class: 1,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
@@ -426,10 +432,12 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
             Condition::Known(KnownCondition::RoomMemberCount {
                 is: Some(Cow::Borrowed("<20")),
             }),
-            Condition::Known(KnownCondition::RelatedEventMatch(EventMatchCondition {
-                key: Cow::Borrowed("sender"),
+            Condition::Known(KnownCondition::RelatedEventMatch(RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
                 pattern: None,
                 pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.annotation"),
+                include_fallbacks: None,
             })),
         ]),
         actions: Cow::Borrowed(&[Action::DontNotify]),

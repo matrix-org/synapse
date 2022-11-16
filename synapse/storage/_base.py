@@ -83,6 +83,9 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache(
                 "get_number_joined_users_in_room", (room_id,)
             )
+            self._attempt_to_invalidate_cache(
+                "get_number_joined_non_bot_users_in_room", (room_id,)
+            )
             self._attempt_to_invalidate_cache("get_local_users_in_room", (room_id,))
 
             # There's no easy way of invalidating this cache for just the users
