@@ -410,6 +410,43 @@ class RestHelper:
 
         return channel.json_body
 
+    def get_event(
+        self,
+        room_id: str,
+        event_id: str,
+        tok: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+    ) -> JsonDict:
+        """Request a specific event from the server.
+
+        Args:
+            room_id: the room in which the event was sent.
+            event_id: the event's ID.
+            tok: the token to request the event with.
+            expect_code: the expected HTTP status for the response.
+
+        Returns:
+            The event as a dict.
+        """
+        path = f"/_matrix/client/v3/rooms/{room_id}/event/{event_id}"
+        if tok:
+            path = path + f"?access_token={tok}"
+
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            path,
+        )
+
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            channel.code,
+            channel.result["body"],
+        )
+
+        return channel.json_body
+
     def _read_write_state(
         self,
         room_id: str,

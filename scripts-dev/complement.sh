@@ -126,7 +126,7 @@ export COMPLEMENT_BASE_IMAGE=complement-synapse
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3787"
+test_tags="synapse_blacklist,msc3787,msc3874"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -138,6 +138,9 @@ extra_test_args+=("-timeout=60m")
 if [[ -n "$WORKERS" ]]; then
   # Use workers.
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
+
+  # Pass through the workers defined. If none, it will be an empty string
+  export PASS_SYNAPSE_WORKER_TYPES="$WORKER_TYPES"
 
   # Workers can only use Postgres as a database.
   export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres

@@ -3893,6 +3893,26 @@ Example configuration:
 worker_replication_http_port: 9093
 ```
 ---
+### `worker_replication_http_tls`
+
+Whether TLS should be used for talking to the HTTP replication port on the main
+Synapse process.
+The main Synapse process defines this with the `tls` option on its [listener](#listeners) that
+has the `replication` resource enabled.
+
+**Please note:** by default, it is not safe to expose replication ports to the
+public Internet, even with TLS enabled.
+See [`worker_replication_secret`](#worker_replication_secret).
+
+Defaults to `false`.
+
+*Added in Synapse 1.72.0.*
+
+Example configuration:
+```yaml
+worker_replication_http_tls: true
+```
+---
 ### `worker_listeners`
 
 A worker can handle HTTP requests. To do so, a `worker_listeners` option 

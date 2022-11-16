@@ -1224,3 +1224,28 @@ class UserByExternalId(RestServlet):
             raise NotFoundError("User not found")
 
         return HTTPStatus.OK, {"user_id": user_id}
+
+
+class UserByThreePid(RestServlet):
+    """Find a user based on 3PID of a particular medium"""
+
+    PATTERNS = admin_patterns("/threepid/(?P<medium>[^/]*)/users/(?P<address>[^/]*)")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self,
+        request: SynapseRequest,
+        medium: str,
+        address: str,
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        user_id = await self._store.get_user_id_by_threepid(medium, address)
+
+        if user_id is None:
+            raise NotFoundError("User not found")
+
+        return HTTPStatus.OK, {"user_id": user_id}
