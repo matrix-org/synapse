@@ -1451,7 +1451,7 @@ class RoomContextHandler:
             events_before=events_before,
             event=event,
             events_after=events_after,
-            state=await filter_evts(state_events),
+            state=state_events,
             aggregations=aggregations,
             start=await token.copy_and_replace(
                 StreamKeyType.ROOM, results.start
