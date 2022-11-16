@@ -166,7 +166,7 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_enable_redis_cache("get_local_users_in_room")
             self._attempt_to_enable_redis_cache("get_rooms_for_user")
             self._attempt_to_enable_redis_cache(  # @cachedList of above
-                "get_rooms_for_users"
+                "_get_rooms_for_users"
             )
             self._attempt_to_enable_redis_cache(
                 "get_rooms_for_user_with_stream_ordering"
