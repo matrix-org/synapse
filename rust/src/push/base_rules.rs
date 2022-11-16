@@ -440,7 +440,7 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
                 include_fallbacks: None,
             })),
         ]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
         default: true,
         default_enabled: true,
     },
