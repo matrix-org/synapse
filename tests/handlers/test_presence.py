@@ -727,33 +727,38 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         }
     )
     def test_set_presence_from_syncing_keeps_busy(self, test_with_workers: bool):
-        """Test that presence set by syncing doesn't affect busy status"""
+        """Test that presence set by syncing doesn't affect busy status
+
+        Args:
+            test_with_workers: If True, check the presence state of the user by calling
+                /sync against a worker, rather than the main process.
+        """
         user_id = "@test:server"
         status_msg = "I'm busy!"
 
-        worker_hs = None
+        # By default, we call /sync against the main process.
+        worker_to_sync_against = self.hs
         if test_with_workers:
-            # Create a worker that will handle /sync traffic
-            worker_hs = self.make_worker_hs(
+            # Create a worker and use it to handle /sync traffic instead.
+            # This is used to test that presence changes get replicated from workers
+            # to the main process correctly.
+            worker_to_sync_against = self.make_worker_hs(
                 "synapse.app.generic_worker", {"worker_name": "presence_writer"}
             )
 
+        # Set presence to BUSY
         self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
 
-        if worker_hs is not None:
-            # Sync against a worker instead of the main process. Busy state should still
-            # be preserved in this instance.
-            self.get_success(
-                worker_hs.get_presence_handler().user_syncing(
-                    user_id, True, PresenceState.ONLINE
-                )
+        # Perform a sync with a presence state other than busy. This should NOT change
+        # our presence status; we only change from busy if we explicitly set it via
+        # /presence/*.
+        self.get_success(
+            worker_to_sync_against.get_presence_handler().user_syncing(
+                user_id, True, PresenceState.ONLINE
             )
-        else:
-            # Sync against the main process.
-            self.get_success(
-                self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
-            )
+        )
 
+        # Check against the main process that the user's presence did not change.
         state = self.get_success(
             self.presence_handler.get_state(UserID.from_string(user_id))
         )
