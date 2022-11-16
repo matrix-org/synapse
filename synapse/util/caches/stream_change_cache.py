@@ -151,7 +151,7 @@ class StreamChangeCache:
 
         if stream_pos >= self._earliest_known_stream_pos:
             self.metrics.inc_hits()
-            return self._cache.bisect_right(stream_pos) < len(self._cache)
+            return stream_pos < self._cache.peekitem()[0]
         else:
             self.metrics.inc_misses()
             return True
