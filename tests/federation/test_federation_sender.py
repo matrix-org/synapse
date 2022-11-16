@@ -90,7 +90,17 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         )
         mock_send_transaction.return_value = make_awaitable({})
 
+        # Create receipts for the same room and user, but on two different threads,
         sender = self.hs.get_federation_sender()
+        receipt = ReadReceipt(
+            "room_id",
+            "m.read",
+            "user_id",
+            ["event_id"],
+            thread_id=None,
+            data={"ts": 1234},
+        )
+        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
         receipt = ReadReceipt(
             "room_id",
             "m.read",
@@ -103,11 +113,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         self.pump()
 
-        # expect a call to send_transaction
+        # expect a call to send_transaction with two EDUs to separate threads.
         mock_send_transaction.assert_called_once()
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
-        self.assertEqual(
+        # Note that the ordering of the EDUs doesn't matter.
+        self.assertCountEqual(
             data["edus"],
             [
                 {
@@ -122,7 +133,20 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
                             }
                         }
                     },
-                }
+                },
+                {
+                    "edu_type": EduTypes.RECEIPT,
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "user_id": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
+                                }
+                            }
+                        }
+                    },
+                },
             ],
         )
 

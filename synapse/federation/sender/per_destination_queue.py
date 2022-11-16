@@ -136,8 +136,10 @@ class PerDestinationQueue:
         # destination
         self._pending_presence: Dict[str, UserPresenceState] = {}
 
-        # room_id -> receipt_type -> user_id -> receipt_dict
-        self._pending_rrs: Dict[str, Dict[str, Dict[str, dict]]] = {}
+        # room_id -> receipt_type -> thread_id -> user_id -> receipt_dict
+        self._pending_rrs: Dict[
+            str, Dict[str, Dict[Optional[str], Dict[str, dict]]]
+        ] = {}
         self._rrs_pending_flush = False
 
         # stream_id of last successfully sent to-device message.
@@ -202,12 +204,15 @@ class PerDestinationQueue:
         Args:
             receipt: receipt to be queued
         """
-        serialized_receipt: JsonDict = {"event_ids": receipt.event_ids, "data": receipt.data}
+        serialized_receipt: JsonDict = {
+            "event_ids": receipt.event_ids,
+            "data": receipt.data,
+        }
         if receipt.thread_id is not None:
             serialized_receipt["data"]["thread_id"] = receipt.thread_id
         self._pending_rrs.setdefault(receipt.room_id, {}).setdefault(
             receipt.receipt_type, {}
-        )[receipt.user_id] = serialized_receipt
+        ).setdefault(receipt.thread_id, {})[receipt.user_id] = serialized_receipt
 
     def flush_read_receipts_for_room(self, room_id: str) -> None:
         # if we don't have any read-receipts for this room, it may be that we've already
@@ -552,15 +557,44 @@ class PerDestinationQueue:
             # not yet time for this lot
             return
 
-        edu = Edu(
-            origin=self._server_name,
-            destination=self._destination,
-            edu_type=EduTypes.RECEIPT,
-            content=self._pending_rrs,
-        )
+        # Build the EDUs needed to send these receipts. This is a bit complicated
+        # since we can share one for each unique (room, receipt type, user), but
+        # need additional ones for different threads. The result is that we will
+        # send N EDUs where N is the maximum number of threads in a room.
+        #
+        # This could be slightly more efficient by bundling users who have only
+        # send receipts for different threads.
+        while self._pending_rrs:
+            # The next EDU's content.
+            content: JsonDict = {}
+
+            # Iterate each room's receipt types and threads, adding it to the content.
+            for room_id in list(self._pending_rrs.keys()):
+                for receipt_type in list(self._pending_rrs[room_id].keys()):
+                    thread_ids = self._pending_rrs[room_id][receipt_type]
+                    # The thread ID itself doesn't matter at this point.
+                    content.setdefault(room_id, {})[
+                        receipt_type
+                    ] = thread_ids.popitem()[1]
+
+                    # If there are no threads left in this room / receipt type.
+                    # Clear it out.
+                    if not thread_ids:
+                        del self._pending_rrs[room_id][receipt_type]
+
+                # Again, clear out any blank rooms.
+                if not self._pending_rrs[room_id]:
+                    del self._pending_rrs[room_id]
+
+            yield Edu(
+                origin=self._server_name,
+                destination=self._destination,
+                edu_type=EduTypes.RECEIPT,
+                content=content,
+            )
+
         self._pending_rrs = {}
         self._rrs_pending_flush = False
-        yield edu
 
     def _pop_pending_edus(self, limit: int) -> List[Edu]:
         pending_edus = self._pending_edus
