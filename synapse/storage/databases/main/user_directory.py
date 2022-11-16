@@ -185,9 +185,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         - who should be in the user_directory.
 
         Args:
-            progress (dict)
-            batch_size (int): Maximum number of state events to process
-                per cycle.
+            progress
+            batch_size: Maximum number of state events to process per cycle.
 
         Returns:
             number of events processed.
@@ -708,10 +707,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns the rooms that a user is in.
 
         Args:
-            user_id(str): Must be a local user
+            user_id: Must be a local user
 
         Returns:
-            list: user_id
+            List of room IDs
         """
         rows = await self.db_pool.simple_select_onecol(
             table="users_who_share_private_rooms",

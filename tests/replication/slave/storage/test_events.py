@@ -143,6 +143,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         self.persist(type="m.room.create", key="", creator=USER_ID)
         self.check("get_invited_rooms_for_local_user", [USER_ID_2], [])
         event = self.persist(type="m.room.member", key=USER_ID_2, membership="invite")
+        assert event.internal_metadata.stream_ordering is not None
 
         self.replicate()
 
@@ -230,6 +231,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         j2 = self.persist(
             type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
         )
+        assert j2.internal_metadata.stream_ordering is not None
         self.replicate()
 
         expected_pos = PersistedEventPosition(
@@ -287,6 +289,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
             )
         )
         self.replicate()
+        assert j2.internal_metadata.stream_ordering is not None
 
         event_source = RoomEventSource(self.hs)
         event_source.store = self.slaved_store
@@ -336,10 +339,10 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
 
     event_id = 0
 
-    def persist(self, backfill=False, **kwargs):
+    def persist(self, backfill=False, **kwargs) -> FrozenEvent:
         """
         Returns:
-            synapse.events.FrozenEvent: The event that was persisted.
+            The event that was persisted.
         """
         event, context = self.build_event(**kwargs)
 

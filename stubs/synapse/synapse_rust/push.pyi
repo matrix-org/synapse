@@ -1,4 +1,4 @@
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from synapse.types import JsonDict
 
@@ -47,4 +47,4 @@ class PushRuleEvaluator:
         push_rules: FilteredPushRules,
         user_id: Optional[str],
         display_name: Optional[str],
-    ) -> Collection[dict]: ...
+    ) -> Collection[Union[Mapping, str]]: ...

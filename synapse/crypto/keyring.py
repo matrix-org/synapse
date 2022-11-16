@@ -213,7 +213,7 @@ class Keyring:
 
     def verify_json_objects_for_server(
         self, server_and_json: Iterable[Tuple[str, dict, int]]
-    ) -> List[defer.Deferred]:
+    ) -> List["defer.Deferred[None]"]:
         """Bulk verifies signatures of json objects, bulk fetching keys as
         necessary.
 
@@ -226,10 +226,9 @@ class Keyring:
                 valid.
 
         Returns:
-            List<Deferred[None]>: for each input triplet, a deferred indicating success
-                or failure to verify each json object's signature for the given
-                server_name. The deferreds run their callbacks in the sentinel
-                logcontext.
+            For each input triplet, a deferred indicating success or failure to
+            verify each json object's signature for the given server_name. The
+            deferreds run their callbacks in the sentinel logcontext.
         """
         return [
             run_in_background(

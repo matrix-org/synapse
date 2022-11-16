@@ -27,6 +27,7 @@ from typing import (
 )
 
 from synapse.push import PusherConfig, ThrottleParams
+from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import PushersStream
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
@@ -58,15 +59,20 @@ class PusherWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        # In the worker store this is an ID tracker which we overwrite in the non-worker
-        # class below that is used on the main process.
-        self._pushers_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
-            db_conn,
-            "pushers",
-            "id",
-            extra_tables=[("deleted_pushers", "stream_id")],
-            is_writer=hs.config.worker.worker_app is None,
-        )
+        if hs.config.worker.worker_app is None:
+            self._pushers_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+                db_conn,
+                "pushers",
+                "id",
+                extra_tables=[("deleted_pushers", "stream_id")],
+            )
+        else:
+            self._pushers_id_gen = SlavedIdTracker(
+                db_conn,
+                "pushers",
+                "id",
+                extra_tables=[("deleted_pushers", "stream_id")],
+            )
 
         self.db_pool.updates.register_background_update_handler(
             "remove_deactivated_pushers",

@@ -412,10 +412,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         """Retrieve a number of one-time keys for a user
 
         Args:
-            user_id(str): id of user to get keys for
-            device_id(str): id of device to get keys for
-            key_ids(list[str]): list of key ids (excluding algorithm) to
-                retrieve
+            user_id: id of user to get keys for
+            device_id: id of device to get keys for
+            key_ids: list of key ids (excluding algorithm) to retrieve
 
         Returns:
             A map from (algorithm, key_id) to json string for key
