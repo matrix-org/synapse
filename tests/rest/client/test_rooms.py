@@ -3592,7 +3592,7 @@ class TimestampLookupTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3030/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
+            f"/_matrix/client/v1/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
             access_token=self.room_owner_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)

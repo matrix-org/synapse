@@ -1284,18 +1284,13 @@ class TimestampLookupRestServlet(RestServlet):
     `dir` can be `f` or `b` to indicate forwards and backwards in time from the
     given timestamp.
 
-    GET /_matrix/client/unstable/org.matrix.msc3030/rooms/<roomID>/timestamp_to_event?ts=<timestamp>&dir=<direction>
+    GET /_matrix/client/v1/rooms/<roomID>/timestamp_to_event?ts=<timestamp>&dir=<direction>
     {
         "event_id": ...
     }
     """
 
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc3030"
-            "/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"
-        ),
-    )
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/timestamp_to_event$", v1=True)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
