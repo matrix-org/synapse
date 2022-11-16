@@ -560,10 +560,10 @@ class PerDestinationQueue:
         # Build the EDUs needed to send these receipts. This is a bit complicated
         # since we can share one for each unique (room, receipt type, user), but
         # need additional ones for different threads. The result is that we will
-        # send N EDUs where N is the maximum number of threads in a room.
+        # send N EDUs where N is the number of unique threads across rooms.
         #
-        # This could be slightly more efficient by bundling users who have only
-        # send receipts for different threads.
+        # This could be more efficient by bundling users who have sent receipts
+        # for different threads.
         while self._pending_rrs:
             # The next EDU's content.
             content: JsonDict = {}

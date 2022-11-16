@@ -90,26 +90,23 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         )
         mock_send_transaction.return_value = make_awaitable({})
 
-        # Create receipts for the same room and user, but on two different threads,
+        # Create receipts for:
+        #
+        # * The same room / user on multiple threads.
+        # * A different user in the same room.
         sender = self.hs.get_federation_sender()
-        receipt = ReadReceipt(
-            "room_id",
-            "m.read",
-            "user_id",
-            ["event_id"],
-            thread_id=None,
-            data={"ts": 1234},
-        )
-        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
-        receipt = ReadReceipt(
-            "room_id",
-            "m.read",
-            "user_id",
-            ["event_id"],
-            thread_id="thread_id",
-            data={"ts": 1234},
-        )
-        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
+        for user, thread in (("alice", None), ("alice", "thread"), ("bob", None)):
+            receipt = ReadReceipt(
+                "room_id",
+                "m.read",
+                user,
+                ["event_id"],
+                thread_id=thread,
+                data={"ts": 1234},
+            )
+            self.successResultOf(
+                defer.ensureDeferred(sender.send_read_receipt(receipt))
+            )
 
         self.pump()
 
@@ -126,9 +123,9 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
                     "content": {
                         "room_id": {
                             "m.read": {
-                                "user_id": {
+                                "alice": {
                                     "event_ids": ["event_id"],
-                                    "data": {"ts": 1234, "thread_id": "thread_id"},
+                                    "data": {"ts": 1234, "thread_id": "thread"},
                                 }
                             }
                         }
@@ -139,10 +136,14 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
                     "content": {
                         "room_id": {
                             "m.read": {
-                                "user_id": {
+                                "alice": {
                                     "event_ids": ["event_id"],
                                     "data": {"ts": 1234},
-                                }
+                                },
+                                "bob": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
+                                },
                             }
                         }
                     },
