@@ -84,6 +84,49 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         )
 
     @override_config({"send_federation": True})
+    def test_send_receipts_thread(self):
+        mock_send_transaction = (
+            self.hs.get_federation_transport_client().send_transaction
+        )
+        mock_send_transaction.return_value = make_awaitable({})
+
+        sender = self.hs.get_federation_sender()
+        receipt = ReadReceipt(
+            "room_id",
+            "m.read",
+            "user_id",
+            ["event_id"],
+            thread_id="thread_id",
+            data={"ts": 1234},
+        )
+        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
+
+        self.pump()
+
+        # expect a call to send_transaction
+        mock_send_transaction.assert_called_once()
+        json_cb = mock_send_transaction.call_args[0][1]
+        data = json_cb()
+        self.assertEqual(
+            data["edus"],
+            [
+                {
+                    "edu_type": EduTypes.RECEIPT,
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "user_id": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234, "thread_id": "thread_id"},
+                                }
+                            }
+                        }
+                    },
+                }
+            ],
+        )
+
+    @override_config({"send_federation": True})
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""

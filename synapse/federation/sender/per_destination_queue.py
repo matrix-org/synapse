@@ -35,7 +35,7 @@ from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import SynapseTags, set_tag
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import ReadReceipt
+from synapse.types import JsonDict, ReadReceipt
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.visibility import filter_events_for_server
 
@@ -202,9 +202,12 @@ class PerDestinationQueue:
         Args:
             receipt: receipt to be queued
         """
+        serialized_receipt: JsonDict = {"event_ids": receipt.event_ids, "data": receipt.data}
+        if receipt.thread_id is not None:
+            serialized_receipt["data"]["thread_id"] = receipt.thread_id
         self._pending_rrs.setdefault(receipt.room_id, {}).setdefault(
             receipt.receipt_type, {}
-        )[receipt.user_id] = {"event_ids": receipt.event_ids, "data": receipt.data}
+        )[receipt.user_id] = serialized_receipt
 
     def flush_read_receipts_for_room(self, room_id: str) -> None:
         # if we don't have any read-receipts for this room, it may be that we've already
