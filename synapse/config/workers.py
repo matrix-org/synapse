@@ -67,6 +67,7 @@ class InstanceLocationConfig:
 
     host: str
     port: int
+    tls: bool = False
 
 
 @attr.s
@@ -148,6 +149,12 @@ class WorkerConfig(Config):
 
         # The port on the main synapse for HTTP replication endpoint
         self.worker_replication_http_port = config.get("worker_replication_http_port")
+
+        # The tls mode on the main synapse for HTTP replication endpoint.
+        # For backward compatibility this defaults to False.
+        self.worker_replication_http_tls = config.get(
+            "worker_replication_http_tls", False
+        )
 
         # The shared secret used for authentication when connecting to the main synapse.
         self.worker_replication_secret = config.get("worker_replication_secret", None)
