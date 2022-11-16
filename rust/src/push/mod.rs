@@ -277,6 +277,10 @@ pub enum KnownCondition {
     SenderNotificationPermission {
         key: Cow<'static, str>,
     },
+    #[serde(rename = "org.matrix.msc3931.room_version_supports")]
+    RoomVersionSupports {
+        feature: Cow<'static, str>,
+    },
 }
 
 impl IntoPy<PyObject> for Condition {
@@ -488,6 +492,18 @@ fn test_deserialize_unstable_msc3664_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RelatedEventMatch(_))
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3931_condition() {
+    let json =
+        r#"{"kind":"org.matrix.msc3931.room_version_supports","feature":"org.example.feature"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RoomVersionSupports { feature: _ })
     ));
 }
 
