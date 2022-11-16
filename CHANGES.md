@@ -1,6 +1,8 @@
 Synapse 1.72.0rc1 (2022-11-16)
 ==============================
 
+Please note that we now only support PostgreSQL 11+, because PostgreSQL 10 has reached end-of-life.
+
 Features
 --------
 
@@ -54,41 +56,16 @@ Internal Changes
 - Add TLS support for generic worker endpoints. ([\#14128](https://github.com/matrix-org/synapse/issues/14128), [\#14455](https://github.com/matrix-org/synapse/issues/14455))
 - Switch to a maintained action for installing Rust in CI. ([\#14313](https://github.com/matrix-org/synapse/issues/14313))
 - Add override ability to `complement.sh` command line script to request certain types of workers. ([\#14324](https://github.com/matrix-org/synapse/issues/14324))
-- Bump flake8-bugbear from 22.9.23 to 22.10.27. ([\#14329](https://github.com/matrix-org/synapse/issues/14329))
 - Enabling testing of [MSC3874](https://github.com/matrix-org/matrix-spec-proposals/pull/3874) (filtering of `/messages` by relation type) in complement. ([\#14339](https://github.com/matrix-org/synapse/issues/14339))
-- Bump twisted from 22.8.0 to 22.10.0. ([\#14340](https://github.com/matrix-org/synapse/issues/14340))
 - Concisely log a failure to resolve state due to missing `prev_events`. ([\#14346](https://github.com/matrix-org/synapse/issues/14346))
 - Use a maintained Github action to install Rust. ([\#14351](https://github.com/matrix-org/synapse/issues/14351))
 - Cleanup old worker datastore classes. Contributed by Nick @ Beeper (@fizzadar). ([\#14375](https://github.com/matrix-org/synapse/issues/14375))
-- Bump dawidd6/action-download-artifact from 2.15.0 to 2.24.0. ([\#14378](https://github.com/matrix-org/synapse/issues/14378))
-- Bump peaceiris/actions-mdbook from 1.1.14 to 1.2.0. ([\#14379](https://github.com/matrix-org/synapse/issues/14379))
-- Bump regex from 1.6.0 to 1.7.0. ([\#14380](https://github.com/matrix-org/synapse/issues/14380))
-- Bump pyo3 from 0.17.2 to 0.17.3. ([\#14381](https://github.com/matrix-org/synapse/issues/14381))
-- Bump types-setuptools from 65.5.0.1 to 65.5.0.2. ([\#14382](https://github.com/matrix-org/synapse/issues/14382))
-- Bump pillow from 9.2.0 to 9.3.0. ([\#14383](https://github.com/matrix-org/synapse/issues/14383))
-- Bump cryptography from 36.0.1 to 38.0.3. ([\#14384](https://github.com/matrix-org/synapse/issues/14384))
-- Bump types-pyyaml from 6.0.12 to 6.0.12.1. ([\#14385](https://github.com/matrix-org/synapse/issues/14385))
-- Bump types-jsonschema from 4.4.6 to 4.17.0.0. ([\#14386](https://github.com/matrix-org/synapse/issues/14386))
 - Test against PostgreSQL 15 in CI. ([\#14394](https://github.com/matrix-org/synapse/issues/14394))
-- Bump dawidd6/action-download-artifact from 2.24.0 to 2.24.1. ([\#14398](https://github.com/matrix-org/synapse/issues/14398))
 - Remove unreachable code. ([\#14410](https://github.com/matrix-org/synapse/issues/14410))
 - Clean-up event persistence code. ([\#14411](https://github.com/matrix-org/synapse/issues/14411))
 - Update docstring to clarify that `get_partial_state_events_batch` does not just give you completely arbitrary partial-state events. ([\#14417](https://github.com/matrix-org/synapse/issues/14417))
-- Bump dawidd6/action-download-artifact from 2.24.1 to 2.24.2. ([\#14424](https://github.com/matrix-org/synapse/issues/14424))
-- Bump actions/upload-artifact from 2 to 3. ([\#14425](https://github.com/matrix-org/synapse/issues/14425))
-- Bump blake2 from 0.10.4 to 0.10.5. ([\#14426](https://github.com/matrix-org/synapse/issues/14426))
-- Bump attrs from 21.4.0 to 22.1.0. ([\#14427](https://github.com/matrix-org/synapse/issues/14427))
-- Bump types-pyyaml from 6.0.12.1 to 6.0.12.2. ([\#14428](https://github.com/matrix-org/synapse/issues/14428))
-- Bump gitpython from 3.1.27 to 3.1.29. ([\#14429](https://github.com/matrix-org/synapse/issues/14429))
-- Bump types-jsonschema from 4.17.0.0 to 4.17.0.1. ([\#14430](https://github.com/matrix-org/synapse/issues/14430))
-- Bump flake8 from 4.0.1 to 5.0.4. ([\#14431](https://github.com/matrix-org/synapse/issues/14431))
 - Fix mypy errors introduced by bumping the locked version of `attrs` and `gitpython`. ([\#14433](https://github.com/matrix-org/synapse/issues/14433))
 - Make Dependabot only bump Rust deps in the lock file. ([\#14434](https://github.com/matrix-org/synapse/issues/14434))
-- Bump types-setuptools from 65.5.0.2 to 65.5.0.3. ([\#14436](https://github.com/matrix-org/synapse/issues/14436))
-- Bump types-pyopenssl from 22.0.10 to 22.1.0.2. ([\#14437](https://github.com/matrix-org/synapse/issues/14437))
-- Bump flake8-comprehensions from 3.8.0 to 3.10.1. ([\#14438](https://github.com/matrix-org/synapse/issues/14438))
-- Bump jsonschema from 4.16.0 to 4.17.0. ([\#14439](https://github.com/matrix-org/synapse/issues/14439))
-- Bump canonicaljson from 1.6.3 to 1.6.4. ([\#14440](https://github.com/matrix-org/synapse/issues/14440))
 - Fix an incorrect stub return type for `PushRuleEvaluator.run`. ([\#14451](https://github.com/matrix-org/synapse/issues/14451))
 - Improve performance of `/context` in large rooms. ([\#14461](https://github.com/matrix-org/synapse/issues/14461))
 
