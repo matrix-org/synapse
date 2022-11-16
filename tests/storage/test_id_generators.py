@@ -22,6 +22,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import IncorrectDatabaseSetup
+from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.util import Clock
 
@@ -189,9 +190,9 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: Optional[List[str]] = None
+        self, instance_name: str = "master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
-        def _create(conn):
+        def _create(conn: LoggingDatabaseConnection) -> MultiWriterIdGenerator:
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
@@ -587,7 +588,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self._insert_row_with_id("master", 3)
 
         # Now we add a row *without* updating the stream ID
-        def _insert(txn):
+        def _insert(txn: Cursor) -> None:
             txn.execute("INSERT INTO foobar VALUES (26, 'master')")
 
         self.get_success(self.db_pool.runInteraction("_insert", _insert))
@@ -622,9 +623,9 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: Optional[List[str]] = None
+        self, instance_name: str = "master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
-        def _create(conn):
+        def _create(conn: LoggingDatabaseConnection) -> MultiWriterIdGenerator:
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
@@ -758,9 +759,9 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers: Optional[List[str]] = None
+        self, instance_name: str = "master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
-        def _create(conn):
+        def _create(conn: LoggingDatabaseConnection) -> MultiWriterIdGenerator:
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
@@ -782,7 +783,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         instance_name: str,
         number: int,
         update_stream_table: bool = True,
-    ):
+    ) -> None:
         """Insert N rows as the given instance, inserting with stream IDs pulled
         from the postgres sequence.
         """
