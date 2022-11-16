@@ -25,7 +25,7 @@ from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
 from synapse.api.auth.base import BaseAuth
-from synapse.api.errors import AuthError, StoreError
+from synapse.api.errors import AuthError, InvalidClientTokenError, StoreError
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import Requester, UserID, create_requester
@@ -164,18 +164,29 @@ class OAuthDelegatedAuth(BaseAuth):
         logger.info(f"Introspection result: {introspection_result!r}")
 
         # TODO: introspection verification should be more extensive, especially:
-        #   - verify the scopes
         #   - verify the audience
         if not introspection_result.get("active"):
-            raise AuthError(
-                403,
-                "Invalid access token",
-            )
+            raise InvalidClientTokenError("Token is not active")
+
+        # Let's look at the scope
+        scope: List[str] = scope_to_list(introspection_result.get("scope", ""))
+
+        # Determine type of user based on presence of particular scopes
+        has_admin_scope = "urn:synapse:admin:*" in scope
+        has_user_scope = "urn:matrix:org.matrix.msc2967.client:api:*" in scope
+        has_guest_scope = "urn:matrix:org.matrix.msc2967.client:api:guest" in scope
+        is_user = has_user_scope or has_admin_scope
+        is_guest = has_guest_scope and not is_user
+
+        if not is_user and not is_guest:
+            raise InvalidClientTokenError("No scope in token granting user rights")
 
         # Match via the sub claim
         sub: Optional[str] = introspection_result.get("sub")
         if sub is None:
-            raise AuthError(500, "Invalid sub claim in the introspection result")
+            raise InvalidClientTokenError(
+                "Invalid sub claim in the introspection result"
+            )
 
         user_id_str = await self.store.get_user_by_external_id(
             OAuthDelegatedAuth.EXTERNAL_ID_PROVIDER, sub
@@ -216,10 +227,8 @@ class OAuthDelegatedAuth(BaseAuth):
         else:
             user_id = UserID.from_string(user_id_str)
 
-        # Let's look at the scope
-        scope: List[str] = scope_to_list(introspection_result.get("scope", ""))
-        device_id = None
         # Find device_id in scope
+        device_id = None
         for tok in scope:
             if tok.startswith("urn:matrix:org.matrix.msc2967.client:device:"):
                 parts = tok.split(":")
@@ -250,4 +259,5 @@ class OAuthDelegatedAuth(BaseAuth):
             user_id=user_id,
             device_id=device_id,
             scope=scope,
+            is_guest=is_guest,
         )
