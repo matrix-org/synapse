@@ -149,12 +149,14 @@ class StreamChangeCache:
             # If the cache is empty, nothing can have changed.
             return False
 
-        if stream_pos >= self._earliest_known_stream_pos:
-            self.metrics.inc_hits()
-            return stream_pos < self._cache.peekitem()[0]
-        else:
+        # _cache is not valid at or before the earliest known stream position, so
+        # return that an entity has changed.
+        if stream_pos <= self._earliest_known_stream_pos:
             self.metrics.inc_misses()
             return True
+
+        self.metrics.inc_hits()
+        return stream_pos < self._cache.peekitem()[0]
 
     def get_all_entities_changed(self, stream_pos: int) -> Optional[List[EntityType]]:
         """Returns all entities that have had changes since the given
@@ -164,9 +166,9 @@ class StreamChangeCache:
         """
         assert isinstance(stream_pos, int)
 
-        # _cache is not valid before the earliest known stream position, so
-        # return that no known entities have changed.
-        if stream_pos < self._earliest_known_stream_pos:
+        # _cache is not valid at or before the earliest known stream position, so
+        # return None to mark that it is unknown if an entity has changed.
+        if stream_pos <= self._earliest_known_stream_pos:
             return None
 
         changed_entities: List[EntityType] = []
