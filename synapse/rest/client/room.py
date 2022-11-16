@@ -1290,15 +1290,15 @@ class TimestampLookupRestServlet(RestServlet):
     }
     """
 
-    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"),)
+    PATTERNS = (
+        re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"),
+    )
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
         self.timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
-
-        logger.info("asdfdfs asfd=%s", self.PATTERNS)
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
