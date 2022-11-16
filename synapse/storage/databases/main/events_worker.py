@@ -1589,7 +1589,7 @@ class EventsWorkerStore(SQLBaseStore):
             room_id: The room ID to query.
 
         Returns:
-            dict[str:float] of complexity version to complexity.
+            Map of complexity version to complexity.
         """
         state_events = await self.get_current_state_event_counts(room_id)
 
