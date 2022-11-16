@@ -123,7 +123,11 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     async def get_account_data_for_user(
         self, user_id: str
     ) -> Tuple[Dict[str, JsonDict], Dict[str, Dict[str, JsonDict]]]:
-        """Get all the client account_data for a user.
+        """
+        Get all the client account_data for a user.
+
+        If experimental MSC3391 support is enabled, any entries with an empty
+        content body are excluded; as this means they have been deleted.
 
         Args:
             user_id: The user to get the account_data for.
@@ -142,6 +146,12 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 ["account_data_type", "content"],
             )
 
+            # If experimental MSC3391 support is enabled, then account data entries
+            # with an empty content are considered "deleted". So skip adding them to
+            # the results.
+            if self.hs.config.experimental.msc3391_enabled:
+                rows = [row for row in rows if row["content"] != "{}"]
+
             global_account_data = {
                 row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
@@ -156,6 +166,16 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             by_room: Dict[str, Dict[str, JsonDict]] = {}
             for row in rows:
                 room_data = by_room.setdefault(row["room_id"], {})
+
+                # If experimental MSC3391 support is enabled, then account data entries
+                # with an empty content are considered "deleted". So skip adding them to
+                # the results.
+                if (
+                    self.hs.config.experimental.msc3391_enabled
+                    and row["content"] == "{}"
+                ):
+                    continue
+
                 room_data[row["account_data_type"]] = db_to_json(row["content"])
 
             return global_account_data, by_room
