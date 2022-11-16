@@ -347,6 +347,25 @@ class RoomVersions:
         msc3667_int_only_power_levels=False,
         msc3931_push_features=[],
     )
+    MSC1767v10 = RoomVersion(
+        # MSC1767 (Extensible Events) based on room version "10"
+        "org.matrix.msc1767.10",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.ROOM_V4_PLUS,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=True,
+        msc3667_int_only_power_levels=True,
+    )
 
 
 KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
