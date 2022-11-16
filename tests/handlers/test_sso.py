@@ -30,7 +30,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         self.http_client = Mock(spec=["get_file"])
         self.http_client.get_file.side_effect = mock_get_file
         self.http_client.user_agent = b"Synapse Test"
-        hs = self.setup_test_homeserver(proxied_blacklisted_http_client=self.http_client)
+        hs = self.setup_test_homeserver(
+            proxied_blacklisted_http_client=self.http_client
+        )
         return hs
 
     async def test_set_avatar(self) -> None:
