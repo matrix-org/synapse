@@ -83,8 +83,8 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
     """Ask master to upload keys for the user and send them out over federation to
     update other servers.
 
-    This must happen on master so that the results can be correctly cached in
-    the database and streamed to workers.( Is this accurate?)
+    For now, only the master is permitted to handle key upload requests;
+    any worker can handle key query requests (since they're read-only).
 
     Calls to e2e_keys_handler.upload_keys_for_user(user_id, device_id, keys) on
     the main process to accomplish this.
