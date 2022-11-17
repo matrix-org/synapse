@@ -387,7 +387,7 @@ async def _get_auth_chain_difference(
             if not auth_chain:
                 continue
 
-            conflicted_boundary != auth_chain & boundary
+            conflicted_boundary |= auth_chain & boundary
 
     else:
         auth_difference_unpersisted_part = ()
