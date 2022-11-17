@@ -17,7 +17,8 @@ from urllib.parse import parse_qs
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.errors import InvalidClientTokenError
+from synapse.api.errors import InvalidClientTokenError, OAuthInsufficientScopeError
+from synapse.rest.client import devices
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -82,6 +83,10 @@ async def get_json(url: str) -> JsonDict:
 
 @skip_unless(HAS_AUTHLIB, "requires authlib")
 class MSC3861OAuthDelegation(HomeserverTestCase):
+    servlets = [
+        devices.register_servlets,
+    ]
+
     def default_config(self) -> Dict[str, Any]:
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
@@ -314,7 +319,37 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         )
         self.assertEqual(requester.device_id, DEVICE)
 
-    def test_active_guest_with_device(self) -> None:
+    def test_active_guest_not_allowed(self) -> None:
+        """The handler should return an insufficient scope error."""
+
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(
+                code=200,
+                payload={
+                    "active": True,
+                    "sub": SUBJECT,
+                    "scope": " ".join([MATRIX_GUEST_SCOPE, MATRIX_DEVICE_SCOPE]),
+                    "username": USERNAME,
+                },
+            )
+        )
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"mockAccessToken"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        error = self.get_failure(
+            self.auth.get_user_by_req(request), OAuthInsufficientScopeError
+        )
+        self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
+        self.http_client.request.assert_called_once_with(
+            method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
+        )
+        self._assertParams()
+        self.assertEqual(
+            getattr(error.value, "headers", {})["WWW-Authenticate"],
+            'Bearer error="insufficient_scope", scope="urn:matrix:org.matrix.msc2967.client:api:*"',
+        )
+
+    def test_active_guest_allowed(self) -> None:
         """The handler should return a requester with guest user rights and a device ID."""
 
         self.http_client.request = simple_async_mock(
@@ -331,7 +366,9 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         request = Mock(args={})
         request.args[b"access_token"] = [b"mockAccessToken"]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = self.get_success(self.auth.get_user_by_req(request))
+        requester = self.get_success(
+            self.auth.get_user_by_req(request, allow_guest=True)
+        )
         self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
         self.http_client.request.assert_called_once_with(
             method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
