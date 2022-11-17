@@ -104,58 +104,21 @@ class ServerACLsTestCase(unittest.TestCase):
 
 
 class StateQueryTests(unittest.FederatingHomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
     ]
 
-    def test_without_event_id(self):
-        """
-        Querying v1/state/<room_id> without an event ID will return the current
-        known state.
-        """
-        u1 = self.register_user("u1", "pass")
-        u1_token = self.login("u1", "pass")
-
-        room_1 = self.helper.create_room_as(u1, tok=u1_token)
-        self.inject_room_member(room_1, "@user:other.example.com", "join")
-
-        channel = self.make_signed_federation_request(
-            "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
-        )
-        self.assertEqual(200, channel.code, channel.result)
-
-        self.assertEqual(
-            channel.json_body["room_version"],
-            self.hs.config.server.default_room_version.identifier,
-        )
-
-        members = set(
-            map(
-                lambda x: x["state_key"],
-                filter(
-                    lambda x: x["type"] == "m.room.member", channel.json_body["pdus"]
-                ),
-            )
-        )
-
-        self.assertEqual(members, {"@user:other.example.com", u1})
-        self.assertEqual(len(channel.json_body["pdus"]), 6)
-
     def test_needs_to_be_in_room(self):
-        """
-        Querying v1/state/<room_id> requires the server
-        be in the room to provide data.
-        """
+        """/v1/state/<room_id> requires the server to be in the room"""
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
         channel = self.make_signed_federation_request(
-            "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
+            "GET", "/_matrix/federation/v1/state/%s?event_id=xyz" % (room_1,)
         )
         self.assertEqual(403, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
@@ -170,6 +133,8 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         super().prepare(reactor, clock, hs)
+
+        self._storage_controllers = hs.get_storage_controllers()
 
         # create the room
         creator_user_id = self.register_user("kermit", "test")
@@ -244,7 +209,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
         # the room should show that the new user is a member
         r = self.get_success(
-            self.hs.get_state_handler().get_current_state(self._room_id)
+            self._storage_controllers.state.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
@@ -295,7 +260,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
         # the room should show that the new user is a member
         r = self.get_success(
-            self.hs.get_state_handler().get_current_state(self._room_id)
+            self._storage_controllers.state.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 

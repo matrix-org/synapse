@@ -33,7 +33,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, HistoryVisibility, Membership
+from synapse.api.constants import EduTypes, EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -46,6 +46,7 @@ from synapse.types import (
     JsonDict,
     PersistedEventPosition,
     RoomStreamToken,
+    StreamKeyType,
     StreamToken,
     UserID,
 )
@@ -220,7 +221,7 @@ class Notifier:
         self.room_to_user_streams: Dict[str, Set[_NotifierUserStream]] = {}
 
         self.hs = hs
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastores().main
         self.pending_new_room_events: List[_PendingRoomEventEntry] = []
@@ -228,9 +229,7 @@ class Notifier:
         # Called when there are new things to stream over replication
         self.replication_callbacks: List[Callable[[], None]] = []
 
-        # Called when remote servers have come back online after having been
-        # down.
-        self.remote_server_up_callbacks: List[Callable[[str], None]] = []
+        self._federation_client = hs.get_federation_http_client()
 
         self._third_party_rules = hs.get_third_party_event_rules()
 
@@ -372,7 +371,7 @@ class Notifier:
 
         if users or rooms:
             self.on_new_event(
-                "room_key",
+                StreamKeyType.ROOM,
                 max_room_stream_token,
                 users=users,
                 rooms=rooms,
@@ -442,7 +441,7 @@ class Notifier:
             for room in rooms:
                 user_streams |= self.room_to_user_streams.get(room, set())
 
-            if stream_key == "to_device_key":
+            if stream_key == StreamKeyType.TO_DEVICE:
                 issue9533_logger.debug(
                     "to-device messages stream id %s, awaking streams for %s",
                     new_token,
@@ -624,7 +623,7 @@ class Notifier:
 
                 if name == "room":
                     new_events = await filter_events_for_client(
-                        self.storage,
+                        self._storage_controllers,
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,
@@ -633,7 +632,7 @@ class Notifier:
                     now = self.clock.time_msec()
                     new_events[:] = [
                         {
-                            "type": "m.presence",
+                            "type": EduTypes.PRESENCE,
                             "content": format_user_presence_state(event, now),
                         }
                         for event in new_events
@@ -682,7 +681,7 @@ class Notifier:
         return joined_room_ids, True
 
     async def _is_world_readable(self, room_id: str) -> bool:
-        state = await self.state_handler.get_current_state(
+        state = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
@@ -731,3 +730,7 @@ class Notifier:
         # circular dependencies.
         if self.federation_sender:
             self.federation_sender.wake_destination(server)
+
+        # Tell the federation client about the fact the server is back up, so
+        # that any in flight requests can be immediately retried.
+        self._federation_client.wake_destination(server)

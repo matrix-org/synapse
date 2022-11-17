@@ -39,7 +39,8 @@ yet correlated to the DAG.
 Outliers typically arise when we fetch the auth chain or state for a given
 event. When that happens, we just grab the events in the state/auth chain,
 without calculating the state at those events, or backfilling their
-`prev_events`.
+`prev_events`. Since we don't have the state at any events fetched in that
+way, we mark them as outliers.
 
 So, typically, we won't have the `prev_events` of an `outlier` in the database,
 (though it's entirely possible that we *might* have them for some other

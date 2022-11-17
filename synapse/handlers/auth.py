@@ -41,6 +41,7 @@ import pymacaroons
 import unpaddedbase64
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
+from twisted.internet.defer import CancelledError
 from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
@@ -67,7 +68,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
@@ -209,8 +210,10 @@ class AuthHandler:
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.auth.password_enabled
+        self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
+        self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -385,13 +388,13 @@ class AuthHandler:
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use"""
+        """Get a list of the user-interactive authentication types this user can use."""
 
         ui_auth_types = set()
 
         # if the HS supports password auth, and the user has a non-null password, we
         # support password auth
-        if self._password_localdb_enabled and self._password_enabled:
+        if self._password_localdb_enabled and self._password_enabled_for_reauth:
             lookupres = await self._find_user_id_and_pwd_hash(user.to_string())
             if lookupres:
                 _, password_hash = lookupres
@@ -400,7 +403,7 @@ class AuthHandler:
 
         # also allow auth from password providers
         for t in self.password_auth_provider.get_supported_login_types().keys():
-            if t == LoginType.PASSWORD and not self._password_enabled:
+            if t == LoginType.PASSWORD and not self._password_enabled_for_reauth:
                 continue
             ui_auth_types.add(t)
 
@@ -480,7 +483,7 @@ class AuthHandler:
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
-        uri = request.uri.decode("utf-8")  # type: ignore
+        uri = request.uri.decode("utf-8")
         method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
@@ -550,7 +553,7 @@ class AuthHandler:
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         user_agent = get_request_user_agent(request)
-        clientip = request.getClientIP()
+        clientip = request.getClientAddress().host
 
         await self.store.add_user_agent_ip_to_ui_auth_session(
             session.session_id, user_agent, clientip
@@ -708,7 +711,7 @@ class AuthHandler:
             return res
 
         # fall back to the v1 login flow
-        canonical_id, _ = await self.validate_login(authdict)
+        canonical_id, _ = await self.validate_login(authdict, is_reauth=True)
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
@@ -1062,7 +1065,7 @@ class AuthHandler:
         Returns:
             Whether users on this server are allowed to change or set a password
         """
-        return self._password_enabled and self._password_localdb_enabled
+        return self._password_enabled_for_login and self._password_localdb_enabled
 
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
@@ -1087,9 +1090,9 @@ class AuthHandler:
         # that comes first, where it's present.
         if LoginType.PASSWORD in types:
             types.remove(LoginType.PASSWORD)
-            if self._password_enabled:
+            if self._password_enabled_for_login:
                 types.insert(0, LoginType.PASSWORD)
-        elif self._password_localdb_enabled and self._password_enabled:
+        elif self._password_localdb_enabled and self._password_enabled_for_login:
             types.insert(0, LoginType.PASSWORD)
 
         return types
@@ -1098,6 +1101,7 @@ class AuthHandler:
         self,
         login_submission: Dict[str, Any],
         ratelimit: bool = False,
+        is_reauth: bool = False,
     ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -1108,6 +1112,9 @@ class AuthHandler:
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
             ratelimit: whether to apply the failed_login_attempt ratelimiter
+            is_reauth: whether this is part of a User-Interactive Authorisation
+                flow to reauthenticate for a privileged action (rather than a
+                new login)
         Returns:
             A tuple of the canonical user id, and optional callback
                 to be called once the access token and device id are issued
@@ -1130,8 +1137,14 @@ class AuthHandler:
         # special case to check for "password" for the check_password interface
         # for the auth providers
         password = login_submission.get("password")
+
         if login_type == LoginType.PASSWORD:
-            if not self._password_enabled:
+            if is_reauth:
+                passwords_allowed_here = self._password_enabled_for_reauth
+            else:
+                passwords_allowed_here = self._password_enabled_for_login
+
+            if not passwords_allowed_here:
                 raise SynapseError(400, "Password login has been disabled.")
             if not isinstance(password, str):
                 raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
@@ -1504,6 +1517,8 @@ class AuthHandler:
         await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
         )
+
+        await self._third_party_rules.on_threepid_bind(user_id, medium, address)
 
     async def delete_threepid(
         self, user_id: str, medium: str, address: str, id_server: Optional[str] = None
@@ -2199,7 +2214,11 @@ class PasswordAuthProvider:
         # other than None (i.e. until a callback returns a success)
         for callback in self.auth_checker_callbacks[login_type]:
             try:
-                result = await callback(username, login_type, login_dict)
+                result = await delay_cancellation(
+                    callback(username, login_type, login_dict)
+                )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -2260,7 +2279,9 @@ class PasswordAuthProvider:
 
         for callback in self.check_3pid_auth_callbacks:
             try:
-                result = await callback(medium, address, password)
+                result = await delay_cancellation(callback(medium, address, password))
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -2342,7 +2363,7 @@ class PasswordAuthProvider:
         """
         for callback in self.get_username_for_registration_callbacks:
             try:
-                res = await callback(uia_results, params)
+                res = await delay_cancellation(callback(uia_results, params))
 
                 if isinstance(res, str):
                     return res
@@ -2356,6 +2377,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_username_for_registration: %s",
@@ -2385,7 +2408,7 @@ class PasswordAuthProvider:
         """
         for callback in self.get_displayname_for_registration_callbacks:
             try:
-                res = await callback(uia_results, params)
+                res = await delay_cancellation(callback(uia_results, params))
 
                 if isinstance(res, str):
                     return res
@@ -2399,6 +2422,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_displayname_for_registration: %s",
@@ -2426,7 +2451,7 @@ class PasswordAuthProvider:
         """
         for callback in self.is_3pid_allowed_callbacks:
             try:
-                res = await callback(medium, address, registration)
+                res = await delay_cancellation(callback(medium, address, registration))
 
                 if res is False:
                     return res
@@ -2440,6 +2465,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error("Module raised an exception in is_3pid_allowed: %s", e)
                 raise SynapseError(code=500, msg="Internal Server Error")

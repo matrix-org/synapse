@@ -1,1 +1,0 @@
-Remove check on `update_user_directory` for shared rooms handler (MSC2666), and update/expand documentation.

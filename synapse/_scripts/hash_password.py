@@ -9,7 +9,7 @@ import bcrypt
 import yaml
 
 
-def prompt_for_pass():
+def prompt_for_pass() -> str:
     password = getpass.getpass("Password: ")
 
     if not password:
@@ -23,7 +23,7 @@ def prompt_for_pass():
     return password
 
 
-def main():
+def main() -> None:
     bcrypt_rounds = 12
     password_pepper = ""
 
@@ -46,14 +46,14 @@ def main():
             "Path to server config file. "
             "Used to read in bcrypt_rounds and password_pepper."
         ),
+        required=True,
     )
 
     args = parser.parse_args()
-    if "config" in args and args.config:
-        config = yaml.safe_load(args.config)
-        bcrypt_rounds = config.get("bcrypt_rounds", bcrypt_rounds)
-        password_config = config.get("password_config", None) or {}
-        password_pepper = password_config.get("pepper", password_pepper)
+    config = yaml.safe_load(args.config)
+    bcrypt_rounds = config.get("bcrypt_rounds", bcrypt_rounds)
+    password_config = config.get("password_config", None) or {}
+    password_pepper = password_config.get("pepper", password_pepper)
     password = args.password
 
     if not password:

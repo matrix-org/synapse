@@ -14,10 +14,16 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
+from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
-from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
+from synapse.types import (
+    JsonDict,
+    ReadReceipt,
+    StreamKeyType,
+    UserID,
+    get_domain_from_id,
+)
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -46,11 +52,11 @@ class ReceiptsHandler:
         # to the appropriate worker.
         if hs.get_instance_name() in hs.config.worker.writers.receipts:
             hs.get_federation_registry().register_edu_handler(
-                "m.receipt", self._received_remote_receipt
+                EduTypes.RECEIPT, self._received_remote_receipt
             )
         else:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.receipt",
+                EduTypes.RECEIPT,
                 hs.config.worker.writers.receipts,
             )
 
@@ -112,7 +118,7 @@ class ReceiptsHandler:
             )
 
             if not res:
-                # res will be None if this read receipt is 'old'
+                # res will be None if this receipt is 'old'
                 continue
 
             stream_id, max_persisted_id = res
@@ -129,7 +135,9 @@ class ReceiptsHandler:
 
         affected_room_ids = list({r.room_id for r in receipts})
 
-        self.notifier.on_new_event("receipt_key", max_batch_id, rooms=affected_room_ids)
+        self.notifier.on_new_event(
+            StreamKeyType.RECEIPT, max_batch_id, rooms=affected_room_ids
+        )
         # Note that the min here shouldn't be relied upon to be accurate.
         await self.hs.get_pusherpool().on_new_receipts(
             min_batch_id, max_batch_id, affected_room_ids
@@ -138,7 +146,7 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str, hidden: bool
+        self, room_id: str, receipt_type: str, user_id: str, event_id: str
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
@@ -148,16 +156,14 @@ class ReceiptsHandler:
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec()), "hidden": hidden},
+            data={"ts": int(self.clock.time_msec())},
         )
 
         is_new = await self._handle_new_receipts([receipt])
         if not is_new:
             return
 
-        if self.federation_sender and not (
-            self.hs.config.experimental.msc2285_enabled and hidden
-        ):
+        if self.federation_sender and receipt_type != ReceiptTypes.READ_PRIVATE:
             await self.federation_sender.send_read_receipt(receipt)
 
 
@@ -167,52 +173,69 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self.config = hs.config
 
     @staticmethod
-    def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
-        visible_events = []
+    def filter_out_private_receipts(
+        rooms: List[JsonDict], user_id: str
+    ) -> List[JsonDict]:
+        """
+        Filters a list of serialized receipts (as returned by /sync and /initialSync)
+        and removes private read receipts of other users.
 
-        # filter out hidden receipts the user shouldn't see
-        for event in events:
-            content = event.get("content", {})
-            new_event = event.copy()
-            new_event["content"] = {}
+        This operates on the return value of get_linearized_receipts_for_rooms(),
+        which is wrapped in a cache. Care must be taken to ensure that the input
+        values are not modified.
 
-            for event_id in content.keys():
-                event_content = content.get(event_id, {})
-                m_read = event_content.get(ReceiptTypes.READ, {})
+        Args:
+            rooms: A list of mappings, each mapping has a `content` field, which
+                is a map of event ID -> receipt type -> user ID -> receipt information.
 
-                # If m_read is missing copy over the original event_content as there is nothing to process here
-                if not m_read:
-                    new_event["content"][event_id] = event_content.copy()
-                    continue
+        Returns:
+            The same as rooms, but filtered.
+        """
 
-                new_users = {}
-                for rr_user_id, user_rr in m_read.items():
-                    try:
-                        hidden = user_rr.get("hidden")
-                    except AttributeError:
-                        # Due to https://github.com/matrix-org/synapse/issues/10376
-                        # there are cases where user_rr is a string, in those cases
-                        # we just ignore the read receipt
-                        continue
+        result = []
 
-                    if hidden is not True or rr_user_id == user_id:
-                        new_users[rr_user_id] = user_rr.copy()
-                        # If hidden has a value replace hidden with the correct prefixed key
-                        if hidden is not None:
-                            new_users[rr_user_id].pop("hidden")
-                            new_users[rr_user_id][
-                                ReadReceiptEventFields.MSC2285_HIDDEN
-                            ] = hidden
+        # Iterate through each room's receipt content.
+        for room in rooms:
+            # The receipt content with other user's private read receipts removed.
+            content = {}
 
-                # Set new users unless empty
-                if len(new_users.keys()) > 0:
-                    new_event["content"][event_id] = {ReceiptTypes.READ: new_users}
+            # Iterate over each event ID / receipts for that event.
+            for event_id, orig_event_content in room.get("content", {}).items():
+                event_content = orig_event_content
+                # If there are private read receipts, additional logic is necessary.
+                if ReceiptTypes.READ_PRIVATE in event_content:
+                    # Make a copy without private read receipts to avoid leaking
+                    # other user's private read receipts..
+                    event_content = {
+                        receipt_type: receipt_value
+                        for receipt_type, receipt_value in event_content.items()
+                        if receipt_type != ReceiptTypes.READ_PRIVATE
+                    }
 
-            # Append new_event to visible_events unless empty
-            if len(new_event["content"].keys()) > 0:
-                visible_events.append(new_event)
+                    # Copy the current user's private read receipt from the
+                    # original content, if it exists.
+                    user_private_read_receipt = orig_event_content[
+                        ReceiptTypes.READ_PRIVATE
+                    ].get(user_id, None)
+                    if user_private_read_receipt:
+                        event_content[ReceiptTypes.READ_PRIVATE] = {
+                            user_id: user_private_read_receipt
+                        }
 
-        return visible_events
+                # Include the event if there is at least one non-private read
+                # receipt or the current user has a private read receipt.
+                if event_content:
+                    content[event_id] = event_content
+
+            # Include the event if there is at least one non-private read receipt
+            # or the current user has a private read receipt.
+            if content:
+                # Build a new event to avoid mutating the cache.
+                new_room = {k: v for k, v in room.items() if k != "content"}
+                new_room["content"] = content
+                result.append(new_room)
+
+        return result
 
     async def get_new_events(
         self,
@@ -234,18 +257,21 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         )
 
         if self.config.experimental.msc2285_enabled:
-            events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
+            events = ReceiptEventSource.filter_out_private_receipts(
+                events, user.to_string()
+            )
 
         return events, to_key
 
     async def get_new_events_as(
-        self, from_key: int, service: ApplicationService
+        self, from_key: int, to_key: int, service: ApplicationService
     ) -> Tuple[List[JsonDict], int]:
         """Returns a set of new read receipt events that an appservice
         may be interested in.
 
         Args:
             from_key: the stream position at which events should be fetched from
+            to_key: the stream position up to which events should be fetched to
             service: The appservice which may be interested
 
         Returns:
@@ -255,7 +281,6 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                 * The current read receipt stream token.
         """
         from_key = int(from_key)
-        to_key = self.get_current_key()
 
         if from_key == to_key:
             return [], to_key

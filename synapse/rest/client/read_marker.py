@@ -15,8 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.constants import ReceiptTypes
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -36,6 +35,7 @@ class ReadMarkerRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
+        self.config = hs.config
         self.receipts_handler = hs.get_receipts_handler()
         self.read_marker_handler = hs.get_read_marker_handler()
         self.presence_handler = hs.get_presence_handler()
@@ -48,27 +48,42 @@ class ReadMarkerRestServlet(RestServlet):
         await self.presence_handler.bump_presence_active_time(requester.user)
 
         body = parse_json_object_from_request(request)
+
+        valid_receipt_types = {
+            ReceiptTypes.READ,
+            ReceiptTypes.FULLY_READ,
+            ReceiptTypes.READ_PRIVATE,
+        }
+
+        unrecognized_types = set(body.keys()) - valid_receipt_types
+        if unrecognized_types:
+            # It's fine if there are unrecognized receipt types, but let's log
+            # it to help debug clients that have typoed the receipt type.
+            #
+            # We specifically *don't* error here, as a) it stops us processing
+            # the valid receipts, and b) we need to be extensible on receipt
+            # types.
+            logger.info("Ignoring unrecognized receipt types: %s", unrecognized_types)
+
         read_event_id = body.get(ReceiptTypes.READ, None)
-        hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
-
-        if not isinstance(hidden, bool):
-            raise SynapseError(
-                400,
-                "Param %s must be a boolean, if given"
-                % ReadReceiptEventFields.MSC2285_HIDDEN,
-                Codes.BAD_JSON,
-            )
-
         if read_event_id:
             await self.receipts_handler.received_client_receipt(
                 room_id,
                 ReceiptTypes.READ,
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
-                hidden=hidden,
             )
 
-        read_marker_event_id = body.get("m.fully_read", None)
+        read_private_event_id = body.get(ReceiptTypes.READ_PRIVATE, None)
+        if read_private_event_id and self.config.experimental.msc2285_enabled:
+            await self.receipts_handler.received_client_receipt(
+                room_id,
+                ReceiptTypes.READ_PRIVATE,
+                user_id=requester.user.to_string(),
+                event_id=read_private_event_id,
+            )
+
+        read_marker_event_id = body.get(ReceiptTypes.FULLY_READ, None)
         if read_marker_event_id:
             await self.read_marker_handler.received_client_read_marker(
                 room_id,

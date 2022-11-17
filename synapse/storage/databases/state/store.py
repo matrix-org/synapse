@@ -189,7 +189,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         group: int,
         state_filter: StateFilter,
     ) -> Tuple[MutableStateMap[str], bool]:
-        """Checks if group is in cache. See `_get_state_for_groups`
+        """Checks if group is in cache. See `get_state_for_groups`
 
         Args:
             cache: the state group cache to use

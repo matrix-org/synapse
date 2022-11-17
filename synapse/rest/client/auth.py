@@ -112,7 +112,7 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.RECAPTCHA, authdict, request.getClientIP()
+                    LoginType.RECAPTCHA, authdict, request.getClientAddress().host
                 )
             except LoginError as e:
                 # Authentication failed, let user try again
@@ -132,7 +132,7 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.TERMS, authdict, request.getClientIP()
+                    LoginType.TERMS, authdict, request.getClientAddress().host
                 )
             except LoginError as e:
                 # Authentication failed, let user try again
@@ -161,7 +161,9 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.REGISTRATION_TOKEN, authdict, request.getClientIP()
+                    LoginType.REGISTRATION_TOKEN,
+                    authdict,
+                    request.getClientAddress().host,
                 )
             except LoginError as e:
                 html = self.registration_token_template.render(

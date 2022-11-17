@@ -16,11 +16,12 @@ import functools
 import logging
 import re
 import time
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, cast
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
-from synapse.http.server import HttpServer, ServletCallback
+from synapse.http.server import HttpServer, ServletCallback, is_method_cancellable
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
@@ -86,15 +87,24 @@ class Authenticator:
 
         if not auth_headers:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED
+                HTTPStatus.UNAUTHORIZED,
+                "Missing Authorization headers",
+                Codes.UNAUTHORIZED,
             )
 
         for auth in auth_headers:
             if auth.startswith(b"X-Matrix"):
-                (origin, key, sig) = _parse_auth_header(auth)
+                (origin, key, sig, destination) = _parse_auth_header(auth)
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
+                # if the origin_server sent a destination along it needs to match our own server_name
+                if destination is not None and destination != self.server_name:
+                    raise AuthenticationError(
+                        HTTPStatus.UNAUTHORIZED,
+                        "Destination mismatch in auth header",
+                        Codes.UNAUTHORIZED,
+                    )
         if (
             self.federation_domain_whitelist is not None
             and origin not in self.federation_domain_whitelist
@@ -103,7 +113,9 @@ class Authenticator:
 
         if origin is None or not json_request["signatures"]:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED
+                HTTPStatus.UNAUTHORIZED,
+                "Missing Authorization headers",
+                Codes.UNAUTHORIZED,
             )
 
         await self.keyring.verify_json_for_server(
@@ -142,13 +154,14 @@ class Authenticator:
             logger.exception("Error resetting retry timings on %s", origin)
 
 
-def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
+def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str]]:
     """Parse an X-Matrix auth header
 
     Args:
         header_bytes: header value
 
     Returns:
+        origin, key id, signature, destination.
         origin, key id, signature.
 
     Raises:
@@ -156,12 +169,16 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
     """
     try:
         header_str = header_bytes.decode("utf-8")
-        params = header_str.split(" ")[1].split(",")
-        param_dict = {k: v for k, v in (kv.split("=", maxsplit=1) for kv in params)}
+        params = re.split(" +", header_str)[1].split(",")
+        param_dict: Dict[str, str] = {
+            k.lower(): v for k, v in [param.split("=", maxsplit=1) for param in params]
+        }
 
         def strip_quotes(value: str) -> str:
             if value.startswith('"'):
-                return value[1:-1]
+                return re.sub(
+                    "\\\\(.)", lambda matchobj: matchobj.group(1), value[1:-1]
+                )
             else:
                 return value
 
@@ -172,7 +189,15 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
 
         key = strip_quotes(param_dict["key"])
         sig = strip_quotes(param_dict["sig"])
-        return origin, key, sig
+
+        # get the destination server_name from the auth header if it exists
+        destination = param_dict.get("destination")
+        if destination is not None:
+            destination = strip_quotes(destination)
+        else:
+            destination = None
+
+        return origin, key, sig, destination
     except Exception as e:
         logger.warning(
             "Error parsing auth header '%s': %s",
@@ -180,7 +205,7 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
             e,
         )
         raise AuthenticationError(
-            400, "Malformed Authorization header", Codes.UNAUTHORIZED
+            HTTPStatus.BAD_REQUEST, "Malformed Authorization header", Codes.UNAUTHORIZED
         )
 
 
@@ -349,6 +374,17 @@ class BaseFederationServlet:
             code = getattr(self, "on_%s" % (method), None)
             if code is None:
                 continue
+
+            if is_method_cancellable(code):
+                # The wrapper added by `self._wrap` will inherit the cancellable flag,
+                # but the wrapper itself does not support cancellation yet.
+                # Once resolved, the cancellation tests in
+                # `tests/federation/transport/server/test__base.py` can be re-enabled.
+                raise Exception(
+                    f"{self.__class__.__name__}.on_{method} has been marked as "
+                    "cancellable, but federation servlets do not support cancellation "
+                    "yet."
+                )
 
             server.register_paths(
                 method,

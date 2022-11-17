@@ -26,6 +26,10 @@ class AccountHandler:
         self._main_store = hs.get_datastores().main
         self._is_mine = hs.is_mine
         self._federation_client = hs.get_federation_client()
+        self._use_account_validity_in_account_status = (
+            hs.config.server.use_account_validity_in_account_status
+        )
+        self._account_validity_handler = hs.get_account_validity_handler()
 
     async def get_account_statuses(
         self,
@@ -105,6 +109,13 @@ class AccountHandler:
                 "exists": True,
                 "deactivated": userinfo.is_deactivated,
             }
+
+            if self._use_account_validity_in_account_status:
+                status[
+                    "org.matrix.expired"
+                ] = await self._account_validity_handler.is_user_expired(
+                    user_id.to_string()
+                )
 
         return status
 

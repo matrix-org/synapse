@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -21,13 +23,8 @@ class ExperimentalConfig(Config):
 
     section = "experimental"
 
-    def read_config(self, config: JsonDict, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         experimental = config.get("experimental_features") or {}
-
-        # MSC3440 (thread relation)
-        self.msc3440_enabled: bool = experimental.get("msc3440_enabled", False)
-        # MSC3666: including bundled relations in /search.
-        self.msc3666_enabled: bool = experimental.get("msc3666_enabled", False)
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
@@ -35,7 +32,7 @@ class ExperimentalConfig(Config):
         # MSC2716 (importing historical messages)
         self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
-        # MSC2285 (hidden read receipts)
+        # MSC2285 (private read receipts)
         self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
 
         # MSC3244 (room version capabilities)
@@ -59,8 +56,9 @@ class ExperimentalConfig(Config):
             "msc3202_device_masquerading", False
         )
 
-        # Portion of MSC3202 related to transaction extensions:
-        # sending one-time key counts and fallback key usage to application services.
+        # The portion of MSC3202 related to transaction extensions:
+        # sending device list changes, one-time key counts and fallback key
+        # usage to application services.
         self.msc3202_transaction_extensions: bool = experimental.get(
             "msc3202_transaction_extensions", False
         )
@@ -75,5 +73,14 @@ class ExperimentalConfig(Config):
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
 
-        # The deprecated groups feature.
-        self.groups_enabled: bool = experimental.get("groups_enabled", True)
+        # MSC2654: Unread counts
+        self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
+        # MSC2815 (allow room moderators to view redacted event content)
+        self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
+
+        # MSC3786 (Add a default push rule to ignore m.room.server_acl events)
+        self.msc3786_enabled: bool = experimental.get("msc3786_enabled", False)
+
+        # MSC3772: A push rule for mutual relations.
+        self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)

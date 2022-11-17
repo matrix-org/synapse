@@ -31,7 +31,8 @@ class ExtremPruneTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
-        self.persistence = self.hs.get_storage().persistence
+        self._persistence = self.hs.get_storage_controllers().persistence
+        self._state_storage_controller = self.hs.get_storage_controllers().state
         self.store = self.hs.get_datastores().main
 
         self.register_user("user", "pass")
@@ -69,9 +70,9 @@ class ExtremPruneTestCase(HomeserverTestCase):
     def persist_event(self, event, state=None):
         """Persist the event, with optional state"""
         context = self.get_success(
-            self.state.compute_event_context(event, old_state=state)
+            self.state.compute_event_context(event, state_ids_before_event=state)
         )
-        self.get_success(self.persistence.persist_event(event, context))
+        self.get_success(self._persistence.persist_event(event, context))
 
     def assert_extremities(self, expected_extremities):
         """Assert the current extremities for the room"""
@@ -103,9 +104,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
             RoomVersions.V6,
         )
 
-        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+        state_before_gap = self.get_success(
+            self._state_storage_controller.get_current_state_ids(self.room_id)
+        )
 
-        self.persist_event(remote_event_2, state=state_before_gap.values())
+        self.persist_event(remote_event_2, state=state_before_gap)
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
@@ -135,17 +138,20 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # setting. The state resolution across the old and new event will then
         # include it, and so the resolved state won't match the new state.
         state_before_gap = dict(
-            self.get_success(self.state.get_current_state(self.room_id))
+            self.get_success(
+                self._state_storage_controller.get_current_state_ids(self.room_id)
+            )
         )
         state_before_gap.pop(("m.room.history_visibility", ""))
 
         context = self.get_success(
             self.state.compute_event_context(
-                remote_event_2, old_state=state_before_gap.values()
+                remote_event_2,
+                state_ids_before_event=state_before_gap,
             )
         )
 
-        self.get_success(self.persistence.persist_event(remote_event_2, context))
+        self.get_success(self._persistence.persist_event(remote_event_2, context))
 
         # Check that we haven't dropped the old extremity.
         self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
@@ -177,9 +183,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
             RoomVersions.V6,
         )
 
-        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+        state_before_gap = self.get_success(
+            self._state_storage_controller.get_current_state_ids(self.room_id)
+        )
 
-        self.persist_event(remote_event_2, state=state_before_gap.values())
+        self.persist_event(remote_event_2, state=state_before_gap)
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
@@ -207,9 +215,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
             RoomVersions.V6,
         )
 
-        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+        state_before_gap = self.get_success(
+            self._state_storage_controller.get_current_state_ids(self.room_id)
+        )
 
-        self.persist_event(remote_event_2, state=state_before_gap.values())
+        self.persist_event(remote_event_2, state=state_before_gap)
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
@@ -247,9 +257,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
             RoomVersions.V6,
         )
 
-        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+        state_before_gap = self.get_success(
+            self._state_storage_controller.get_current_state_ids(self.room_id)
+        )
 
-        self.persist_event(remote_event_2, state=state_before_gap.values())
+        self.persist_event(remote_event_2, state=state_before_gap)
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
@@ -289,9 +301,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
             RoomVersions.V6,
         )
 
-        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+        state_before_gap = self.get_success(
+            self._state_storage_controller.get_current_state_ids(self.room_id)
+        )
 
-        self.persist_event(remote_event_2, state=state_before_gap.values())
+        self.persist_event(remote_event_2, state=state_before_gap)
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id, local_message_event_id])
@@ -323,9 +337,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
             RoomVersions.V6,
         )
 
-        state_before_gap = self.get_success(self.state.get_current_state(self.room_id))
+        state_before_gap = self.get_success(
+            self._state_storage_controller.get_current_state_ids(self.room_id)
+        )
 
-        self.persist_event(remote_event_2, state=state_before_gap.values())
+        self.persist_event(remote_event_2, state=state_before_gap)
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([local_message_event_id, remote_event_2.event_id])
@@ -340,7 +356,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
-        self.persistence = self.hs.get_storage().persistence
+        self._persistence = self.hs.get_storage_controllers().persistence
         self.store = self.hs.get_datastores().main
 
     def test_remote_user_rooms_cache_invalidated(self):
@@ -377,7 +393,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         )
 
         context = self.get_success(self.state.compute_event_context(remote_event_1))
-        self.get_success(self.persistence.persist_event(remote_event_1, context))
+        self.get_success(self._persistence.persist_event(remote_event_1, context))
 
         # Call `get_rooms_for_user` to add the remote user to the cache
         rooms = self.get_success(self.store.get_rooms_for_user(remote_user))
@@ -424,7 +440,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         )
 
         context = self.get_success(self.state.compute_event_context(remote_event_1))
-        self.get_success(self.persistence.persist_event(remote_event_1, context))
+        self.get_success(self._persistence.persist_event(remote_event_1, context))
 
         # Call `get_users_in_room` to add the remote user to the cache
         users = self.get_success(self.store.get_users_in_room(room_id))

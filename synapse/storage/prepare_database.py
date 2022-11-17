@@ -85,7 +85,7 @@ def prepare_database(
     database_engine: BaseDatabaseEngine,
     config: Optional[HomeServerConfig],
     databases: Collection[str] = ("main", "state"),
-):
+) -> None:
     """Prepares a physical database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
 
@@ -501,11 +501,11 @@ def _upgrade_existing_database(
 
                 if hasattr(module, "run_create"):
                     logger.info("Running %s:run_create", relative_path)
-                    module.run_create(cur, database_engine)  # type: ignore
+                    module.run_create(cur, database_engine)
 
                 if not is_empty and hasattr(module, "run_upgrade"):
                     logger.info("Running %s:run_upgrade", relative_path)
-                    module.run_upgrade(cur, database_engine, config=config)  # type: ignore
+                    module.run_upgrade(cur, database_engine, config=config)
             elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package

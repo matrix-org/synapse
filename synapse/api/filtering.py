@@ -19,6 +19,7 @@ from typing import (
     TYPE_CHECKING,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -32,7 +33,7 @@ from typing import (
 import jsonschema
 from jsonschema import FormatChecker
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
@@ -89,9 +90,7 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "org.matrix.not_labels": {"type": "array", "items": {"type": "string"}},
         # MSC3440, filtering by event relations.
         "related_by_senders": {"type": "array", "items": {"type": "string"}},
-        "io.element.relation_senders": {"type": "array", "items": {"type": "string"}},
         "related_by_rel_types": {"type": "array", "items": {"type": "string"}},
-        "io.element.relation_types": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -323,16 +322,6 @@ class Filter:
         self.related_by_senders = self.filter_json.get("related_by_senders", None)
         self.related_by_rel_types = self.filter_json.get("related_by_rel_types", None)
 
-        # Fallback to the unstable prefix if the stable version is not given.
-        if hs.config.experimental.msc3440_enabled:
-            self.related_by_senders = self.related_by_senders or self.filter_json.get(
-                "io.element.relation_senders", None
-            )
-            self.related_by_rel_types = (
-                self.related_by_rel_types
-                or self.filter_json.get("io.element.relation_types", None)
-            )
-
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
 
@@ -358,7 +347,7 @@ class Filter:
             user_id = event.user_id
             field_matchers = {
                 "senders": lambda v: user_id == v,
-                "types": lambda v: "m.presence" == v,
+                "types": lambda v: EduTypes.PRESENCE == v,
             }
             return self._check_fields(field_matchers)
         else:
@@ -456,9 +445,9 @@ class Filter:
         return room_ids
 
     async def _check_event_relations(
-        self, events: Iterable[FilterEvent]
+        self, events: Collection[FilterEvent]
     ) -> List[FilterEvent]:
-        # The event IDs to check, mypy doesn't understand the ifinstance check.
+        # The event IDs to check, mypy doesn't understand the isinstance check.
         event_ids = [event.event_id for event in events if isinstance(event, EventBase)]  # type: ignore[attr-defined]
         event_ids_to_keep = set(
             await self._store.events_have_relations(

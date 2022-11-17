@@ -59,7 +59,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        self.get_success(self.register_user(self.frank.localpart, "frankpassword"))
+        self.register_user(self.frank.localpart, "frankpassword")
 
         self.handler = hs.get_profile_handler()
 
@@ -265,6 +265,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         res = self.get_success(
             self.handler.check_avatar_size_and_mime_type("mxc://test/unknown_file")
         )
+        self.assertTrue(res)
+
+    @unittest.override_config({"max_avatar_size": 50})
+    def test_avatar_constraints_allow_empty_avatar_url(self) -> None:
+        """An empty avatar is always permitted."""
+        res = self.get_success(self.handler.check_avatar_size_and_mime_type(""))
         self.assertTrue(res)
 
     @unittest.override_config({"max_avatar_size": 50})

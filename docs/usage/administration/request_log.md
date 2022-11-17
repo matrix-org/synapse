@@ -28,7 +28,7 @@ See the following for how to decode the dense data available from the default lo
 | NNNN  | Total time waiting for response to DB queries across all parallel DB work from this request |
 | OOOO  | Count of DB transactions performed |
 | PPPP  | Response body size |
-| QQQQ  | Response status code (prefixed with ! if the socket was closed before the response was generated) |
+| QQQQ  | Response status code<br/>Suffixed with `!` if the socket was closed before the response was generated.<br/>A `499!` status code indicates that Synapse also cancelled request processing after the socket was closed.<br/> |
 | RRRR  | Request |
 | SSSS  | User-agent |
 | TTTT  | Events fetched from DB to service this request (note that this does not include events fetched from the cache) |

@@ -595,13 +595,14 @@ def cached(
 def cachedList(
     *, cached_method_name: str, list_name: str, num_args: Optional[int] = None
 ) -> Callable[[F], _CachedFunction[F]]:
-    """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
+    """Creates a descriptor that wraps a function in a `DeferredCacheListDescriptor`.
 
-    Used to do batch lookups for an already created cache. A single argument
+    Used to do batch lookups for an already created cache. One of the arguments
     is specified as a list that is iterated through to lookup keys in the
     original cache. A new tuple consisting of the (deduplicated) keys that weren't in
-    the cache gets passed to the original function, the result of which is stored in the
-    cache.
+    the cache gets passed to the original function, which is expected to results
+    in a map of key to value for each passed value. THe new results are stored in the
+    original cache. Note that any missing values are cached as None.
 
     Args:
         cached_method_name: The name of the single-item lookup method.
@@ -614,11 +615,11 @@ def cachedList(
     Example:
 
         class Example:
-            @cached(num_args=2)
-            def do_something(self, first_arg):
+            @cached()
+            def do_something(self, first_arg, second_arg):
                 ...
 
-            @cachedList(do_something.cache, list_name="second_args", num_args=2)
+            @cachedList(cached_method_name="do_something", list_name="second_args")
             def batch_do_something(self, first_arg, second_args):
                 ...
     """

@@ -107,6 +107,8 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
+            assert self._secret is not None
+
             resp_body = await self._http_client.post_urlencoded_get_json(
                 self._url,
                 args={
@@ -254,7 +256,9 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
-        self._enabled = bool(hs.config.registration.registration_requires_token)
+        self._enabled = bool(
+            hs.config.registration.registration_requires_token
+        ) or bool(hs.config.registration.enable_registration_token_3pid_bypass)
         self.store = hs.get_datastores().main
 
     def is_enabled(self) -> bool:

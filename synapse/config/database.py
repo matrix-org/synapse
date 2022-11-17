@@ -15,8 +15,10 @@
 import argparse
 import logging
 import os
+from typing import Any, List
 
 from synapse.config._base import Config, ConfigError
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,12 @@ DEFAULT_CONFIG = """\
 #
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
+#
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
@@ -115,12 +123,12 @@ class DatabaseConnectionConfig:
 class DatabaseConfig(Config):
     section = "database"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args: Any):
+        super().__init__(*args)
 
-        self.databases = []
+        self.databases: List[DatabaseConnectionConfig] = []
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # We *experimentally* support specifying multiple databases via the
         # `databases` key. This is a map from a label to database config in the
         # same format as the `database` config option, plus an extra
@@ -164,7 +172,7 @@ class DatabaseConfig(Config):
             self.databases = [DatabaseConnectionConfig("master", database_config)]
             self.set_databasepath(database_path)
 
-    def generate_config_section(self, data_dir_path, **kwargs) -> str:
+    def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
         return DEFAULT_CONFIG % {
             "database_path": os.path.join(data_dir_path, "homeserver.db")
         }

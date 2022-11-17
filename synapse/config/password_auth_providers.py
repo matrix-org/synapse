@@ -14,6 +14,7 @@
 
 from typing import Any, List, Tuple, Type
 
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 
 from ._base import Config
@@ -24,7 +25,7 @@ LDAP_PROVIDER = "ldap_auth_provider.LdapAuthProvider"
 class PasswordAuthProviderConfig(Config):
     section = "authproviders"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         """Parses the old password auth providers config. The config format looks like this:
 
         password_providers:

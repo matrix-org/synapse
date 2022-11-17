@@ -54,7 +54,6 @@ class EventSources:
         push_rules_key = self.store.get_max_push_rules_stream_id()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
-        groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
             room_key=self.sources.room.get_current_key(),
@@ -65,11 +64,12 @@ class EventSources:
             push_rules_key=push_rules_key,
             to_device_key=to_device_key,
             device_list_key=device_list_key,
-            groups_key=groups_key,
+            # Groups key is unused.
+            groups_key=0,
         )
         return token
 
-    def get_current_token_for_pagination(self) -> StreamToken:
+    async def get_current_token_for_pagination(self, room_id: str) -> StreamToken:
         """Get the current token for a given room to be used to paginate
         events.
 
@@ -80,7 +80,7 @@ class EventSources:
             The current token for pagination.
         """
         token = StreamToken(
-            room_key=self.sources.room.get_current_key(),
+            room_key=await self.sources.room.get_current_key_for_room(room_id),
             presence_key=0,
             typing_key=0,
             receipt_key=0,

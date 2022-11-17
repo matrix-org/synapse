@@ -139,6 +139,7 @@ BASE_APPEND_CONTENT_RULES: List[Dict[str, Any]] = [
             {
                 "kind": "event_match",
                 "key": "content.body",
+                # Match the localpart of the requester's MXID.
                 "pattern_type": "user_localpart",
             }
         ],
@@ -191,6 +192,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "pattern": "invite",
                 "_cache_key": "_invite_member",
             },
+            # Match the requester's MXID.
             {"kind": "event_match", "key": "state_key", "pattern_type": "user_id"},
         ],
         "actions": [
@@ -277,6 +279,21 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
         ],
         "actions": ["dont_notify"],
     },
+    # XXX: This is an experimental rule that is only enabled if msc3786_enabled
+    # is enabled, if it is not the rule gets filtered out in _load_rules() in
+    # PushRulesWorkerStore
+    {
+        "rule_id": "global/override/.org.matrix.msc3786.rule.room.server_acl",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.room.server_acl",
+                "_cache_key": "_room_server_acl",
+            }
+        ],
+        "actions": [],
+    },
 ]
 
 
@@ -334,6 +351,18 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
             {"set_tweak": "sound", "value": "default"},
             {"set_tweak": "highlight", "value": False},
         ],
+    },
+    {
+        "rule_id": "global/underride/.org.matrix.msc3772.thread_reply",
+        "conditions": [
+            {
+                "kind": "org.matrix.msc3772.relation_match",
+                "rel_type": "m.thread",
+                # Match the requester's MXID.
+                "sender_type": "user_id",
+            }
+        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
     {
         "rule_id": "global/underride/.m.rule.message",

@@ -21,6 +21,7 @@ from urllib import parse as urlparse
 
 from twisted.web.server import Request
 
+from synapse import event_auth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
@@ -29,10 +30,11 @@ from synapse.api.errors import (
     MissingClientTokenError,
     ShadowBanError,
     SynapseError,
+    UnredactedContentDeletedError,
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
-from synapse.http.server import HttpServer
+from synapse.http.server import HttpServer, cancellable
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -107,10 +109,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /room/$roomid/state/$eventtype
+        # /rooms/$roomid/state/$eventtype
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
-        # /room/$roomid/state/$eventtype/$statekey
+        # /rooms/$roomid/state/$eventtype/$statekey
         state_key = (
             "/rooms/(?P<room_id>[^/]*)/state/"
             "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$"
@@ -141,6 +143,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             self.__class__.__name__,
         )
 
+    @cancellable
     def on_GET_no_state_key(
         self, request: SynapseRequest, room_id: str, event_type: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
@@ -151,6 +154,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
     ) -> Awaitable[Tuple[int, JsonDict]]:
         return self.on_PUT(request, room_id, event_type, "")
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str, event_type: str, state_key: str
     ) -> Tuple[int, JsonDict]:
@@ -479,6 +483,7 @@ class RoomMemberListRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
@@ -600,6 +605,7 @@ class RoomStateRestServlet(RestServlet):
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, List[JsonDict]]:
@@ -643,18 +649,58 @@ class RoomEventServlet(RestServlet):
         super().__init__()
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
+        self._state = hs.get_state_handler()
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
         self.auth = hs.get_auth()
+        self.content_keep_ms = hs.config.server.redaction_retention_period
+        self.msc2815_enabled = hs.config.experimental.msc2815_enabled
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+
+        include_unredacted_content = self.msc2815_enabled and (
+            parse_string(
+                request,
+                "fi.mau.msc2815.include_unredacted_content",
+                allowed_values=("true", "false"),
+            )
+            == "true"
+        )
+        if include_unredacted_content and not await self.auth.is_server_admin(
+            requester.user
+        ):
+            power_level_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, EventTypes.PowerLevels, ""
+                )
+            )
+
+            auth_events = {}
+            if power_level_event:
+                auth_events[(EventTypes.PowerLevels, "")] = power_level_event
+
+            redact_level = event_auth.get_named_level(auth_events, "redact", 50)
+            user_level = event_auth.get_user_power_level(
+                requester.user.to_string(), auth_events
+            )
+            if user_level < redact_level:
+                raise SynapseError(
+                    403,
+                    "You don't have permission to view redacted events in this room.",
+                    errcode=Codes.FORBIDDEN,
+                )
+
         try:
             event = await self.event_handler.get_event(
-                requester.user, room_id, event_id
+                requester.user,
+                room_id,
+                event_id,
+                show_redacted=include_unredacted_content,
             )
         except AuthError:
             # This endpoint is supposed to return a 404 when the requester does
@@ -663,14 +709,21 @@ class RoomEventServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         if event:
+            if include_unredacted_content and await self._store.have_censored_event(
+                event_id
+            ):
+                raise UnredactedContentDeletedError(self.content_keep_ms)
+
             # Ensure there are bundled aggregations available.
             aggregations = await self._relations_handler.get_bundled_aggregations(
                 [event], requester.user.to_string()
             )
 
             time_now = self.clock.time_msec()
+            # per MSC2676, /rooms/{roomId}/event/{eventId}, should return the
+            # *original* event, rather than the edited version
             event_dict = self._event_serializer.serialize_event(
-                event, time_now, bundle_aggregations=aggregations
+                event, time_now, bundle_aggregations=aggregations, apply_edits=False
             )
             return 200, event_dict
 
@@ -1143,12 +1196,7 @@ class TimestampLookupRestServlet(RestServlet):
 
 
 class RoomHierarchyRestServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/(v1|unstable/org.matrix.msc2946)"
-            "/rooms/(?P<room_id>[^/]*)/hierarchy$"
-        ),
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

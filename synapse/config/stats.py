@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import logging
+from typing import Any
+
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -36,7 +39,7 @@ class StatsConfig(Config):
 
     section = "stats"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.stats_enabled = True
         stats_config = config.get("stats", None)
         if stats_config:
@@ -44,7 +47,7 @@ class StatsConfig(Config):
         if not self.stats_enabled:
             logger.warning(ROOM_STATS_DISABLED_WARN)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """
         # Settings for local room and user statistics collection. See
         # https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.

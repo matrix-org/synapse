@@ -34,32 +34,24 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # TODO: consider using https://github.com/docker/metadata-action instead of this
-      # custom magic
       - name: Calculate docker image tag
         id: set-tag
-        run: |
-          case "${GITHUB_REF}" in
-              refs/heads/develop)
-                  tag=develop
-                  ;;
-              refs/heads/master|refs/heads/main)
-                  tag=latest
-                  ;;
-              refs/tags/*)
-                  tag=${GITHUB_REF#refs/tags/}
-                  ;;
-              *)
-                  tag=${GITHUB_SHA}
-                  ;;
-          esac
-          echo "::set-output name=tag::$tag"
+        uses: docker/metadata-action@master
+        with:
+          images: matrixdotorg/synapse
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=pep440,pattern={{raw}}
 
       - name: Build and push all platforms
         uses: docker/build-push-action@v2
         with:
           push: true
           labels: "gitsha1=${{ github.sha }}"
-          tags: "matrixdotorg/synapse:${{ steps.set-tag.outputs.tag }}"
+          tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64

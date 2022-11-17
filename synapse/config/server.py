@@ -186,7 +186,7 @@ KNOWN_RESOURCES = {
 class HttpResourceConfig:
     names: List[str] = attr.ib(
         factory=list,
-        validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),  # type: ignore
+        validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),
     )
     compress: bool = attr.ib(
         default=False,
@@ -231,9 +231,7 @@ class ManholeConfig:
 class LimitRemoteRoomsConfig:
     enabled: bool = attr.ib(validator=attr.validators.instance_of(bool), default=False)
     complexity: Union[float, int] = attr.ib(
-        validator=attr.validators.instance_of(
-            (float, int)  # type: ignore[arg-type] # noqa
-        ),
+        validator=attr.validators.instance_of((float, int)),  # noqa
         default=1.0,
     )
     complexity_error: str = attr.ib(
@@ -248,7 +246,7 @@ class LimitRemoteRoomsConfig:
 class ServerConfig(Config):
     section = "server"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
 
@@ -259,8 +257,8 @@ class ServerConfig(Config):
 
         self.pid_file = self.abspath(config.get("pid_file"))
         self.soft_file_limit = config.get("soft_file_limit", 0)
-        self.daemonize = config.get("daemonize")
-        self.print_pidfile = config.get("print_pidfile")
+        self.daemonize = bool(config.get("daemonize"))
+        self.print_pidfile = bool(config.get("print_pidfile"))
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.serve_server_wellknown = config.get("serve_server_wellknown", False)
@@ -320,10 +318,6 @@ class ServerConfig(Config):
                 self.presence_router_module_class,
                 self.presence_router_config,
             ) = load_module(presence_router_config, ("presence", "presence_router"))
-
-        # Whether to update the user directory or not. This should be set to
-        # false only if we are updating the user directory in a worker
-        self.update_user_directory = config.get("update_user_directory", True)
 
         # whether to enable the media repository endpoints. This should be set
         # to false if the media repository is running as a separate endpoint;
@@ -415,6 +409,7 @@ class ServerConfig(Config):
         )
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
+        self.mau_appservice_trial_days = config.get("mau_appservice_trial_days", {})
         self.mau_limit_alerting = config.get("mau_limit_alerting", True)
 
         # How long to keep redacted events in the database in unredacted form
@@ -676,18 +671,37 @@ class ServerConfig(Config):
         ):
             raise ConfigError("'custom_template_directory' must be a string")
 
+        self.use_account_validity_in_account_status: bool = (
+            config.get("use_account_validity_in_account_status") or False
+        )
+
+        self.rooms_to_exclude_from_sync: List[str] = (
+            config.get("exclude_rooms_from_sync") or []
+        )
+
+        delete_stale_devices_after: Optional[str] = (
+            config.get("delete_stale_devices_after") or None
+        )
+
+        if delete_stale_devices_after is not None:
+            self.delete_stale_devices_after: Optional[int] = self.parse_duration(
+                delete_stale_devices_after
+            )
+        else:
+            self.delete_stale_devices_after = None
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
     def generate_config_section(
         self,
-        server_name,
-        data_dir_path,
-        open_private_ports,
-        listeners,
-        config_dir_path,
-        **kwargs,
-    ):
+        config_dir_path: str,
+        data_dir_path: str,
+        server_name: str,
+        open_private_ports: bool,
+        listeners: Optional[List[dict]],
+        **kwargs: Any,
+    ) -> str:
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
         )
@@ -993,7 +1007,7 @@ class ServerConfig(Config):
         #   federation: the server-server API (/_matrix/federation). Also implies
         #       'media', 'keys', 'openid'
         #
-        #   keys: the key discovery API (/_matrix/keys).
+        #   keys: the key discovery API (/_matrix/key).
         #
         #   media: the media API (/_matrix/media).
         #
@@ -1099,6 +1113,11 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
+        # The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but
+        # applies a different trial number if the user was registered by an appservice.
+        # A value of 0 means no trial days are applied. Appservices not listed in this
+        # dictionary use the value of `mau_trial_days` instead.
+        #
         # 'mau_limit_alerting' is a means of limiting client side alerting
         # should the mau limit be reached. This is useful for small instances
         # where the admin has 5 mau seats (say) for 5 specific people and no
@@ -1109,6 +1128,8 @@ class ServerConfig(Config):
         #max_mau_value: 50
         #mau_trial_days: 2
         #mau_limit_alerting: false
+        #mau_appservice_trial_days:
+        #  "appservice-id": 1
 
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
@@ -1230,6 +1251,15 @@ class ServerConfig(Config):
           # information about using custom templates.
           #
           #custom_template_directory: /path/to/custom/templates/
+
+        # List of rooms to exclude from sync responses. This is useful for server
+        # administrators wishing to group users into a room without these users being able
+        # to see it from their client.
+        #
+        # By default, no room is excluded.
+        #
+        #exclude_rooms_from_sync:
+        #    - !foo:example.com
         """
             % locals()
         )

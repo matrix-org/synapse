@@ -354,10 +354,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         req = Mock(spec=["cookies"])
         req.cookies = []
 
-        url = self.get_success(
-            self.provider.handle_redirect_request(req, b"http://client/redirect")
+        url = urlparse(
+            self.get_success(
+                self.provider.handle_redirect_request(req, b"http://client/redirect")
+            )
         )
-        url = urlparse(url)
         auth_endpoint = urlparse(AUTHORIZATION_ENDPOINT)
 
         self.assertEqual(url.scheme, auth_endpoint.scheme)
@@ -1299,7 +1300,7 @@ def _build_callback_request(
             "getCookie",
             "cookies",
             "requestHeaders",
-            "getClientIP",
+            "getClientAddress",
             "getHeader",
         ]
     )
@@ -1309,5 +1310,5 @@ def _build_callback_request(
     request.args = {}
     request.args[b"code"] = [code.encode("utf-8")]
     request.args[b"state"] = [state.encode("utf-8")]
-    request.getClientIP.return_value = ip_address
+    request.getClientAddress.return_value.host = ip_address
     return request

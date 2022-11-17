@@ -50,6 +50,7 @@ EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 class RoomListHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.hs = hs
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.response_cache: ResponseCache[
@@ -274,7 +275,7 @@ class RoomListHandler:
             if aliases:
                 result["aliases"] = aliases
 
-        current_state_ids = await self.store.get_current_state_ids(
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
             room_id, on_invalidate=cache_context.invalidate
         )
 

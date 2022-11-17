@@ -66,6 +66,18 @@
       ],
       "title": "Dashboards",
       "type": "dashboards"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Synapse Documentation",
+      "tooltip": "Open Documentation",
+      "type": "link",
+      "url": "https://matrix-org.github.io/synapse/latest/"
     }
   ],
   "panels": [

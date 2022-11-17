@@ -2467,7 +2467,6 @@ PURGE_TABLES = [
     "event_push_actions",
     "event_search",
     "events",
-    "group_rooms",
     "receipts_graph",
     "receipts_linearized",
     "room_aliases",
@@ -2484,9 +2483,9 @@ PURGE_TABLES = [
     "e2e_room_keys",
     "event_push_summary",
     "pusher_throttle",
-    "group_summary_rooms",
     "room_account_data",
     "room_tags",
     # "state_groups",  # Current impl leaves orphaned state groups around.
     "state_groups_state",
+    "federation_inbound_events_staging",
 ]

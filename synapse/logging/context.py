@@ -722,6 +722,11 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
+async def _unwrap_awaitable(awaitable: Awaitable[R]) -> R:
+    """Unwraps an arbitrary awaitable by awaiting it."""
+    return await awaitable
+
+
 @overload
 def preserve_fn(  # type: ignore[misc]
     f: Callable[P, Awaitable[R]],
@@ -802,17 +807,20 @@ def run_in_background(  # type: ignore[misc]
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
+    # `res` may be a coroutine, `Deferred`, some other kind of awaitable, or a plain
+    # value. Convert it to a `Deferred`.
     if isinstance(res, typing.Coroutine):
+        # Wrap the coroutine in a `Deferred`.
         res = defer.ensureDeferred(res)
-
-    # At this point we should have a Deferred, if not then f was a synchronous
-    # function, wrap it in a Deferred for consistency.
-    if not isinstance(res, defer.Deferred):
-        # `res` is not a `Deferred` and not a `Coroutine`.
-        # There are no other types of `Awaitable`s we expect to encounter in Synapse.
-        assert not isinstance(res, Awaitable)
-
-        return defer.succeed(res)
+    elif isinstance(res, defer.Deferred):
+        pass
+    elif isinstance(res, Awaitable):
+        # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
+        # or `Future` from `make_awaitable`.
+        res = defer.ensureDeferred(_unwrap_awaitable(res))
+    else:
+        # `res` is a plain value. Wrap it in a `Deferred`.
+        res = defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can

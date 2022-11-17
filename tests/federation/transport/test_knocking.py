@@ -23,7 +23,7 @@ from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
 from tests.test_utils import event_injection
-from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
+from tests.unittest import FederatingHomeserverTestCase, TestCase
 
 
 class KnockingStrippedStateEventHelperMixin(TestCase):
@@ -221,7 +221,6 @@ class FederationKnockingTestCase(
 
         return super().prepare(reactor, clock, homeserver)
 
-    @override_config({"experimental_features": {"msc2403_enabled": True}})
     def test_room_state_returned_when_knocking(self):
         """
         Tests that specific, stripped state events from a room are returned after

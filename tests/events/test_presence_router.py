@@ -439,7 +439,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
             for edu in edus:
                 # Make sure we're only checking presence-type EDUs
-                if edu["edu_type"] != EduTypes.Presence:
+                if edu["edu_type"] != EduTypes.PRESENCE:
                     continue
 
                 # EDUs can contain multiple presence updates

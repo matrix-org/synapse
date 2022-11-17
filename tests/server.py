@@ -22,7 +22,6 @@ import warnings
 from collections import deque
 from io import SEEK_END, BytesIO
 from typing import (
-    AnyStr,
     Callable,
     Dict,
     Iterable,
@@ -77,6 +76,7 @@ from tests.utils import (
     POSTGRES_BASE_DB,
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
+    POSTGRES_PORT,
     POSTGRES_USER,
     SQLITE_PERSIST_DB,
     USE_POSTGRES_FOR_TESTS,
@@ -85,6 +85,9 @@ from tests.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# the type of thing that can be passed into `make_request` in the headers list
+CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
 
 
 class TimedOutException(Exception):
@@ -106,6 +109,17 @@ class FakeChannel:
     _ip: str = "127.0.0.1"
     _producer: Optional[Union[IPullProducer, IPushProducer]] = None
     resource_usage: Optional[ContextResourceUsage] = None
+    _request: Optional[Request] = None
+
+    @property
+    def request(self) -> Request:
+        assert self._request is not None
+        return self._request
+
+    @request.setter
+    def request(self, request: Request) -> None:
+        assert self._request is None
+        self._request = request
 
     @property
     def json_body(self):
@@ -178,7 +192,7 @@ class FakeChannel:
             self.resource_usage = _self.logcontext.get_resource_usage()
 
     def getPeer(self):
-        # We give an address so that getClientIP returns a non null entry,
+        # We give an address so that getClientAddress/getClientIP returns a non null entry,
         # causing us to record the MAU
         return address.IPv4Address("TCP", self._ip, 3423)
 
@@ -260,7 +274,7 @@ def make_request(
     federation_auth_origin: Optional[bytes] = None,
     content_is_form: bool = False,
     await_result: bool = True,
-    custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+    custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     client_ip: str = "127.0.0.1",
 ) -> FakeChannel:
     """
@@ -319,6 +333,8 @@ def make_request(
     channel = FakeChannel(site, reactor, ip=client_ip)
 
     req = request(channel, site)
+    channel.request = req
+
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(0, SEEK_END)
@@ -559,7 +575,10 @@ class FakeTransport:
     """
 
     _peer_address: Optional[IAddress] = attr.ib(default=None)
-    """The value to be returend by getPeer"""
+    """The value to be returned by getPeer"""
+
+    _host_address: Optional[IAddress] = attr.ib(default=None)
+    """The value to be returned by getHost"""
 
     disconnecting = False
     disconnected = False
@@ -568,11 +587,11 @@ class FakeTransport:
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
 
-    def getPeer(self):
+    def getPeer(self) -> Optional[IAddress]:
         return self._peer_address
 
-    def getHost(self):
-        return None
+    def getHost(self) -> Optional[IAddress]:
+        return self._host_address
 
     def loseConnection(self, reason=None):
         if not self.disconnecting:
@@ -730,6 +749,7 @@ def setup_test_homeserver(
     if config is None:
         config = default_config(name, parse=True)
 
+    config.caches.resize_all_caches()
     config.ldap_enabled = False
 
     if "clock" not in kwargs:
@@ -745,6 +765,7 @@ def setup_test_homeserver(
                 "host": POSTGRES_HOST,
                 "password": POSTGRES_PASSWORD,
                 "user": POSTGRES_USER,
+                "port": POSTGRES_PORT,
                 "cp_min": 1,
                 "cp_max": 5,
             },
@@ -784,6 +805,7 @@ def setup_test_homeserver(
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
         db_conn.autocommit = True
@@ -831,6 +853,7 @@ def setup_test_homeserver(
                 database=POSTGRES_BASE_DB,
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
+                port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
             )
             db_conn.autocommit = True

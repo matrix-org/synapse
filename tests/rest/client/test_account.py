@@ -31,7 +31,7 @@ from synapse.rest import admin
 from synapse.rest.client import account, login, register, room
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
 from synapse.server import HomeServer
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -88,6 +88,17 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.submit_token_resource = PasswordResetSubmitTokenResource(hs)
+
+    def attempt_wrong_password_login(self, username: str, password: str) -> None:
+        """Attempts to login as the user with the given password, asserting
+        that the attempt *fails*.
+        """
+        body = {"type": "m.login.password", "user": username, "password": password}
+
+        channel = self.make_request(
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
+        )
+        self.assertEqual(channel.code, 403, channel.result)
 
     def test_basic_password_reset(self) -> None:
         """Test basic password reset flow"""
@@ -509,8 +520,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
-                "org.matrix.msc3069.is_guest": False,
                 "is_guest": False,
             },
         )
@@ -529,8 +538,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
-                "org.matrix.msc3069.is_guest": True,
                 "is_guest": True,
             },
         )
@@ -541,7 +548,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": user_id, "exclusive": True}]},
             sender=user_id,
@@ -553,8 +559,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             whoami,
             {
                 "user_id": user_id,
-                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
-                "org.matrix.msc3069.is_guest": False,
                 "is_guest": False,
             },
         )
@@ -1220,6 +1224,62 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                 },
             },
             expected_failures=[users[2]],
+        )
+
+    @unittest.override_config(
+        {
+            "use_account_validity_in_account_status": True,
+        }
+    )
+    def test_no_account_validity(self) -> None:
+        """Tests that if we decide to include account validity in the response but no
+        account validity 'is_user_expired' callback is provided, we default to marking all
+        users as not expired.
+        """
+        user = self.register_user("someuser", "password")
+
+        self._test_status(
+            users=[user],
+            expected_statuses={
+                user: {
+                    "exists": True,
+                    "deactivated": False,
+                    "org.matrix.expired": False,
+                },
+            },
+            expected_failures=[],
+        )
+
+    @unittest.override_config(
+        {
+            "use_account_validity_in_account_status": True,
+        }
+    )
+    def test_account_validity_expired(self) -> None:
+        """Test that if we decide to include account validity in the response and the user
+        is expired, we return the correct info.
+        """
+        user = self.register_user("someuser", "password")
+
+        async def is_expired(user_id: str) -> bool:
+            # We can't blindly say everyone is expired, otherwise the request to get the
+            # account status will fail.
+            return UserID.from_string(user_id).localpart == "someuser"
+
+        self.hs.get_account_validity_handler()._is_user_expired_callbacks.append(
+            is_expired
+        )
+
+        self._test_status(
+            users=[user],
+            expected_statuses={
+                user: {
+                    "exists": True,
+                    "deactivated": False,
+                    "org.matrix.expired": True,
+                },
+            },
+            expected_failures=[],
         )
 
     def _test_status(

@@ -28,6 +28,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.util.async_helpers import (
+    AwakenableSleeper,
     ObservableDeferred,
     concurrently_execute,
     delay_cancellation,
@@ -35,6 +36,7 @@ from synapse.util.async_helpers import (
     timeout_deferred,
 )
 
+from tests.server import get_clock
 from tests.unittest import TestCase
 
 
@@ -382,7 +384,7 @@ class StopCancellationTests(TestCase):
 class DelayCancellationTests(TestCase):
     """Tests for the `delay_cancellation` function."""
 
-    def test_cancellation(self):
+    def test_deferred_cancellation(self):
         """Test that cancellation of the new `Deferred` waits for the original."""
         deferred: "Deferred[str]" = Deferred()
         wrapper_deferred = delay_cancellation(deferred)
@@ -401,6 +403,35 @@ class DelayCancellationTests(TestCase):
         self.assertIsNone(deferred.result, "`Failure` was not consumed")
 
         # Now that the original `Deferred` has failed, we should get a `CancelledError`.
+        self.failureResultOf(wrapper_deferred, CancelledError)
+
+    def test_coroutine_cancellation(self):
+        """Test that cancellation of the new `Deferred` waits for the original."""
+        blocking_deferred: "Deferred[None]" = Deferred()
+        completion_deferred: "Deferred[None]" = Deferred()
+
+        async def task():
+            await blocking_deferred
+            completion_deferred.callback(None)
+            # Raise an exception. Twisted should consume it, otherwise unwanted
+            # tracebacks will be printed in logs.
+            raise ValueError("abc")
+
+        wrapper_deferred = delay_cancellation(task())
+
+        # Cancel the new `Deferred`.
+        wrapper_deferred.cancel()
+        self.assertNoResult(wrapper_deferred)
+        self.assertFalse(
+            blocking_deferred.called, "Cancellation was propagated too deep"
+        )
+        self.assertFalse(completion_deferred.called)
+
+        # Unblock the task.
+        blocking_deferred.callback(None)
+        self.assertTrue(completion_deferred.called)
+
+        # Now that the original coroutine has failed, we should get a `CancelledError`.
         self.failureResultOf(wrapper_deferred, CancelledError)
 
     def test_suppresses_second_cancellation(self):
@@ -451,7 +482,7 @@ class DelayCancellationTests(TestCase):
         async def outer():
             with LoggingContext("c") as c:
                 try:
-                    await delay_cancellation(defer.ensureDeferred(inner()))
+                    await delay_cancellation(inner())
                     self.fail("`CancelledError` was not raised")
                 except CancelledError:
                     self.assertEqual(c, current_context())
@@ -467,3 +498,81 @@ class DelayCancellationTests(TestCase):
         # logging context.
         blocking_d.callback(None)
         self.successResultOf(d)
+
+
+class AwakenableSleeperTests(TestCase):
+    "Tests AwakenableSleeper"
+
+    def test_sleep(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.pump([0.0])
+        self.assertFalse(d.called)
+
+        reactor.advance(0.5)
+        self.assertFalse(d.called)
+
+        reactor.advance(0.6)
+        self.assertTrue(d.called)
+
+    def test_explicit_wake(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.pump([0.0])
+        self.assertFalse(d.called)
+
+        reactor.advance(0.5)
+        self.assertFalse(d.called)
+
+        sleeper.wake("name")
+        self.assertTrue(d.called)
+
+        reactor.advance(0.6)
+
+    def test_multiple_sleepers_timeout(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d1 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.advance(0.6)
+        self.assertFalse(d1.called)
+
+        # Add another sleeper
+        d2 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        # Only the first sleep should time out now.
+        reactor.advance(0.6)
+        self.assertTrue(d1.called)
+        self.assertFalse(d2.called)
+
+        reactor.advance(0.6)
+        self.assertTrue(d2.called)
+
+    def test_multiple_sleepers_wake(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d1 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.advance(0.5)
+        self.assertFalse(d1.called)
+
+        # Add another sleeper
+        d2 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        # Neither should fire yet
+        reactor.advance(0.3)
+        self.assertFalse(d1.called)
+        self.assertFalse(d2.called)
+
+        # Explicitly waking both up works
+        sleeper.wake("name")
+        self.assertTrue(d1.called)
+        self.assertTrue(d2.called)

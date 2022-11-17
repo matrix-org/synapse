@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import EduTypes
+
 from tests import unittest
 from tests.unittest import DEBUG, override_config
 
@@ -50,7 +52,7 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
             "/_matrix/federation/v1/send/txn_id_1234/",
             content={
                 "edus": [
-                    {"edu_type": "m.device_list_update", "content": {"foo": "bar"}}
+                    {"edu_type": EduTypes.DEVICE_LIST_UPDATE, "content": {"foo": "bar"}}
                 ],
                 "pdus": [],
             },

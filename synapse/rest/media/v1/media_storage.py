@@ -352,7 +352,7 @@ class ReadableFileWrapper:
     `IConsumer`.
     """
 
-    CHUNK_SIZE = 2 ** 14
+    CHUNK_SIZE = 2**14
 
     clock: Clock
     path: str

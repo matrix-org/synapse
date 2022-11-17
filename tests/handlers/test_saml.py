@@ -349,4 +349,16 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
 def _mock_request():
     """Returns a mock which will stand in as a SynapseRequest"""
-    return Mock(spec=["getClientIP", "getHeader", "_disconnected"])
+    mock = Mock(
+        spec=[
+            "finish",
+            "getClientAddress",
+            "getHeader",
+            "setHeader",
+            "setResponseCode",
+            "write",
+        ]
+    )
+    # `_disconnected` musn't be another `Mock`, otherwise it will be truthy.
+    mock._disconnected = False
+    return mock

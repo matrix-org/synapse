@@ -13,9 +13,12 @@
 # limitations under the License.
 import abc
 from enum import IntEnum
-from typing import Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Mapping, Optional, TypeVar
 
-from synapse.storage.types import Connection
+from synapse.storage.types import Connection, Cursor, DBAPI2Module
+
+if TYPE_CHECKING:
+    from synapse.storage.database import LoggingDatabaseConnection
 
 
 class IsolationLevel(IntEnum):
@@ -32,7 +35,7 @@ ConnectionType = TypeVar("ConnectionType", bound=Connection)
 
 
 class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
-    def __init__(self, module, database_config: dict):
+    def __init__(self, module: DBAPI2Module, config: Mapping[str, Any]):
         self.module = module
 
     @property
@@ -69,7 +72,7 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def check_new_database(self, txn) -> None:
+    def check_new_database(self, txn: Cursor) -> None:
         """Gets called when setting up a brand new database. This allows us to
         apply stricter checks on new databases versus existing database.
         """
@@ -79,8 +82,11 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
     def convert_param_style(self, sql: str) -> str:
         ...
 
+    # This method would ideally take a plain ConnectionType, but it seems that
+    # the Sqlite engine expects to use LoggingDatabaseConnection.cursor
+    # instead of sqlite3.Connection.cursor: only the former takes a txn_name.
     @abc.abstractmethod
-    def on_new_connection(self, db_conn: ConnectionType) -> None:
+    def on_new_connection(self, db_conn: "LoggingDatabaseConnection") -> None:
         ...
 
     @abc.abstractmethod
@@ -92,7 +98,7 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def lock_table(self, txn, table: str) -> None:
+    def lock_table(self, txn: Cursor, table: str) -> None:
         ...
 
     @property
@@ -102,12 +108,12 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def in_transaction(self, conn: Connection) -> bool:
+    def in_transaction(self, conn: ConnectionType) -> bool:
         """Whether the connection is currently in a transaction."""
         ...
 
     @abc.abstractmethod
-    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+    def attempt_to_set_autocommit(self, conn: ConnectionType, autocommit: bool) -> None:
         """Attempt to set the connections autocommit mode.
 
         When True queries are run outside of transactions.
@@ -119,8 +125,8 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def attempt_to_set_isolation_level(
-        self, conn: Connection, isolation_level: Optional[int]
-    ):
+        self, conn: ConnectionType, isolation_level: Optional[int]
+    ) -> None:
         """Attempt to set the connections isolation level.
 
         Note: This has no effect on SQLite3, as transactions are SERIALIZABLE by default.

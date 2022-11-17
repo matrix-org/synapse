@@ -430,7 +430,7 @@ class SsoHandler:
         # grab a lock while we try to find a mapping for this user. This seems...
         # optimistic, especially for implementations that end up redirecting to
         # interstitial pages.
-        with await self._mapping_lock.queue(auth_provider_id):
+        async with self._mapping_lock.queue(auth_provider_id):
             # first of all, check if we already have a mapping for this user
             user_id = await self.get_sso_user_by_remote_user_id(
                 auth_provider_id,
@@ -468,7 +468,7 @@ class SsoHandler:
                     auth_provider_id,
                     remote_user_id,
                     get_request_user_agent(request),
-                    request.getClientIP(),
+                    request.getClientAddress().host,
                 )
                 new_user = True
             elif self._sso_update_profile_information:
@@ -928,7 +928,7 @@ class SsoHandler:
             session.auth_provider_id,
             session.remote_user_id,
             get_request_user_agent(request),
-            request.getClientIP(),
+            request.getClientAddress().host,
         )
 
         logger.info(

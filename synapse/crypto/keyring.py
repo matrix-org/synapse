@@ -176,13 +176,13 @@ class Keyring:
         self._local_verify_keys: Dict[str, FetchKeyResult] = {}
         for key_id, key in hs.config.key.old_signing_keys.items():
             self._local_verify_keys[key_id] = FetchKeyResult(
-                verify_key=key, valid_until_ts=key.expired_ts
+                verify_key=key, valid_until_ts=key.expired
             )
 
         vk = get_verify_key(hs.signing_key)
         self._local_verify_keys[f"{vk.alg}:{vk.version}"] = FetchKeyResult(
             verify_key=vk,
-            valid_until_ts=2 ** 63,  # fake future timestamp
+            valid_until_ts=2**63,  # fake future timestamp
         )
 
     async def verify_json_for_server(

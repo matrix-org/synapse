@@ -585,26 +585,6 @@ class AccountDataStream(Stream):
         return updates, to_token, limited
 
 
-class GroupServerStream(Stream):
-    @attr.s(slots=True, frozen=True, auto_attribs=True)
-    class GroupsStreamRow:
-        group_id: str
-        user_id: str
-        type: str
-        content: JsonDict
-
-    NAME = "groups"
-    ROW_TYPE = GroupsStreamRow
-
-    def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastores().main
-        super().__init__(
-            hs.get_instance_name(),
-            current_token_without_instance(store.get_group_stream_token),
-            store.get_all_groups_changes,
-        )
-
-
 class UserSignatureStream(Stream):
     """A user has signed their own device with their user-signing key"""
 

@@ -70,7 +70,7 @@ async def inject_event(
     """
     event, context = await create_event(hs, room_version, prev_event_ids, **kwargs)
 
-    persistence = hs.get_storage().persistence
+    persistence = hs.get_storage_controllers().persistence
     assert persistence is not None
 
     await persistence.persist_event(event, context)

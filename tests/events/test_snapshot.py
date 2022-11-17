@@ -29,7 +29,7 @@ class TestEventContext(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.user_id = self.register_user("u1", "pass")
         self.user_tok = self.login("u1", "pass")
@@ -87,7 +87,7 @@ class TestEventContext(unittest.HomeserverTestCase):
     def _check_serialize_deserialize(self, event, context):
         serialized = self.get_success(context.serialize(event, self.store))
 
-        d_context = EventContext.deserialize(self.storage, serialized)
+        d_context = EventContext.deserialize(self._storage_controllers, serialized)
 
         self.assertEqual(context.state_group, d_context.state_group)
         self.assertEqual(context.rejected, d_context.rejected)

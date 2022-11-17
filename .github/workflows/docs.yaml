@@ -22,7 +22,7 @@ jobs:
       - name: Setup mdbook
         uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
         with:
-          mdbook-version: '0.4.9'
+          mdbook-version: '0.4.17'
 
       - name: Build the documentation
         # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.

@@ -24,7 +24,7 @@ from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, StreamKeyType, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -55,11 +55,9 @@ class SearchHandler:
         self.hs = hs
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self.auth = hs.get_auth()
-
-        self._msc3666_enabled = hs.config.experimental.msc3666_enabled
 
     async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
         """Retrieves room IDs of old rooms in the history of an upgraded room.
@@ -350,25 +348,23 @@ class SearchHandler:
         state_results = {}
         if include_state:
             for room_id in {e.room_id for e in search_result.allowed_events}:
-                state = await self.state_handler.get_current_state(room_id)
+                state = await self._storage_controllers.state.get_current_state(room_id)
                 state_results[room_id] = list(state.values())
 
-        aggregations = None
-        if self._msc3666_enabled:
-            aggregations = await self._relations_handler.get_bundled_aggregations(
-                # Generate an iterable of EventBase for all the events that will be
-                # returned, including contextual events.
-                itertools.chain(
-                    # The events_before and events_after for each context.
-                    itertools.chain.from_iterable(
-                        itertools.chain(context["events_before"], context["events_after"])  # type: ignore[arg-type]
-                        for context in contexts.values()
-                    ),
-                    # The returned events.
-                    search_result.allowed_events,
+        aggregations = await self._relations_handler.get_bundled_aggregations(
+            # Generate an iterable of EventBase for all the events that will be
+            # returned, including contextual events.
+            itertools.chain(
+                # The events_before and events_after for each context.
+                itertools.chain.from_iterable(
+                    itertools.chain(context["events_before"], context["events_after"])
+                    for context in contexts.values()
                 ),
-                user.to_string(),
-            )
+                # The returned events.
+                search_result.allowed_events,
+            ),
+            user.to_string(),
+        )
 
         # We're now about to serialize the events. We should not make any
         # blocking calls after this. Otherwise, the 'age' will be wrong.
@@ -377,10 +373,10 @@ class SearchHandler:
 
         for context in contexts.values():
             context["events_before"] = self._event_serializer.serialize_events(
-                context["events_before"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
+                context["events_before"], time_now, bundle_aggregations=aggregations
             )
             context["events_after"] = self._event_serializer.serialize_events(
-                context["events_after"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
+                context["events_after"], time_now, bundle_aggregations=aggregations
             )
 
         results = [
@@ -464,7 +460,7 @@ class SearchHandler:
         filtered_events = await search_filter.filter([r["event"] for r in results])
 
         events = await filter_events_for_client(
-            self.storage, user.to_string(), filtered_events
+            self._storage_controllers, user.to_string(), filtered_events
         )
 
         events.sort(key=lambda e: -rank_map[e.event_id])
@@ -563,7 +559,7 @@ class SearchHandler:
             filtered_events = await search_filter.filter([r["event"] for r in results])
 
             events = await filter_events_for_client(
-                self.storage, user.to_string(), filtered_events
+                self._storage_controllers, user.to_string(), filtered_events
             )
 
             room_events.extend(events)
@@ -648,22 +644,22 @@ class SearchHandler:
             )
 
             events_before = await filter_events_for_client(
-                self.storage, user.to_string(), res.events_before
+                self._storage_controllers, user.to_string(), res.events_before
             )
 
             events_after = await filter_events_for_client(
-                self.storage, user.to_string(), res.events_after
+                self._storage_controllers, user.to_string(), res.events_after
             )
 
             context: JsonDict = {
                 "events_before": events_before,
                 "events_after": events_after,
                 "start": await now_token.copy_and_replace(
-                    "room_key", res.start
+                    StreamKeyType.ROOM, res.start
                 ).to_string(self.store),
-                "end": await now_token.copy_and_replace("room_key", res.end).to_string(
-                    self.store
-                ),
+                "end": await now_token.copy_and_replace(
+                    StreamKeyType.ROOM, res.end
+                ).to_string(self.store),
             }
 
             if include_profile:
@@ -681,7 +677,7 @@ class SearchHandler:
                     [(EventTypes.Member, sender) for sender in senders]
                 )
 
-                state = await self.state_store.get_state_for_event(
+                state = await self._state_storage_controller.get_state_for_event(
                     last_event_id, state_filter
                 )
 

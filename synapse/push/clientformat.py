@@ -48,6 +48,10 @@ def format_push_rules_for_user(
             elif pattern_type == "user_localpart":
                 c["pattern"] = user.localpart
 
+            sender_type = c.pop("sender_type", None)
+            if sender_type == "user_id":
+                c["sender"] = user.to_string()
+
         rulearray = rules["global"][template_name]
 
         template_rule = _rule_to_template(r)

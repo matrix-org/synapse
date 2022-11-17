@@ -14,9 +14,9 @@
 
 import logging
 from typing import (
-    TYPE_CHECKING,
     Collection,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Optional,
@@ -31,35 +31,29 @@ import attr
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import (
-    DatabasePool,
-    LoggingDatabaseConnection,
-    LoggingTransaction,
-    make_in_list_sql_clause,
-)
+from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.relations import AggregationPaginationToken, PaginationChunk
-from synapse.types import RoomStreamToken, StreamToken
+from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
-
-if TYPE_CHECKING:
-    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _RelatedEvent:
+    """
+    Contains enough information about a related event in order to properly filter
+    events from ignored users.
+    """
+
+    # The event ID of the related event.
+    event_id: str
+    # The sender of the related event.
+    sender: str
+
+
 class RelationsWorkerStore(SQLBaseStore):
-    def __init__(
-        self,
-        database: DatabasePool,
-        db_conn: LoggingDatabaseConnection,
-        hs: "HomeServer",
-    ):
-        super().__init__(database, db_conn, hs)
-
-        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
-
     @cached(uncached_args=("event",), tree=True)
     async def get_relations_for_event(
         self,
@@ -73,7 +67,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-    ) -> PaginationChunk:
+    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
@@ -90,8 +84,10 @@ class RelationsWorkerStore(SQLBaseStore):
             to_token: Fetch rows up to the given token, or up to the end if None.
 
         Returns:
-            List of event IDs that match relations requested. The rows are of
-            the form `{"event_id": "..."}`.
+            A tuple of:
+                A list of related event IDs & their senders.
+
+                The next stream token, if one exists.
         """
         # We don't use `event_id`, it's there so that we can cache based on
         # it. The `event_id` must match the `event.event_id`.
@@ -132,7 +128,7 @@ class RelationsWorkerStore(SQLBaseStore):
             order = "ASC"
 
         sql = """
-            SELECT event_id, relation_type, topological_ordering, stream_ordering
+            SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE %s
@@ -146,7 +142,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_recent_references_for_event_txn(
             txn: LoggingTransaction,
-        ) -> PaginationChunk:
+        ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
             txn.execute(sql, where_args + [limit + 1])
 
             last_topo_id = None
@@ -156,16 +152,18 @@ class RelationsWorkerStore(SQLBaseStore):
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or row[1] != RelationTypes.REPLACE:
-                    events.append({"event_id": row[0]})
-                last_topo_id = row[2]
-                last_stream_id = row[3]
+                    events.append(_RelatedEvent(row[0], row[2]))
+                last_topo_id = row[3]
+                last_stream_id = row[4]
 
             # If there are more events, generate the next pagination key.
             next_token = None
             if len(events) > limit and last_topo_id and last_stream_id:
                 next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
-                    next_token = from_token.copy_and_replace("room_key", next_key)
+                    next_token = from_token.copy_and_replace(
+                        StreamKeyType.ROOM, next_key
+                    )
                 else:
                     next_token = StreamToken(
                         room_key=next_key,
@@ -179,9 +177,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         groups_key=0,
                     )
 
-            return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_token, prev_batch=from_token
-            )
+            return events[:limit], next_token
 
         return await self.db_pool.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn
@@ -252,15 +248,8 @@ class RelationsWorkerStore(SQLBaseStore):
 
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
-        self,
-        event_id: str,
-        room_id: str,
-        event_type: Optional[str] = None,
-        limit: int = 5,
-        direction: str = "b",
-        from_token: Optional[AggregationPaginationToken] = None,
-        to_token: Optional[AggregationPaginationToken] = None,
-    ) -> PaginationChunk:
+        self, event_id: str, room_id: str, limit: int = 5
+    ) -> List[JsonDict]:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
 
@@ -270,82 +259,96 @@ class RelationsWorkerStore(SQLBaseStore):
         Args:
             event_id: Fetch events that relate to this event ID.
             room_id: The room the event belongs to.
-            event_type: Only fetch events with this event type, if given.
             limit: Only fetch the `limit` groups.
-            direction: Whether to fetch the highest count first (`"b"`) or
-                the lowest count first (`"f"`).
-            from_token: Fetch rows from the given token, or from the start if None.
-            to_token: Fetch rows up to the given token, or up to the end if None.
 
         Returns:
             List of groups of annotations that match. Each row is a dict with
             `type`, `key` and `count` fields.
         """
 
-        where_clause = ["relates_to_id = ?", "room_id = ?", "relation_type = ?"]
-        where_args: List[Union[str, int]] = [
+        args = [
+            event_id,
+            room_id,
+            RelationTypes.ANNOTATION,
+            limit,
+        ]
+
+        sql = """
+            SELECT type, aggregation_key, COUNT(DISTINCT sender)
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ?
+            GROUP BY relation_type, type, aggregation_key
+            ORDER BY COUNT(*) DESC
+            LIMIT ?
+        """
+
+        def _get_aggregation_groups_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> List[JsonDict]:
+            txn.execute(sql, args)
+
+            return [{"type": row[0], "key": row[1], "count": row[2]} for row in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
+        )
+
+    async def get_aggregation_groups_for_users(
+        self,
+        event_id: str,
+        room_id: str,
+        limit: int,
+        users: FrozenSet[str] = frozenset(),
+    ) -> Dict[Tuple[str, str], int]:
+        """Fetch the partial aggregations for an event for specific users.
+
+        This is used, in conjunction with get_aggregation_groups_for_event, to
+        remove information from the results for ignored users.
+
+        Args:
+            event_id: Fetch events that relate to this event ID.
+            room_id: The room the event belongs to.
+            limit: Only fetch the `limit` groups.
+            users: The users to fetch information for.
+
+        Returns:
+            A map of (event type, aggregation key) to a count of users.
+        """
+
+        if not users:
+            return {}
+
+        args: List[Union[str, int]] = [
             event_id,
             room_id,
             RelationTypes.ANNOTATION,
         ]
 
-        if event_type:
-            where_clause.append("type = ?")
-            where_args.append(event_type)
-
-        having_clause = generate_pagination_where_clause(
-            direction=direction,
-            column_names=("COUNT(*)", "MAX(stream_ordering)"),
-            from_token=attr.astuple(from_token) if from_token else None,  # type: ignore[arg-type]
-            to_token=attr.astuple(to_token) if to_token else None,  # type: ignore[arg-type]
-            engine=self.database_engine,
+        users_sql, users_args = make_in_list_sql_clause(
+            self.database_engine, "sender", users
         )
+        args.extend(users_args)
 
-        if direction == "b":
-            order = "DESC"
-        else:
-            order = "ASC"
-
-        if having_clause:
-            having_clause = "HAVING " + having_clause
-        else:
-            having_clause = ""
-
-        sql = """
-            SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering)
+        sql = f"""
+            SELECT type, aggregation_key, COUNT(DISTINCT sender)
             FROM event_relations
             INNER JOIN events USING (event_id)
-            WHERE {where_clause}
+            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ? AND {users_sql}
             GROUP BY relation_type, type, aggregation_key
-            {having_clause}
-            ORDER BY COUNT(*) {order}, MAX(stream_ordering) {order}
+            ORDER BY COUNT(*) DESC
             LIMIT ?
-        """.format(
-            where_clause=" AND ".join(where_clause),
-            order=order,
-            having_clause=having_clause,
-        )
+        """
 
-        def _get_aggregation_groups_for_event_txn(
+        def _get_aggregation_groups_for_users_txn(
             txn: LoggingTransaction,
-        ) -> PaginationChunk:
-            txn.execute(sql, where_args + [limit + 1])
+        ) -> Dict[Tuple[str, str], int]:
+            txn.execute(sql, args + [limit])
 
-            next_batch = None
-            events = []
-            for row in txn:
-                events.append({"type": row[0], "key": row[1], "count": row[2]})
-                next_batch = AggregationPaginationToken(row[2], row[3])
-
-            if len(events) <= limit:
-                next_batch = None
-
-            return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
-            )
+            return {(row[0], row[1]): row[2] for row in txn}
 
         return await self.db_pool.runInteraction(
-            "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
+            "get_aggregation_groups_for_users", _get_aggregation_groups_for_users_txn
         )
 
     @cached()
@@ -444,8 +447,8 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
     async def get_thread_summaries(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[Tuple[int, EventBase, Optional[EventBase]]]]:
-        """Get the number of threaded replies, the latest reply (if any), and the latest edit for that reply for the given event.
+    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
+        """Get the number of threaded replies and the latest reply (if any) for the given events.
 
         Args:
             event_ids: Summarize the thread related to this event ID.
@@ -457,7 +460,6 @@ class RelationsWorkerStore(SQLBaseStore):
             Each summary is a tuple of:
                 The number of events in the thread.
                 The most recent event in the thread.
-                The most recent edit to the most recent event in the thread, if applicable.
         """
 
         def _get_thread_summaries_txn(
@@ -477,7 +479,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND %s
+                        AND relation_type = ?
                     ORDER BY parent.event_id, child.topological_ordering DESC, child.stream_ordering DESC
                 """
             else:
@@ -492,22 +494,16 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND %s
+                        AND relation_type = ?
                     ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
                 """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
+            args.append(RelationTypes.THREAD)
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
-            else:
-                relations_clause = "relation_type = ?"
-                args.append(RelationTypes.THREAD)
-
-            txn.execute(sql % (clause, relations_clause), args)
+            txn.execute(sql % (clause,), args)
             latest_event_ids = {}
             for parent_event_id, child_event_id in txn:
                 # Only consider the latest threaded reply (by topological ordering).
@@ -527,7 +523,7 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND %s
+                    AND relation_type = ?
                 GROUP BY parent.event_id
             """
 
@@ -536,15 +532,9 @@ class RelationsWorkerStore(SQLBaseStore):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
+            args.append(RelationTypes.THREAD)
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
-            else:
-                relations_clause = "relation_type = ?"
-                args.append(RelationTypes.THREAD)
-
-            txn.execute(sql % (clause, relations_clause), args)
+            txn.execute(sql % (clause,), args)
             counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
 
             return counts, latest_event_ids
@@ -554,9 +544,6 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
         latest_events = await self.get_events(latest_event_ids.values())  # type: ignore[attr-defined]
-
-        # Check to see if any of those events are edited.
-        latest_edits = await self.get_applicable_edits(latest_event_ids.values())
 
         # Map to the event IDs to the thread summary.
         #
@@ -568,11 +555,64 @@ class RelationsWorkerStore(SQLBaseStore):
 
             summary = None
             if latest_event:
-                latest_edit = latest_edits.get(latest_event_id)
-                summary = (counts[parent_event_id], latest_event, latest_edit)
+                summary = (counts[parent_event_id], latest_event)
             summaries[parent_event_id] = summary
 
         return summaries
+
+    async def get_threaded_messages_per_user(
+        self,
+        event_ids: Collection[str],
+        users: FrozenSet[str] = frozenset(),
+    ) -> Dict[Tuple[str, str], int]:
+        """Get the number of threaded replies for a set of users.
+
+        This is used, in conjunction with get_thread_summaries, to calculate an
+        accurate count of the replies to a thread by subtracting ignored users.
+
+        Args:
+            event_ids: The events to check for threaded replies.
+            users: The user to calculate the count of their replies.
+
+        Returns:
+            A map of the (event_id, sender) to the count of their replies.
+        """
+        if not users:
+            return {}
+
+        # Fetch the number of threaded replies.
+        sql = """
+            SELECT parent.event_id, child.sender, COUNT(child.event_id) FROM events AS child
+            INNER JOIN event_relations USING (event_id)
+            INNER JOIN events AS parent ON
+                parent.event_id = relates_to_id
+                AND parent.room_id = child.room_id
+            WHERE
+                relation_type = ?
+                AND %s
+                AND %s
+            GROUP BY parent.event_id, child.sender
+        """
+
+        def _get_threaded_messages_per_user_txn(
+            txn: LoggingTransaction,
+        ) -> Dict[Tuple[str, str], int]:
+            users_sql, users_args = make_in_list_sql_clause(
+                self.database_engine, "child.sender", users
+            )
+            events_clause, events_args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+
+            txn.execute(
+                sql % (users_sql, events_clause),
+                [RelationTypes.THREAD] + users_args + events_args,
+            )
+            return {(row[0], row[1]): row[2] for row in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_threaded_messages_per_user", _get_threaded_messages_per_user_txn
+        )
 
     @cached()
     def get_thread_participated(self, event_id: str, user_id: str) -> bool:
@@ -596,7 +636,7 @@ class RelationsWorkerStore(SQLBaseStore):
             user participated in that event's thread, otherwise false.
         """
 
-        def _get_thread_summary_txn(txn: LoggingTransaction) -> Set[str]:
+        def _get_threads_participated_txn(txn: LoggingTransaction) -> Set[str]:
             # Fetch whether the requester has participated or not.
             sql = """
                 SELECT DISTINCT relates_to_id
@@ -607,28 +647,20 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND %s
+                    AND relation_type = ?
                     AND child.sender = ?
             """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
+            args.extend([RelationTypes.THREAD, user_id])
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
-            else:
-                relations_clause = "relation_type = ?"
-                args.append(RelationTypes.THREAD)
-
-            args.append(user_id)
-
-            txn.execute(sql % (clause, relations_clause), args)
+            txn.execute(sql % (clause,), args)
             return {row[0] for row in txn.fetchall()}
 
         participated_threads = await self.db_pool.runInteraction(
-            "get_thread_summary", _get_thread_summary_txn
+            "get_threads_participated", _get_threads_participated_txn
         )
 
         return {event_id: event_id in participated_threads for event_id in event_ids}
@@ -661,7 +693,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 %s;
         """
 
-        def _get_if_events_have_relations(txn) -> List[str]:
+        def _get_if_events_have_relations(txn: LoggingTransaction) -> List[str]:
             clauses: List[str] = []
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", parent_ids
@@ -733,6 +765,59 @@ class RelationsWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction(
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
+        )
+
+    @cached(iterable=True)
+    async def get_mutual_event_relations_for_rel_type(
+        self, event_id: str, relation_type: str
+    ) -> Set[Tuple[str, str]]:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="get_mutual_event_relations_for_rel_type",
+        list_name="relation_types",
+    )
+    async def get_mutual_event_relations(
+        self, event_id: str, relation_types: Collection[str]
+    ) -> Dict[str, Set[Tuple[str, str]]]:
+        """
+        Fetch event metadata for events which related to the same event as the given event.
+
+        If the given event has no relation information, returns an empty dictionary.
+
+        Args:
+            event_id: The event ID which is targeted by relations.
+            relation_types: The relation types to check for mutual relations.
+
+        Returns:
+            A dictionary of relation type to:
+                A set of tuples of:
+                    The sender
+                    The event type
+        """
+        rel_type_sql, rel_type_args = make_in_list_sql_clause(
+            self.database_engine, "relation_type", relation_types
+        )
+
+        sql = f"""
+            SELECT DISTINCT relation_type, sender, type FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND {rel_type_sql}
+        """
+
+        def _get_event_relations(
+            txn: LoggingTransaction,
+        ) -> Dict[str, Set[Tuple[str, str]]]:
+            txn.execute(sql, [event_id] + rel_type_args)
+            result: Dict[str, Set[Tuple[str, str]]] = {
+                rel_type: set() for rel_type in relation_types
+            }
+            for rel_type, sender, type in txn.fetchall():
+                result[rel_type].add((sender, type))
+            return result
+
+        return await self.db_pool.runInteraction(
+            "get_event_relations", _get_event_relations
         )
 
 

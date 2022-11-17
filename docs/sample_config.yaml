@@ -289,7 +289,7 @@ presence:
 #   federation: the server-server API (/_matrix/federation). Also implies
 #       'media', 'keys', 'openid'
 #
-#   keys: the key discovery API (/_matrix/keys).
+#   keys: the key discovery API (/_matrix/key).
 #
 #   media: the media API (/_matrix/media).
 #
@@ -407,6 +407,11 @@ manhole_settings:
 # sign up in a short space of time never to return after their initial
 # session.
 #
+# The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but
+# applies a different trial number if the user was registered by an appservice.
+# A value of 0 means no trial days are applied. Appservices not listed in this
+# dictionary use the value of `mau_trial_days` instead.
+#
 # 'mau_limit_alerting' is a means of limiting client side alerting
 # should the mau limit be reached. This is useful for small instances
 # where the admin has 5 mau seats (say) for 5 specific people and no
@@ -417,6 +422,8 @@ manhole_settings:
 #max_mau_value: 50
 #mau_trial_days: 2
 #mau_limit_alerting: false
+#mau_appservice_trial_days:
+#  "appservice-id": 1
 
 # If enabled, the metrics for the number of monthly active users will
 # be populated, however no one will be limited. If limit_usage_by_mau
@@ -538,6 +545,15 @@ templates:
   # information about using custom templates.
   #
   #custom_template_directory: /path/to/custom/templates/
+
+# List of rooms to exclude from sync responses. This is useful for server
+# administrators wishing to group users into a room without these users being able
+# to see it from their client.
+#
+# By default, no room is excluded.
+#
+#exclude_rooms_from_sync:
+#    - !foo:example.com
 
 
 # Message retention policy at the server level.
@@ -700,11 +716,11 @@ retention:
 #
 #allow_profile_lookup_over_federation: false
 
-# Uncomment to disable device display name lookup over federation. By default, the
-# Federation API allows other homeservers to obtain device display names of any user
-# on this homeserver. Defaults to 'true'.
+# Uncomment to allow device display name lookup over federation. By default, the
+# Federation API prevents other homeservers from obtaining the display names of
+# user devices on this homeserver. Defaults to 'false'.
 #
-#allow_device_name_lookup_over_federation: false
+#allow_device_name_lookup_over_federation: true
 
 
 ## Caching ##
@@ -714,6 +730,12 @@ retention:
 # A cache 'factor' is a multiplier that can be applied to each of
 # Synapse's caches in order to increase or decrease the maximum
 # number of entries that can be stored.
+#
+# The configuration for cache factors (caches.global_factor and
+# caches.per_cache_factors) can be reloaded while the application is running,
+# by sending a SIGHUP signal to the Synapse process. Changes to other parts of
+# the caching config will NOT be applied after a SIGHUP is received; a restart
+# is necessary.
 
 # The number of events to cache in memory. Not affected by
 # caches.global_factor.
@@ -762,6 +784,24 @@ caches:
   #
   #cache_entry_ttl: 30m
 
+  # This flag enables cache autotuning, and is further specified by the sub-options `max_cache_memory_usage`,
+  # `target_cache_memory_usage`, `min_cache_ttl`. These flags work in conjunction with each other to maintain
+  # a balance between cache memory usage and cache entry availability. You must be using jemalloc to utilize
+  # this option, and all three of the options must be specified for this feature to work.
+  #cache_autotuning:
+    # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
+    # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
+    # the flag below, or until the `min_cache_ttl` is hit.
+    #max_cache_memory_usage: 1024M
+
+    # This flag sets a rough target for the desired memory usage of the caches.
+    #target_cache_memory_usage: 758M
+
+    # 'min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
+    # caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
+    # from being emptied while Synapse is evicting due to memory.
+    #min_cache_ttl: 5m
+
   # Controls how long the results of a /sync request are cached for after
   # a successful response is returned. A higher duration can help clients with
   # intermittent connections, at the cost of higher memory usage.
@@ -782,6 +822,12 @@ caches:
 #
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
+#
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
@@ -1212,9 +1258,17 @@ oembed:
 # Registration can be rate-limited using the parameters in the "Ratelimiting"
 # section of this file.
 
-# Enable registration for new users.
+# Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
+
+# Enable registration without email or captcha verification. Note: this option is *not* recommended,
+# as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+# unless `enable_registration` is also enabled.
+#
+#enable_registration_without_verification: true
 
 # Time that a user's session remains valid for, after they log in.
 #
@@ -1299,6 +1353,12 @@ oembed:
 # Defaults to false. Uncomment the following to require tokens:
 #
 #registration_requires_token: true
+
+# Allow users to submit a token during registration to bypass any required 3pid
+# steps configured in `registrations_require_3pid`.
+# Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
+#
+#enable_registration_token_3pid_bypass: false
 
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
@@ -2156,7 +2216,9 @@ sso:
 
 
 password_config:
-   # Uncomment to disable password login
+   # Uncomment to disable password login.
+   # Set to `only_for_reauth` to permit reauthentication for users that
+   # have passwords and are already logged in.
    #
    #enabled: false
 
@@ -2426,15 +2488,39 @@ push:
 #
 #encryption_enabled_by_default_for_room_type: invite
 
-
-# Uncomment to allow non-server-admin users to create groups on this server
+# Override the default power levels for rooms created on this server, per
+# room creation preset.
 #
-#enable_group_creation: true
-
-# If enabled, non server admins can only create groups with local parts
-# starting with this prefix
+# The appropriate dictionary for the room preset will be applied on top
+# of the existing power levels content.
 #
-#group_creation_prefix: "unofficial_"
+# Useful if you know that your users need special permissions in rooms
+# that they create (e.g. to send particular types of state events without
+# needing an elevated power level).  This takes the same shape as the
+# `power_level_content_override` parameter in the /createRoom API, but
+# is applied before that parameter.
+#
+# Valid keys are some or all of `private_chat`, `trusted_private_chat`
+# and `public_chat`. Inside each of those should be any of the
+# properties allowed in `power_level_content_override` in the
+# /createRoom API. If any property is missing, its default value will
+# continue to be used. If any property is present, it will overwrite
+# the existing default completely (so if the `events` property exists,
+# the default event power levels will be ignored).
+#
+#default_power_level_content_override:
+#    private_chat:
+#        "events":
+#            "com.example.myeventtype" : 0
+#            "m.room.avatar": 50
+#            "m.room.canonical_alias": 50
+#            "m.room.encryption": 100
+#            "m.room.history_visibility": 100
+#            "m.room.name": 50
+#            "m.room.power_levels": 100
+#            "m.room.server_acl": 100
+#            "m.room.tombstone": 100
+#        "events_default": 1
 
 
 

@@ -20,7 +20,7 @@ from signedjson.key import generate_signing_key, write_signing_keys
 from synapse.util.stringutils import random_string
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

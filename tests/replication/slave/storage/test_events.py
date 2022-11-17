@@ -262,13 +262,15 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         )
         msg, msgctx = self.build_event()
         self.get_success(
-            self.storage.persistence.persist_events([(j2, j2ctx), (msg, msgctx)])
+            self._storage_controllers.persistence.persist_events(
+                [(j2, j2ctx), (msg, msgctx)]
+            )
         )
         self.replicate()
 
         event_source = RoomEventSource(self.hs)
         event_source.store = self.slaved_store
-        current_token = self.get_success(event_source.get_current_key())
+        current_token = event_source.get_current_key()
 
         # gradually stream out the replication
         while repl_transport.buffer:
@@ -277,7 +279,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             self.pump(0)
 
             prev_token = current_token
-            current_token = self.get_success(event_source.get_current_key())
+            current_token = event_source.get_current_key()
 
             # attempt to replicate the behaviour of the sync handler.
             #
@@ -323,12 +325,14 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         if backfill:
             self.get_success(
-                self.storage.persistence.persist_events(
+                self._storage_controllers.persistence.persist_events(
                     [(event, context)], backfilled=True
                 )
             )
         else:
-            self.get_success(self.storage.persistence.persist_event(event, context))
+            self.get_success(
+                self._storage_controllers.persistence.persist_event(event, context)
+            )
 
         return event
 

@@ -71,13 +71,14 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
         if members_changed:
             self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
+            self._attempt_to_invalidate_cache("get_current_hosts_in_room", (room_id,))
             self._attempt_to_invalidate_cache(
                 "get_users_in_room_with_profiles", (room_id,)
             )
 
         # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
-        self._attempt_to_invalidate_cache("get_current_state_ids", (room_id,))
+        self._attempt_to_invalidate_cache("get_partial_current_state_ids", (room_id,))
 
     def _attempt_to_invalidate_cache(
         self, cache_name: str, key: Optional[Collection[Any]]

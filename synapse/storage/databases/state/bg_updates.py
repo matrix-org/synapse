@@ -195,6 +195,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
+    STATE_GROUP_EDGES_UNIQUE_INDEX_UPDATE_NAME = "state_group_edges_unique_idx"
 
     def __init__(
         self,
@@ -215,6 +216,21 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             index_name="state_groups_room_id_idx",
             table="state_groups",
             columns=["room_id"],
+        )
+
+        # `state_group_edges` can cause severe performance issues if duplicate
+        # rows are introduced, which can accidentally be done by well-meaning
+        # server admins when trying to restore a database dump, etc.
+        # See https://github.com/matrix-org/synapse/issues/11779.
+        # Introduce a unique index to guard against that.
+        self.db_pool.updates.register_background_index_update(
+            self.STATE_GROUP_EDGES_UNIQUE_INDEX_UPDATE_NAME,
+            index_name="state_group_edges_unique_idx",
+            table="state_group_edges",
+            columns=["state_group", "prev_state_group"],
+            unique=True,
+            # The old index was on (state_group) and was not unique.
+            replaces_index="state_group_edges_idx",
         )
 
     async def _background_deduplicate_state(

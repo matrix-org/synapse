@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
+from synapse.types import JsonDict
+
 from ._base import Config
 
 
 class VoipConfig(Config):
     section = "voip"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.turn_uris = config.get("turn_uris", [])
         self.turn_shared_secret = config.get("turn_shared_secret")
         self.turn_username = config.get("turn_username")
@@ -28,7 +32,7 @@ class VoipConfig(Config):
         )
         self.turn_allow_guests = config.get("turn_allow_guests", True)
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## TURN ##
 

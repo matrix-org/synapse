@@ -88,7 +88,7 @@ class RestHelper:
     def create_room_as(
         self,
         room_creator: Optional[str] = None,
-        is_public: Optional[bool] = None,
+        is_public: Optional[bool] = True,
         room_version: Optional[str] = None,
         tok: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
@@ -101,9 +101,12 @@ class RestHelper:
         Args:
             room_creator: The user ID to create the room with.
             is_public: If True, the `visibility` parameter will be set to
-                "public". If False, it will be set to "private". If left
-                unspecified, the server will set it to an appropriate default
-                (which should be "private" as per the CS spec).
+                "public". If False, it will be set to "private".
+                If None, doesn't specify the `visibility` parameter in which
+                case the server is supposed to make the room private according to
+                the CS API.
+                Defaults to public, since that is commonly needed in tests
+                for convenience where room privacy is not a problem.
             room_version: The room version to create the room as. Defaults to Synapse's
                 default room version.
             tok: The access token to use in the request.

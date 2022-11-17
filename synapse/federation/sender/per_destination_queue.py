@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tupl
 import attr
 from prometheus_client import Counter
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
@@ -223,7 +224,7 @@ class PerDestinationQueue:
         """Marks that the destination has new data to send, without starting a
         new transaction.
 
-        If a transaction loop is already in progress then a new transcation will
+        If a transaction loop is already in progress then a new transaction will
         be attempted when the current one finishes.
         """
 
@@ -542,7 +543,7 @@ class PerDestinationQueue:
         edu = Edu(
             origin=self._server_name,
             destination=self._destination,
-            edu_type="m.receipt",
+            edu_type=EduTypes.RECEIPT,
             content=self._pending_rrs,
         )
         self._pending_rrs = {}
@@ -592,7 +593,7 @@ class PerDestinationQueue:
             Edu(
                 origin=self._server_name,
                 destination=self._destination,
-                edu_type="m.direct_to_device",
+                edu_type=EduTypes.DIRECT_TO_DEVICE,
                 content=content,
             )
             for content in contents
@@ -670,7 +671,7 @@ class _TransactionQueueManager:
                 Edu(
                     origin=self.queue._server_name,
                     destination=self.queue._destination,
-                    edu_type="m.presence",
+                    edu_type=EduTypes.PRESENCE,
                     content={
                         "push": [
                             format_user_presence_state(

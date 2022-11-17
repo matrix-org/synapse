@@ -36,7 +36,7 @@ LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingPr
 class OIDCConfig(Config):
     section = "oidc"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.oidc_providers = tuple(_parse_oidc_provider_configs(config))
         if not self.oidc_providers:
             return
@@ -66,7 +66,7 @@ class OIDCConfig(Config):
         # OIDC is enabled if we have a provider
         return bool(self.oidc_providers)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
         # and login.

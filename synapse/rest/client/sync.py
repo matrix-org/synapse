@@ -16,7 +16,7 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
-from synapse.api.constants import Membership, PresenceState
+from synapse.api.constants import EduTypes, Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
@@ -99,6 +99,7 @@ class SyncRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
+        self._msc2654_enabled = hs.config.experimental.msc2654_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         # This will always be set by the time Twisted calls us.
@@ -179,13 +180,10 @@ class SyncRestServlet(RestServlet):
 
         affect_presence = set_presence != PresenceState.OFFLINE
 
-        if affect_presence:
-            await self.presence_handler.set_state(
-                user, {"presence": set_presence}, True
-            )
-
         context = await self.presence_handler.user_syncing(
-            user.to_string(), affect_presence=affect_presence
+            user.to_string(),
+            affect_presence=affect_presence,
+            presence_state=set_presence,
         )
         with context:
             sync_result = await self.sync_handler.wait_for_sync_for_user(
@@ -300,15 +298,6 @@ class SyncRestServlet(RestServlet):
         if archived:
             response["rooms"][Membership.LEAVE] = archived
 
-        # By the time we get here groups is no longer optional.
-        assert sync_result.groups is not None
-        if sync_result.groups.join:
-            response["groups"][Membership.JOIN] = sync_result.groups.join
-        if sync_result.groups.invite:
-            response["groups"][Membership.INVITE] = sync_result.groups.invite
-        if sync_result.groups.leave:
-            response["groups"][Membership.LEAVE] = sync_result.groups.leave
-
         return response
 
     @staticmethod
@@ -316,7 +305,7 @@ class SyncRestServlet(RestServlet):
         return {
             "events": [
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "sender": event.user_id,
                     "content": format_user_presence_state(
                         event, time_now, include_user_id=False
@@ -521,7 +510,8 @@ class SyncRestServlet(RestServlet):
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
             result["summary"] = room.summary
-            result["org.matrix.msc2654.unread_count"] = room.unread_count
+            if self._msc2654_enabled:
+                result["org.matrix.msc2654.unread_count"] = room.unread_count
 
         return result
 

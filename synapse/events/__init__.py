@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import abc
+import collections.abc
 import os
 from typing import (
     TYPE_CHECKING,
@@ -32,9 +33,11 @@ from typing import (
     overload,
 )
 
+import attr
 from typing_extensions import Literal
 from unpaddedbase64 import encode_base64
 
+from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches import intern_dict
@@ -213,10 +216,17 @@ class _EventInternalMetadata:
         return self.outlier
 
     def is_out_of_band_membership(self) -> bool:
-        """Whether this is an out of band membership, like an invite or an invite
-        rejection. This is needed as those events are marked as outliers, but
-        they still need to be processed as if they're new events (e.g. updating
-        invite state in the database, relaying to clients, etc).
+        """Whether this event is an out-of-band membership.
+
+        OOB memberships are a special case of outlier events: they are membership events
+        for federated rooms that we aren't full members of. Examples include invites
+        received over federation, and rejections for such invites.
+
+        The concept of an OOB membership is needed because these events need to be
+        processed as if they're new regular events (e.g. updating membership state in
+        the database, relaying to clients via /sync, etc) despite being outliers.
+
+        See also https://matrix-org.github.io/synapse/develop/development/room-dag-concepts.html#out-of-band-membership-events.
 
         (Added in synapse 0.99.0, so may be unreliable for events received before that)
         """
@@ -608,3 +618,45 @@ def make_event_from_dict(
     return event_type(
         event_dict, room_version, internal_metadata_dict or {}, rejected_reason
     )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventRelation:
+    # The target event of the relation.
+    parent_id: str
+    # The relation type.
+    rel_type: str
+    # The aggregation key. Will be None if the rel_type is not m.annotation or is
+    # not a string.
+    aggregation_key: Optional[str]
+
+
+def relation_from_event(event: EventBase) -> Optional[_EventRelation]:
+    """
+    Attempt to parse relation information an event.
+
+    Returns:
+        The event relation information, if it is valid. None, otherwise.
+    """
+    relation = event.content.get("m.relates_to")
+    if not relation or not isinstance(relation, collections.abc.Mapping):
+        # No relation information.
+        return None
+
+    # Relations must have a type and parent event ID.
+    rel_type = relation.get("rel_type")
+    if not isinstance(rel_type, str):
+        return None
+
+    parent_id = relation.get("event_id")
+    if not isinstance(parent_id, str):
+        return None
+
+    # Annotations have a key field.
+    aggregation_key = None
+    if rel_type == RelationTypes.ANNOTATION:
+        aggregation_key = relation.get("key")
+        if not isinstance(aggregation_key, str):
+            aggregation_key = None
+
+    return _EventRelation(parent_id, rel_type, aggregation_key)

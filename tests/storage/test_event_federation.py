@@ -58,15 +58,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 (room_id, event_id),
             )
 
-            txn.execute(
-                (
-                    "INSERT INTO event_reference_hashes "
-                    "(event_id, algorithm, hash) "
-                    "VALUES (?, 'sha256', ?)"
-                ),
-                (event_id, bytearray(b"ffff")),
-            )
-
         for i in range(0, 20):
             self.get_success(
                 self.store.db_pool.runInteraction("insert", insert_event, i)

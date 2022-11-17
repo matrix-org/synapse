@@ -414,7 +414,12 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
+        elif (
+            room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED
+        ) or (
+            room_version.msc3787_knock_restricted_join_rule
+            and join_rule == JoinRules.KNOCK_RESTRICTED
+        ):
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.
@@ -440,8 +445,13 @@ def _is_membership_change_allowed(
                 if authorising_user_level < invite_level:
                     raise AuthError(403, "Join event authorised by invalid server.")
 
-        elif join_rule == JoinRules.INVITE or (
-            room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+        elif (
+            join_rule == JoinRules.INVITE
+            or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+            or (
+                room_version.msc3787_knock_restricted_join_rule
+                and join_rule == JoinRules.KNOCK_RESTRICTED
+            )
         ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
@@ -462,7 +472,10 @@ def _is_membership_change_allowed(
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
     elif room_version.msc2403_knocking and Membership.KNOCK == membership:
-        if join_rule != JoinRules.KNOCK:
+        if join_rule != JoinRules.KNOCK and (
+            not room_version.msc3787_knock_restricted_join_rule
+            or join_rule != JoinRules.KNOCK_RESTRICTED
+        ):
             raise AuthError(403, "You don't have permission to knock")
         elif target_user_id != event.user_id:
             raise AuthError(403, "You cannot knock for other users")

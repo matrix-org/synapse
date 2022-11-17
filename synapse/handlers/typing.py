@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError, ShadowBanError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.metrics.background_process_metrics import (
@@ -25,7 +26,7 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.replication.tcp.streams import TypingStream
 from synapse.streams import EventSource
-from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
+from synapse.types import JsonDict, Requester, StreamKeyType, UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
@@ -58,6 +59,7 @@ class FollowerTypingHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
@@ -68,7 +70,7 @@ class FollowerTypingHandler:
 
         if hs.get_instance_name() not in hs.config.worker.writers.typing:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.typing",
+                EduTypes.TYPING,
                 hs.config.worker.writers.typing,
             )
 
@@ -130,7 +132,6 @@ class FollowerTypingHandler:
             return
 
         try:
-            users = await self.store.get_users_in_room(member.room_id)
             self._member_last_federation_poke[member] = self.clock.time_msec()
 
             now = self.clock.time_msec()
@@ -138,12 +139,15 @@ class FollowerTypingHandler:
                 now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
             )
 
-            for domain in {get_domain_from_id(u) for u in users}:
+            hosts = await self._storage_controllers.state.get_current_hosts_in_room(
+                member.room_id
+            )
+            for domain in hosts:
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(
                         destination=domain,
-                        edu_type="m.typing",
+                        edu_type=EduTypes.TYPING,
                         content={
                             "room_id": member.room_id,
                             "user_id": member.user_id,
@@ -218,7 +222,9 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         self.hs = hs
 
-        hs.get_federation_registry().register_edu_handler("m.typing", self._recv_edu)
+        hs.get_federation_registry().register_edu_handler(
+            EduTypes.TYPING, self._recv_edu
+        )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
@@ -382,7 +388,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         )
 
         self.notifier.on_new_event(
-            "typing_key", self._latest_room_serial, rooms=[member.room_id]
+            StreamKeyType.TYPING, self._latest_room_serial, rooms=[member.room_id]
         )
 
     async def get_all_typing_updates(
@@ -458,7 +464,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
     def _make_event_for(self, room_id: str) -> JsonDict:
         typing = self.get_typing_handler()._room_typing[room_id]
         return {
-            "type": "m.typing",
+            "type": EduTypes.TYPING,
             "room_id": room_id,
             "content": {"user_ids": list(typing)},
         }

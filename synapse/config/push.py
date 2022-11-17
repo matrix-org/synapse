@@ -13,13 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
+from synapse.types import JsonDict
+
 from ._base import Config
 
 
 class PushConfig(Config):
     section = "push"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         push_config = config.get("push") or {}
         self.push_include_content = push_config.get("include_content", True)
         self.push_group_unread_count_by_room = push_config.get(
@@ -46,7 +50,7 @@ class PushConfig(Config):
             )
             self.push_include_content = not redact_content
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """
         ## Push ##
 

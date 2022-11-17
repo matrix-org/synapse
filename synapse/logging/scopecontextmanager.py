@@ -13,6 +13,8 @@
 # limitations under the License.import logging
 
 import logging
+from types import TracebackType
+from typing import Optional, Type
 
 from opentracing import Scope, ScopeManager
 
@@ -107,19 +109,26 @@ class _LogContextScope(Scope):
         and - if enter_logcontext was set - the logcontext is finished too.
     """
 
-    def __init__(self, manager, span, logcontext, enter_logcontext, finish_on_close):
+    def __init__(
+        self,
+        manager: LogContextScopeManager,
+        span,
+        logcontext,
+        enter_logcontext: bool,
+        finish_on_close: bool,
+    ):
         """
         Args:
-            manager (LogContextScopeManager):
+            manager:
                 the manager that is responsible for this scope.
             span (Span):
                 the opentracing span which this scope represents the local
                 lifetime for.
             logcontext (LogContext):
                 the logcontext to which this scope is attached.
-            enter_logcontext (Boolean):
+            enter_logcontext:
                 if True the logcontext will be exited when the scope is finished
-            finish_on_close (Boolean):
+            finish_on_close:
                 if True finish the span when the scope is closed
         """
         super().__init__(manager, span)
@@ -127,16 +136,21 @@ class _LogContextScope(Scope):
         self._finish_on_close = finish_on_close
         self._enter_logcontext = enter_logcontext
 
-    def __exit__(self, exc_type, value, traceback):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         if exc_type == twisted.internet.defer._DefGen_Return:
             # filter out defer.returnValue() calls
             exc_type = value = traceback = None
         super().__exit__(exc_type, value, traceback)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Scope<{self.span}>"
 
-    def close(self):
+    def close(self) -> None:
         active_scope = self.manager.active
         if active_scope is not self:
             logger.error(

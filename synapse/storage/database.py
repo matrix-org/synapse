@@ -31,6 +31,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Type,
     TypeVar,
     cast,
     overload,
@@ -38,10 +39,10 @@ from typing import (
 
 import attr
 from prometheus_client import Histogram
-from typing_extensions import Literal
+from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.enterprise import adbapi
-from twisted.internet import defer
+from twisted.internet.interfaces import IReactorCore
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
@@ -63,7 +64,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # python 3 does not have a maximum int value
-MAX_TXN_ID = 2 ** 63 - 1
+MAX_TXN_ID = 2**63 - 1
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +90,15 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_extremeties": "device_lists_remote_extremeties_unique_idx",
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
+    "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
+    "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
 }
 
 
 def make_pool(
-    reactor, db_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
+    reactor: IReactorCore,
+    db_config: DatabaseConnectionConfig,
+    engine: BaseDatabaseEngine,
 ) -> adbapi.ConnectionPool:
     """Get the connection pool for the database."""
 
@@ -102,7 +107,7 @@ def make_pool(
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
 
-    def _on_new_connection(conn):
+    def _on_new_connection(conn: Connection) -> None:
         # Ensure we have a logging context so we can correctly track queries,
         # etc.
         with LoggingContext("db.on_new_connection"):
@@ -158,7 +163,11 @@ class LoggingDatabaseConnection:
     default_txn_name: str
 
     def cursor(
-        self, *, txn_name=None, after_callbacks=None, exception_callbacks=None
+        self,
+        *,
+        txn_name: Optional[str] = None,
+        after_callbacks: Optional[List["_CallbackListEntry"]] = None,
+        exception_callbacks: Optional[List["_CallbackListEntry"]] = None,
     ) -> "LoggingTransaction":
         if not txn_name:
             txn_name = self.default_txn_name
@@ -184,18 +193,23 @@ class LoggingDatabaseConnection:
         self.conn.__enter__()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> Optional[bool]:
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[types.TracebackType],
+    ) -> Optional[bool]:
         return self.conn.__exit__(exc_type, exc_value, traceback)
 
     # Proxy through any unknown lookups to the DB conn class.
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return getattr(self.conn, name)
 
 
 # The type of entry which goes on our after_callbacks and exception_callbacks lists.
-_CallbackListEntry = Tuple[Callable[..., object], Iterable[Any], Dict[str, Any]]
+_CallbackListEntry = Tuple[Callable[..., object], Tuple[object, ...], Dict[str, object]]
 
-
+P = ParamSpec("P")
 R = TypeVar("R")
 
 
@@ -240,25 +254,46 @@ class LoggingTransaction:
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: Callable[..., object], *args: Any, **kwargs: Any):
-        """Call the given callback on the main twisted thread after the
-        transaction has finished. Used to invalidate the caches on the
-        correct thread.
+    def call_after(
+        self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
+        """Call the given callback on the main twisted thread after the transaction has
+        finished.
+
+        Mostly used to invalidate the caches on the correct thread.
+
+        Note that transactions may be retried a few times if they encounter database
+        errors such as serialization failures. Callbacks given to `call_after`
+        will accumulate across transaction attempts and will _all_ be called once a
+        transaction attempt succeeds, regardless of whether previous transaction
+        attempts failed. Otherwise, if all transaction attempts fail, all
+        `call_on_exception` callbacks will be run instead.
         """
         # if self.after_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.after_callbacks is not None
-        self.after_callbacks.append((callback, args, kwargs))
+        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
+        self.after_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
 
     def call_on_exception(
-        self, callback: Callable[..., object], *args: Any, **kwargs: Any
-    ):
+        self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
+        """Call the given callback on the main twisted thread after the transaction has
+        failed.
+
+        Note that transactions may be retried a few times if they encounter database
+        errors such as serialization failures. Callbacks given to `call_on_exception`
+        will accumulate across transaction attempts and will _all_ be called once the
+        final transaction attempt fails. No `call_on_exception` callbacks will be run
+        if any transaction attempt succeeds.
+        """
         # if self.exception_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.exception_callbacks is not None
-        self.exception_callbacks.append((callback, args, kwargs))
+        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
+        self.exception_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
 
     def fetchone(self) -> Optional[Tuple]:
         return self.txn.fetchone()
@@ -290,11 +325,15 @@ class LoggingTransaction:
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
 
-            self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
+            self._do_execute(
+                lambda the_sql: execute_batch(self.txn, the_sql, args), sql
+            )
         else:
             self.executemany(sql, args)
 
-    def execute_values(self, sql: str, *args: Any, fetch: bool = True) -> List[Tuple]:
+    def execute_values(
+        self, sql: str, values: Iterable[Iterable[Any]], fetch: bool = True
+    ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
@@ -305,15 +344,8 @@ class LoggingTransaction:
         from psycopg2.extras import execute_values
 
         return self._do_execute(
-            # Type ignore: mypy is unhappy because if `x` is a 5-tuple, then there will
-            # be two values for `fetch`: one given positionally, and another given
-            # as a keyword argument. We might be able to fix this by
-            # - propagating the signature of psycopg2.extras.execute_values to this
-            #   function, or
-            # - changing `*args: Any` to `values: T` for some appropriate T.
-            lambda *x: execute_values(self.txn, *x, fetch=fetch),  # type: ignore[misc]
+            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
             sql,
-            *args,
         )
 
     def execute(self, sql: str, *args: Any) -> None:
@@ -326,7 +358,13 @@ class LoggingTransaction:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
-    def _do_execute(self, func: Callable[..., R], sql: str, *args: Any) -> R:
+    def _do_execute(
+        self,
+        func: Callable[Concatenate[str, P], R],
+        sql: str,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
         sql = self._make_sql_one_line(sql)
 
         # TODO(paul): Maybe use 'info' and 'debug' for values?
@@ -335,7 +373,10 @@ class LoggingTransaction:
         sql = self.database_engine.convert_param_style(sql)
         if args:
             try:
-                sql_logger.debug("[SQL values] {%s} %r", self.name, args[0])
+                # The type-ignore should be redundant once mypy releases a version with
+                # https://github.com/python/mypy/pull/12668. (`args` might be empty,
+                # (but we'll catch the index error if so.)
+                sql_logger.debug("[SQL values] {%s} %r", self.name, args[0])  # type: ignore[index]
             except Exception:
                 # Don't let logging failures stop SQL from working
                 pass
@@ -350,7 +391,7 @@ class LoggingTransaction:
                     opentracing.tags.DATABASE_STATEMENT: sql,
                 },
             ):
-                return func(sql, *args)
+                return func(sql, *args, **kwargs)
         except Exception as e:
             sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
@@ -365,17 +406,22 @@ class LoggingTransaction:
     def __enter__(self) -> "LoggingTransaction":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[types.TracebackType],
+    ) -> None:
         self.close()
 
 
 class PerformanceCounters:
-    def __init__(self):
-        self.current_counters = {}
-        self.previous_counters = {}
+    def __init__(self) -> None:
+        self.current_counters: Dict[str, Tuple[int, float]] = {}
+        self.previous_counters: Dict[str, Tuple[int, float]] = {}
 
     def update(self, key: str, duration_secs: float) -> None:
-        count, cum_time = self.current_counters.get(key, (0, 0))
+        count, cum_time = self.current_counters.get(key, (0, 0.0))
         count += 1
         cum_time += duration_secs
         self.current_counters[key] = (count, cum_time)
@@ -501,7 +547,7 @@ class DatabasePool:
     def start_profiling(self) -> None:
         self._previous_loop_ts = monotonic_time()
 
-        def loop():
+        def loop() -> None:
             curr = self._current_txn_total_time
             prev = self._previous_txn_total_time
             self._previous_txn_total_time = curr
@@ -527,9 +573,9 @@ class DatabasePool:
         desc: str,
         after_callbacks: List[_CallbackListEntry],
         exception_callbacks: List[_CallbackListEntry],
-        func: Callable[..., R],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[Concatenate[LoggingTransaction, P], R],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> R:
         """Start a new database transaction with the given connection.
 
@@ -559,7 +605,10 @@ class DatabasePool:
         # will fail if we have to repeat the transaction.
         # For now, we just log an error, and hope that it works on the first attempt.
         # TODO: raise an exception.
-        for i, arg in enumerate(args):
+
+        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be iterable; see
+        # https://github.com/python/mypy/pull/12668
+        for i, arg in enumerate(args):  # type: ignore[arg-type, var-annotated]
             if inspect.isgenerator(arg):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -567,7 +616,9 @@ class DatabasePool:
                     i,
                     func,
                 )
-        for name, val in kwargs.items():
+        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be a mapping; see
+        # https://github.com/python/mypy/pull/12668
+        for name, val in kwargs.items():  # type: ignore[attr-defined]
             if inspect.isgenerator(val):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -780,7 +831,7 @@ class DatabasePool:
         # We also wait until everything above is done before releasing the
         # `CancelledError`, so that logging contexts won't get used after they have been
         # finished.
-        return await delay_cancellation(defer.ensureDeferred(_runInteraction()))
+        return await delay_cancellation(_runInteraction())
 
     async def runWithConnection(
         self,
@@ -1155,7 +1206,7 @@ class DatabasePool:
         if lock:
             self.engine.lock_table(txn, table)
 
-        def _getwhere(key):
+        def _getwhere(key: str) -> str:
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
             if keyvalues[key] is None:
@@ -1254,6 +1305,7 @@ class DatabasePool:
         value_names: Collection[str],
         value_values: Collection[Collection[Any]],
         desc: str,
+        lock: bool = True,
     ) -> None:
         """
         Upsert, many times.
@@ -1265,6 +1317,8 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
+            lock: True to lock the table when doing the upsert. Unused if the database engine
+                supports native upserts.
         """
 
         # We can autocommit if we are going to use native upserts
@@ -1272,7 +1326,7 @@ class DatabasePool:
             self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables
         )
 
-        return await self.runInteraction(
+        await self.runInteraction(
             desc,
             self.simple_upsert_many_txn,
             table,
@@ -1280,6 +1334,7 @@ class DatabasePool:
             key_values,
             value_names,
             value_values,
+            lock=lock,
             db_autocommit=autocommit,
         )
 
@@ -1291,6 +1346,7 @@ class DatabasePool:
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
         value_values: Iterable[Iterable[Any]],
+        lock: bool = True,
     ) -> None:
         """
         Upsert, many times.
@@ -1302,6 +1358,8 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
+            lock: True to lock the table when doing the upsert. Unused if the database engine
+                supports native upserts.
         """
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
@@ -1309,7 +1367,7 @@ class DatabasePool:
             )
         else:
             return self.simple_upsert_many_txn_emulated(
-                txn, table, key_names, key_values, value_names, value_values
+                txn, table, key_names, key_values, value_names, value_values, lock=lock
             )
 
     def simple_upsert_many_txn_emulated(
@@ -1320,6 +1378,7 @@ class DatabasePool:
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
         value_values: Iterable[Iterable[Any]],
+        lock: bool = True,
     ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
@@ -1331,17 +1390,24 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
+            lock: True to lock the table when doing the upsert.
         """
         # No value columns, therefore make a blank list so that the following
         # zip() works correctly.
         if not value_names:
             value_values = [() for x in range(len(key_values))]
 
+        if lock:
+            # Lock the table just once, to prevent it being done once per row.
+            # Note that, according to Postgres' documentation, once obtained,
+            # the lock is held for the remainder of the current transaction.
+            self.engine.lock_table(txn, "user_ips")
+
         for keyv, valv in zip(key_values, value_values):
             _keys = {x: y for x, y in zip(key_names, keyv)}
             _vals = {x: y for x, y in zip(value_names, valv)}
 
-            self.simple_upsert_txn_emulated(txn, table, _keys, _vals)
+            self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=False)
 
     def simple_upsert_many_txn_native_upsert(
         self,
@@ -1778,6 +1844,86 @@ class DatabasePool:
 
         return txn.rowcount
 
+    async def simple_update_many(
+        self,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+        desc: str,
+    ) -> None:
+        """
+        Update, many times, using batching where possible.
+        If the keys don't match anything, nothing will be updated.
+
+        Args:
+            table: The table to update
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The names of value columns to update.
+            value_values: A list of each row's value column values.
+        """
+
+        await self.runInteraction(
+            desc,
+            self.simple_update_many_txn,
+            table,
+            key_names,
+            key_values,
+            value_names,
+            value_values,
+        )
+
+    @staticmethod
+    def simple_update_many_txn(
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Collection[Iterable[Any]],
+    ) -> None:
+        """
+        Update, many times, using batching where possible.
+        If the keys don't match anything, nothing will be updated.
+
+        Args:
+            table: The table to update
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The names of value columns to update.
+            value_values: A list of each row's value column values.
+        """
+
+        if len(value_values) != len(key_values):
+            raise ValueError(
+                f"{len(key_values)} key rows and {len(value_values)} value rows: should be the same number."
+            )
+
+        # List of tuples of (value values, then key values)
+        # (This matches the order needed for the query)
+        args = [tuple(x) + tuple(y) for x, y in zip(value_values, key_values)]
+
+        for ks, vs in zip(key_values, value_values):
+            args.append(tuple(vs) + tuple(ks))
+
+        # 'col1 = ?, col2 = ?, ...'
+        set_clause = ", ".join(f"{n} = ?" for n in value_names)
+
+        if key_names:
+            # 'WHERE col3 = ? AND col4 = ? AND col5 = ?'
+            where_clause = "WHERE " + (" AND ".join(f"{n} = ?" for n in key_names))
+        else:
+            where_clause = ""
+
+        # UPDATE mytable SET col1 = ?, col2 = ? WHERE col3 = ? AND col4 = ?
+        sql = f"""
+            UPDATE {table} SET {set_clause} {where_clause}
+        """
+
+        txn.execute_batch(sql, args)
+
     async def simple_update_one(
         self,
         table: str,
@@ -2016,29 +2162,40 @@ class DatabasePool:
         max_value: int,
         limit: int = 100000,
     ) -> Tuple[Dict[Any, int], int]:
-        # Fetch a mapping of room_id -> max stream position for "recent" rooms.
-        # It doesn't really matter how many we get, the StreamChangeCache will
-        # do the right thing to ensure it respects the max size of cache.
-        sql = (
-            "SELECT %(entity)s, MAX(%(stream)s) FROM %(table)s"
-            " WHERE %(stream)s > ? - %(limit)s"
-            " GROUP BY %(entity)s"
-        ) % {
-            "table": table,
-            "entity": entity_column,
-            "stream": stream_column,
-            "limit": limit,
-        }
+        """Gets roughly the last N changes in the given stream table as a
+        map from entity to the stream ID of the most recent change.
+
+        Also returns the minimum stream ID.
+        """
+
+        # This may return many rows for the same entity, but the `limit` is only
+        # a suggestion so we don't care that much.
+        #
+        # Note: Some stream tables can have multiple rows with the same stream
+        # ID. Instead of handling this with complicated SQL, we instead simply
+        # add one to the returned minimum stream ID to ensure correctness.
+        sql = f"""
+            SELECT {entity_column}, {stream_column}
+            FROM {table}
+            ORDER BY {stream_column} DESC
+            LIMIT ?
+        """
 
         txn = db_conn.cursor(txn_name="get_cache_dict")
-        txn.execute(sql, (int(max_value),))
+        txn.execute(sql, (limit,))
 
-        cache = {row[0]: int(row[1]) for row in txn}
+        # The rows come out in reverse stream ID order, so we want to keep the
+        # stream ID of the first row for each entity.
+        cache: Dict[Any, int] = {}
+        for row in txn:
+            cache.setdefault(row[0], int(row[1]))
 
         txn.close()
 
         if cache:
-            min_val = min(cache.values())
+            # We add one here as we don't know if we have all rows for the
+            # minimum stream ID.
+            min_val = min(cache.values()) + 1
         else:
             min_val = max_value
 
@@ -2121,7 +2278,7 @@ class DatabasePool:
         term: Optional[str],
         col: str,
         retcols: Collection[str],
-        desc="simple_search_list",
+        desc: str = "simple_search_list",
     ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.

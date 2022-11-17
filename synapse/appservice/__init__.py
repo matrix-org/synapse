@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +23,7 @@ from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import GroupID, JsonDict, UserID, get_domain_from_id
+from synapse.types import DeviceListUpdates, JsonDict, UserID
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 #   user ID -> {device ID -> {algorithm -> count}}
 TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
 
-# Type for the `device_unused_fallback_keys` field in an appservice transaction
+# Type for the `device_unused_fallback_key_types` field in an appservice transaction
 #   user ID -> {device ID -> [algorithm]}
 TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
 
@@ -48,7 +49,6 @@ class ApplicationServiceState(Enum):
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class Namespace:
     exclusive: bool
-    group_id: Optional[str]
     regex: Pattern[str]
 
 
@@ -70,7 +70,6 @@ class ApplicationService:
     def __init__(
         self,
         token: str,
-        hostname: str,
         id: str,
         sender: str,
         url: Optional[str] = None,
@@ -88,7 +87,6 @@ class ApplicationService:
         )  # url must not end with a slash
         self.hs_token = hs_token
         self.sender = sender
-        self.server_name = hostname
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
@@ -134,30 +132,13 @@ class ApplicationService:
                 exclusive = regex_obj.get("exclusive")
                 if not isinstance(exclusive, bool):
                     raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
-                group_id = regex_obj.get("group_id")
-                if group_id:
-                    if not isinstance(group_id, str):
-                        raise ValueError(
-                            "Expected string for 'group_id' in ns '%s'" % ns
-                        )
-                    try:
-                        GroupID.from_string(group_id)
-                    except Exception:
-                        raise ValueError(
-                            "Expected valid group ID for 'group_id' in ns '%s'" % ns
-                        )
-
-                    if get_domain_from_id(group_id) != self.server_name:
-                        raise ValueError(
-                            "Expected 'group_id' to be this host in ns '%s'" % ns
-                        )
 
                 regex = regex_obj.get("regex")
                 if not isinstance(regex, str):
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
 
                 # Pre-compile regex.
-                result[ns].append(Namespace(exclusive, group_id, re.compile(regex)))
+                result[ns].append(Namespace(exclusive, re.compile(regex)))
 
         return result
 
@@ -362,21 +343,6 @@ class ApplicationService:
             if namespace.exclusive
         ]
 
-    def get_groups_for_user(self, user_id: str) -> Iterable[str]:
-        """Get the groups that this user is associated with by this AS
-
-        Args:
-            user_id: The ID of the user.
-
-        Returns:
-            An iterable that yields group_id strings.
-        """
-        return (
-            namespace.group_id
-            for namespace in self.namespaces[ApplicationService.NS_USERS]
-            if namespace.group_id and namespace.regex.match(user_id)
-        )
-
     def is_rate_limited(self) -> bool:
         return self.rate_limited
 
@@ -400,6 +366,7 @@ class AppServiceTransaction:
         to_device_messages: List[JsonDict],
         one_time_key_counts: TransactionOneTimeKeyCounts,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
     ):
         self.service = service
         self.id = id
@@ -408,6 +375,7 @@ class AppServiceTransaction:
         self.to_device_messages = to_device_messages
         self.one_time_key_counts = one_time_key_counts
         self.unused_fallback_keys = unused_fallback_keys
+        self.device_list_summary = device_list_summary
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -424,6 +392,7 @@ class AppServiceTransaction:
             to_device_messages=self.to_device_messages,
             one_time_key_counts=self.one_time_key_counts,
             unused_fallback_keys=self.unused_fallback_keys,
+            device_list_summary=self.device_list_summary,
             txn_id=self.id,
         )
 

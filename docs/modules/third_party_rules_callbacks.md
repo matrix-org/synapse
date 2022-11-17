@@ -247,6 +247,24 @@ admin API.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `on_threepid_bind`
+
+_First introduced in Synapse v1.56.0_
+
+```python
+async def on_threepid_bind(user_id: str, medium: str, address: str) -> None:
+```
+
+Called after creating an association between a local user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (`email` or `msisdn`) and address of the
+third-party identifier.
+
+Note that this callback is _not_ called after a successful association on an _identity
+server_.
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
 ## Example
 
 The example below is a module that implements the third-party rules callback

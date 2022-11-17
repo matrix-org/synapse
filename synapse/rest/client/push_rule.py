@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
-
-import attr
+from typing import TYPE_CHECKING, List, Sequence, Tuple, Union
 
 from synapse.api.errors import (
     NotFoundError,
@@ -22,6 +20,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.handlers.push_rules import InvalidRuleException, RuleSpec, check_actions
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -29,7 +28,6 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.http.site import SynapseRequest
-from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
@@ -38,14 +36,6 @@ from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-
-
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class RuleSpec:
-    scope: str
-    template: str
-    rule_id: str
-    attr: Optional[str]
 
 
 class PushRuleRestServlet(RestServlet):
@@ -60,6 +50,7 @@ class PushRuleRestServlet(RestServlet):
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker.worker_app is not None
+        self._push_rules_handler = hs.get_push_rules_handler()
 
     async def on_PUT(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         if self._is_worker:
@@ -81,8 +72,13 @@ class PushRuleRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         if spec.attr:
-            await self.set_rule_attr(user_id, spec, content)
-            self.notify_user(user_id)
+            try:
+                await self._push_rules_handler.set_rule_attr(user_id, spec, content)
+            except InvalidRuleException as e:
+                raise SynapseError(400, "Invalid actions: %s" % e)
+            except RuleNotFoundException:
+                raise NotFoundError("Unknown rule")
+
             return 200, {}
 
         if spec.rule_id.startswith("."):
@@ -98,23 +94,23 @@ class PushRuleRestServlet(RestServlet):
 
         before = parse_string(request, "before")
         if before:
-            before = _namespaced_rule_id(spec, before)
+            before = f"global/{spec.template}/{before}"
 
         after = parse_string(request, "after")
         if after:
-            after = _namespaced_rule_id(spec, after)
+            after = f"global/{spec.template}/{after}"
 
         try:
             await self.store.add_push_rule(
                 user_id=user_id,
-                rule_id=_namespaced_rule_id_from_spec(spec),
+                rule_id=f"global/{spec.template}/{spec.rule_id}",
                 priority_class=priority_class,
                 conditions=conditions,
                 actions=actions,
                 before=before,
                 after=after,
             )
-            self.notify_user(user_id)
+            self._push_rules_handler.notify_user(user_id)
         except InconsistentRuleException as e:
             raise SynapseError(400, str(e))
         except RuleNotFoundException as e:
@@ -133,11 +129,11 @@ class PushRuleRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
+        namespaced_rule_id = f"global/{spec.template}/{spec.rule_id}"
 
         try:
             await self.store.delete_push_rule(user_id, namespaced_rule_id)
-            self.notify_user(user_id)
+            self._push_rules_handler.notify_user(user_id)
             return 200, {}
         except StoreError as e:
             if e.code == 404:
@@ -152,9 +148,9 @@ class PushRuleRestServlet(RestServlet):
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rules = await self.store.get_push_rules_for_user(user_id)
+        rules_raw = await self.store.get_push_rules_for_user(user_id)
 
-        rules = format_push_rules_for_user(requester.user, rules)
+        rules = format_push_rules_for_user(requester.user, rules_raw)
 
         path_parts = path.split("/")[1:]
 
@@ -169,55 +165,6 @@ class PushRuleRestServlet(RestServlet):
         elif path_parts[0] == "global":
             result = _filter_ruleset_with_path(rules["global"], path_parts[1:])
             return 200, result
-        else:
-            raise UnrecognizedRequestError()
-
-    def notify_user(self, user_id: str) -> None:
-        stream_id = self.store.get_max_push_rules_stream_id()
-        self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
-
-    async def set_rule_attr(
-        self, user_id: str, spec: RuleSpec, val: Union[bool, JsonDict]
-    ) -> None:
-        if spec.attr not in ("enabled", "actions"):
-            # for the sake of potential future expansion, shouldn't report
-            # 404 in the case of an unknown request so check it corresponds to
-            # a known attribute first.
-            raise UnrecognizedRequestError()
-
-        namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-        rule_id = spec.rule_id
-        is_default_rule = rule_id.startswith(".")
-        if is_default_rule:
-            if namespaced_rule_id not in BASE_RULE_IDS:
-                raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
-        if spec.attr == "enabled":
-            if isinstance(val, dict) and "enabled" in val:
-                val = val["enabled"]
-            if not isinstance(val, bool):
-                # Legacy fallback
-                # This should *actually* take a dict, but many clients pass
-                # bools directly, so let's not break them.
-                raise SynapseError(400, "Value for 'enabled' must be boolean")
-            await self.store.set_push_rule_enabled(
-                user_id, namespaced_rule_id, val, is_default_rule
-            )
-        elif spec.attr == "actions":
-            if not isinstance(val, dict):
-                raise SynapseError(400, "Value must be a dict")
-            actions = val.get("actions")
-            if not isinstance(actions, list):
-                raise SynapseError(400, "Value for 'actions' must be dict")
-            _check_actions(actions)
-            namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            rule_id = spec.rule_id
-            is_default_rule = rule_id.startswith(".")
-            if is_default_rule:
-                if namespaced_rule_id not in BASE_RULE_IDS:
-                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
-            await self.store.set_push_rule_actions(
-                user_id, namespaced_rule_id, actions, is_default_rule
-            )
         else:
             raise UnrecognizedRequestError()
 
@@ -291,22 +238,9 @@ def _rule_tuple_from_request_object(
         raise InvalidRuleException("No actions found")
     actions = req_obj["actions"]
 
-    _check_actions(actions)
+    check_actions(actions)
 
     return conditions, actions
-
-
-def _check_actions(actions: List[Union[str, JsonDict]]) -> None:
-    if not isinstance(actions, list):
-        raise InvalidRuleException("No actions found")
-
-    for a in actions:
-        if a in ["notify", "dont_notify", "coalesce"]:
-            pass
-        elif isinstance(a, dict) and "set_tweak" in a:
-            pass
-        else:
-            raise InvalidRuleException("Unrecognised action")
 
 
 def _filter_ruleset_with_path(ruleset: JsonDict, path: List[str]) -> JsonDict:
@@ -355,18 +289,6 @@ def _priority_class_from_spec(spec: RuleSpec) -> int:
     pc = PRIORITY_CLASS_MAP[spec.template]
 
     return pc
-
-
-def _namespaced_rule_id_from_spec(spec: RuleSpec) -> str:
-    return _namespaced_rule_id(spec, spec.rule_id)
-
-
-def _namespaced_rule_id(spec: RuleSpec, rule_id: str) -> str:
-    return "global/%s/%s" % (spec.template, rule_id)
-
-
-class InvalidRuleException(Exception):
-    pass
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

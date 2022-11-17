@@ -31,7 +31,7 @@ class PurgeTests(HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id)
 
         self.store = hs.get_datastores().main
-        self.storage = self.hs.get_storage()
+        self._storage_controllers = self.hs.get_storage_controllers()
 
     def test_purge_history(self):
         """
@@ -51,7 +51,9 @@ class PurgeTests(HomeserverTestCase):
 
         # Purge everything before this topological token
         self.get_success(
-            self.storage.purge_events.purge_history(self.room_id, token_str, True)
+            self._storage_controllers.purge_events.purge_history(
+                self.room_id, token_str, True
+            )
         )
 
         # 1-3 should fail and last will succeed, meaning that 1-3 are deleted
@@ -79,7 +81,9 @@ class PurgeTests(HomeserverTestCase):
 
         # Purge everything before this topological token
         f = self.get_failure(
-            self.storage.purge_events.purge_history(self.room_id, event, True),
+            self._storage_controllers.purge_events.purge_history(
+                self.room_id, event, True
+            ),
             SynapseError,
         )
         self.assertIn("greater than forward", f.value.args[0])
@@ -98,14 +102,17 @@ class PurgeTests(HomeserverTestCase):
         first = self.helper.send(self.room_id, body="test1")
 
         # Get the current room state.
-        state_handler = self.hs.get_state_handler()
         create_event = self.get_success(
-            state_handler.get_current_state(self.room_id, "m.room.create", "")
+            self._storage_controllers.state.get_current_state_event(
+                self.room_id, "m.room.create", ""
+            )
         )
         self.assertIsNotNone(create_event)
 
         # Purge everything before this topological token
-        self.get_success(self.storage.purge_events.purge_room(self.room_id))
+        self.get_success(
+            self._storage_controllers.purge_events.purge_room(self.room_id)
+        )
 
         # The events aren't found.
         self.store._invalidate_get_event_cache(create_event.event_id)

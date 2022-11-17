@@ -30,6 +30,7 @@ from typing import (
 
 import attr
 import jinja2
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
@@ -46,12 +47,14 @@ from synapse.events.spamcheck import (
     CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
     CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
     USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
     USER_MAY_CREATE_ROOM_CALLBACK,
     USER_MAY_INVITE_CALLBACK,
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamChecker,
 )
 from synapse.events.third_party_rules import (
     CHECK_CAN_DEACTIVATE_USER_CALLBACK,
@@ -62,8 +65,10 @@ from synapse.events.third_party_rules import (
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
+from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.account_validity import (
     IS_USER_EXPIRED_CALLBACK,
     ON_LEGACY_ADMIN_REQUEST,
@@ -80,6 +85,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -107,6 +113,7 @@ from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
+    JsonMapping,
     Requester,
     StateMap,
     UserID,
@@ -117,6 +124,7 @@ from synapse.types import (
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import cached
+from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerSlavedStore
@@ -124,6 +132,7 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -131,6 +140,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
+NOT_SPAM = SpamChecker.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -139,6 +149,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
+    "NOT_SPAM",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
@@ -148,6 +159,7 @@ __all__ = [
     "PRESENCE_ALL_USERS",
     "LoginResponse",
     "JsonDict",
+    "JsonMapping",
     "EventBase",
     "StateMap",
     "ProfileInfo",
@@ -182,6 +194,7 @@ class ModuleApi:
         self._store: Union[
             DataStore, "GenericWorkerSlavedStore"
         ] = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
@@ -190,6 +203,7 @@ class ModuleApi:
         self._clock: Clock = hs.get_clock()
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
+        self._push_rules_handler = hs.get_push_rules_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
@@ -209,12 +223,14 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client: SimpleHttpClient = hs.get_simple_http_client()
         self._public_room_list_manager = PublicRoomListManager(hs)
+        self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
+        self._account_data_handler = hs.get_account_data_handler()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -223,6 +239,9 @@ class ModuleApi:
         self,
         *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -243,6 +262,7 @@ class ModuleApi:
         """
         return self._spam_checker.register_callbacks(
             check_event_for_spam=check_event_for_spam,
+            should_drop_federated_event=should_drop_federated_event,
             user_may_join_room=user_may_join_room,
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,
@@ -293,6 +313,7 @@ class ModuleApi:
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
+        on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -308,6 +329,7 @@ class ModuleApi:
             check_can_deactivate_user=check_can_deactivate_user,
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
+            on_threepid_bind=on_threepid_bind,
         )
 
     def register_presence_router_callbacks(
@@ -373,6 +395,19 @@ class ModuleApi:
                 min_batch_size=min_batch_size,
             )
 
+    def register_account_data_callbacks(
+        self,
+        *,
+        on_account_data_updated: Optional[ON_ACCOUNT_DATA_UPDATED_CALLBACK] = None,
+    ) -> None:
+        """Registers account data callbacks.
+
+        Added in Synapse 1.57.0.
+        """
+        return self._account_data_handler.register_module_callbacks(
+            on_account_data_updated=on_account_data_updated,
+        )
+
     def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
 
@@ -412,6 +447,14 @@ class ModuleApi:
         Added in Synapse v1.22.0.
         """
         return self._public_room_list_manager
+
+    @property
+    def account_data_manager(self) -> "AccountDataManager":
+        """Allows reading and modifying users' account data.
+
+        Added in Synapse v1.57.0.
+        """
+        return self._account_data_manager
 
     @property
     def public_baseurl(self) -> str:
@@ -511,6 +554,17 @@ class ModuleApi:
             True if the user is a server admin, False otherwise.
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
+
+    async def set_user_admin(self, user_id: str, admin: bool) -> None:
+        """Sets if a user is a server admin.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The Matrix ID of the user to set admin status for.
+            admin: True iff the user is to be a server admin, false otherwise.
+        """
+        await self._store.set_server_admin(UserID.from_string(user_id), admin)
 
     def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
@@ -671,7 +725,8 @@ class ModuleApi:
     def record_user_external_id(
         self, auth_provider_id: str, remote_user_id: str, registered_user_id: str
     ) -> defer.Deferred:
-        """Record a mapping from an external user id to a mxid
+        """Record a mapping between an external user id from a single sign-on provider
+        and a mxid.
 
         Added in Synapse v1.9.0.
 
@@ -755,9 +810,9 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
         """Run a function with a database connection
 
@@ -773,8 +828,9 @@ class ModuleApi:
         Returns:
             Deferred[object]: result of func
         """
+        # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
-            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
         )
 
     def complete_sso_login(
@@ -856,7 +912,7 @@ class ModuleApi:
                 The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
-            self._store.get_filtered_current_state_ids(
+            self._storage_controllers.state.get_current_state_ids(
                 room_id=room_id, state_filter=StateFilter.from_types(types)
             )
         )
@@ -1092,7 +1148,10 @@ class ModuleApi:
             )
 
     async def sleep(self, seconds: float) -> None:
-        """Sleeps for the given number of seconds."""
+        """Sleeps for the given number of seconds.
+
+        Added in Synapse v1.49.0.
+        """
 
         await self._clock.sleep(seconds)
 
@@ -1231,20 +1290,16 @@ class ModuleApi:
                                                                 # regardless of their state key
                     ]
         """
+        state_filter = None
         if event_filter:
             # If a filter was provided, turn it into a StateFilter and retrieve a filtered
             # view of the state.
             state_filter = StateFilter.from_types(event_filter)
-            state_ids = await self._store.get_filtered_current_state_ids(
-                room_id,
-                state_filter,
-            )
-        else:
-            # If no filter was provided, get the whole state. We could also reuse the call
-            # to get_filtered_current_state_ids above, with `state_filter = StateFilter.all()`,
-            # but get_filtered_current_state_ids isn't cached and `get_current_state_ids`
-            # is, so using the latter when we can is better for perf.
-            state_ids = await self._store.get_current_state_ids(room_id)
+
+        state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id,
+            state_filter,
+        )
 
         state_events = await self._store.get_events(state_ids.values())
 
@@ -1252,9 +1307,9 @@ class ModuleApi:
 
     async def defer_to_thread(
         self,
-        f: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        f: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> T:
         """Runs the given function in a separate thread from Synapse's thread pool.
 
@@ -1285,6 +1340,114 @@ class ModuleApi:
             use.
         """
         await self._registration_handler.check_username(username)
+
+    async def store_remote_3pid_association(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ) -> None:
+        """Stores an existing association between a user ID and a third-party identifier.
+
+        The association must already exist on the remote identity server.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The user ID that's been associated with the 3PID.
+            medium: The medium of the 3PID (current supported values are "msisdn" and
+                "email").
+            address: The address of the 3PID.
+            id_server: The identity server the 3PID association has been registered on.
+                This should only be the domain (or IP address, optionally with the port
+                number) for the identity server. This will be used to reach out to the
+                identity server using HTTPS (unless specified otherwise by Synapse's
+                configuration) when attempting to unbind the third-party identifier.
+
+
+        """
+        await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
+
+    def check_push_rule_actions(
+        self, actions: List[Union[str, Dict[str, str]]]
+    ) -> None:
+        """Checks if the given push rule actions are valid according to the Matrix
+        specification.
+
+        See https://spec.matrix.org/v1.2/client-server-api/#actions for the list of valid
+        actions.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            actions: the actions to check.
+
+        Raises:
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
+        """
+        check_actions(actions)
+
+    async def set_push_rule_action(
+        self,
+        user_id: str,
+        scope: str,
+        kind: str,
+        rule_id: str,
+        actions: List[Union[str, Dict[str, str]]],
+    ) -> None:
+        """Changes the actions of an existing push rule for the given user.
+
+        See https://spec.matrix.org/v1.2/client-server-api/#push-rules for more
+        information about push rules and their syntax.
+
+        Can only be called on the main process.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            user_id: the user for which to change the push rule's actions.
+            scope: the push rule's scope, currently only "global" is allowed.
+            kind: the push rule's kind.
+            rule_id: the push rule's identifier.
+            actions: the actions to run when the rule's conditions match.
+
+        Raises:
+            RuntimeError if this method is called on a worker or `scope` is invalid.
+            synapse.module_api.errors.RuleNotFoundException if the rule being modified
+                can't be found.
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
+        """
+        if self.worker_app is not None:
+            raise RuntimeError("module tried to change push rule actions on a worker")
+
+        if scope != "global":
+            raise RuntimeError(
+                "invalid scope %s, only 'global' is currently allowed" % scope
+            )
+
+        spec = RuleSpec(scope, kind, rule_id, "actions")
+        await self._push_rules_handler.set_rule_attr(
+            user_id, spec, {"actions": actions}
+        )
+
+    async def get_monthly_active_users_by_service(
+        self, start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None
+    ) -> List[Tuple[str, str]]:
+        """Generates list of monthly active users and their services.
+        Please see corresponding storage docstring for more details.
+
+        Added in Synapse v1.61.0.
+
+        Arguments:
+            start_timestamp: If specified, only include users that were first active
+                at or after this point
+            end_timestamp: If specified, only include users that were first active
+                at or before this point
+
+        Returns:
+            A list of tuples (appservice_id, user_id)
+
+        """
+        return await self._store.get_monthly_active_users_by_service(
+            start_timestamp, end_timestamp
+        )
 
 
 class PublicRoomListManager:
@@ -1332,3 +1495,69 @@ class PublicRoomListManager:
             room_id: The ID of the room.
         """
         await self._store.set_room_is_public(room_id, False)
+
+
+class AccountDataManager:
+    """
+    Allows modules to manage account data.
+    """
+
+    def __init__(self, hs: "HomeServer") -> None:
+        self._hs = hs
+        self._store = hs.get_datastores().main
+        self._handler = hs.get_account_data_handler()
+
+    def _validate_user_id(self, user_id: str) -> None:
+        """
+        Validates a user ID is valid and local.
+        Private method to be used in other account data methods.
+        """
+        user = UserID.from_string(user_id)
+        if not self._hs.is_mine(user):
+            raise ValueError(
+                f"{user_id} is not local to this homeserver; can't access account data for remote users."
+            )
+
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonMapping]:
+        """
+        Gets some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Added in Synapse v1.57.0.
+        """
+        self._validate_user_id(user_id)
+
+        data = await self._store.get_global_account_data_by_type_for_user(
+            user_id, data_type
+        )
+        # We clone and freeze to prevent the module accidentally mutating the
+        # dict that lives in the cache, as that could introduce nasty bugs.
+        return freeze(data)
+
+    async def put_global(
+        self, user_id: str, data_type: str, new_data: JsonDict
+    ) -> None:
+        """
+        Puts some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Please note that this will overwrite existing the account data of that type
+        for that user!
+
+        Added in Synapse v1.57.0.
+        """
+        self._validate_user_id(user_id)
+
+        if not isinstance(data_type, str):
+            raise TypeError(f"data_type must be a str; got {type(data_type).__name__}")
+
+        if not isinstance(new_data, dict):
+            raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
+
+        # Ensure the user exists, so we don't just write to users that aren't there.
+        if await self._store.get_userinfo_by_id(user_id) is None:
+            raise ValueError(f"User {user_id} does not exist on this server.")
+
+        await self._handler.add_account_data_for_user(user_id, data_type, new_data)

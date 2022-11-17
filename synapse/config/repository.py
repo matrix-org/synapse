@@ -14,7 +14,7 @@
 
 import logging
 import os
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from urllib.request import getproxies_environment  # type: ignore
 
 import attr
@@ -94,7 +94,7 @@ def parse_thumbnail_requirements(
 class ContentRepositoryConfig(Config):
     section = "media"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
 
         # Only enable the media repo if either the media repo is enabled or the
         # current worker app is the media repo.
@@ -223,7 +223,24 @@ class ContentRepositoryConfig(Config):
                 "url_preview_accept_language"
             ) or ["en"]
 
-    def generate_config_section(self, data_dir_path, **kwargs):
+        media_retention = config.get("media_retention") or {}
+
+        self.media_retention_local_media_lifetime_ms = None
+        local_media_lifetime = media_retention.get("local_media_lifetime")
+        if local_media_lifetime is not None:
+            self.media_retention_local_media_lifetime_ms = self.parse_duration(
+                local_media_lifetime
+            )
+
+        self.media_retention_remote_media_lifetime_ms = None
+        remote_media_lifetime = media_retention.get("remote_media_lifetime")
+        if remote_media_lifetime is not None:
+            self.media_retention_remote_media_lifetime_ms = self.parse_duration(
+                remote_media_lifetime
+            )
+
+    def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
+        assert data_dir_path is not None
         media_store = os.path.join(data_dir_path, "media_store")
 
         formatted_thumbnail_sizes = "".join(

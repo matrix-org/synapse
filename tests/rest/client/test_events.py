@@ -19,6 +19,7 @@ from unittest.mock import Mock
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
+from synapse.api.constants import EduTypes
 from synapse.rest.client import events, login, room
 from synapse.server import HomeServer
 from synapse.util import Clock
@@ -103,7 +104,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
                     c
                     for c in channel.json_body["chunk"]
                     if not (
-                        c.get("type") == "m.presence"
+                        c.get("type") == EduTypes.PRESENCE
                         and c["content"].get("user_id") == self.user_id
                     )
                 ]

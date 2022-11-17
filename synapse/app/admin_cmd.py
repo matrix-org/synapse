@@ -33,12 +33,10 @@ from synapse.handlers.admin import ExfiltrationWriter
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
-from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
-from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
@@ -56,12 +54,10 @@ class AdminCmdSlavedStore(
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedFilteringStore,
-    SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
-    SlavedClientIpStore,
     BaseSlavedStore,
     RoomWorkerStore,
 ):
@@ -212,7 +208,7 @@ def start(config_options: List[str]) -> None:
         config.logging.no_redirect_stdio = True
 
     # Explicitly disable background processes
-    config.server.update_user_directory = False
+    config.worker.should_update_user_directory = False
     config.worker.run_background_tasks = False
     config.worker.start_pushers = False
     config.worker.pusher_shard_config.instances = []

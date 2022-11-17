@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +14,10 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from prometheus_client import Counter
+from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
@@ -27,7 +29,7 @@ from synapse.appservice import (
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -65,7 +67,7 @@ def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     return True
 
 
-def _is_valid_3pe_result(r: JsonDict, field: str) -> bool:
+def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     if not isinstance(r, dict):
         return False
 
@@ -153,6 +155,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
             APP_SERVICE_PREFIX,
@@ -160,7 +165,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             urllib.parse.quote(protocol),
         )
         try:
-            response = await self.get_json(uri, fields)
+            args: Mapping[Any, Any] = {
+                **fields,
+                b"access_token": service.hs_token,
+            }
+            response = await self.get_json(uri, args=args)
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
@@ -188,13 +197,15 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
+            # This is required by the configuration.
+            assert service.hs_token is not None
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri)
+                info = await self.get_json(uri, {"access_token": service.hs_token})
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -225,6 +236,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         to_device_messages: List[JsonDict],
         one_time_key_counts: TransactionOneTimeKeyCounts,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
     ) -> bool:
         """
@@ -268,6 +280,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 }
             )
 
+        # TODO: Update to stable prefixes once MSC3202 completes FCP merge
         if service.msc3202_transaction_extensions:
             if one_time_key_counts:
                 body[
@@ -275,8 +288,13 @@ class ApplicationServiceApi(SimpleHttpClient):
                 ] = one_time_key_counts
             if unused_fallback_keys:
                 body[
-                    "org.matrix.msc3202.device_unused_fallback_keys"
+                    "org.matrix.msc3202.device_unused_fallback_key_types"
                 ] = unused_fallback_keys
+            if device_list_summary:
+                body["org.matrix.msc3202.device_lists"] = {
+                    "changed": list(device_list_summary.changed),
+                    "left": list(device_list_summary.left),
+                }
 
         try:
             await self.put_json(

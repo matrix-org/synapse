@@ -162,7 +162,7 @@ class RequestMetrics:
         with _in_flight_requests_lock:
             _in_flight_requests.add(self)
 
-    def stop(self, time_sec, response_code, sent_bytes):
+    def stop(self, time_sec: float, response_code: int, sent_bytes: int) -> None:
         with _in_flight_requests_lock:
             _in_flight_requests.discard(self)
 
@@ -186,13 +186,13 @@ class RequestMetrics:
             )
             return
 
-        response_code = str(response_code)
+        response_code_str = str(response_code)
 
-        outgoing_responses_counter.labels(self.method, response_code).inc()
+        outgoing_responses_counter.labels(self.method, response_code_str).inc()
 
         response_count.labels(self.method, self.name, tag).inc()
 
-        response_timer.labels(self.method, self.name, tag, response_code).observe(
+        response_timer.labels(self.method, self.name, tag, response_code_str).observe(
             time_sec - self.start_ts
         )
 
@@ -221,7 +221,7 @@ class RequestMetrics:
         # flight.
         self.update_metrics()
 
-    def update_metrics(self):
+    def update_metrics(self) -> None:
         """Updates the in flight metrics with values from this request."""
         if not self.start_context:
             logger.error(
