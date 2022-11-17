@@ -568,6 +568,7 @@ async def filter_events_for_server(
     events: List[EventBase],
     redact: bool = True,
     check_history_visibility_only: bool = False,
+    filter_partial_state: bool = True,
 ) -> List[EventBase]:
     """Filter a list of events based on whether given server is allowed to
     see them.
@@ -633,8 +634,10 @@ async def filter_events_for_server(
 
     partial_state_invisible_events = set()
     for e in events:
-        if e.origin != local_server_name and await storage.main.is_partial_state_room(
-            e.room_id
+        if (
+            filter_partial_state
+            and e.origin != local_server_name
+            and await storage.main.is_partial_state_room(e.room_id)
         ):
             partial_state_invisible_events.add(e)
 

@@ -383,6 +383,7 @@ class FederationHandler:
                 events_to_check,
                 redact=False,
                 check_history_visibility_only=True,
+                filter_partial_state=False,
             )
             if filtered_extremities:
                 extremities_to_request.append(bp.event_id)
