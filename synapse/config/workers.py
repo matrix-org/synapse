@@ -166,7 +166,7 @@ class WorkerConfig(Config):
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)
         if self.worker_main_http_uri is not None:
             logger.warning(
-                "The config option worker_main_http_uri is unused since Synapse 1.72. "
+                "The config option worker_main_http_uri is unused since Synapse 1.73. "
                 "It can be safely removed from your configuration."
             )
 
