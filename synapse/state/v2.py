@@ -61,7 +61,11 @@ class StateResolutionStore(Protocol):
         ...
 
     def get_auth_chain_difference(
-        self, room_id: str, state_sets: List[Set[str]]
+        self,
+        room_id: str,
+        state_sets: List[Set[str]],
+        conflicted_state_ids: Set[str],
+        conflicted_boundary: Set[str],
     ) -> Awaitable[Set[str]]:
         ...
 
@@ -122,10 +126,12 @@ async def resolve_events_with_store(
     logger.debug("%d conflicted state entries", len(conflicted_state))
     logger.debug("Calculating auth chain difference")
 
+    conflicted_state_ids = set(itertools.chain.from_iterable(conflicted_state.values()))
+
     # Also fetch all auth events that appear in only some of the state sets'
     # auth chains.
     auth_diff = await _get_auth_chain_difference(
-        room_id, state_sets, event_map, state_res_store
+        room_id, state_sets, event_map, conflicted_state_ids, state_res_store
     )
 
     full_conflicted_set = set(
@@ -272,6 +278,7 @@ async def _get_auth_chain_difference(
     room_id: str,
     state_sets: Sequence[Mapping[Any, str]],
     unpersisted_events: Dict[str, EventBase],
+    conflicted_state_ids: Set[str],
     state_res_store: StateResolutionStore,
 ) -> Set[str]:
     """Compare the auth chains of each state set and return the set of events
@@ -367,14 +374,45 @@ async def _get_auth_chain_difference(
         intersection = unpersisted_set_ids[0].intersection(*unpersisted_set_ids[1:])
 
         auth_difference_unpersisted_part: Collection[str] = union - intersection
+
+        persisted_conflicted_state_ids = {
+            event_id for event_id in conflicted_state_ids if event_id not in union
+        }
+
+        boundary = state_sets_ids[0].union(*state_sets_ids[1:])
+        conflicted_boundary = set()
+
+        for event_id in persisted_conflicted_state_ids:
+            auth_chain = events_to_auth_chain.get(event_id)
+            if not auth_chain:
+                continue
+
+            conflicted_boundary != auth_chain & boundary
+
     else:
         auth_difference_unpersisted_part = ()
+        conflicted_boundary = set()
+        persisted_conflicted_state_ids = conflicted_state_ids
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
 
-    difference = await state_res_store.get_auth_chain_difference(
-        room_id, state_sets_ids
+    difference, conflicted_boundary = await state_res_store.get_auth_chain_difference(
+        room_id,
+        state_sets_ids,
+        persisted_conflicted_state_ids,
+        conflicted_boundary,
     )
     difference.update(auth_difference_unpersisted_part)
+
+    unpersisted_conflicted_state_ids = (
+        conflicted_state_ids - persisted_conflicted_state_ids
+    )
+    for boundary_event_id in conflicted_boundary:
+        for conflicted_id in unpersisted_conflicted_state_ids:
+            auth_chain = events_to_auth_chain[conflicted_id]
+            if boundary_event_id not in auth_chain:
+                continue
+
+            # TODO: Include all paths from conflicted_id -> boundary_id in difference.
 
     return difference
 
