@@ -25,7 +25,12 @@ from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
 from synapse.api.auth.base import BaseAuth
-from synapse.api.errors import AuthError, InvalidClientTokenError, StoreError
+from synapse.api.errors import (
+    AuthError,
+    InvalidClientTokenError,
+    OAuthInsufficientScopeError,
+    StoreError,
+)
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import Requester, UserID, create_requester
@@ -152,7 +157,16 @@ class OAuthDelegatedAuth(BaseAuth):
         allow_expired: bool = False,
     ) -> Requester:
         access_token = self.get_access_token_from_request(request)
-        return await self.get_user_by_access_token(access_token, allow_expired)
+
+        # TODO: we probably want to assert the allow_guest inside this call so that we don't provision the user if they don't have enough permission:
+        requester = await self.get_user_by_access_token(access_token, allow_expired)
+
+        if not allow_guest and requester.is_guest:
+            raise OAuthInsufficientScopeError(
+                ["urn:matrix:org.matrix.msc2967.client:api:*"]
+            )
+
+        return requester
 
     async def get_user_by_access_token(
         self,
