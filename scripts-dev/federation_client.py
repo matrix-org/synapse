@@ -104,6 +104,7 @@ def request(
     destination: str,
     path: str,
     content: Optional[str],
+    verify_tls: bool,
 ) -> requests.Response:
     if method is None:
         if content is None:
@@ -152,7 +153,7 @@ def request(
         method=method,
         url=dest,
         headers=headers,
-        verify=False,
+        verify=verify_tls,
         data=content,
         stream=True,
     )
@@ -203,6 +204,12 @@ def main() -> None:
     parser.add_argument("--body", help="Data to send as the body of the HTTP request")
 
     parser.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Disable TLS certificate verification",
+    )
+
+    parser.add_argument(
         "path", help="request path, including the '/_matrix/federation/...' prefix."
     )
 
@@ -227,6 +234,7 @@ def main() -> None:
         args.destination,
         args.path,
         content=args.body,
+        verify_tls=not args.insecure,
     )
 
     sys.stderr.write("Status Code: %d\n" % (result.status_code,))
@@ -288,24 +296,27 @@ class MatrixConnectionAdapter(HTTPAdapter):
     ) -> HTTPConnectionPool:
         # overrides the get_connection() method in the base class
         parsed = urlparse.urlsplit(url)
-        (host, port) = self._lookup(parsed.netloc)
-        netloc = f"{host}:{port}"
-
-        print(f"Connecting to {netloc}", file=sys.stderr)
-        url = urlparse.urlunsplit(
-            ("https", netloc, parsed.path, parsed.query, parsed.fragment)
+        (host, port, ssl_server_name) = self._lookup(parsed.netloc)
+        print(
+            f"Connecting to {host}:{port} with SNI {ssl_server_name}", file=sys.stderr
         )
-        return super().get_connection(url, proxies)
+        return self.poolmanager.connection_from_host(
+            host,
+            port=port,
+            scheme="https",
+            pool_kwargs={"server_hostname": ssl_server_name},
+        )
 
     @staticmethod
-    def _lookup(server_name: str) -> Tuple[str, int]:
+    def _lookup(server_name: str) -> Tuple[str, int, str]:
         """
         Do an SRV lookup on a server name and return the host:port to connect to
-        Given the server_name (after any .well-known lookup), return the host:port
+        Given the server_name (after any .well-known lookup), return the host, port and
+        the ssl server name
         """
         if server_name[-1] == "]":
             # ipv6 literal (with no port)
-            return server_name, 8448
+            return server_name, 8448, server_name
 
         if ":" in server_name:
             # explicit port
@@ -314,7 +325,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
                 port = int(out[1])
             except ValueError:
                 raise ValueError("Invalid host:port '%s'" % (server_name,))
-            return out[0], port
+            return out[0], port, out[0]
 
         try:
             srv = srvlookup.lookup("matrix", "tcp", server_name)[0]
@@ -322,9 +333,9 @@ class MatrixConnectionAdapter(HTTPAdapter):
                 f"SRV lookup on _matrix._tcp.{server_name} gave {srv}",
                 file=sys.stderr,
             )
-            return srv.host, srv.port
+            return srv.host, srv.port, server_name
         except Exception:
-            return server_name, 8448
+            return server_name, 8448, server_name
 
     @staticmethod
     def _get_well_known(server_name: str) -> Optional[str]:
