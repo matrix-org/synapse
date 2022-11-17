@@ -657,37 +657,103 @@ class BulkPushRuleEvaluatorTestCase(unittest.HomeserverTestCase):
         # user2 should not be notified about it, because they can't see it.
         self.assertEqual(self.get_notif_count(self.user_id2), 0)
 
+
 class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
+    def test_reactions(self) -> None:
+        message_event = FrozenEvent(
+            {
+                "event_id": "$event_id",
+                "room_id": "!room_id:beeper.com",
+                "content": {
+                    "body": "Looks like Nick is way ahead of me on this one",
+                    "msgtype": "m.text",
+                },
+                "sender": "@brad:beeper.com",
+                "type": "m.room.message",
+            },
+            RoomVersions.V1,
+        )
+
+        reaction_event = FrozenEvent(
+            {
+                "event_id": "$reaction_id",
+                "room_id": "!room_id:beeper.com",
+                "content": {
+                    "m.relates_to": {
+                        "event_id": "$event_id",
+                        "key": "\U0001F44D",
+                        "rel_type": "m.annotation",
+                    }
+                },
+                "sender": "@nick:beeper.com",
+                "type": "m.reaction",
+            },
+            RoomVersions.V1,
+        )
+
+        dm_evaluator = PushRuleEvaluator(
+            _flatten_dict(reaction_event),
+            2,
+            0,
+            {},
+            {"m.annotation": _flatten_dict(message_event)},
+            True,
+        )
+
+        # Reaction to Brad's message, should be an action for Brad
+        actions = dm_evaluator.run(
+            FilteredPushRules(PushRules([]), {}, True), "@brad:beeper.com", "Brad"
+        )
+        self.assertTrue("notify" in actions)
+
+        # Reaction to Brad's message, should not be an action for Nick
+        actions = dm_evaluator.run(
+            FilteredPushRules(PushRules([]), {}, True), "@nick:beeper.com", "Nick"
+        )
+        self.assertEqual(actions, [])
+
+        large_room_evaluator = PushRuleEvaluator(
+            _flatten_dict(reaction_event),
+            30,
+            0,
+            {},
+            {"m.annotation": _flatten_dict(message_event)},
+            True,
+        )
+
+        # Large rooms should never have emoji reaction notifications
+        actions = large_room_evaluator.run(
+            FilteredPushRules(PushRules([]), {}, True), "@brad:beeper.com", "Brad"
+        )
+        self.assertEqual(actions, [])
+        actions = large_room_evaluator.run(
+            FilteredPushRules(PushRules([]), {}, True), "@nick:beeper.com", "Nick"
+        )
+        self.assertEqual(actions, [])
+
     def test_supress_auto_accept_invite(self) -> None:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
-                "room_id":"!wFyjEwanOaElpGOaLW:beeper.com",
-                "content":{
-                    "displayname":"Brad Murray",
+                "room_id": "!wFyjEwanOaElpGOaLW:beeper.com",
+                "content": {
+                    "displayname": "Brad Murray",
                     "fi.mau.will_auto_accept": True,
                     "is_direct": True,
-                    "membership":"invite"
+                    "membership": "invite",
                 },
-                "sender":"@_brad_imessagecloud_83372:beeper.com",
-                "state_key":"@brad:beeper.com",
-                "type":"m.room.member",
+                "sender": "@_brad_imessagecloud_83372:beeper.com",
+                "state_key": "@brad:beeper.com",
+                "type": "m.room.member",
             },
             RoomVersions.V1,
         )
-        room_member_count = 0
-        sender_power_level = 0
-        power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
 
-        evaluator = PushRuleEvaluator(
-            _flatten_dict(event),
-            room_member_count,
-            sender_power_level,
-            power_levels.get("notifications", {}),
-            {},
-            True,
+        evaluator = PushRuleEvaluator(_flatten_dict(event), 0, 0, {}, {}, True)
+
+        actions = evaluator.run(
+            FilteredPushRules(PushRules([]), {}, True),
+            "@brad:beeper.com",
+            "Brad Murray",
         )
-
-        actions = evaluator.run(FilteredPushRules(PushRules([]), {}, True), "@brad:beeper.com", "Brad Murray")
         self.assertEqual(actions, [])
-
