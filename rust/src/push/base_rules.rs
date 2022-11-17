@@ -87,7 +87,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
             })),
             Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
                 key: Cow::Borrowed("content.fi.mau.will_auto_accept"),
-                pattern: Some(Cow::Borrowed("true")),
+                pattern: Some(Cow::Borrowed("*")),
                 pattern_type: None,
             })),
         ]),

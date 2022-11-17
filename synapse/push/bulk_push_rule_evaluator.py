@@ -444,6 +444,8 @@ def _flatten_dict(
     for key, value in d.items():
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
+        elif isinstance(value, bool):
+            result[".".join(prefix + [key])] = str(value).lower()
         elif isinstance(value, Mapping):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
 

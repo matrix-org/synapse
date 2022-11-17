@@ -29,7 +29,7 @@ from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
-from synapse.synapse_rust.push import PushRuleEvaluator
+from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator, PushRules
 from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
@@ -656,3 +656,38 @@ class BulkPushRuleEvaluatorTestCase(unittest.HomeserverTestCase):
 
         # user2 should not be notified about it, because they can't see it.
         self.assertEqual(self.get_notif_count(self.user_id2), 0)
+
+class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
+    def test_supress_auto_accept_invite(self) -> None:
+        event = FrozenEvent(
+            {
+                "event_id": "$event_id",
+                "room_id":"!wFyjEwanOaElpGOaLW:beeper.com",
+                "content":{
+                    "displayname":"Brad Murray",
+                    "fi.mau.will_auto_accept": True,
+                    "is_direct": True,
+                    "membership":"invite"
+                },
+                "sender":"@_brad_imessagecloud_83372:beeper.com",
+                "state_key":"@brad:beeper.com",
+                "type":"m.room.member",
+            },
+            RoomVersions.V1,
+        )
+        room_member_count = 0
+        sender_power_level = 0
+        power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
+
+        evaluator = PushRuleEvaluator(
+            _flatten_dict(event),
+            room_member_count,
+            sender_power_level,
+            power_levels.get("notifications", {}),
+            {},
+            True,
+        )
+
+        actions = evaluator.run(FilteredPushRules(PushRules([]), {}, True), "@brad:beeper.com", "Brad Murray")
+        self.assertEqual(actions, [])
+
