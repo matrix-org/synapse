@@ -265,13 +265,14 @@ class MatrixConnectionAdapter(HTTPAdapter):
     def send(
         self,
         request: PreparedRequest,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> Response:
         # overrides the send() method in the base class.
 
         # We need to look for .well-known redirects before passing the request up to
         # HTTPAdapter.send().
+        assert isinstance(request.url, str)
         parsed = urlparse.urlsplit(request.url)
         server_name = parsed.netloc
         well_known = self._get_well_known(parsed.netloc)
