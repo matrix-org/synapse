@@ -503,6 +503,8 @@ worker application type.
 
 ### `synapse.app.pusher`
 
+**Deprecated as of Synapse v1.74.** [Use `synapse.app.generic_worker` with the `pusher_instances` map instead](usage/configuration/config_documentation.md#pusher_instances).
+
 Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
 [`start_pushers: false`](usage/configuration/config_documentation.md#start_pushers) in the
@@ -540,6 +542,8 @@ Note this worker cannot be load-balanced: only one instance should be active.
 
 
 ### `synapse.app.federation_sender`
+
+**Deprecated as of Synapse v1.74.** [Use `synapse.app.generic_worker` with the `federation_sender_instances` map instead](usage/configuration/config_documentation.md#federation_sender_instances).
 
 Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
@@ -637,7 +641,9 @@ equivalent to `synapse.app.generic_worker`:
  * `synapse.app.client_reader`
  * `synapse.app.event_creator`
  * `synapse.app.federation_reader`
+ * `synapse.app.federation_sender`
  * `synapse.app.frontend_proxy`
+ * `synapse.app.pusher`
  * `synapse.app.synchrotron`
 
 
