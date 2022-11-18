@@ -276,11 +276,22 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             A mapping from device_id to a dict containing "device_id", "user_id"
             and "display_name" for each device.
         """
-        devices = await self.db_pool.simple_select_list(
+        return await self.db_pool.runInteraction(
+            "get_devices_by_user",
+            self.get_devices_by_user_txn,
+            self.db_pool,
+            user_id,
+        )
+
+    @staticmethod
+    def get_devices_by_user_txn(
+        txn: LoggingTransaction, db_pool: DatabasePool, user_id: str
+    ) -> Dict[str, Dict[str, str]]:
+        devices = db_pool.simple_select_list_txn(
+            txn,
             table="devices",
             keyvalues={"user_id": user_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
-            desc="get_devices_by_user",
         )
 
         return {d["device_id"]: d for d in devices}
