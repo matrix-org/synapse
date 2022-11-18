@@ -857,7 +857,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 response = await self.client.get_json(
                     destination=server_name,
                     path="/_matrix/key/v2/server/"
-                    + urllib.parse.quote(requested_key_id),
+                    + urllib.parse.quote(requested_key_id, safe=""),
                     ignore_backoff=True,
                     # we only give the remote server 10s to respond. It should be an
                     # easy request to handle, so if it doesn't reply within 10s, it's
