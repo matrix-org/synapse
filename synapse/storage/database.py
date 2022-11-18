@@ -1154,10 +1154,11 @@ class DatabasePool:
         conflict (i.e. `keyvalues.keys()`).
 
         If there is no such index yet[*], we can "emulate" an upsert with a SELECT
-        followed by either an INSERT or an UPDATE. This is unsafe: we cannot make the
-        same atomicity guarantees that a native upsert can and are very vulnerable to
-        races and crashes. Therefore if we wish to upsert without an appropriate unique
-        index, we must acquire a table-level lock before the emulated upsert.
+        followed by either an INSERT or an UPDATE. This is unsafe unless *all* upserters
+        run at the SERIALIZABLE isolation level: we cannot make the same atomicity
+        guarantees that a native upsert can and are very vulnerable to races and
+        crashes. Therefore to upsert without an appropriate unique index, we acquire a
+        table-level lock before the emulated upsert.
 
         [*]: Some tables have unique indices added to them in the background. Those
              tables `T` are keys in the dictionary UNIQUE_INDEX_BACKGROUND_UPDATES,
