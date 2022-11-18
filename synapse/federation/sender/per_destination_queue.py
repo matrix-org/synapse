@@ -570,6 +570,10 @@ class PerDestinationQueue:
             content: JsonDict = {}
 
             # Iterate each room's receipt types and threads, adding it to the content.
+            #
+            # _pending_rrs is mutated inside of this loop so take care to iterate
+            # a copy of the keys. Similarly, the dictionary values of _pending_rrs
+            # are mutated during iteration.
             for room_id in list(self._pending_rrs.keys()):
                 for receipt_type in list(self._pending_rrs[room_id].keys()):
                     thread_ids = self._pending_rrs[room_id][receipt_type]
