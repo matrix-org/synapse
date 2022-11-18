@@ -634,8 +634,9 @@ async def filter_events_for_server(
     partial_state_invisible_events = set()
     if not check_history_visibility_only:
         for e in events:
+            sender_domain = get_domain_from_id(e.sender)
             if (
-                e.origin != local_server_name
+                sender_domain != local_server_name
                 and await storage.main.is_partial_state_room(e.room_id)
             ):
                 partial_state_invisible_events.add(e)
