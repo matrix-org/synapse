@@ -595,7 +595,6 @@ class PerDestinationQueue:
             )
             generated_edus += 1
 
-        self._pending_rrs = {}
         self._rrs_pending_flush = False
 
     def _pop_pending_edus(self, limit: int) -> List[Edu]:
