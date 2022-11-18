@@ -286,7 +286,8 @@ class MatrixConnectionAdapter(HTTPAdapter):
         )
 
         # at this point we also add the host header (otherwise urllib will add one
-        # based on the host we connect to, which may be wrong).
+        # based on the `host` from the connection returned by `get_connection`,
+        # which will be wrong if there is an SRV record).
         request.headers["Host"] = server_name
 
         return super().send(request, *args, **kwargs)
