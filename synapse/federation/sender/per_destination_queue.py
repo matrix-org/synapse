@@ -562,8 +562,8 @@ class PerDestinationQueue:
         # need additional ones for different threads. The result is that we will
         # send N EDUs where N is the number of unique threads across rooms.
         #
-        # This could be more efficient by bundling users who have sent receipts
-        # for different threads.
+        # TODO This could be more efficient by bundling users who have sent
+        #      receipts for different threads.
         generated_edus = 0
         while self._pending_rrs and generated_edus < limit:
             # The next EDU's content.
@@ -577,17 +577,18 @@ class PerDestinationQueue:
             for room_id in list(self._pending_rrs.keys()):
                 for receipt_type in list(self._pending_rrs[room_id].keys()):
                     thread_ids = self._pending_rrs[room_id][receipt_type]
-                    # The thread ID itself doesn't matter at this point.
+                    # The thread ID itself doesn't matter at this point -- it is
+                    # included in the receipt data already.
                     content.setdefault(room_id, {})[
                         receipt_type
                     ] = thread_ids.popitem()[1]
 
-                    # If there are no threads left in this room / receipt type.
-                    # Clear it out.
+                    # If there are no threads left in the receipt type for this
+                    # room, then delete the entire receipt type.
                     if not thread_ids:
                         del self._pending_rrs[room_id][receipt_type]
 
-                # Again, clear out any blank rooms.
+                # If there are no receipt types left in this room, delete the room.
                 if not self._pending_rrs[room_id]:
                     del self._pending_rrs[room_id]
 
