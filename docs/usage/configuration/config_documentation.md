@@ -3719,6 +3719,7 @@ worker_replication_secret: "secret_secret"
 ---
 ### `start_pushers`
 
+Unnecessary to set if using [`pusher_instances`](#pusher_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
 Controls sending of push notifications on the main process. Set to `false`
 if using a [pusher worker](../../workers.md#synapseapppusher). Defaults to `true`.
 
@@ -3729,24 +3730,29 @@ start_pushers: false
 ---
 ### `pusher_instances`
 
-It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
-in which case the work is balanced across them. Use this setting to list the pushers by
-[`worker_name`](#worker_name). Ensure the main process and all pusher workers are
-restarted after changing this option.
+It is possible to scale the processes that handle sending push notifications to sygnal
+and email by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+a `pusher_instances` map. Doing so will remove handling of this function from the main
+process. Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.
 
-If no or only one pusher worker is configured, this setting is not necessary.
-The main process will send out push notifications by default if you do not disable
-it by setting [`start_pushers: false`](#start_pushers).
-
-Example configuration:
+Example configuration for a single worker:
 ```yaml
-start_pushers: false
+pusher_instances:
+  - pusher_worker1
+```
+And for multiple workers:
+```yaml
 pusher_instances:
   - pusher_worker1
   - pusher_worker2
 ```
+
 ---
 ### `send_federation`
+
+Unnecessary to set if using [`federation_sender_instances`](#federation_sender_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
 
 Controls sending of outbound federation transactions on the main process.
 Set to `false` if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
@@ -3759,20 +3765,27 @@ send_federation: false
 ---
 ### `federation_sender_instances`
 
-It is possible to run multiple
-[federation sender worker](../../workers.md#synapseappfederation_sender), in which
-case the work is balanced across them. Use this setting to list the senders.
+It is possible to scale the processes that handle sending outbound federation requests
+by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+a `federation_sender_instances` map. Doing so will remove handling of this function from
+the main process. Multiple workers can be added to this map, in which case the work is
+balanced across them.
 
-This configuration setting must be shared between all federation sender workers, and if
-changed all federation sender workers must be stopped at the same time and then
-started, to ensure that all instances are running with the same config (otherwise
+This configuration setting must be shared between all workers handling federation
+sending, and if changed all federation sender workers must be stopped at the same time
+and then started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).
 
-Example configuration:
+Example configuration for a single worker:
 ```yaml
-send_federation: false
 federation_sender_instances:
   - federation_sender1
+```
+And for multiple workers:
+```yaml
+federation_sender_instances:
+  - federation_sender1
+  - federation_sender2
 ```
 ---
 ### `instance_map`
