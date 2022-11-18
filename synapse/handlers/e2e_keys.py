@@ -872,7 +872,7 @@ class E2eKeysHandler:
         - signatures of the user's master key by the user's devices.
 
         Args:
-            user_id (string): the user uploading the keys
+            user_id: the user uploading the keys
             signatures (dict[string, dict]): map of devices to signed keys
 
         Returns:

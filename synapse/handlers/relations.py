@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Tup
 
 import attr
 
-from synapse.api.constants import RelationTypes
+from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
 from synapse.logging.opentracing import trace
@@ -75,6 +75,7 @@ class RelationsHandler:
         self._clock = hs.get_clock()
         self._event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
+        self._event_creation_handler = hs.get_event_creation_handler()
 
     async def get_relations(
         self,
@@ -204,6 +205,59 @@ class RelationsHandler:
         ]
 
         return related_events, next_token
+
+    async def redact_events_related_to(
+        self,
+        requester: Requester,
+        event_id: str,
+        initial_redaction_event: EventBase,
+        relation_types: List[str],
+    ) -> None:
+        """Redacts all events related to the given event ID with one of the given
+        relation types.
+
+        This method is expected to be called when redacting the event referred to by
+        the given event ID.
+
+        If an event cannot be redacted (e.g. because of insufficient permissions), log
+        the error and try to redact the next one.
+
+        Args:
+            requester: The requester to redact events on behalf of.
+            event_id: The event IDs to look and redact relations of.
+            initial_redaction_event: The redaction for the event referred to by
+                event_id.
+            relation_types: The types of relations to look for.
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned
+        """
+        related_event_ids = (
+            await self._main_store.get_all_relations_for_event_with_types(
+                event_id, relation_types
+            )
+        )
+
+        for related_event_id in related_event_ids:
+            try:
+                await self._event_creation_handler.create_and_send_nonmember_event(
+                    requester,
+                    {
+                        "type": EventTypes.Redaction,
+                        "content": initial_redaction_event.content,
+                        "room_id": initial_redaction_event.room_id,
+                        "sender": requester.user.to_string(),
+                        "redacts": related_event_id,
+                    },
+                    ratelimit=False,
+                )
+            except SynapseError as e:
+                logger.warning(
+                    "Failed to redact event %s (related to event %s): %s",
+                    related_event_id,
+                    event_id,
+                    e.msg,
+                )
 
     async def get_annotations_for_event(
         self,

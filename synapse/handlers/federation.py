@@ -1596,8 +1596,8 @@ class FederationHandler:
         Fetch the complexity of a remote room over federation.
 
         Args:
-            remote_room_hosts (list[str]): The remote servers to ask.
-            room_id (str): The room ID to ask about.
+            remote_room_hosts: The remote servers to ask.
+            room_id: The room ID to ask about.
 
         Returns:
             Dict contains the complexity

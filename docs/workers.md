@@ -135,8 +135,8 @@ In the config file for each worker, you must specify:
    [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)).
  * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners) option
    with an `http` listener.
- * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
-   the main process (`worker_main_http_uri`).
+ * **Synapse 1.72 and older:** if handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
+   the main process (`worker_main_http_uri`). This config option is no longer required and is ignored when running Synapse 1.73 and newer.
 
 For example:
 
@@ -221,7 +221,6 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
-    # Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
     ^/_matrix/client/(r0|v3|unstable)/keys/changes$
     ^/_matrix/client/(r0|v3|unstable)/keys/claim$
@@ -305,9 +304,11 @@ may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
-requests from a particular user are routed to a single instance. Extracting a
-user ID from the access token or `Authorization` header is currently left as an
-exercise for the reader. Admins may additionally wish to separate out `/sync`
+requests from a particular user are routed to a single instance. This can
+be done e.g. in nginx via IP `hash $http_x_forwarded_for;` or via
+`hash $http_authorization consistent;` which contains the users access token.
+
+Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
 `/initialSync`), as requests that don't are known as "initial sync" that happens
 when a user logs in on a new device and can be *very* resource intensive, so
@@ -374,7 +375,7 @@ responsible for
 - persisting them to the DB, and finally
 - updating the events stream.
 
-Because load is sharded in this way, you *must* restart all worker instances when 
+Because load is sharded in this way, you *must* restart all worker instances when
 adding or removing event persisters.
 
 An `event_persister` should not be mistaken for an `event_creator`.

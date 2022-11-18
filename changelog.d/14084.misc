@@ -1,1 +1,0 @@
-Fix type annotation causing import time error in the Complement forking launcher.
