@@ -183,7 +183,7 @@ class FederationRateLimiter:
                 # Handle request ...
 
         Args:
-            host (str): Origin of incoming request.
+            host: Origin of incoming request.
 
         Returns:
             context manager which returns a deferred.

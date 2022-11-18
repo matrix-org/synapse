@@ -569,15 +569,15 @@ class DatabasePool:
             retcols=["update_name"],
             desc="check_background_updates",
         )
-        updates = [x["update_name"] for x in updates]
+        background_update_names = [x["update_name"] for x in updates]
 
         for table, update_name in UNIQUE_INDEX_BACKGROUND_UPDATES.items():
-            if update_name not in updates:
+            if update_name not in background_update_names:
                 logger.debug("Now safe to upsert in %s", table)
                 self._unsafe_to_upsert_tables.discard(table)
 
         # If there's any updates still running, reschedule to run.
-        if updates:
+        if background_update_names:
             self._clock.call_later(
                 15.0,
                 run_as_background_process,

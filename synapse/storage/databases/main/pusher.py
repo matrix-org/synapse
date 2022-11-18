@@ -27,13 +27,18 @@ from typing import (
 )
 
 from synapse.push import PusherConfig, ThrottleParams
+from synapse.replication.tcp.streams import PushersStream
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    AbstractStreamIdTracker,
+    StreamIdGenerator,
+)
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -52,8 +57,15 @@ class PusherWorkerStore(SQLBaseStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
-        self._pushers_id_gen = StreamIdGenerator(
-            db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
+
+        # In the worker store this is an ID tracker which we overwrite in the non-worker
+        # class below that is used on the main process.
+        self._pushers_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+            db_conn,
+            "pushers",
+            "id",
+            extra_tables=[("deleted_pushers", "stream_id")],
+            is_writer=hs.config.worker.worker_app is None,
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -95,6 +107,16 @@ class PusherWorkerStore(SQLBaseStore):
             r["enabled"] = bool(r["enabled"])
 
             yield PusherConfig(**r)
+
+    def get_pushers_stream_token(self) -> int:
+        return self._pushers_id_gen.get_current_token()
+
+    def process_replication_rows(
+        self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
+    ) -> None:
+        if stream_name == PushersStream.NAME:
+            self._pushers_id_gen.advance(instance_name, token)
+        return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     async def get_pushers_by_app_id_and_pushkey(
         self, app_id: str, pushkey: str
@@ -545,8 +567,9 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
 
 
 class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
-    def get_pushers_stream_token(self) -> int:
-        return self._pushers_id_gen.get_current_token()
+    # Because we have write access, this will be a StreamIdGenerator
+    # (see PusherWorkerStore.__init__)
+    _pushers_id_gen: AbstractStreamIdGenerator
 
     async def add_pusher(
         self,

@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import abc
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -39,6 +38,7 @@ from synapse.logging.tracing import (
     whitelisted_homeserver,
 )
 from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatureStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -49,6 +49,11 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.types import Cursor
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    AbstractStreamIdTracker,
+    StreamIdGenerator,
+)
 from synapse.types import JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -80,9 +85,23 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
+        # In the worker store this is an ID tracker which we overwrite in the non-worker
+        # class below that is used on the main process.
+        self._device_list_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+            db_conn,
+            "device_lists_stream",
+            "stream_id",
+            extra_tables=[
+                ("user_signature_stream", "stream_id"),
+                ("device_lists_outbound_pokes", "stream_id"),
+                ("device_lists_changes_in_room", "stream_id"),
+            ],
+            is_writer=hs.config.worker.worker_app is None,
+        )
+
         # Type-ignore: _device_list_id_gen is mixed in from either DataStore (as a
         # StreamIdGenerator) or SlavedDataStore (as a SlavedIdTracker).
-        device_list_max = self._device_list_id_gen.get_current_token()  # type: ignore[attr-defined]
+        device_list_max = self._device_list_id_gen.get_current_token()
         device_list_prefill, min_device_list_id = self.db_pool.get_cache_dict(
             db_conn,
             "device_lists_stream",
@@ -135,6 +154,39 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             self._clock.looping_call(
                 self._prune_old_outbound_device_pokes, 60 * 60 * 1000
             )
+
+    def process_replication_rows(
+        self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
+    ) -> None:
+        if stream_name == DeviceListsStream.NAME:
+            self._device_list_id_gen.advance(instance_name, token)
+            self._invalidate_caches_for_devices(token, rows)
+        elif stream_name == UserSignatureStream.NAME:
+            self._device_list_id_gen.advance(instance_name, token)
+            for row in rows:
+                self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
+        return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def _invalidate_caches_for_devices(
+        self, token: int, rows: Iterable[DeviceListsStream.DeviceListsStreamRow]
+    ) -> None:
+        for row in rows:
+            # The entities are either user IDs (starting with '@') whose devices
+            # have changed, or remote servers that we need to tell about
+            # changes.
+            if row.entity.startswith("@"):
+                self._device_list_stream_cache.entity_has_changed(row.entity, token)
+                self.get_cached_devices_for_user.invalidate((row.entity,))
+                self._get_cached_user_device.invalidate((row.entity,))
+                self.get_device_list_last_stream_id_for_remote.invalidate((row.entity,))
+
+            else:
+                self._device_list_federation_stream_cache.entity_has_changed(
+                    row.entity, token
+                )
+
+    def get_device_stream_token(self) -> int:
+        return self._device_list_id_gen.get_current_token()
 
     async def count_devices_by_users(self, user_ids: Optional[List[str]] = None) -> int:
         """Retrieve number of all devices of given users.
@@ -274,6 +326,13 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             destination, int(from_stream_id)
         )
         if not has_changed:
+            # debugging for https://github.com/matrix-org/synapse/issues/14251
+            issue_8631_logger.debug(
+                "%s: no change between %i and %i",
+                destination,
+                from_stream_id,
+                now_stream_id,
+            )
             return now_stream_id, []
 
         updates = await self.db_pool.runInteraction(
@@ -466,7 +525,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             limit: Maximum number of device updates to return
 
         Returns:
-            List: List of device update tuples:
+            List of device update tuples:
                 - user_id
                 - device_id
                 - stream_id
@@ -669,11 +728,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 "user_ids": json_encoder.encode(user_ids),
             },
         )
-
-    @abc.abstractmethod
-    def get_device_stream_token(self) -> int:
-        """Get the current stream id from the _device_list_id_gen"""
-        ...
 
     @trace
     @cancellable
@@ -1474,6 +1528,10 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
+    # Because we have write access, this will be a StreamIdGenerator
+    # (see DeviceWorkerStore.__init__)
+    _device_list_id_gen: AbstractStreamIdGenerator
+
     def __init__(
         self,
         database: DatabasePool,
@@ -1798,7 +1856,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 context,
             )
 
-        async with self._device_list_id_gen.get_next_mult(  # type: ignore[attr-defined]
+        async with self._device_list_id_gen.get_next_mult(
             len(device_ids)
         ) as stream_ids:
             await self.db_pool.runInteraction(
@@ -1848,7 +1906,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self,
         txn: LoggingTransaction,
         user_id: str,
-        device_ids: Iterable[str],
+        device_id: str,
         hosts: Collection[str],
         stream_ids: List[int],
         context: Optional[Dict[str, str]],
@@ -1864,6 +1922,21 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         stream_id_iterator = iter(stream_ids)
 
         encoded_context = json_encoder.encode(context)
+        mark_sent = not self.hs.is_mine_id(user_id)
+
+        values = [
+            (
+                destination,
+                next(stream_id_iterator),
+                user_id,
+                device_id,
+                mark_sent,
+                now,
+                encoded_context if whitelisted_homeserver(destination) else "{}",
+            )
+            for destination in hosts
+        ]
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
@@ -1876,22 +1949,20 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 "ts",
                 "tracing_context",
             ),
-            values=[
-                (
-                    destination,
-                    next(stream_id_iterator),
-                    user_id,
-                    device_id,
-                    not self.hs.is_mine_id(
-                        user_id
-                    ),  # We only need to send out update for *our* users
-                    now,
-                    encoded_context if whitelisted_homeserver(destination) else "{}",
-                )
-                for destination in hosts
-                for device_id in device_ids
-            ],
+            values=values,
         )
+
+        # debugging for https://github.com/matrix-org/synapse/issues/14251
+        if issue_8631_logger.isEnabledFor(logging.DEBUG):
+            issue_8631_logger.debug(
+                "Recorded outbound pokes for %s:%s with device stream ids %s",
+                user_id,
+                device_id,
+                {
+                    stream_id: destination
+                    for (destination, stream_id, _, _, _, _, _) in values
+                },
+            )
 
     def _add_device_outbound_room_poke_txn(
         self,
@@ -1997,7 +2068,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 self._add_device_outbound_poke_to_stream_txn(
                     txn,
                     user_id=user_id,
-                    device_ids=[device_id],
+                    device_id=device_id,
                     hosts=hosts,
                     stream_ids=stream_ids,
                     context=context,
@@ -2024,7 +2095,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 [],
             )
 
-        async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:  # type: ignore[attr-defined]
+        async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:
             return await self.db_pool.runInteraction(
                 "add_device_list_outbound_pokes",
                 add_device_list_outbound_pokes_txn,
@@ -2038,7 +2109,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         updates during partial joins.
         """
 
-        async with self._device_list_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
+        async with self._device_list_id_gen.get_next() as stream_id:
             await self.db_pool.simple_upsert(
                 table="device_lists_remote_pending",
                 keyvalues={

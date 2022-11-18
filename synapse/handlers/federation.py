@@ -442,6 +442,15 @@ class FederationHandler:
                     # appropriate stuff.
                     # TODO: We can probably do something more intelligent here.
                     return True
+                except NotRetryingDestination as e:
+                    logger.info("_maybe_backfill_inner: %s", e)
+                    continue
+                except FederationDeniedError:
+                    logger.info(
+                        "_maybe_backfill_inner: Not attempting to backfill from %s because the homeserver is not on our federation whitelist",
+                        dom,
+                    )
+                    continue
                 except (SynapseError, InvalidResponseError) as e:
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
@@ -477,14 +486,8 @@ class FederationHandler:
 
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
-                except NotRetryingDestination as e:
-                    logger.info(str(e))
-                    continue
                 except RequestSendFailed as e:
                     logger.info("Failed to get backfill from %s because %s", dom, e)
-                    continue
-                except FederationDeniedError as e:
-                    logger.info(e)
                     continue
                 except Exception as e:
                     logger.exception("Failed to backfill from %s because %s", dom, e)
@@ -1017,7 +1020,9 @@ class FederationHandler:
 
         context = EventContext.for_outlier(self._storage_controllers)
 
-        await self._bulk_push_rule_evaluator.action_for_event_by_user(event, context)
+        await self._bulk_push_rule_evaluator.action_for_events_by_user(
+            [(event, context)]
+        )
         try:
             await self._federation_event_handler.persist_events_and_notify(
                 event.room_id, [(event, context)]
@@ -1591,8 +1596,8 @@ class FederationHandler:
         Fetch the complexity of a remote room over federation.
 
         Args:
-            remote_room_hosts (list[str]): The remote servers to ask.
-            room_id (str): The room ID to ask about.
+            remote_room_hosts: The remote servers to ask.
+            room_id: The room ID to ask about.
 
         Returns:
             Dict contains the complexity

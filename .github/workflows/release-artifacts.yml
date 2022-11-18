@@ -99,7 +99,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-10.15]
+        os: [ubuntu-20.04, macos-11]
         arch: [x86_64, aarch64]
         # is_pr is a flag used to exclude certain jobs from the matrix on PRs.
         # It is not read by the rest of the workflow.
@@ -109,9 +109,9 @@ jobs:
         exclude:
           # Don't build macos wheels on PR CI.
           - is_pr: true
-            os: "macos-10.15"
+            os: "macos-11"
           # Don't build aarch64 wheels on mac.
-          - os: "macos-10.15"
+          - os: "macos-11"
             arch: aarch64
           # Don't build aarch64 wheels on PR CI.
           - is_pr: true

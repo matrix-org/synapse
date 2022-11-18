@@ -116,8 +116,7 @@ class ContextResourceUsage:
         """Create a new ContextResourceUsage
 
         Args:
-            copy_from (ContextResourceUsage|None): if not None, an object to
-                copy stats from
+            copy_from: if not None, an object to copy stats from
         """
         if copy_from is None:
             self.reset()
@@ -161,7 +160,7 @@ class ContextResourceUsage:
         """Add another ContextResourceUsage's stats to this one's.
 
         Args:
-            other (ContextResourceUsage): the other resource usage object
+            other: the other resource usage object
         """
         self.ru_utime += other.ru_utime
         self.ru_stime += other.ru_stime
@@ -335,7 +334,7 @@ class LoggingContext:
         called directly.
 
         Returns:
-            LoggingContext: the current logging context
+            The current logging context
         """
         warnings.warn(
             "synapse.logging.context.LoggingContext.current_context() is deprecated "
@@ -355,7 +354,8 @@ class LoggingContext:
         called directly.
 
         Args:
-            context(LoggingContext): The context to activate.
+            context: The context to activate.
+
         Returns:
             The context that was previously active
         """
@@ -467,8 +467,7 @@ class LoggingContext:
         """Get resources used by this logcontext so far.
 
         Returns:
-            ContextResourceUsage: a *copy* of the object tracking resource
-                usage so far
+            A *copy* of the object tracking resource usage so far
         """
         # we always return a copy, for consistency
         res = self._resource_usage.copy()
@@ -656,7 +655,8 @@ def current_context() -> LoggingContextOrSentinel:
 def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSentinel:
     """Set the current logging context in thread local storage
     Args:
-        context(LoggingContext): The context to activate.
+        context: The context to activate.
+
     Returns:
         The context that was previously active
     """
@@ -693,7 +693,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
         suffix: suffix to add to the parent context's 'name'.
 
     Returns:
-        LoggingContext: new logging context.
+        A new logging context.
     """
     curr_context = current_context()
     if not curr_context:
@@ -891,20 +891,19 @@ def defer_to_thread(
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked, and whose threadpool we should use for the
-            function.
+        reactor: The reactor in whose main thread the Deferred will be invoked,
+            and whose threadpool we should use for the function.
 
             Normally this will be hs.get_reactor().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     return defer_to_threadpool(reactor, reactor.getThreadPool(), f, *args, **kwargs)
@@ -932,20 +931,20 @@ def defer_to_threadpool(
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked. Normally this will be hs.get_reactor().
+        reactor: The reactor in whose main thread the Deferred will be invoked.
+            Normally this will be hs.get_reactor().
 
-        threadpool (twisted.python.threadpool.ThreadPool): The threadpool to use for
-            running `f`. Normally this will be hs.get_reactor().getThreadPool().
+        threadpool: The threadpool to use for running `f`. Normally this will be
+            hs.get_reactor().getThreadPool().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     curr_context = current_context()

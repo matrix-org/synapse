@@ -415,6 +415,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
+        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
     def get_room_max_stream_ordering(self) -> int:
         """Get the stream_ordering of regular events that we have committed up to

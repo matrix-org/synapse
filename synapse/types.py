@@ -143,8 +143,8 @@ class Requester:
         Requester.
 
         Args:
-            store (DataStore): Used to convert AS ID to AS object
-            input (dict): A dict produced by `serialize`
+            store: Used to convert AS ID to AS object
+            input: A dict produced by `serialize`
 
         Returns:
             Requester
