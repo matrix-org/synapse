@@ -3731,7 +3731,7 @@ start_pushers: false
 ---
 ### `pusher_instances`
 
-It is possible to scale the processes that handle sending push notifications to sygnal
+It is possible to scale the processes that handle sending push notifications to [sygnal](https://github.com/matrix-org/sygnal)
 and email by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
 a `pusher_instances` map. Doing so will remove handling of this function from the main
 process. Multiple workers can be added to this map, in which case the work is balanced
