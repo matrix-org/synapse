@@ -3720,6 +3720,7 @@ worker_replication_secret: "secret_secret"
 ### `start_pushers`
 
 Unnecessary to set if using [`pusher_instances`](#pusher_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
+
 Controls sending of push notifications on the main process. Set to `false`
 if using a [pusher worker](../../workers.md#synapseapppusher). Defaults to `true`.
 
