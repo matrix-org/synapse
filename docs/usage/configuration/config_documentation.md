@@ -858,7 +858,7 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default. Please be advised 
+The message retention policies feature is disabled by default. Please be advised
 that enabling this feature carries some risk. There are known bugs with the implementation
 which can cause database corruption. Setting retention to delete older history
 is less risky than deleting newer history but in general caution is advised when enabling this
@@ -3021,7 +3021,7 @@ Options for each entry include:
      which is set to the claims returned by the UserInfo Endpoint and/or
      in the ID Token.
 
-* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications. 
+* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications.
   Those notifications are expected to be received on `/_synapse/client/oidc/backchannel_logout`.
   Defaults to `false`.
 
@@ -3438,7 +3438,7 @@ This option has the following sub-options:
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
-    
+
     These indexes are built the first time Synapse starts; admins can
     manually trigger a rebuild via the API following the instructions
     [for running background updates](../administration/admin_api/background_updates.md#run),
@@ -3697,7 +3697,7 @@ As a result, the worker configuration is divided into two parts.
 
 1. The first part (in this section of the manual) defines which shardable tasks
    are delegated to privileged workers. This allows unprivileged workers to make
-   request a privileged worker to act on their behalf.
+   requests to a privileged worker to act on their behalf.
 1. [The second part](#individual-worker-configuration)
    controls the behaviour of individual workers in isolation.
 
@@ -3709,7 +3709,7 @@ For guidance on setting up workers, see the [worker documentation](../../workers
 A shared secret used by the replication APIs on the main process to authenticate
 HTTP requests from workers.
 
-The default, this value is omitted (equivalently `null`), which means that 
+The default, this value is omitted (equivalently `null`), which means that
 traffic between the workers and the main process is not authenticated.
 
 Example configuration:
@@ -3779,9 +3779,9 @@ federation_sender_instances:
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs 
+Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
 a HTTP replication listener, and that listener should be included in the `instance_map`.
-(The main process also needs an HTTP replication listener, but it should not be 
+(The main process also needs an HTTP replication listener, but it should not be
 listed in the `instance_map`.)
 
 Example configuration:
@@ -3915,8 +3915,8 @@ worker_replication_http_tls: true
 ---
 ### `worker_listeners`
 
-A worker can handle HTTP requests. To do so, a `worker_listeners` option 
-must be declared, in the same way as the [`listeners` option](#listeners) 
+A worker can handle HTTP requests. To do so, a `worker_listeners` option
+must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
 Workers declared in [`stream_writers`](#stream_writers) will need to include a
@@ -3935,7 +3935,7 @@ worker_listeners:
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option 
+If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option
 must be omitted or set to `false`.
 
 Defaults to `false`.
@@ -3947,11 +3947,11 @@ worker_daemonize: true
 ---
 ### `worker_pid_file`
 
-When running a worker as a daemon, we need a place to store the 
+When running a worker as a daemon, we need a place to store the
 [PID](https://en.wikipedia.org/wiki/Process_identifier) of the worker.
 This option defines the location of that "pid file".
 
-This option is required if `worker_daemonize` is `true` and ignored 
+This option is required if `worker_daemonize` is `true` and ignored
 otherwise. It has no default.
 
 See also the [`pid_file` option](#pid_file) option for the main Synapse process.
@@ -4001,4 +4001,3 @@ background_updates:
     min_batch_size: 10
     default_batch_size: 50
 ```
-
