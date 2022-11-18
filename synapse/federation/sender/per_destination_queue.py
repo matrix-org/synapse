@@ -600,7 +600,10 @@ class PerDestinationQueue:
             )
             generated_edus += 1
 
-        self._rrs_pending_flush = False
+        # If there are still pending read-receipts, don't reset the pending flush
+        # flag.
+        if not self._pending_rrs:
+            self._rrs_pending_flush = False
 
     def _pop_pending_edus(self, limit: int) -> List[Edu]:
         pending_edus = self._pending_edus
