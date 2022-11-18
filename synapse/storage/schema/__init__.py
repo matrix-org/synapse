@@ -85,15 +85,16 @@ Changes in SCHEMA_VERSION = 73;
       events over federation.
     - Add indexes to various tables (`event_failed_pull_attempts`, `insertion_events`,
       `batch_events`) to make it easy to delete all associated rows when purging a room.
+    - `inserted_ts` column is added to `event_push_actions_staging` table.
     - Rename column in `device_lists_outbound_pokes` and `device_lists_changes_in_room`
       from `opentracing_context` to generalized `tracing_context`.
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    # The groups tables are no longer accessible, so synapses with SCHEMA_VERSION < 72
-    # could break.
-    72
+    # The threads_id column must exist for event_push_actions, event_push_summary,
+    # receipts_linearized, and receipts_graph.
+    73
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

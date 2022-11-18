@@ -25,6 +25,7 @@ use crate::push::Action;
 use crate::push::Condition;
 use crate::push::EventMatchCondition;
 use crate::push::PushRule;
+use crate::push::RelatedEventMatchCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 
@@ -115,6 +116,22 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
+        rule_id: Cow::Borrowed("global/override/.im.nheko.msc3664.reply"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatch(
+            RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
+                pattern: None,
+                pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.in_reply_to"),
+                include_fallbacks: None,
+            },
+        ))]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.contains_display_name"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::ContainsDisplayName)]),
@@ -173,7 +190,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3786.rule.room.server_acl"),
+        rule_id: Cow::Borrowed("global/override/.m.rule.room.server_acl"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
@@ -254,18 +271,6 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
             }),
         ]),
         actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
-        default: true,
-        default_enabled: true,
-    },
-    PushRule {
-        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3772.thread_reply"),
-        priority_class: 1,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelationMatch {
-            rel_type: Cow::Borrowed("m.thread"),
-            sender: None,
-            sender_type: Some(Cow::Borrowed("user_id")),
-        })]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
         default: true,
         default_enabled: true,
     },

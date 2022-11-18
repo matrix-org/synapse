@@ -289,6 +289,10 @@ class _EventInternalMetadata:
         """
         return self._dict.get("historical", False)
 
+    def is_notifiable(self) -> bool:
+        """Whether this event can trigger a push notification"""
+        return not self.is_outlier() or self.is_out_of_band_membership()
+
 
 class EventBase(metaclass=abc.ABCMeta):
     @property
@@ -593,8 +597,7 @@ def _event_type_from_format_version(
         format_version: The event format version
 
     Returns:
-        type: A type that can be initialized as per the initializer of
-        `FrozenEvent`
+        A type that can be initialized as per the initializer of `FrozenEvent`
     """
 
     if format_version == EventFormatVersions.ROOM_V1_V2:

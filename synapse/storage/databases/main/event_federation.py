@@ -73,12 +73,29 @@ pdus_pruned_from_federation_queue = Counter(
 
 logger = logging.getLogger(__name__)
 
-BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS: int = int(
-    datetime.timedelta(days=7).total_seconds()
+# Parameters controlling exponential backoff between backfill failures.
+# After the first failure to backfill, we wait 2 hours before trying again. If the
+# second attempt fails, we wait 4 hours before trying again. If the third attempt fails,
+# we wait 8 hours before trying again, ... and so on.
+#
+# Each successive backoff period is twice as long as the last. However we cap this
+# period at a maximum of 2^8 = 256 hours: a little over 10 days. (This is the smallest
+# power of 2 which yields a maximum backoff period of at least 7 days---which was the
+# original maximum backoff period.) Even when we hit this cap, we will continue to
+# make backfill attempts once every 10 days.
+BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS = 8
+BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS = int(
+    datetime.timedelta(hours=1).total_seconds() * 1000
 )
-BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS: int = int(
-    datetime.timedelta(hours=1).total_seconds()
-)
+
+# We need a cap on the power of 2 or else the backoff period
+#   2^N * (milliseconds per hour)
+# will overflow when calcuated within the database. We ensure overflow does not occur
+# by checking that the largest backoff period fits in a 32-bit signed integer.
+_LONGEST_BACKOFF_PERIOD_MILLISECONDS = (
+    2**BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS
+) * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+assert 0 < _LONGEST_BACKOFF_PERIOD_MILLISECONDS <= ((2**31) - 1)
 
 
 # All the info we need while iterating the DAG while backfilling
@@ -726,17 +743,35 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     async def get_backfill_points_in_room(
         self,
         room_id: str,
+        current_depth: int,
+        limit: int,
     ) -> List[Tuple[str, int]]:
         """
-        Gets the oldest events(backwards extremities) in the room along with the
-        approximate depth. Sorted by depth, highest to lowest (descending).
+        Get the backward extremities to backfill from in the room along with the
+        approximate depth.
+
+        Only returns events that are at a depth lower than or
+        equal to the `current_depth`. Sorted by depth, highest to lowest (descending)
+        so the closest events to the `current_depth` are first in the list.
+
+        We ignore extremities that are newer than the user's current scroll position
+        (ie, those with depth greater than `current_depth`) as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that extremity, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those extremities.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the user's current scrollback position
+            limit: The max number of backfill points to return
 
         Returns:
             List of (event_id, depth) tuples. Sorted by depth, highest to lowest
-            (descending)
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
         def get_backfill_points_in_room_txn(
@@ -749,7 +784,15 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             # persisted in our database yet (meaning we don't know their depth
             # specifically). So we need to look for the approximate depth from
             # the events connected to the current backwards extremeties.
-            sql = """
+
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "LEAST"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "MIN"
+            else:
+                raise RuntimeError("Unknown database engine")
+
+            sql = f"""
                 SELECT backward_extrem.event_id, event.depth FROM events AS event
                 /**
                  * Get the edge connections from the event_edges table
@@ -785,6 +828,18 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND edge.is_state is ? /* False */
                     /**
+                     * We only want backwards extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                    /**
                      * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
                      *
@@ -795,31 +850,31 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
+                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+                            * ? /* step */
+                        )
                     )
                 /**
-                 * Sort from highest to the lowest depth. Then tie-break on
-                 * alphabetical order of the event_ids so we get a consistent
-                 * ordering which is nice when asserting things in tests.
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
                  */
                 ORDER BY event.depth DESC, backward_extrem.event_id DESC
+                LIMIT ?
             """
 
-            if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
-            else:
-                raise RuntimeError("Unknown database engine")
-
             txn.execute(
-                sql % (least_function,),
+                sql,
                 (
                     room_id,
                     False,
+                    current_depth,
                     self._clock.time_msec(),
-                    1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
-                    1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
+                    limit,
                 ),
             )
 
@@ -835,24 +890,47 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     async def get_insertion_event_backward_extremities_in_room(
         self,
         room_id: str,
+        current_depth: int,
+        limit: int,
     ) -> List[Tuple[str, int]]:
         """
         Get the insertion events we know about that we haven't backfilled yet
-        along with the approximate depth. Sorted by depth, highest to lowest
-        (descending).
+        along with the approximate depth. Only returns insertion events that are
+        at a depth lower than or equal to the `current_depth`. Sorted by depth,
+        highest to lowest (descending) so the closest events to the
+        `current_depth` are first in the list.
+
+        We ignore insertion events that are newer than the user's current scroll
+        position (ie, those with depth greater than `current_depth`) as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that insertion event, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those insertion event.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the user's current scrollback position
+            limit: The max number of insertion event extremities to return
 
         Returns:
             List of (event_id, depth) tuples. Sorted by depth, highest to lowest
-            (descending)
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
         def get_insertion_event_backward_extremities_in_room_txn(
             txn: LoggingTransaction, room_id: str
         ) -> List[Tuple[str, int]]:
-            sql = """
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "LEAST"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "MIN"
+            else:
+                raise RuntimeError("Unknown database engine")
+
+            sql = f"""
                 SELECT
                     insertion_event_extremity.event_id, event.depth
                 /* We only want insertion events that are also marked as backwards extremities */
@@ -870,6 +948,18 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 WHERE
                     insertion_event_extremity.room_id = ?
                     /**
+                     * We only want extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                    /**
                      * Exponential back-off (up to the upper bound) so we don't retry the
                      * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
                      *
@@ -880,30 +970,30 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      */
                     AND (
                         failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + /*least*/%s((1 << failed_backfill_attempt_info.num_attempts) * ? /* step */, ? /* upper bound */)
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
+                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+                            * ? /* step */
+                        )
                     )
                 /**
-                 * Sort from highest to the lowest depth. Then tie-break on
-                 * alphabetical order of the event_ids so we get a consistent
-                 * ordering which is nice when asserting things in tests.
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
                  */
                 ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
+                LIMIT ?
             """
 
-            if isinstance(self.database_engine, PostgresEngine):
-                least_function = "least"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "min"
-            else:
-                raise RuntimeError("Unknown database engine")
-
             txn.execute(
-                sql % (least_function,),
+                sql,
                 (
                     room_id,
+                    current_depth,
                     self._clock.time_msec(),
-                    1000 * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_SECONDS,
-                    1000 * BACKFILL_EVENT_BACKOFF_UPPER_BOUND_SECONDS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
+                    limit,
                 ),
             )
             return cast(List[Tuple[str, int]], txn.fetchall())
@@ -1411,6 +1501,12 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             event_id: The event that failed to be fetched or processed
             cause: The error message or reason that we failed to pull the event
         """
+        logger.debug(
+            "record_event_failed_pull_attempt room_id=%s, event_id=%s, cause=%s",
+            room_id,
+            event_id,
+            cause,
+        )
         await self.db_pool.runInteraction(
             "record_event_failed_pull_attempt",
             self._record_event_failed_pull_attempt_upsert_txn,
@@ -1439,6 +1535,54 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
+
+    @trace
+    async def get_event_ids_to_not_pull_from_backoff(
+        self,
+        room_id: str,
+        event_ids: Collection[str],
+    ) -> List[str]:
+        """
+        Filter down the events to ones that we've failed to pull before recently. Uses
+        exponential backoff.
+
+        Args:
+            room_id: The room that the events belong to
+            event_ids: A list of events to filter down
+
+        Returns:
+            List of event_ids that should not be attempted to be pulled
+        """
+        event_failed_pull_attempts = await self.db_pool.simple_select_many_batch(
+            table="event_failed_pull_attempts",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=(
+                "event_id",
+                "last_attempt_ts",
+                "num_attempts",
+            ),
+            desc="get_event_ids_to_not_pull_from_backoff",
+        )
+
+        current_time = self._clock.time_msec()
+        return [
+            event_failed_pull_attempt["event_id"]
+            for event_failed_pull_attempt in event_failed_pull_attempts
+            # Exponential back-off (up to the upper bound) so we don't try to
+            # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+            if current_time
+            < event_failed_pull_attempt["last_attempt_ts"]
+            + (
+                2
+                ** min(
+                    event_failed_pull_attempt["num_attempts"],
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                )
+            )
+            * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+        ]
 
     async def get_missing_events(
         self,

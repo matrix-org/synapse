@@ -50,7 +50,7 @@ class SQLBaseStore(metaclass=ABCMeta):
 
         self.external_cached_functions: Dict[str, CachedFunction] = {}
 
-    def process_replication_rows(
+    def process_replication_rows(  # noqa: B027 (no-op by design)
         self,
         stream_name: str,
         instance_name: str,
@@ -94,6 +94,7 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache(
                 "get_rooms_for_user_with_stream_ordering", (user_id,)
             )
+            self._attempt_to_invalidate_cache("get_rooms_for_user", (user_id,))
 
         # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))

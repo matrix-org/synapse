@@ -12,6 +12,8 @@ trusted_key_servers: []
 enable_registration: true
 enable_registration_without_verification: true
 bcrypt_rounds: 4
+url_preview_enabled: true
+url_preview_ip_range_blacklist: []
 
 ## Registration ##
 
@@ -90,8 +92,6 @@ allow_device_name_lookup_over_federation: true
 ## Experimental Features ##
 
 experimental_features:
-  # Enable spaces support
-  spaces_enabled: true
   # Enable history backfilling support
   msc2716_enabled: true
   # server-side support for partial state in /send_join responses
@@ -102,6 +102,8 @@ experimental_features:
   {% endif %}
   # Enable jump to date endpoint
   msc3030_enabled: true
+  # Filtering /messages by relation type.
+  msc3874_enabled: true
 
 server_notices:
   system_mxid_localpart: _server

@@ -84,34 +84,6 @@ class MacaroonGeneratorTestCase(TestCase):
         )
         self.assertEqual(user_id, "@user:tesths")
 
-    def test_short_term_login_token(self):
-        """Test the generation and verification of short-term login tokens"""
-        token = self.macaroon_generator.generate_short_term_login_token(
-            user_id="@user:tesths",
-            auth_provider_id="oidc",
-            auth_provider_session_id="sid",
-            duration_in_ms=2 * 60 * 1000,
-        )
-
-        info = self.macaroon_generator.verify_short_term_login_token(token)
-        self.assertEqual(info.user_id, "@user:tesths")
-        self.assertEqual(info.auth_provider_id, "oidc")
-        self.assertEqual(info.auth_provider_session_id, "sid")
-
-        # Raises with another secret key
-        with self.assertRaises(MacaroonVerificationFailedException):
-            self.other_macaroon_generator.verify_short_term_login_token(token)
-
-        # Wait a minute
-        self.reactor.pump([60])
-        # Shouldn't raise
-        self.macaroon_generator.verify_short_term_login_token(token)
-        # Wait another minute
-        self.reactor.pump([60])
-        # Should raise since it expired
-        with self.assertRaises(MacaroonVerificationFailedException):
-            self.macaroon_generator.verify_short_term_login_token(token)
-
     def test_oidc_session_token(self):
         """Test the generation and verification of OIDC session cookies"""
         state = "arandomstate"

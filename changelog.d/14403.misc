@@ -1,0 +1,1 @@
+Faster joins: do not wait for full state when creating events to send.

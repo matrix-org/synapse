@@ -209,7 +209,10 @@ class _DummyLookup(object):
     def __init__(self, value: T) -> None:
         self.value = value
 
-    def __getattribute__(self, name: str) -> T:
+    # type-ignore: Because mypy says "A function returning TypeVar should receive at
+    # least one argument containing the same Typevar" but this is just a dummy
+    # stand-in that doesn't need any input.
+    def __getattribute__(self, name: str) -> T:  # type: ignore[type-var]
         return object.__getattribute__(self, "value")
 
 
@@ -949,9 +952,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         # FIXME: We could update this to handle any type of function by ignoring the
         #   first argument only if it's named `self` or `cls`. This isn't fool-proof
         #   but handles the idiomatic cases.
-        for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
+        for i, arg in enumerate(args[1:], start=1):
             set_attribute(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i], str(arg))
-        set_attribute(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))  # type: ignore[index]
+        set_attribute(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))
         set_attribute(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 

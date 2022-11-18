@@ -32,6 +32,7 @@ class AdminHandler:
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def get_whois(self, user: UserID) -> JsonDict:
         connections = []
@@ -75,6 +76,10 @@ class AdminHandler:
             "is_guest",
         }
 
+        if self._msc3866_enabled:
+            # Only include the approved flag if support for MSC3866 is enabled.
+            user_info_to_return.add("approved")
+
         # Restrict returned keys to a known set.
         user_info_dict = {
             key: value
@@ -95,6 +100,7 @@ class AdminHandler:
         user_info_dict["avatar_url"] = profile.avatar_url
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
+        user_info_dict["erased"] = await self.store.is_user_erased(user.to_string())
 
         return user_info_dict
 
