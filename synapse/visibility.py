@@ -23,7 +23,13 @@ from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
-from synapse.logging.opentracing import trace
+from synapse.logging.opentracing import (
+    start_active_span,
+    SynapseTags,
+    set_tag,
+    tag_args,
+    trace,
+)
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
 from synapse.storage.state import StateFilter
@@ -53,6 +59,7 @@ _HISTORY_VIS_KEY: Final[Tuple[str, str]] = (EventTypes.RoomHistoryVisibility, ""
 
 
 @trace
+@tag_args
 async def filter_events_for_client(
     storage: StorageControllers,
     user_id: str,
@@ -82,6 +89,11 @@ async def filter_events_for_client(
     Returns:
         The filtered events.
     """
+    set_tag(
+        SynapseTags.FUNC_ARG_PREFIX + "events.length",
+        str(len(events)),
+    )
+
     # Filter out events that have been soft failed so that we don't relay them
     # to clients.
     events_before_filtering = events
@@ -130,9 +142,10 @@ async def filter_events_for_client(
             sender_erased=erased_senders.get(event.sender, False),
         )
 
-    # Check each event: gives an iterable of None or (a potentially modified)
-    # EventBase.
-    filtered_events = map(allowed, events)
+    with start_active_span("filtering events against allowed function"):
+        # Check each event: gives an iterable of None or (a potentially modified)
+        # EventBase.
+        filtered_events = map(allowed, events)
 
     # Turn it into a list and remove None entries before returning.
     return [ev for ev in filtered_events if ev]
