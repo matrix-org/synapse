@@ -101,9 +101,11 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             where_clause = " AND (%s)" % (where_clause,)
 
         if isinstance(self.database_engine, PostgresEngine):
+            # Suspicion start
             # Temporarily disable sequential scans in this transaction. This is
             # a temporary hack until we can add the right indices in
             txn.execute("SET LOCAL enable_seqscan=off")
+            # Suspicion end
 
             # The below query walks the state_group tree so that the "state"
             # table includes all state_groups in the tree. It then joins
