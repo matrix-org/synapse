@@ -36,13 +36,6 @@ synapse process before they can be run in a separate worker.
 Please add ``send_federation: false`` to the main config
 """
 
-_PUSHER_WITH_START_PUSHERS_ENABLED_ERROR = """
-The start_pushers config option must be disabled in the main
-synapse process before they can be run in a separate worker.
-
-Please add ``start_pushers: false`` to the main config
-"""
-
 _DEPRECATED_WORKER_DUTY_OPTION_USED = """
 The '%s' configuration option is deprecated and will be removed in a future
 Synapse version. Please use ``%s: name_of_worker`` instead.
@@ -282,27 +275,12 @@ class WorkerConfig(Config):
         )
 
         # Handle sharded push
-        start_pushers = config.get("start_pushers", True)
-        pusher_instances = config.get("pusher_instances")
-        if pusher_instances is None:
-            # Default to an empty list, which means "another, unknown, worker is
-            # responsible for it".
-            pusher_instances = []
-
-            # If no pushers instances are set we check if `start_pushers` is
-            # set, which means use master
-            if start_pushers:
-                pusher_instances = ["master"]
-
-            if self.worker_app == "synapse.app.pusher":
-                if start_pushers:
-                    # If we're running pushers, and not using
-                    # `pusher_instances`, then we should have explicitly set
-                    # `start_pushers` to false.
-                    raise ConfigError(_PUSHER_WITH_START_PUSHERS_ENABLED_ERROR)
-
-                pusher_instances = [self.instance_name]
-
+        pusher_instances = self._worker_name_performing_this_duty(
+            config,
+            "start_pushers",
+            "synapse.app.pusher",
+            "pusher_instances",
+        )
         self.start_pushers = self.instance_name in pusher_instances
         self.pusher_shard_config = ShardedWorkerHandlingConfig(pusher_instances)
 
