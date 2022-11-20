@@ -228,16 +228,6 @@ class WorkerConfig(Config):
             self.writers.events
         )
 
-        # Handle federation sender configuration.
-        #
-        # There are two ways of configuring which instances handle federation
-        # sending:
-        #   1. The old way where "send_federation" is set to false and running a
-        #      `synapse.app.federation_sender` worker app.
-        #   2. Specifying the workers sending federation in
-        #      `federation_sender_instances`.
-        #
-
         federation_sender_instances = self._worker_name_performing_this_duty(
             config,
             "send_federation",
