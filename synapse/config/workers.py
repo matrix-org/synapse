@@ -228,7 +228,7 @@ class WorkerConfig(Config):
             self.writers.events
         )
 
-        federation_sender_instances = self._worker_name_performing_this_duty(
+        federation_sender_instances = self._worker_names_performing_this_duty(
             config,
             "send_federation",
             "synapse.app.federation_sender",
@@ -240,7 +240,7 @@ class WorkerConfig(Config):
         )
 
         # Handle sharded push
-        pusher_instances = self._worker_name_performing_this_duty(
+        pusher_instances = self._worker_names_performing_this_duty(
             config,
             "start_pushers",
             "synapse.app.pusher",
@@ -368,7 +368,7 @@ class WorkerConfig(Config):
         # (By this point, these are either the same value or only one is not None.)
         return bool(new_option_should_run_here or legacy_option_should_run_here)
 
-    def _worker_name_performing_this_duty(
+    def _worker_names_performing_this_duty(
         self,
         config: Dict[str, Any],
         legacy_option_name: str,
@@ -376,7 +376,7 @@ class WorkerConfig(Config):
         modern_instance_map_name: str,
     ) -> List[str]:
         """
-        retrieves the name of the worker handling a given duty, by either legacy option or instance_map
+        retrieves the names of the workers handling a given duty, by either legacy option or instance_map
         config: settings read from yaml.
         legacy_option_name: the old way of enabling options. e.g. 'start_pushers'
         legacy_app_name: The historical app name. e.g. 'synapse.app.pusher'
