@@ -29,13 +29,6 @@ from ._base import (
 )
 from .server import DIRECT_TCP_ERROR, ListenerConfig, parse_listener_def
 
-_FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
-The send_federation config option must be disabled in the main
-synapse process before they can be run in a separate worker.
-
-Please add ``send_federation: false`` to the main config
-"""
-
 _DEPRECATED_WORKER_DUTY_OPTION_USED = """
 The '%s' configuration option is deprecated and will be removed in a future
 Synapse version. Please use ``%s: name_of_worker`` instead.
@@ -175,45 +168,6 @@ class WorkerConfig(Config):
                 )
             )
 
-        # Handle federation sender configuration.
-        #
-        # There are two ways of configuring which instances handle federation
-        # sending:
-        #   1. The old way where "send_federation" is set to false and running a
-        #      `synapse.app.federation_sender` worker app.
-        #   2. Specifying the workers sending federation in
-        #      `federation_sender_instances`.
-        #
-
-        send_federation = config.get("send_federation", True)
-
-        federation_sender_instances = config.get("federation_sender_instances")
-        if federation_sender_instances is None:
-            # Default to an empty list, which means "another, unknown, worker is
-            # responsible for it".
-            federation_sender_instances = []
-
-            # If no federation sender instances are set we check if
-            # `send_federation` is set, which means use master
-            if send_federation:
-                federation_sender_instances = ["master"]
-
-            if self.worker_app == "synapse.app.federation_sender":
-                if send_federation:
-                    # If we're running federation senders, and not using
-                    # `federation_sender_instances`, then we should have
-                    # explicitly set `send_federation` to false.
-                    raise ConfigError(
-                        _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR
-                    )
-
-                federation_sender_instances = [self.worker_name]
-
-        self.send_federation = self.instance_name in federation_sender_instances
-        self.federation_shard_config = ShardedWorkerHandlingConfig(
-            federation_sender_instances
-        )
-
         # A map from instance name to host/port of their HTTP replication endpoint.
         instance_map = config.get("instance_map") or {}
         self.instance_map = {
@@ -272,6 +226,27 @@ class WorkerConfig(Config):
 
         self.events_shard_config = RoutableShardedWorkerHandlingConfig(
             self.writers.events
+        )
+
+        # Handle federation sender configuration.
+        #
+        # There are two ways of configuring which instances handle federation
+        # sending:
+        #   1. The old way where "send_federation" is set to false and running a
+        #      `synapse.app.federation_sender` worker app.
+        #   2. Specifying the workers sending federation in
+        #      `federation_sender_instances`.
+        #
+
+        federation_sender_instances = self._worker_name_performing_this_duty(
+            config,
+            "send_federation",
+            "synapse.app.federation_sender",
+            "federation_sender_instances",
+        )
+        self.send_federation = self.instance_name in federation_sender_instances
+        self.federation_shard_config = ShardedWorkerHandlingConfig(
+            federation_sender_instances
         )
 
         # Handle sharded push
