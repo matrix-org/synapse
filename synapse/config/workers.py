@@ -412,7 +412,6 @@ class WorkerConfig(Config):
 
         return worker_instance_map
 
-
     def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in
         # the config. A lot of these options have a worker_* prefix when running
