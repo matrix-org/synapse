@@ -172,40 +172,6 @@ class RelationsHandler:
 
         return return_value
 
-    async def get_relations_for_event(
-        self,
-        event_id: str,
-        event: EventBase,
-        room_id: str,
-        relation_type: str,
-        ignored_users: FrozenSet[str] = frozenset(),
-    ) -> List[_RelatedEvent]:
-        """Get a list of events which relate to an event, ordered by topological ordering.
-
-        Args:
-            event_id: Fetch events that relate to this event ID.
-            event: The matching EventBase to event_id.
-            room_id: The room the event belongs to.
-            relation_type: The type of relation.
-            ignored_users: The users ignored by the requesting user.
-
-        Returns:
-            List of event IDs that match relations requested. The rows are of
-            the form `{"event_id": "..."}`.
-        """
-
-        # Call the underlying storage method, which is cached.
-        related_events, _ = await self._main_store.get_relations_for_event(
-            event_id, event, room_id, relation_type, direction="f"
-        )
-
-        # Filter out ignored users and convert to the expected format.
-        related_events = [
-            event for event in related_events if event.sender not in ignored_users
-        ]
-
-        return related_events
-
     async def redact_events_related_to(
         self,
         requester: Requester,
@@ -443,13 +409,17 @@ class RelationsHandler:
                 if event is None:
                     continue
 
-                potential_events = await self.get_relations_for_event(
-                    event_id,
-                    event,
-                    room_id,
-                    RelationTypes.THREAD,
-                    ignored_users,
+                # Attempt to find another event to use as the latest event.
+                potential_events, _ = await self._main_store.get_relations_for_event(
+                    event_id, event, room_id, RelationTypes.THREAD, direction="f"
                 )
+
+                # Filter out ignored users.
+                potential_events = [
+                    event
+                    for event in potential_events
+                    if event.sender not in ignored_users
+                ]
 
                 # If all found events are from ignored users, do not include
                 # a summary of the thread.
@@ -620,7 +590,7 @@ class RelationsHandler:
             room_id, requester, allow_departed_users=True
         )
 
-        # Note that ignored users are not passed into get_relations_for_event
+        # Note that ignored users are not passed into get_threads
         # below. Ignored users are handled in filter_events_for_client (and by
         # not passing them in here we should get a better cache hit rate).
         thread_roots, next_batch = await self._main_store.get_threads(
