@@ -752,11 +752,10 @@ class _TransactionQueueManager:
         edu_limit -= len(device_update_edus)
 
         # Finally add any other types of EDUs if there is room.
-        pending_edus.extend(self.queue._pop_pending_edus(edu_limit))
-        while (
-            len(pending_edus) < MAX_EDUS_PER_TRANSACTION
-            and self.queue._pending_edus_keyed
-        ):
+        other_edus = self.queue._pop_pending_edus(edu_limit)
+        pending_edus.extend(other_edus)
+        edu_limit -= len(other_edus)
+        while edu_limit > 0 and self.queue._pending_edus_keyed:
             _, val = self.queue._pending_edus_keyed.popitem()
             pending_edus.append(val)
             edu_limit -= 1
