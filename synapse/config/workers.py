@@ -168,6 +168,17 @@ class WorkerConfig(Config):
                 )
             )
 
+        federation_sender_instances = self._worker_names_performing_this_duty(
+            config,
+            "send_federation",
+            "synapse.app.federation_sender",
+            "federation_sender_instances",
+        )
+        self.send_federation = self.instance_name in federation_sender_instances
+        self.federation_shard_config = ShardedWorkerHandlingConfig(
+            federation_sender_instances
+        )
+
         # A map from instance name to host/port of their HTTP replication endpoint.
         instance_map = config.get("instance_map") or {}
         self.instance_map = {
@@ -226,17 +237,6 @@ class WorkerConfig(Config):
 
         self.events_shard_config = RoutableShardedWorkerHandlingConfig(
             self.writers.events
-        )
-
-        federation_sender_instances = self._worker_names_performing_this_duty(
-            config,
-            "send_federation",
-            "synapse.app.federation_sender",
-            "federation_sender_instances",
-        )
-        self.send_federation = self.instance_name in federation_sender_instances
-        self.federation_shard_config = ShardedWorkerHandlingConfig(
-            federation_sender_instances
         )
 
         # Handle sharded push
