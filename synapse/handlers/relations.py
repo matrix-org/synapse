@@ -320,6 +320,46 @@ class RelationsHandler:
 
         return filtered_results
 
+    async def get_references_for_events(
+        self, event_ids: Collection[str], ignored_users: FrozenSet[str] = frozenset()
+    ) -> Dict[str, List[_RelatedEvent]]:
+        """Get a list of references to the given events.
+
+        Args:
+            event_ids: Fetch events that relate to this event ID.
+            ignored_users: The users ignored by the requesting user.
+
+        Returns:
+            A map of event IDs to a list related events.
+        """
+
+        related_events = await self._main_store.get_references_for_events(event_ids)
+
+        # Avoid additional logic if there are no ignored users.
+        if not ignored_users:
+            return {
+                event_id: results
+                for event_id, results in related_events.items()
+                if results
+            }
+
+        # Filter out ignored users.
+        results = {}
+        for event_id, events in related_events.items():
+            # If no references, skip.
+            if not events:
+                continue
+
+            # Filter ignored users out.
+            events = [event for event in events if event.sender not in ignored_users]
+            # If there are no events left, skip this event.
+            if not events:
+                continue
+
+            results[event_id] = events
+
+        return results
+
     async def _get_threads_for_events(
         self,
         events_by_id: Dict[str, EventBase],
@@ -525,18 +565,13 @@ class RelationsHandler:
                     "chunk": annotations
                 }
 
-        # Fetch other relations per event.
-        for event in events_by_id.values():
-            # Fetch any references to bundle with this event.
-            references = await self.get_relations_for_event(
-                event.event_id,
-                event,
-                event.room_id,
-                RelationTypes.REFERENCE,
-                ignored_users=ignored_users,
-            )
+        # Fetch any references to bundle with this event.
+        references_by_event_id = await self.get_references_for_events(
+            events_by_id.keys(), ignored_users=ignored_users
+        )
+        for event_id, references in references_by_event_id.items():
             if references:
-                results.setdefault(event.event_id, BundledAggregations()).references = {
+                results.setdefault(event_id, BundledAggregations()).references = {
                     "chunk": [{"event_id": ev.event_id} for ev in references]
                 }
 
