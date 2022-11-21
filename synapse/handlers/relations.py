@@ -13,16 +13,7 @@
 # limitations under the License.
 import enum
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    FrozenSet,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Collection, Dict, FrozenSet, Iterable, List, Optional
 
 import attr
 
@@ -32,7 +23,7 @@ from synapse.events import EventBase, relation_from_event
 from synapse.logging.opentracing import trace
 from synapse.storage.databases.main.relations import ThreadsNextBatch, _RelatedEvent
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester, StreamToken, UserID
+from synapse.types import JsonDict, Requester, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -188,7 +179,7 @@ class RelationsHandler:
         room_id: str,
         relation_type: str,
         ignored_users: FrozenSet[str] = frozenset(),
-    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
+    ) -> List[_RelatedEvent]:
         """Get a list of events which relate to an event, ordered by topological ordering.
 
         Args:
@@ -204,7 +195,7 @@ class RelationsHandler:
         """
 
         # Call the underlying storage method, which is cached.
-        related_events, next_token = await self._main_store.get_relations_for_event(
+        related_events, _ = await self._main_store.get_relations_for_event(
             event_id, event, room_id, relation_type, direction="f"
         )
 
@@ -213,7 +204,7 @@ class RelationsHandler:
             event for event in related_events if event.sender not in ignored_users
         ]
 
-        return related_events, next_token
+        return related_events
 
     async def redact_events_related_to(
         self,
@@ -412,7 +403,7 @@ class RelationsHandler:
                 if event is None:
                     continue
 
-                potential_events, _ = await self.get_relations_for_event(
+                potential_events = await self.get_relations_for_event(
                     event_id,
                     event,
                     room_id,
@@ -537,7 +528,7 @@ class RelationsHandler:
         # Fetch other relations per event.
         for event in events_by_id.values():
             # Fetch any references to bundle with this event.
-            references, next_token = await self.get_relations_for_event(
+            references = await self.get_relations_for_event(
                 event.event_id,
                 event,
                 event.room_id,
@@ -549,11 +540,6 @@ class RelationsHandler:
                 aggregations.references = {
                     "chunk": [{"event_id": ev.event_id} for ev in references]
                 }
-
-                if next_token:
-                    aggregations.references["next_batch"] = await next_token.to_string(
-                        self._main_store
-                    )
 
         # Fetch any edits (but not for redacted events).
         #
