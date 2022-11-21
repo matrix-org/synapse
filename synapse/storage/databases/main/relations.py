@@ -459,9 +459,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 if len(event_results) == limit:
                     continue
 
-                event_results.append(
-                    {"type": type, "key": key, "count": count}
-                )
+                event_results.append({"type": type, "key": key, "count": count})
 
             return result
 
