@@ -505,6 +505,7 @@ class PerDestinationQueue:
                     new_pdus = await filter_events_for_server(
                         self._storage_controllers,
                         self._destination,
+                        self._server_name,
                         new_pdus,
                         redact=False,
                     )
