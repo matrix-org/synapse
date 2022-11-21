@@ -536,8 +536,7 @@ class RelationsHandler:
                 ignored_users=ignored_users,
             )
             if references:
-                aggregations = results.setdefault(event.event_id, BundledAggregations())
-                aggregations.references = {
+                results.setdefault(event.event_id, BundledAggregations()).references = {
                     "chunk": [{"event_id": ev.event_id} for ev in references]
                 }
 

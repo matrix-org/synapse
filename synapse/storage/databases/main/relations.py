@@ -82,8 +82,6 @@ class _RelatedEvent:
     event_id: str
     # The sender of the related event.
     sender: str
-    topological_ordering: Optional[int]
-    stream_ordering: int
 
 
 class RelationsWorkerStore(SQLBaseStore):
@@ -246,13 +244,17 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, where_args + [limit + 1])
 
             events = []
-            for event_id, relation_type, sender, topo_ordering, stream_ordering in txn:
+            topo_orderings: List[int] = []
+            stream_orderings: List[int] = []
+            for event_id, relation_type, sender, topo_ordering, stream_ordering in cast(
+                List[Tuple[str, str, str, int, int]], txn
+            ):
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or relation_type != RelationTypes.REPLACE:
-                    events.append(
-                        _RelatedEvent(event_id, sender, topo_ordering, stream_ordering)
-                    )
+                    events.append(_RelatedEvent(event_id, sender))
+                    topo_orderings.append(topo_ordering)
+                    stream_orderings.append(stream_ordering)
 
             # If there are more events, generate the next pagination key from the
             # last event returned.
@@ -261,9 +263,11 @@ class RelationsWorkerStore(SQLBaseStore):
                 # Instead of using the last row (which tells us there is more
                 # data), use the last row to be returned.
                 events = events[:limit]
+                topo_orderings = topo_orderings[:limit]
+                stream_orderings = stream_orderings[:limit]
 
-                topo = events[-1].topological_ordering
-                token = events[-1].stream_ordering
+                topo = topo_orderings[-1]
+                token = stream_orderings[-1]
                 if direction == "b":
                     # Tokens are positions between events.
                     # This token points *after* the last event in the chunk.
