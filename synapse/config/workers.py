@@ -376,11 +376,13 @@ class WorkerConfig(Config):
         modern_instance_map_name: str,
     ) -> List[str]:
         """
-        retrieves the names of the workers handling a given duty, by either legacy option or instance_map
-        config: settings read from yaml.
-        legacy_option_name: the old way of enabling options. e.g. 'start_pushers'
-        legacy_app_name: The historical app name. e.g. 'synapse.app.pusher'
-        modern_instance_map_name: the string name of the new instance_map. e.g. 'pusher_instances'
+        Retrieves the names of the workers handling a given duty, by either legacy option or instance list
+
+        Args:
+            config: settings read from yaml.
+            legacy_option_name: the old way of enabling options. e.g. 'start_pushers'
+            legacy_app_name: The historical app name. e.g. 'synapse.app.pusher'
+            modern_instance_map_name: the string name of the new instance_map. e.g. 'pusher_instances'
         """
 
         legacy_option = config.get(legacy_option_name, True)
