@@ -95,7 +95,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         # * The same room / user on multiple threads.
         # * A different user in the same room.
         sender = self.hs.get_federation_sender()
-        for user, thread in (("alice", None), ("alice", "thread"), ("bob", None)):
+        for user, thread in (
+            ("alice", None),
+            ("alice", "thread"),
+            ("bob", None),
+            ("bob", "diff-thread"),
+        ):
             receipt = ReadReceipt(
                 "room_id",
                 "m.read",
@@ -126,7 +131,11 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
                                 "alice": {
                                     "event_ids": ["event_id"],
                                     "data": {"ts": 1234, "thread_id": "thread"},
-                                }
+                                },
+                                "bob": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234, "thread_id": "diff-thread"},
+                                },
                             }
                         }
                     },

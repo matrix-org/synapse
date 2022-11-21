@@ -136,10 +136,11 @@ class PerDestinationQueue:
         # destination
         self._pending_presence: Dict[str, UserPresenceState] = {}
 
-        # room_id -> receipt_type -> thread_id -> user_id -> receipt_dict
-        self._pending_rrs: Dict[
-            str, Dict[str, Dict[Optional[str], Dict[str, dict]]]
-        ] = {}
+        # List of room_id -> receipt_type -> user_id -> receipt_dict,
+        #
+        # Each receipt can only have a single receipt per
+        # (room ID, receipt type, user ID, thread ID) tuple.
+        self._pending_receipt_edus: List[Dict[str, Dict[str, Dict[str, dict]]]] = []
         self._rrs_pending_flush = False
 
         # stream_id of last successfully sent to-device message.
@@ -210,17 +211,45 @@ class PerDestinationQueue:
         }
         if receipt.thread_id is not None:
             serialized_receipt["data"]["thread_id"] = receipt.thread_id
-        self._pending_rrs.setdefault(receipt.room_id, {}).setdefault(
-            receipt.receipt_type, {}
-        ).setdefault(receipt.thread_id, {})[receipt.user_id] = serialized_receipt
+
+        # Find which EDU to add this receipt to. There's three situations depending
+        # on the (room ID, receipt type, user, thread ID) tuple:
+        #
+        # 1. If it fully matches, clobber the information.
+        # 2. If it is missing, add the information.
+        # 3. If the subset tuple of (room ID, receipt type, user) matches, check
+        #    the next EDU (or add a new EDU).
+        for edu in self._pending_receipt_edus:
+            receipt_content = edu.setdefault(receipt.room_id, {}).setdefault(
+                receipt.receipt_type, {}
+            )
+            # If this room ID, receipt type, user ID is not in this EDU, OR if
+            # the full tuple matches, use the current EDU.
+            if (
+                receipt.user_id not in receipt_content
+                or receipt_content[receipt.user_id].get("thread_id")
+                == receipt.thread_id
+            ):
+                receipt_content[receipt.user_id] = serialized_receipt
+                break
+
+        # If no matching EDU was found, create a new one.
+        else:
+            self._pending_receipt_edus.append(
+                {
+                    receipt.room_id: {
+                        receipt.receipt_type: {receipt.user_id: serialized_receipt}
+                    }
+                }
+            )
 
     def flush_read_receipts_for_room(self, room_id: str) -> None:
-        # if we don't have any read-receipts for this room, it may be that we've already
+        # if we don't have any receipts for this room, it may be that we've already
         # sent them out, so we don't need to flush.
-        if room_id not in self._pending_rrs:
-            return
-        self._rrs_pending_flush = True
-        self.attempt_new_transaction()
+        for edu in self._pending_receipt_edus:
+            if room_id in edu:
+                self._rrs_pending_flush = True
+                self.attempt_new_transaction()
 
     def send_keyed_edu(self, edu: Edu, key: Hashable) -> None:
         self._pending_edus_keyed[(edu.edu_type, key)] = edu
@@ -359,7 +388,7 @@ class PerDestinationQueue:
                 self._pending_edus = []
                 self._pending_edus_keyed = {}
                 self._pending_presence = {}
-                self._pending_rrs = {}
+                self._pending_receipt_edus = []
 
                 self._start_catching_up()
         except FederationDeniedError as e:
@@ -550,59 +579,26 @@ class PerDestinationQueue:
                     self._destination, last_successful_stream_ordering
                 )
 
-    def _get_rr_edus(self, force_flush: bool, limit: int) -> Iterable[Edu]:
-        if not self._pending_rrs:
+    def _get_receipt_edus(self, force_flush: bool, limit: int) -> Iterable[Edu]:
+        if not self._pending_receipt_edus:
             return
         if not force_flush and not self._rrs_pending_flush:
             # not yet time for this lot
             return
 
-        # Build the EDUs needed to send these receipts. This is a bit complicated
-        # since we can share one for each unique (room, receipt type, user), but
-        # need additional ones for different threads. The result is that we will
-        # send N EDUs where N is the number of unique threads across rooms.
-        #
-        # TODO This could be more efficient by bundling users who have sent
-        #      receipts for different threads.
-        generated_edus = 0
-        while self._pending_rrs and generated_edus < limit:
-            # The next EDU's content.
-            content: JsonDict = {}
-
-            # Iterate each room's receipt types and threads, adding it to the content.
-            #
-            # _pending_rrs is mutated inside of this loop so take care to iterate
-            # a copy of the keys. Similarly, the dictionary values of _pending_rrs
-            # are mutated during iteration.
-            for room_id in list(self._pending_rrs.keys()):
-                for receipt_type in list(self._pending_rrs[room_id].keys()):
-                    thread_ids = self._pending_rrs[room_id][receipt_type]
-                    # The thread ID itself doesn't matter at this point -- it is
-                    # included in the receipt data already.
-                    content.setdefault(room_id, {})[
-                        receipt_type
-                    ] = thread_ids.popitem()[1]
-
-                    # If there are no threads left in the receipt type for this
-                    # room, then delete the entire receipt type.
-                    if not thread_ids:
-                        del self._pending_rrs[room_id][receipt_type]
-
-                # If there are no receipt types left in this room, delete the room.
-                if not self._pending_rrs[room_id]:
-                    del self._pending_rrs[room_id]
-
+        # Send at most limit EDUs for receipts.
+        for content in self._pending_receipt_edus[:limit]:
             yield Edu(
                 origin=self._server_name,
                 destination=self._destination,
                 edu_type=EduTypes.RECEIPT,
                 content=content,
             )
-            generated_edus += 1
+        self._pending_receipt_edus = self._pending_receipt_edus[limit:]
 
         # If there are still pending read-receipts, don't reset the pending flush
         # flag.
-        if not self._pending_rrs:
+        if not self._pending_receipt_edus:
             self._rrs_pending_flush = False
 
     def _pop_pending_edus(self, limit: int) -> List[Edu]:
@@ -723,7 +719,7 @@ class _TransactionQueueManager:
             self.queue._pending_presence = {}
 
         # Add read receipt EDUs.
-        pending_edus.extend(self.queue._get_rr_edus(force_flush=False, limit=5))
+        pending_edus.extend(self.queue._get_receipt_edus(force_flush=False, limit=5))
         edu_limit = MAX_EDUS_PER_TRANSACTION - len(pending_edus)
 
         # Next, prioritize to-device messages so that existing encryption channels
@@ -776,7 +772,7 @@ class _TransactionQueueManager:
         # may as well send any pending RRs
         if edu_limit:
             pending_edus.extend(
-                self.queue._get_rr_edus(force_flush=True, limit=edu_limit)
+                self.queue._get_receipt_edus(force_flush=True, limit=edu_limit)
             )
 
         if self._pdus:
