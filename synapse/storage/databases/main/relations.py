@@ -418,6 +418,8 @@ class RelationsWorkerStore(SQLBaseStore):
             A map of event IDs to a list of groups of annotations that match.
             Each entry is a dict with `type`, `key` and `count` fields.
         """
+        # The number of entries to return per event ID.
+        limit = 5
 
         clause, args = make_in_list_sql_clause(
             self.database_engine, "relates_to_id", event_ids
@@ -451,7 +453,13 @@ class RelationsWorkerStore(SQLBaseStore):
             for event_id, type, key, count in cast(
                 List[Tuple[str, str, str, int]], txn
             ):
-                result.setdefault(event_id, []).append(
+                event_results = result.setdefault(event_id, [])
+
+                # Limit the number of results per event ID.
+                if len(event_results) == limit:
+                    continue
+
+                event_results.append(
                     {"type": type, "key": key, "count": count}
                 )
 
