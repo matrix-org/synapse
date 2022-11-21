@@ -1257,11 +1257,11 @@ python-versions = ">= 3.5"
 
 [[package]]
 name = "towncrier"
-version = "21.9.0"
+version = "22.8.0"
 description = "Building newsfiles for your project."
 category = "dev"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 
 [package.dependencies]
 click = "*"
@@ -1269,7 +1269,7 @@ click-default-group = "*"
 incremental = "*"
 jinja2 = "*"
 setuptools = "*"
-tomli = {version = "*", markers = "python_version >= \"3.6\""}
+tomli = "*"
 
 [package.extras]
 dev = ["packaging"]
@@ -2721,8 +2721,8 @@ tornado = [
     {file = "tornado-6.1.tar.gz", hash = "sha256:33c6e81d7bd55b468d2e793517c909b139960b6c790a60b7991b9b6b76fb9791"},
 ]
 towncrier = [
-    {file = "towncrier-21.9.0-py2.py3-none-any.whl", hash = "sha256:fc5a88a2a54988e3a8ed2b60d553599da8330f65722cc607c839614ed87e0f92"},
-    {file = "towncrier-21.9.0.tar.gz", hash = "sha256:9cb6f45c16e1a1eec9d0e7651165e7be60cd0ab81d13a5c96ca97a498ae87f48"},
+    {file = "towncrier-22.8.0-py2.py3-none-any.whl", hash = "sha256:3b780c3d966e1b26414830aec3d15000654b31e64e024f3e5fd128b4c6eb8f47"},
+    {file = "towncrier-22.8.0.tar.gz", hash = "sha256:7d3839b033859b45fb55df82b74cfd702431933c0cc9f287a5a7ea3e05d042cb"},
 ]
 treq = [
     {file = "treq-22.2.0-py3-none-any.whl", hash = "sha256:27d95b07c5c14be3e7b280416139b036087617ad5595be913b1f9b3ce981b9b2"},
