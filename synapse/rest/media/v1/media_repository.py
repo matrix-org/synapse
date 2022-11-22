@@ -344,8 +344,8 @@ class MediaRepository:
         download from remote server.
 
         Args:
-            server_name (str): Remote server_name where the media originated.
-            media_id (str): The media ID of the content (as defined by the
+            server_name: Remote server_name where the media originated.
+            media_id: The media ID of the content (as defined by the
                 remote server).
 
         Returns:

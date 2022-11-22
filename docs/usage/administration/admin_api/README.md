@@ -19,7 +19,7 @@ already on your `$PATH` depending on how Synapse was installed.
 Finding your user's `access_token` is client-dependent, but will usually be shown in the client's settings.
 
 ## Making an Admin API request
-For security reasons, we [recommend](reverse_proxy.md#synapse-administration-endpoints)
+For security reasons, we [recommend](../../../reverse_proxy.md#synapse-administration-endpoints)
 that the Admin API (`/_synapse/admin/...`) should be hidden from public view using a
 reverse proxy. This means you should typically query the Admin API from a terminal on
 the machine which runs Synapse.

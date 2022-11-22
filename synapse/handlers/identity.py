@@ -711,7 +711,7 @@ class IdentityHandler:
             inviter_display_name: The current display name of the
                 inviter.
             inviter_avatar_url: The URL of the inviter's avatar.
-            id_access_token (str): The access token to authenticate to the identity
+            id_access_token: The access token to authenticate to the identity
                 server with
 
         Returns:

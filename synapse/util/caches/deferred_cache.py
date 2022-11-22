@@ -153,7 +153,7 @@ class DeferredCache(Generic[KT, VT]):
         Args:
             key:
             callback: Gets called when the entry in the cache is invalidated
-            update_metrics (bool): whether to update the cache hit rate metrics
+            update_metrics: whether to update the cache hit rate metrics
 
         Returns:
             A Deferred which completes with the result. Note that this may later fail
