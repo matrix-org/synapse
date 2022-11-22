@@ -193,6 +193,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         else:
             max_entries_returned = state_filter.max_entries_returned()
 
+            where_clause, where_args = state_filter.make_sql_filter_clause()
+
             # We don't use WITH RECURSIVE on sqlite3 as there are distributions
             # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
             for group in groups:
