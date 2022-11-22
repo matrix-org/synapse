@@ -812,21 +812,21 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
 
         results = {}
 
-        async def get_key(key_to_fetch_item: _FetchKeyRequest) -> None:
+        async def get_keys(key_to_fetch_item: _FetchKeyRequest) -> None:
             server_name = key_to_fetch_item.server_name
 
             try:
-                keys = await self.get_server_verify_key_v2_direct(server_name)
+                keys = await self.get_server_verify_keys_v2_direct(server_name)
                 results[server_name] = keys
             except KeyLookupError as e:
                 logger.warning("Error looking up keys from %s: %s", server_name, e)
             except Exception:
                 logger.exception("Error getting keys from %s", server_name)
 
-        await yieldable_gather_results(get_key, keys_to_fetch)
+        await yieldable_gather_results(get_keys, keys_to_fetch)
         return results
 
-    async def get_server_verify_key_v2_direct(
+    async def get_server_verify_keys_v2_direct(
         self, server_name: str
     ) -> Dict[str, FetchKeyResult]:
         """
