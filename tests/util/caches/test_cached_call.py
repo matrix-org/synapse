@@ -28,7 +28,7 @@ class CachedCallTestCase(TestCase):
         Happy-path test case: makes a couple of calls and makes sure they behave
         correctly
         """
-        d = Deferred()
+        d: "Deferred[int]" = Deferred()
 
         async def f():
             return await d
@@ -95,7 +95,7 @@ class RetryOnExceptionCachedCallTestCase(TestCase):
     def test_get(self):
         # set up the RetryOnExceptionCachedCall around a function which will fail
         # (after a while)
-        d = Deferred()
+        d: "Deferred[int]" = Deferred()
 
         async def f1():
             await d
