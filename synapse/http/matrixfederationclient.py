@@ -1214,7 +1214,7 @@ class MatrixFederationHttpClient:
 
         try:
             d = read_body_with_max_size(response, output_stream, max_size)
-            d.addTimeout(self.default_timeout, self.reactor)
+            d.addTimeout(self.default_timeout, self.reactor) # type: ignore[unused-awaitable]
             length = await make_deferred_yieldable(d)
         except BodyExceededMaxSize:
             msg = "Requested file is too large > %r bytes" % (max_size,)

@@ -334,7 +334,7 @@ class _PerHostRatelimiter:
                 queue_defer = queue_request()
                 return queue_defer
 
-            ret_defer.addBoth(on_wait_finished)
+            ret_defer.addBoth(on_wait_finished) # type: ignore[unused-awaitable]
         else:
             ret_defer = queue_request()
 
@@ -358,8 +358,8 @@ class _PerHostRatelimiter:
             self.ready_request_queue.pop(request_id, None)
             return r
 
-        ret_defer.addCallbacks(on_start, on_err)
-        ret_defer.addBoth(on_both)
+        ret_defer.addCallbacks(on_start, on_err) # type: ignore[unused-awaitable]
+        ret_defer.addBoth(on_both) # type: ignore[unused-awaitable]
         return make_deferred_yieldable(ret_defer)
 
     def _on_exit(self, request_id: object) -> None:

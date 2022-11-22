@@ -120,7 +120,7 @@ class HttpTransactionCache:
                 # we deliberately do not propagate the error any further, as we
                 # expect the observers to have reported it.
 
-            deferred.addErrback(remove_from_map)
+            deferred.addErrback(remove_from_map) # type: ignore[unused-awaitable]
 
         return make_deferred_yieldable(observable.observe())
 

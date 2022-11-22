@@ -193,7 +193,7 @@ class RemoteHandler(logging.Handler):
             self._connection_waiter = None
 
         deferred: Deferred = self._service.whenConnected(failAfterFailures=1)
-        deferred.addCallbacks(writer, fail)
+        deferred.addCallbacks(writer, fail) # type: ignore[unused-awaitable]
         self._connection_waiter = deferred
 
     def _handle_pressure(self) -> None:

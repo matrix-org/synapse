@@ -843,7 +843,7 @@ def run_in_background(  # type: ignore[misc]
     # which is supposed to have a single entry and exit point. But
     # by spawning off another deferred, we are effectively
     # adding a new exit point.)
-    res.addBoth(_set_context_cb, ctx)
+    res.addBoth(_set_context_cb, ctx) # type: ignore[unused-awaitable]
     return res
 
 
@@ -870,7 +870,7 @@ def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]
     # ok, we can't be sure that a yield won't block, so let's reset the
     # logcontext, and add a callback to the deferred to restore it.
     prev_context = set_current_context(SENTINEL_CONTEXT)
-    deferred.addBoth(_set_context_cb, prev_context)
+    deferred.addBoth(_set_context_cb, prev_context) # type: ignore[unused-awaitable]
     return deferred
 
 

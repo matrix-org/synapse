@@ -102,7 +102,7 @@ class HTTPConnectProxyEndpoint:
         d = self._proxy_endpoint.connect(f)
         # once the tcp socket connects successfully, we need to wait for the
         # CONNECT to complete.
-        d.addCallback(lambda conn: f.on_connection)
+        d.addCallback(lambda conn: f.on_connection) # type: ignore[unused-awaitable]
         return d
 
 
@@ -196,7 +196,7 @@ class HTTPConnectProtocol(protocol.Protocol):
         self.http_setup_client = HTTPConnectSetupClient(
             self.host, self.port, self.proxy_creds
         )
-        self.http_setup_client.on_connected.addCallback(self.proxyConnected)
+        self.http_setup_client.on_connected.addCallback(self.proxyConnected) # type: ignore[unused-awaitable]
 
     def connectionMade(self) -> None:
         self.http_setup_client.makeConnection(self.transport)

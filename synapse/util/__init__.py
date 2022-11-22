@@ -132,7 +132,7 @@ class Clock:
         call = task.LoopingCall(f, *args, **kwargs)
         call.clock = self._reactor
         d = call.start(msec / 1000.0, now=False)
-        d.addErrback(log_failure, "Looping call died", consumeErrors=False)
+        d.addErrback(log_failure, "Looping call died", consumeErrors=False) # type: ignore[unused-awaitable]
         return call
 
     def call_later(

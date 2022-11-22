@@ -108,7 +108,7 @@ def do_patch() -> None:
                     raise Exception(err)
                 return r
 
-            res.addBoth(check_ctx)
+            res.addBoth(check_ctx) # type: ignore[unused-awaitable]
             return res
 
         return wrapped

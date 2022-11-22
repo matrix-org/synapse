@@ -377,7 +377,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     for k, v in r.items():
                         results[cache_key_to_arg(k)] = v
 
-                pending_deferred.addCallback(update_results)
+                pending_deferred.addCallback(update_results) # type: ignore[unused-awaitable]
                 cached_defers.append(pending_deferred)
 
             if missing:

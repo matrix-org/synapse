@@ -452,7 +452,7 @@ class SimpleHttpClient:
                 )
 
                 # turn timeouts into RequestTimedOutErrors
-                request_deferred.addErrback(_timeout_to_request_timed_out_error)
+                request_deferred.addErrback(_timeout_to_request_timed_out_error) # type: ignore[unused-awaitable]
 
                 response = await make_deferred_yieldable(request_deferred)
 
