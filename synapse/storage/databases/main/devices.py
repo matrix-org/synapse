@@ -2029,7 +2029,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             SELECT user_id, device_id, room_id, stream_id, opentracing_context
             FROM device_lists_changes_in_room
             WHERE
-                (stream_id > ? OR (stream_id = ? AND room_id > ?)) AND
+                (stream_id, room_id) > (?, ?) AND
                 stream_id <= ? AND
                 NOT converted_to_destinations
             ORDER BY stream_id ASC, room_id ASC
@@ -2042,7 +2042,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             txn.execute(
                 sql,
                 (
-                    start_stream_id,
                     start_stream_id,
                     start_room_id,
                     # Avoid returning rows if there may be uncommitted device list
