@@ -65,9 +65,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
             self.assertTrue(ignore_backoff)
             self.assertEqual(destination, server_name)
             key_id = "%s:%s" % (signing_key.alg, signing_key.version)
-            self.assertEqual(
-                path, "/_matrix/key/v2/server/%s" % (urllib.parse.quote(key_id),)
-            )
+            self.assertEqual(path, "/_matrix/key/v2/server")
 
             response = {
                 "server_name": server_name,
