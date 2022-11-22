@@ -29,7 +29,7 @@ from typing import (
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.logging.opentracing import tag_args, trace
+from synapse.logging.opentracing import SynapseTags, set_tag, tag_args, trace
 from synapse.storage.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
@@ -183,6 +183,53 @@ class StateStorageController:
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     @trace
+    @tag_args
+    async def _get_state_for_client_filtering_for_events(
+        self, event_ids: Collection[str], user_id_viewing_events: str
+    ) -> Dict[str, StateMap[EventBase]]:
+        """TODO"""
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids.length",
+            str(len(event_ids)),
+        )
+
+        # Since we're making decisions based on the state, we need to wait.
+        await_full_state = True
+
+        event_to_groups = await self.get_state_group_for_events(
+            event_ids, await_full_state=await_full_state
+        )
+
+        groups = set(event_to_groups.values())
+        logger.info(
+            "_get_state_for_client_filtering_for_events: groups=%s",
+            groups,
+        )
+        group_to_state = await self.stores.state._get_state_for_client_filtering(
+            groups, user_id_viewing_events
+        )
+        logger.info(
+            "_get_state_for_client_filtering_for_events: group_to_state=%s",
+            group_to_state,
+        )
+
+        state_event_map = await self.stores.main.get_events(
+            [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
+            get_prev_content=False,
+        )
+
+        event_to_state = {
+            event_id: {
+                k: state_event_map[v]
+                for k, v in group_to_state[group].items()
+                if v in state_event_map
+            }
+            for event_id, group in event_to_groups.items()
+        }
+
+        return {event: event_to_state[event] for event in event_ids}
+
+    @trace
     async def get_state_for_events(
         self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
@@ -209,9 +256,11 @@ class StateStorageController:
         )
 
         groups = set(event_to_groups.values())
+        logger.info("get_state_for_events: groups=%s", groups)
         group_to_state = await self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
+        logger.info("get_state_for_events: group_to_state=%s", group_to_state)
 
         state_event_map = await self.stores.main.get_events(
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],

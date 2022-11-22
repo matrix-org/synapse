@@ -24,9 +24,9 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
 from synapse.logging.opentracing import (
-    start_active_span,
     SynapseTags,
     set_tag,
+    start_active_span,
     tag_args,
     trace,
 )
@@ -108,11 +108,21 @@ async def filter_events_for_client(
 
     # Grab the history visibility and membership for each of the events. That's all we
     # need to know in order to filter them.
-    filter_types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
-    event_id_to_state = await storage.state.get_state_for_events(
+    event_id_to_state = await storage.state._get_state_for_client_filtering_for_events(
         # we exclude outliers at this point, and then handle them separately later
+        event_ids=frozenset(
+            e.event_id for e in events if not e.internal_metadata.outlier
+        ),
+        user_id_viewing_events=user_id,
+    )
+
+    # TODO: Remove comparison
+    logger.info("----------------------------------------------------")
+    logger.info("----------------------------------------------------")
+    types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
+    event_id_to_state_orig = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events if not e.internal_metadata.outlier),
-        state_filter=StateFilter.from_types(filter_types),
+        state_filter=StateFilter.from_types(types),
     )
 
     # Get the users who are ignored by the requesting user.
