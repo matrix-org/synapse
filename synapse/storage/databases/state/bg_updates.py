@@ -139,13 +139,13 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             # with no testing behind it)
             if use_condition_optimization and len(state_filter_condition_combos) < 10:
                 select_clause_list: List[str] = []
-                for etype, state_key in state_filter_condition_combos:
-                    if state_key is None:
+                for etype, skey in state_filter_condition_combos:
+                    if skey is None:
                         where_clause = "(type = ?)"
                         overall_select_query_args.extend([etype])
                     else:
                         where_clause = "(type = ? AND state_key = ?)"
-                        overall_select_query_args.extend([etype, state_key])
+                        overall_select_query_args.extend([etype, skey])
 
                     select_clause_list.append(
                         f"""
