@@ -174,7 +174,7 @@ class FederationHandler:
         # any partial-state-resync operations which were in flight when we
         # were shut down.
         if not hs.config.worker.worker_app:
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "resume_sync_partial_state_room", self._resume_sync_partial_state_room
             )
 
@@ -678,7 +678,7 @@ class FederationHandler:
                 if ret.partial_state:
                     # Kick off the process of asynchronously fetching the state for this
                     # room.
-                    run_as_background_process( # type: ignore[unused-awaitable]
+                    run_as_background_process(  # type: ignore[unused-awaitable]
                         desc="sync_partial_state_room",
                         func=self._sync_partial_state_room,
                         initial_destination=origin,
@@ -722,7 +722,7 @@ class FederationHandler:
             # lots of requests for missing prev_events which we do actually
             # have. Hence we fire off the background task, but don't wait for it.
 
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "handle_queued_pdus", self._handle_queued_pdus, room_queue
             )
 
@@ -1626,7 +1626,7 @@ class FederationHandler:
 
         partial_state_rooms = await self.store.get_partial_state_room_resync_info()
         for room_id, resync_info in partial_state_rooms.items():
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 desc="sync_partial_state_room",
                 func=self._sync_partial_state_room,
                 initial_destination=resync_info.joined_via,

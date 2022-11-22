@@ -942,7 +942,7 @@ class EventsWorkerStore(SQLBaseStore):
                 should_start = False
 
         if should_start:
-            run_as_background_process("fetch_events", self._fetch_thread) # type: ignore[unused-awaitable]
+            run_as_background_process("fetch_events", self._fetch_thread)  # type: ignore[unused-awaitable]
 
     async def _fetch_thread(self) -> None:
         """Services requests for events from `_event_fetch_list`."""

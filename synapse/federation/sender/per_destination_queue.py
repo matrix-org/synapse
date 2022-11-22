@@ -262,7 +262,7 @@ class PerDestinationQueue:
 
         logger.debug("TX [%s] Starting transaction loop", self._destination)
 
-        run_as_background_process( # type: ignore[unused-awaitable]
+        run_as_background_process(  # type: ignore[unused-awaitable]
             "federation_transaction_transmission_loop",
             self._transaction_transmission_loop,
         )

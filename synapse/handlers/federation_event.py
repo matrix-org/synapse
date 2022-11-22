@@ -1408,7 +1408,7 @@ class FederationEventHandler:
                     resync = True
 
             if resync:
-                run_as_background_process( # type: ignore[unused-awaitable]
+                run_as_background_process(  # type: ignore[unused-awaitable]
                     "resync_device_due_to_pdu",
                     self._resync_device,
                     event.sender,

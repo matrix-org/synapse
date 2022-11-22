@@ -129,7 +129,7 @@ def install_gc_manager() -> None:
                 gc_unreachable.labels(i).set(unreachable)
 
     gc_task = task.LoopingCall(_maybe_gc)
-    gc_task.start(0.1) # type: ignore[unused-awaitable]
+    gc_task.start(0.1)  # type: ignore[unused-awaitable]
 
 
 #

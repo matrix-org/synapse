@@ -113,7 +113,7 @@ class EmailPusher(Pusher):
         if self._is_processing:
             return
 
-        run_as_background_process("emailpush.process", self._process) # type: ignore[unused-awaitable]
+        run_as_background_process("emailpush.process", self._process)  # type: ignore[unused-awaitable]
 
     def _pause_processing(self) -> None:
         """Used by tests to temporarily pause processing of events.

@@ -187,7 +187,7 @@ class _DestinationWakeupQueue:
         self.queue[destination] = None
 
         if not self.processing:
-            self._handle() # type: ignore[unused-awaitable]
+            self._handle()  # type: ignore[unused-awaitable]
 
     @wrap_as_background_process("_DestinationWakeupQueue.handle")
     async def _handle(self) -> None:
@@ -342,7 +342,7 @@ class FederationSender(AbstractFederationSender):
             return
 
         # fire off a processing loop in the background
-        run_as_background_process( # type: ignore[unused-awaitable]
+        run_as_background_process(  # type: ignore[unused-awaitable]
             "process_event_queue_for_federation", self._process_event_queue_loop
         )
 

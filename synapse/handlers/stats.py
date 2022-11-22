@@ -75,7 +75,7 @@ class StatsHandler:
             finally:
                 self._is_processing = False
 
-        run_as_background_process("stats.notify_new_event", process) # type: ignore[unused-awaitable]
+        run_as_background_process("stats.notify_new_event", process)  # type: ignore[unused-awaitable]
 
     async def _unsafe_process(self) -> None:
         # If self.pos is None then means we haven't fetched it from DB

@@ -199,7 +199,7 @@ class _ServiceQueuer:
         if service.id in self.requests_in_flight:
             return
 
-        run_as_background_process( # type: ignore[unused-awaitable]
+        run_as_background_process(  # type: ignore[unused-awaitable]
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
@@ -406,10 +406,10 @@ class _TransactionController:
                 if sent:
                     await txn.complete(self.store)
                 else:
-                    run_in_background(self._on_txn_fail, service) # type: ignore[unused-awaitable]
+                    run_in_background(self._on_txn_fail, service)  # type: ignore[unused-awaitable]
         except Exception:
             logger.exception("Error creating appservice transaction")
-            run_in_background(self._on_txn_fail, service) # type: ignore[unused-awaitable]
+            run_in_background(self._on_txn_fail, service)  # type: ignore[unused-awaitable]
 
     async def on_recovered(self, recoverer: "_Recoverer") -> None:
         logger.info(
@@ -478,7 +478,7 @@ class _Recoverer:
 
     def recover(self) -> None:
         def _retry() -> None:
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "as-recoverer-%s" % (self.service.id,), self.retry
             )
 

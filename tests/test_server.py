@@ -117,7 +117,7 @@ class JsonResourceTests(unittest.TestCase):
 
         def _callback(request: SynapseRequest, **kwargs: object) -> "Deferred[None]":
             d: "Deferred[None]" = Deferred()
-            d.addCallback(_throw) # type: ignore[unused-awaitable]
+            d.addCallback(_throw)  # type: ignore[unused-awaitable]
             self.reactor.callLater(0.5, d.callback, True)
             return make_deferred_yieldable(d)
 

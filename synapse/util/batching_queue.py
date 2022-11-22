@@ -128,7 +128,7 @@ class BatchingQueue(Generic[V, R]):
         # If we're not currently processing the key fire off a background
         # process to start processing.
         if key not in self._processing_keys:
-            run_as_background_process(self._name, self._process_queue, key) # type: ignore[unused-awaitable]
+            run_as_background_process(self._name, self._process_queue, key)  # type: ignore[unused-awaitable]
 
         with self._number_in_flight_metric.track_inprogress():
             return await make_deferred_yieldable(d)

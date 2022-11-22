@@ -92,7 +92,7 @@ class PusherPool:
         if not self._should_start_pushers:
             logger.info("Not starting pushers because they are disabled in the config")
             return
-        run_as_background_process("start_pushers", self._start_pushers) # type: ignore[unused-awaitable]
+        run_as_background_process("start_pushers", self._start_pushers)  # type: ignore[unused-awaitable]
 
     async def add_or_update_pusher(
         self,
@@ -236,7 +236,7 @@ class PusherPool:
 
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
-        self._on_new_notifications(max_token) # type: ignore[unused-awaitable]
+        self._on_new_notifications(max_token)  # type: ignore[unused-awaitable]
 
     @wrap_as_background_process("on_new_notifications")
     async def _on_new_notifications(self, max_token: RoomStreamToken) -> None:

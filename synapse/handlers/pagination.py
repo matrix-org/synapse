@@ -293,7 +293,7 @@ class PaginationHandler:
             # We want to purge everything, including local events, and to run the purge in
             # the background so that it's not blocking any other operation apart from
             # other purges in the same room.
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "_purge_history",
                 self._purge_history,
                 purge_id,
@@ -328,7 +328,7 @@ class PaginationHandler:
         logger.info("[purge] starting purge_id %s", purge_id)
 
         self._purges_by_id[purge_id] = PurgeStatus()
-        run_as_background_process( # type: ignore[unused-awaitable]
+        run_as_background_process(  # type: ignore[unused-awaitable]
             "purge_history",
             self._purge_history,
             purge_id,
@@ -769,7 +769,7 @@ class PaginationHandler:
 
         self._delete_by_id[delete_id] = DeleteStatus()
         self._delete_by_room.setdefault(room_id, []).append(delete_id)
-        run_as_background_process( # type: ignore[unused-awaitable]
+        run_as_background_process(  # type: ignore[unused-awaitable]
             "shutdown_and_purge_room",
             self._shutdown_and_purge_room,
             delete_id,

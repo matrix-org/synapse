@@ -757,7 +757,7 @@ def respond_with_json(
     if send_cors:
         set_cors_headers(request)
 
-    run_in_background( # type: ignore[unused-awaitable]
+    run_in_background(  # type: ignore[unused-awaitable]
         _async_write_json_to_request_in_thread, request, encoder, json_object
     )
     return NOT_DONE_YET

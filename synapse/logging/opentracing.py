@@ -908,7 +908,7 @@ def _custom_sync_async_decorator(
                         scope.__exit__(None, None, None)
                         return result
 
-                    result.addCallbacks(call_back, err_back) # type: ignore[unused-awaitable]
+                    result.addCallbacks(call_back, err_back)  # type: ignore[unused-awaitable]
 
                 else:
                     if inspect.isawaitable(result):

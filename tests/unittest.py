@@ -555,7 +555,7 @@ class HomeserverTestCase(TestCase):
         deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
 
         results: list = []
-        deferred.addBoth(results.append) # type: ignore[unused-awaitable]
+        deferred.addBoth(results.append)  # type: ignore[unused-awaitable]
 
         self.pump(by=by)
 

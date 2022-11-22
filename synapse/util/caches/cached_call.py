@@ -89,7 +89,7 @@ class CachedCall(Generic[TV]):
             def got_result(r: Union[TV, Failure]) -> None:
                 self._result = r
 
-            self._deferred.addBoth(got_result) # type: ignore[unused-awaitable]
+            self._deferred.addBoth(got_result)  # type: ignore[unused-awaitable]
 
         # TODO: consider cancellation semantics. Currently, if the call to get()
         #    is cancelled, the underlying call will continue (and any future calls

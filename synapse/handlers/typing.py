@@ -116,7 +116,7 @@ class FollowerTypingHandler:
         if self.federation and self.is_mine_id(member.user_id):
             last_fed_poke = self._member_last_federation_poke.get(member, None)
             if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
-                run_as_background_process( # type: ignore[unused-awaitable]
+                run_as_background_process(  # type: ignore[unused-awaitable]
                     "typing._push_remote", self._push_remote, member=member, typing=True
                 )
 
@@ -180,7 +180,7 @@ class FollowerTypingHandler:
             self._room_typing[row.room_id] = now_typing
 
             if self.federation:
-                run_as_background_process( # type: ignore[unused-awaitable]
+                run_as_background_process(  # type: ignore[unused-awaitable]
                     "_send_changes_in_typing_to_remotes",
                     self._send_changes_in_typing_to_remotes,
                     row.room_id,
@@ -327,7 +327,7 @@ class TypingWriterHandler(FollowerTypingHandler):
     def _push_update(self, member: RoomMember, typing: bool) -> None:
         if self.hs.is_mine_id(member.user_id):
             # Only send updates for changes to our own users.
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "typing._push_remote", self._push_remote, member, typing
             )
 

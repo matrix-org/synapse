@@ -154,7 +154,7 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
             else:
                 return f
 
-        deferred.addCallbacks(callback, errback) # type: ignore[unused-awaitable]
+        deferred.addCallbacks(callback, errback)  # type: ignore[unused-awaitable]
 
     def observe(self) -> "defer.Deferred[_T]":
         """Observe the underlying deferred.
@@ -588,7 +588,7 @@ class ReadWriteLock:
                 # writer waiting for us and it completed entirely within the
                 # `new_defer.callback()` call above.
                 if self.key_to_current_writer.get(key) == new_defer:
-                    self.key_to_current_writer.pop(key) # type: ignore[unused-awaitable]
+                    self.key_to_current_writer.pop(key)  # type: ignore[unused-awaitable]
 
         return _ctx_manager()
 
@@ -646,7 +646,7 @@ def timeout_deferred(
             raise defer.TimeoutError("Timed out after %gs" % (timeout,))
         return value
 
-    deferred.addErrback(convert_cancelled) # type: ignore[unused-awaitable]
+    deferred.addErrback(convert_cancelled)  # type: ignore[unused-awaitable]
 
     def cancel_timeout(result: _T) -> _T:
         # stop the pending call to cancel the deferred if it's been fired
@@ -654,7 +654,7 @@ def timeout_deferred(
             delayed_call.cancel()
         return result
 
-    deferred.addBoth(cancel_timeout) # type: ignore[unused-awaitable]
+    deferred.addBoth(cancel_timeout)  # type: ignore[unused-awaitable]
 
     def success_cb(val: _T) -> None:
         if not new_d.called:
@@ -664,7 +664,7 @@ def timeout_deferred(
         if not new_d.called:
             new_d.errback(val)
 
-    deferred.addCallbacks(success_cb, failure_cb) # type: ignore[unused-awaitable]
+    deferred.addCallbacks(success_cb, failure_cb)  # type: ignore[unused-awaitable]
 
     return new_d
 
@@ -712,7 +712,7 @@ def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
         wrapped with `make_deferred_yieldable`.
     """
     new_deferred: "defer.Deferred[T]" = defer.Deferred()
-    deferred.chainDeferred(new_deferred) # type: ignore[unused-awaitable]
+    deferred.chainDeferred(new_deferred)  # type: ignore[unused-awaitable]
     return new_deferred
 
 
@@ -774,10 +774,10 @@ def delay_cancellation(awaitable: Awaitable[T]) -> Awaitable[T]:
         new_deferred.pause()
         new_deferred.errback(Failure(CancelledError()))
 
-        deferred.addBoth(lambda _: new_deferred.unpause()) # type: ignore[unused-awaitable]
+        deferred.addBoth(lambda _: new_deferred.unpause())  # type: ignore[unused-awaitable]
 
     new_deferred: "defer.Deferred[T]" = defer.Deferred(handle_cancel)
-    deferred.chainDeferred(new_deferred) # type: ignore[unused-awaitable]
+    deferred.chainDeferred(new_deferred)  # type: ignore[unused-awaitable]
     return new_deferred
 
 

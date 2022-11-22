@@ -198,7 +198,7 @@ class DeviceMessageHandler:
             await self.store.mark_remote_user_device_cache_as_stale(sender_user_id)
 
             # Immediately attempt a resync in the background
-            run_in_background(self._user_device_resync, user_id=sender_user_id) # type: ignore[unused-awaitable]
+            run_in_background(self._user_device_resync, user_id=sender_user_id)  # type: ignore[unused-awaitable]
 
     async def send_device_message(
         self,

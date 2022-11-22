@@ -112,7 +112,7 @@ class StorageProviderWrapper(StorageProvider):
                 except Exception:
                     logger.exception("Error storing file")
 
-            run_in_background(store) # type: ignore[unused-awaitable]
+            run_in_background(store)  # type: ignore[unused-awaitable]
 
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         if file_info.url_cache:

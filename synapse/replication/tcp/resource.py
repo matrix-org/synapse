@@ -137,7 +137,7 @@ class ReplicationStreamer:
             logger.debug("Notifier poke loop already running")
             return
 
-        run_as_background_process("replication_notifier", self._run_notifier_loop) # type: ignore[unused-awaitable]
+        run_as_background_process("replication_notifier", self._run_notifier_loop)  # type: ignore[unused-awaitable]
 
     async def _run_notifier_loop(self) -> None:
         self.is_looping = True

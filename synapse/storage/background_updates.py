@@ -272,7 +272,7 @@ class BackgroundUpdater:
             # if we start a new background update, not all updates are done.
             self._all_done = False
             sleep = self.sleep_enabled
-            run_as_background_process( # type: ignore[unused-awaitable]
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "background_updates", self.run_background_updates, sleep
             )
 

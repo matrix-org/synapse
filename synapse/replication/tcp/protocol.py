@@ -300,7 +300,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             # if so.
 
             if isawaitable(res):
-                run_as_background_process( # type: ignore[unused-awaitable]
+                run_as_background_process(  # type: ignore[unused-awaitable]
                     "replication-" + cmd.get_logcontext_id(), lambda: res
                 )
 

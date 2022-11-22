@@ -292,7 +292,7 @@ class ReplicationCommandHandler:
             return
 
         # fire off a background process to start processing the queue.
-        run_as_background_process( # type: ignore[unused-awaitable]
+        run_as_background_process(  # type: ignore[unused-awaitable]
             "process-replication-data", self._unsafe_process_queue, stream_name
         )
 

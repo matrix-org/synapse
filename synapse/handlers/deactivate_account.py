@@ -222,7 +222,7 @@ class DeactivateAccountHandler:
         pending deactivation, if it isn't already running.
         """
         if not self._user_parter_running:
-            run_as_background_process("user_parter_loop", self._user_parter_loop) # type: ignore[unused-awaitable]
+            run_as_background_process("user_parter_loop", self._user_parter_loop)  # type: ignore[unused-awaitable]
 
     async def _user_parter_loop(self) -> None:
         """Loop that parts deactivated users from rooms"""

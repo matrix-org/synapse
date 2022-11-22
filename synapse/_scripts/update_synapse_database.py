@@ -59,7 +59,7 @@ def run_background_updates(hs: HomeServer) -> None:
 
     def run() -> None:
         # Apply all background updates on the database.
-        defer.ensureDeferred( # type: ignore[unused-awaitable]
+        defer.ensureDeferred(  # type: ignore[unused-awaitable]
             run_as_background_process("background_updates", run_background_updates)
         )
 

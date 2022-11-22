@@ -558,7 +558,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # We may need to do some processing asynchronously for local user IDs.
         if self.hs.is_mine_id(user_id):
-            self._handle_new_device_update_async() # type: ignore[unused-awaitable]
+            self._handle_new_device_update_async()  # type: ignore[unused-awaitable]
 
     async def notify_user_signature_update(
         self, from_user_id: str, user_ids: List[str]
