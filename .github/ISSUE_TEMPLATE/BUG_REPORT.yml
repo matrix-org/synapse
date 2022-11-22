@@ -114,6 +114,17 @@ body:
     validations:
       required: true
   - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: |
+        Do you have any unusual config options turned on? If so, please provide details.
+
+        - Experimental or undocumented features
+        - [Presence](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#presence)
+        - [Message retention](https://matrix-org.github.io/synapse/latest/message_retention_policies.html)
+        - [Synapse modules](https://matrix-org.github.io/synapse/latest/modules/index.html)
+  - type: textarea
     id: logs
     attributes:
       label: Relevant log output
