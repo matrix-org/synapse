@@ -63,6 +63,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {} if related_events is None else related_events,
             True,
             event.room_version.msc3931_push_features,
+            True,
         )
 
     def test_display_name(self) -> None:

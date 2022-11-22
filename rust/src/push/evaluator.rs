@@ -64,6 +64,10 @@ pub struct PushRuleEvaluator {
 
     /// If MSC3931 is applicable, the feature flags for the room version.
     room_version_feature_flags: Vec<String>,
+
+    /// If MSC3931 (room version feature flags) is enabled. Usually controlled by the same
+    /// flag as MSC1767 (extensible events core).
+    msc3931_enabled: bool,
 }
 
 #[pymethods]
@@ -78,6 +82,7 @@ impl PushRuleEvaluator {
         related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
+        msc3931_enabled: bool,
     ) -> Result<Self, Error> {
         let body = flattened_keys
             .get("content.body")
@@ -93,6 +98,7 @@ impl PushRuleEvaluator {
             related_events_flattened,
             related_event_match_enabled,
             room_version_feature_flags,
+            msc3931_enabled,
         })
     }
 
@@ -214,8 +220,13 @@ impl PushRuleEvaluator {
                 }
             }
             KnownCondition::RoomVersionSupports { feature } => {
-                let flag = feature.to_string();
-                KNOWN_RVER_FLAGS.contains(&flag) && self.room_version_feature_flags.contains(&flag)
+                if !self.msc3931_enabled {
+                    false
+                } else {
+                    let flag = feature.to_string();
+                    KNOWN_RVER_FLAGS.contains(&flag)
+                        && self.room_version_feature_flags.contains(&flag)
+                }
             }
         };
 
@@ -376,6 +387,7 @@ fn push_rule_evaluator() {
         BTreeMap::new(),
         true,
         vec![],
+        true,
     )
     .unwrap();
 
