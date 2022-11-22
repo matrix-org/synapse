@@ -29,6 +29,7 @@ from typing import (
 from prometheus_client import Counter
 
 from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
+from synapse.api.room_versions import PushRuleRoomFlag, RoomDisposition, RoomVersion
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -343,7 +344,7 @@ class BulkPushRuleEvaluator:
             room_version_features = []
 
         evaluator = PushRuleEvaluator(
-            _flatten_dict(event),
+            _flatten_dict(event, room_version=event.room_version),
             room_member_count,
             sender_power_level,
             notification_levels,
@@ -426,6 +427,7 @@ StateGroup = Union[object, int]
 
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
+    room_version: Optional[RoomVersion] = None,
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
@@ -437,6 +439,31 @@ def _flatten_dict(
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, Mapping):
+            # do not set `room_version` due to recursion considerations below
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
+
+    # `room_version` should only ever be set when looking at the top level of an event
+    if (
+        room_version is not None
+        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in room_version.msc3931_push_features
+        and isinstance(d, EventBase)
+    ):
+        # Room supports extensible events: replace `content.body` with the plain text
+        # representation from `m.markup`, as per MSC1767.
+        markup = d.get("content").get("org.matrix.msc1767.markup")
+        if room_version.disposition == RoomDisposition.STABLE:
+            markup = d.get("content").get("m.markup")
+        if markup is not None and isinstance(markup, list):
+            text = ""
+            for rep in markup:
+                if not isinstance(rep, dict):
+                    # invalid markup - skip all processing
+                    break
+                if rep.get("mimetype", "text/plain") == "text/plain":
+                    rep_text = rep.get("body")
+                    if rep_text is not None and isinstance(rep_text, str):
+                        text = rep_text.lower()
+                        break
+            result["content.body"] = text
 
     return result
