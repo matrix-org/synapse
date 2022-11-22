@@ -187,7 +187,7 @@ class _DestinationWakeupQueue:
         self.queue[destination] = None
 
         if not self.processing:
-            self._handle()
+            self._handle() # type: ignore[unused-awaitable]
 
     @wrap_as_background_process("_DestinationWakeupQueue.handle")
     async def _handle(self) -> None:

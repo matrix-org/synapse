@@ -97,7 +97,7 @@ class ApplicationServicesHandler:
 
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
-        self._notify_interested_services(max_token)
+        self._notify_interested_services(max_token) # type: ignore[unused-awaitable]
 
     @wrap_as_background_process("notify_interested_services")
     async def _notify_interested_services(self, max_token: RoomStreamToken) -> None:
@@ -307,7 +307,7 @@ class ApplicationServicesHandler:
 
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
-        self._notify_interested_services_ephemeral(
+        self._notify_interested_services_ephemeral( # type: ignore[unused-awaitable]
             services, stream_key, new_token, users
         )
 

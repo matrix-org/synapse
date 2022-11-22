@@ -236,7 +236,7 @@ class PusherPool:
 
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
-        self._on_new_notifications(max_token)
+        self._on_new_notifications(max_token) # type: ignore[unused-awaitable]
 
     @wrap_as_background_process("on_new_notifications")
     async def _on_new_notifications(self, max_token: RoomStreamToken) -> None:

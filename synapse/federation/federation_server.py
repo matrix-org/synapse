@@ -191,7 +191,7 @@ class FederationServer(FederationBase):
             )
             if lock:
                 logger.info("Handling old staged inbound events in %s", room_id)
-                self._process_incoming_pdus_in_room_inner(
+                self._process_incoming_pdus_in_room_inner( # type: ignore[unused-awaitable]
                     room_id,
                     room_version,
                     lock,
@@ -268,7 +268,7 @@ class FederationServer(FederationBase):
         # any old events in the staging area.
         if not self._started_handling_of_staged_events:
             self._started_handling_of_staged_events = True
-            self._handle_old_staged_events()
+            self._handle_old_staged_events() # type: ignore[unused-awaitable]
 
             # Start a periodic check for old staged events. This is to handle
             # the case where locks time out, e.g. if another process gets killed
@@ -1129,7 +1129,7 @@ class FederationServer(FederationBase):
             _INBOUND_EVENT_HANDLING_LOCK_NAME, pdu.room_id
         )
         if lock:
-            self._process_incoming_pdus_in_room_inner(
+            self._process_incoming_pdus_in_room_inner( # type: ignore[unused-awaitable]
                 pdu.room_id, room_version, lock, origin, pdu
             )
 
