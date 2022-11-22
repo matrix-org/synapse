@@ -115,27 +115,48 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 %s
             """
 
-            overall_select_query_args: List[any] = []
+            overall_select_query_args: List[Union[int, str]] = []
 
             # This is an optimization to create a select clause per-condition. This
             # makes the query planner a lot smarter on what rows should pull out in the
             # first place and we end up with something that takes 10x less time to get a
             # result.
-            if not state_filter.include_others and not state_filter.is_full():
-                select_clause_list: List[str] = []
+            use_condition_optimization = (
+                not state_filter.include_others and not state_filter.is_full()
+            )
+            state_filter_condition_combos: List[Tuple[str, Optional[str]]] = []
+            # We don't need to caclculate this list if we're not using the condition
+            # optimization
+            if use_condition_optimization:
                 for etype, state_keys in state_filter.types.items():
-                    for state_key in state_keys:
+                    if state_keys is None:
+                        state_filter_condition_combos.append((etype, None))
+                    else:
+                        for state_key in state_keys:
+                            state_filter_condition_combos.append((etype, state_key))
+            # And here is the optimization itself. We don't want to do the optimization
+            # if there are too many individual conditions (10 is an arbitrary number
+            # with no testing behind it)
+            if use_condition_optimization and len(state_filter_condition_combos) < 10:
+                select_clause_list: List[str] = []
+                for etype, state_key in state_filter_condition_combos:
+                    if state_key is None:
+                        where_clause = "(type = ?)"
+                        overall_select_query_args.extend([etype])
+                    else:
+                        where_clause = "(type = ? AND state_key = ?)"
                         overall_select_query_args.extend([etype, state_key])
-                        select_clause_list.append(
-                            """
-                            SELECT DISTINCT ON (type, state_key)
-                                type, state_key, event_id
-                            FROM state_groups_state
-                            INNER JOIN sgs USING (state_group)
-                            WHERE (type = ? AND state_key = ?)
-                            ORDER BY type, state_key, state_group DESC
+
+                    select_clause_list.append(
+                        f"""
+                        SELECT DISTINCT ON (type, state_key)
+                            type, state_key, event_id
+                        FROM state_groups_state
+                        INNER JOIN sgs USING (state_group)
+                        WHERE {where_clause}
+                        ORDER BY type, state_key, state_group DESC
                         """
-                        )
+                    )
 
                 overall_select_clause = (
                     "(" + (") UNION (".join(select_clause_list)) + ")"
@@ -143,7 +164,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             else:
                 where_clause, where_args = state_filter.make_sql_filter_clause()
 
-                overall_select_query_args = where_args
+                overall_select_query_args.extend(where_args)
 
                 # Unless the filter clause is empty, we're going to append it after an
                 # existing where clause
