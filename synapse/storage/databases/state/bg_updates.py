@@ -152,18 +152,18 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
                     select_clause_list.append(
                         f"""
-                        SELECT DISTINCT ON (type, state_key)
-                            type, state_key, event_id
-                        FROM state_groups_state
-                        INNER JOIN sgs USING (state_group)
-                        WHERE {where_clause}
-                        ORDER BY type, state_key, state_group DESC
+                        (
+                            SELECT DISTINCT ON (type, state_key)
+                                type, state_key, event_id
+                            FROM state_groups_state
+                            INNER JOIN sgs USING (state_group)
+                            WHERE {where_clause}
+                            ORDER BY type, state_key, state_group DESC
+                        )
                         """
                     )
 
-                overall_select_clause = (
-                    "(" + (") UNION (".join(select_clause_list)) + ")"
-                )
+                overall_select_clause = " UNION ".join(select_clause_list)
             else:
                 where_clause, where_args = state_filter.make_sql_filter_clause()
                 # Unless the filter clause is empty, we're going to append it after an
