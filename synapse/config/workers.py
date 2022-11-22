@@ -373,35 +373,37 @@ class WorkerConfig(Config):
         config: Dict[str, Any],
         legacy_option_name: str,
         legacy_app_name: str,
-        modern_instance_map_name: str,
+        modern_instance_list_name: str,
     ) -> List[str]:
         """
-        Retrieves the names of the workers handling a given duty, by either legacy option or instance list
+        Retrieves the names of the workers handling a given duty, by either legacy
+        option or instance list
 
         Args:
             config: settings read from yaml.
             legacy_option_name: the old way of enabling options. e.g. 'start_pushers'
             legacy_app_name: The historical app name. e.g. 'synapse.app.pusher'
-            modern_instance_map_name: the string name of the new instance_map. e.g. 'pusher_instances'
+            modern_instance_list_name: the string name of the new instance_list. e.g.
+            'pusher_instances'
         """
 
         legacy_option = config.get(legacy_option_name, True)
 
-        worker_instance_map = config.get(modern_instance_map_name)
-        if worker_instance_map is None:
+        worker_instances = config.get(modern_instance_list_name)
+        if worker_instances is None:
             # Default to an empty list, which means "another, unknown, worker is
             # responsible for it".
-            worker_instance_map = []
+            worker_instances = []
 
-            # If no worker instances are set we check if
-            # `legacy_option_name` is set, which means use master
+            # If no worker instances are set we check if the legacy option
+            # is set, which means use the main process.
             if legacy_option:
-                worker_instance_map = ["master"]
+                worker_instances = ["master"]
 
             if self.worker_app == legacy_app_name:
                 if legacy_option:
                     # If we're using `legacy_app_name`, and not using
-                    # `modern_instance_map_name`, then we should have
+                    # `modern_instance_list_name`, then we should have
                     # explicitly set `legacy_option_name` to false.
                     raise ConfigError(
                         f"The '{legacy_option_name}' config option must be disabled in "
@@ -410,9 +412,9 @@ class WorkerConfig(Config):
                         f"Please add `{legacy_option_name}: false` to the main config.\n",
                     )
 
-                worker_instance_map = [self.worker_name]
+                worker_instances = [self.worker_name]
 
-        return worker_instance_map
+        return worker_instances
 
     def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in
