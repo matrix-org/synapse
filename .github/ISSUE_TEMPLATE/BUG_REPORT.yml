@@ -91,6 +91,19 @@ body:
          - have you previously restored from a backup?
     validations:
       required: true
+  - type: dropdown
+    id: workers
+    attributes:
+      label: Workers
+      description: |
+        Are you running a single Synapse process, or are you running
+        [2 or more workers](https://matrix-org.github.io/synapse/latest/workers.html)?
+      options:
+        - Single process
+        - Multiple workers
+        - I don't know
+    validations:
+      required: true
   - type: textarea
     id: platform
     attributes:
