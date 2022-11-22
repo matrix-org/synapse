@@ -199,7 +199,7 @@ class _ServiceQueuer:
         if service.id in self.requests_in_flight:
             return
 
-        run_as_background_process(
+        run_as_background_process( # type: ignore[unused-awaitable]
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
@@ -478,7 +478,7 @@ class _Recoverer:
 
     def recover(self) -> None:
         def _retry() -> None:
-            run_as_background_process(
+            run_as_background_process( # type: ignore[unused-awaitable]
                 "as-recoverer-%s" % (self.service.id,), self.retry
             )
 

@@ -374,7 +374,7 @@ async def do_something() -> None:
         # `do_something_else` will get its own independent
         # logging context. `request-1` will not count any
         # metrics from `do_something_else`.
-        run_as_background_process(
+        run_as_background_process( # type: ignore[unused-awaitable]
             "do_something_else",
             do_something_else,
             to_resolve,

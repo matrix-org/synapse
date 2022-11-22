@@ -84,7 +84,7 @@ class Distributor:
         if name not in self.signals:
             raise KeyError("%r does not have a signal named %s" % (self, name))
 
-        run_as_background_process(name, self.signals[name].fire, *args, **kwargs)
+        run_as_background_process(name, self.signals[name].fire, *args, **kwargs) # type: ignore[unused-awaitable]
 
 
 P = ParamSpec("P")

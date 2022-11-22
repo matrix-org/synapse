@@ -293,7 +293,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
                 self._currently_persisting_rooms.discard(room_id)
 
         # set handle_queue_loop off in the background
-        run_as_background_process("persist_events", handle_queue_loop)
+        run_as_background_process("persist_events", handle_queue_loop) # type: ignore[unused-awaitable]
 
     def _get_drainining_queue(
         self, room_id: str

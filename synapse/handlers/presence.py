@@ -1333,7 +1333,7 @@ class PresenceHandler(BasePresenceHandler):
             finally:
                 self._event_processing = False
 
-        run_as_background_process("presence.notify_new_event", _process_presence)
+        run_as_background_process("presence.notify_new_event", _process_presence) # type: ignore[unused-awaitable]
 
     async def _unsafe_process(self) -> None:
         # Loop round handling deltas until we're up to date

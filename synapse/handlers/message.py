@@ -101,7 +101,7 @@ class MessageHandler:
         self._scheduled_expiry: Optional[IDelayedCall] = None
 
         if not hs.config.worker.worker_app:
-            run_as_background_process(
+            run_as_background_process( # type: ignore[unused-awaitable]
                 "_schedule_next_expiry", self._schedule_next_expiry
             )
 

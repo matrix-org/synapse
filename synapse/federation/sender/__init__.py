@@ -342,7 +342,7 @@ class FederationSender(AbstractFederationSender):
             return
 
         # fire off a processing loop in the background
-        run_as_background_process(
+        run_as_background_process( # type: ignore[unused-awaitable]
             "process_event_queue_for_federation", self._process_event_queue_loop
         )
 

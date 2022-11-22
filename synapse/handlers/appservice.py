@@ -144,7 +144,7 @@ class ApplicationServicesHandler:
                                 except Exception:
                                     logger.error("Application Services Failure")
 
-                            run_as_background_process("as_scheduler", start_scheduler)
+                            run_as_background_process("as_scheduler", start_scheduler) # type: ignore[unused-awaitable]
                             self.started_scheduler = True
 
                         # Fork off pushes to these services

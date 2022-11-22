@@ -160,7 +160,7 @@ class HttpPusher(Pusher):
 
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
-        run_as_background_process("http_pusher.on_new_receipts", self._update_badge)
+        run_as_background_process("http_pusher.on_new_receipts", self._update_badge) # type: ignore[unused-awaitable]
 
     async def _update_badge(self) -> None:
         # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
@@ -189,7 +189,7 @@ class HttpPusher(Pusher):
         if self._is_processing:
             return
 
-        run_as_background_process("httppush.process", self._process)
+        run_as_background_process("httppush.process", self._process) # type: ignore[unused-awaitable]
 
     async def _process(self) -> None:
         # we should never get here if we are already processing

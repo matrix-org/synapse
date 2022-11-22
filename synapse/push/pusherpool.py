@@ -92,7 +92,7 @@ class PusherPool:
         if not self._should_start_pushers:
             logger.info("Not starting pushers because they are disabled in the config")
             return
-        run_as_background_process("start_pushers", self._start_pushers)
+        run_as_background_process("start_pushers", self._start_pushers) # type: ignore[unused-awaitable]
 
     async def add_or_update_pusher(
         self,

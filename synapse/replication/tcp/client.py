@@ -451,7 +451,7 @@ class FederationSenderHandler:
             # no need to queue up another task.
             return
 
-        run_as_background_process("_save_and_send_ack", self._save_and_send_ack)
+        run_as_background_process("_save_and_send_ack", self._save_and_send_ack) # type: ignore[unused-awaitable]
 
     async def _save_and_send_ack(self) -> None:
         """Save the current federation position in the database and send an ACK

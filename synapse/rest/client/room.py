@@ -1079,7 +1079,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                 )
 
                 if with_relations:
-                    run_as_background_process(
+                    run_as_background_process( # type: ignore[unused-awaitable]
                         "redact_related_events",
                         self._relation_handler.redact_events_related_to,
                         requester=requester,

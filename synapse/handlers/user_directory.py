@@ -122,7 +122,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 self._is_processing = False
 
         self._is_processing = True
-        run_as_background_process("user_directory.notify_new_event", process)
+        run_as_background_process("user_directory.notify_new_event", process) # type: ignore[unused-awaitable]
 
     async def handle_local_profile_change(
         self, user_id: str, profile: ProfileInfo

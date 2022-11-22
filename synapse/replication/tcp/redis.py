@@ -112,7 +112,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
     def connectionMade(self) -> None:
         logger.info("Connected to redis")
         super().connectionMade()
-        run_as_background_process("subscribe-replication", self._send_subscribe)
+        run_as_background_process("subscribe-replication", self._send_subscribe) # type: ignore[unused-awaitable]
 
     async def _send_subscribe(self) -> None:
         # it's important to make sure that we only send the REPLICATE command once we
@@ -183,7 +183,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         # if so.
 
         if isawaitable(res):
-            run_as_background_process(
+            run_as_background_process( # type: ignore[unused-awaitable]
                 "replication-" + cmd.get_logcontext_id(), lambda: res
             )
 
@@ -205,7 +205,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         Args:
             cmd: The command to send
         """
-        run_as_background_process(
+        run_as_background_process( # type: ignore[unused-awaitable]
             "send-cmd", self._async_send_command, cmd, bg_start_span=False
         )
 
