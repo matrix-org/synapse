@@ -189,7 +189,7 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
     clock.looping_call(
         hs.get_datastores().main.reap_monthly_active_users, 1000 * 60 * 60
     )
-    hs.get_datastores().main.reap_monthly_active_users()
+    hs.get_datastores().main.reap_monthly_active_users() # type: ignore[unused-awaitable]
 
     @wrap_as_background_process("generate_monthly_active_users")
     async def generate_monthly_active_users() -> None:
@@ -212,7 +212,7 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
         max_mau_gauge.set(float(hs.config.server.max_mau_value))
 
     if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
-        generate_monthly_active_users()
+        generate_monthly_active_users() # type: ignore[unused-awaitable]
         clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
