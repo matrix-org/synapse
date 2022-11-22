@@ -45,9 +45,7 @@ class DevicesRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        handler = hs.get_device_handler()
-        assert isinstance(handler, DeviceHandler)
-        self.device_handler = handler
+        self.device_handler = hs.get_device_handler()
         self._msc3852_enabled = hs.config.experimental.msc3852_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
