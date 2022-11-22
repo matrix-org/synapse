@@ -74,6 +74,9 @@ body:
         - Debian packages from packages.matrix.org
         - pip (from PyPI)
         - Other (please mention below)
+        - I don't know
+    validations:
+      required: true
   - type: textarea
     id: platform
     attributes:
