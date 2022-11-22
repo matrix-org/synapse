@@ -15,6 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import Codes, StoreError, SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.types import Requester
 
 if TYPE_CHECKING:
@@ -29,7 +30,10 @@ class SetPasswordHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self._auth_handler = hs.get_auth_handler()
-        self._device_handler = hs.get_device_handler()
+        # This can only be instantiated on the main process.
+        device_handler = hs.get_device_handler()
+        assert isinstance(device_handler, DeviceHandler)
+        self._device_handler = device_handler
 
     async def set_password(
         self,
