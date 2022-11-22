@@ -2072,49 +2072,25 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         user_id: str,
         device_id: str,
         room_id: str,
-        stream_id: Optional[int],
         hosts: Collection[str],
         context: Optional[Dict[str, str]],
     ) -> None:
         """Queue the device update to be sent to the given set of hosts,
         calculated from the room ID.
-
-        Marks the associated row in `device_lists_changes_in_room` as handled,
-        if `stream_id` is provided.
         """
+        if not hosts:
+            return
 
         def add_device_list_outbound_pokes_txn(
             txn: LoggingTransaction, stream_ids: List[int]
         ) -> None:
-            if hosts:
-                self._add_device_outbound_poke_to_stream_txn(
-                    txn,
-                    user_id=user_id,
-                    device_id=device_id,
-                    hosts=hosts,
-                    stream_ids=stream_ids,
-                    context=context,
-                )
-
-            if stream_id:
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="device_lists_changes_in_room",
-                    keyvalues={
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "stream_id": stream_id,
-                        "room_id": room_id,
-                    },
-                    updatevalues={"converted_to_destinations": True},
-                )
-
-        if not hosts:
-            # If there are no hosts then we don't try and generate stream IDs.
-            return await self.db_pool.runInteraction(
-                "add_device_list_outbound_pokes",
-                add_device_list_outbound_pokes_txn,
-                [],
+            self._add_device_outbound_poke_to_stream_txn(
+                txn,
+                user_id=user_id,
+                device_id=device_id,
+                hosts=hosts,
+                stream_ids=stream_ids,
+                context=context,
             )
 
         async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:
