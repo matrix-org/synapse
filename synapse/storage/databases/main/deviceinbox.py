@@ -777,6 +777,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     retcol="device_id",
                 )
 
+                if len(devices) > 1000:
+                    logger.warn("ignoring wildcard to-device messages to %i devices", len(devices))
+                    continue
+
                 message_json = json_encoder.encode(messages_by_device["*"])
                 for device_id in devices:
                     # Add the message for all devices for this user on this
