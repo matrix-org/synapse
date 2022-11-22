@@ -184,10 +184,21 @@ class StateStorageController:
 
     @trace
     @tag_args
-    async def _get_state_for_client_filtering_for_events(
+    async def _get_state_for_events_when_filtering_for_client(
         self, event_ids: Collection[str], user_id_viewing_events: str
     ) -> Dict[str, StateMap[EventBase]]:
-        """TODO"""
+        """Get the state at each event that is necessary to filter
+        them before being displayed to clients from the perspective of the
+        `user_id_viewing_events`. Will fetch `m.room.history_visibility` and
+        `m.room.member` event of `user_id_viewing_events`.
+
+        Args:
+            event_ids: List of event ID's that will be displayed to the client
+            user_id_viewing_events: User ID that will be viewing these events
+
+        Returns:
+            Dict of event_id to state map.
+        """
         set_tag(
             SynapseTags.FUNC_ARG_PREFIX + "event_ids.length",
             str(len(event_ids)),
@@ -204,10 +215,6 @@ class StateStorageController:
         group_to_state = await self.stores.state._get_state_for_client_filtering(
             groups, user_id_viewing_events
         )
-        # logger.info(
-        #     "_get_state_for_client_filtering_for_events: group_to_state=%s",
-        #     group_to_state,
-        # )
 
         state_event_map = await self.stores.main.get_events(
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
@@ -255,7 +262,6 @@ class StateStorageController:
         group_to_state = await self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
-        # logger.info("get_state_for_events: group_to_state=%s", group_to_state)
 
         state_event_map = await self.stores.main.get_events(
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
