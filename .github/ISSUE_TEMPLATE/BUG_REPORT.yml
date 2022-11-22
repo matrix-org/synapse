@@ -130,7 +130,7 @@ body:
       label: Relevant log output
       description: |
         Please copy and paste any relevant log output, ideally at INFO or DEBUG log level.
-        This will be automatically formatted into code, so there is no need for backticks.
+        This will be automatically formatted into code, so there is no need for backticks (`\``).
 
         Please be careful to remove any personal or private data.
 
