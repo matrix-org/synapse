@@ -193,9 +193,9 @@ class EventAuthHandler:
                     "Unable to authorise you right now; room is partial-stated here.",
                     errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
                 )
-
-        if not await self.is_host_in_room(room_id, host):
-            raise AuthError(403, "Host not in room.")
+        else:
+            if not await self.is_host_in_room(room_id, host):
+                raise AuthError(403, "Host not in room.")
 
     async def check_restricted_join_rules(
         self,
