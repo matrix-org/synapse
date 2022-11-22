@@ -77,6 +77,20 @@ body:
         - I don't know
     validations:
       required: true
+  - type: input
+    id: database
+    attributes:
+      label: Database
+      description: |
+        Are you using SQLite or PostgreSQL? What's the version of your database?
+
+        If PostgreSQL, please also answer the following:
+         - are you using a single PostgreSQL server
+        or [separate servers for `main` and `state`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#databases)?
+         - have you previously ported from SQLite using the Synapse "portdb" script?
+         - have you previously restored from a backup?
+    validations:
+      required: true
   - type: textarea
     id: platform
     attributes:
