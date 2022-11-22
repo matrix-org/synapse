@@ -566,7 +566,7 @@ class RelationsHandler:
             for event_id, edit in edits.items():
                 results.setdefault(event_id, BundledAggregations()).replace = edit
 
-        # Parallelize the calls for annotations, references, ane edits since they
+        # Parallelize the calls for annotations, references, and edits since they
         # are unrelated.
         await make_deferred_yieldable(
             gather_results(
