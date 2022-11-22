@@ -135,8 +135,11 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                         for state_key in state_keys:
                             state_filter_condition_combos.append((etype, state_key))
             # And here is the optimization itself. We don't want to do the optimization
-            # if there are too many individual conditions (10 is an arbitrary number
-            # with no testing behind it)
+            # if there are too many individual conditions. 10 is an arbitrary number
+            # with no testing behind it but we do know that we specifically made this
+            # optimization for when we grab the necessary state out for
+            # `filter_events_for_client` which just uses 2 conditions
+            # (`EventTypes.RoomHistoryVisibility` and `EventTypes.Member`).
             if use_condition_optimization and len(state_filter_condition_combos) < 10:
                 select_clause_list: List[str] = []
                 for etype, skey in state_filter_condition_combos:
@@ -163,13 +166,12 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 )
             else:
                 where_clause, where_args = state_filter.make_sql_filter_clause()
-
-                overall_select_query_args.extend(where_args)
-
                 # Unless the filter clause is empty, we're going to append it after an
                 # existing where clause
                 if where_clause:
                     where_clause = " AND (%s)" % (where_clause,)
+
+                overall_select_query_args.extend(where_args)
 
                 overall_select_clause = f"""
                     SELECT DISTINCT ON (type, state_key)
@@ -194,6 +196,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             max_entries_returned = state_filter.max_entries_returned()
 
             where_clause, where_args = state_filter.make_sql_filter_clause()
+            # Unless the filter clause is empty, we're going to append it after an
+            # existing where clause
+            if where_clause:
+                where_clause = " AND (%s)" % (where_clause,)
 
             # We don't use WITH RECURSIVE on sqlite3 as there are distributions
             # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
