@@ -1,7 +1,7 @@
 Synapse 1.72.0 (2022-11-22)
 ===========================
 
-Please note that we now only support PostgreSQL 11+, because PostgreSQL 10 has reached end-of-life, c.f. our [Deprecation Policy](https://github.com/matrix-org/synapse/blob/develop/docs/deprecation_policy.md).
+Please note that Synapse now only supports PostgreSQL 11+, because PostgreSQL 10 has reached end-of-life, c.f. our [Deprecation Policy](https://github.com/matrix-org/synapse/blob/develop/docs/deprecation_policy.md).
 
 Bugfixes
 --------
