@@ -318,9 +318,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         def _get_state_for_client_filtering_txn(
             txn: LoggingTransaction, groups: Iterable[int]
         ) -> Mapping[int, MutableStateMap[str]]:
+
             sql = """
                 WITH RECURSIVE sgs(state_group) AS (
-                    VALUES(?::bigint)
+                    VALUES(CAST(? AS bigint))
                     UNION ALL
                     SELECT prev_state_group FROM state_group_edges e, sgs s
                     WHERE s.state_group = e.state_group
