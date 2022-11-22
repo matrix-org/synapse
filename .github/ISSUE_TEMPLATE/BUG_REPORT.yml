@@ -134,7 +134,7 @@ body:
 
         Please be careful to remove any personal or private data.
 
-        **Bug reports are usually very difficult to diagnose without logging.**
+        **Bug reports are usually impossible to diagnose without logging.**
       render: shell
     validations:
       required: true
