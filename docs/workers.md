@@ -305,9 +305,11 @@ may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
-requests from a particular user are routed to a single instance. Extracting a
-user ID from the access token or `Authorization` header is currently left as an
-exercise for the reader. Admins may additionally wish to separate out `/sync`
+requests from a particular user are routed to a single instance. This can
+be done e.g. in nginx via IP `hash $http_x_forwarded_for;` or via
+`hash $http_authorization consistent;` which contains the users access token.
+
+Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
 `/initialSync`), as requests that don't are known as "initial sync" that happens
 when a user logs in on a new device and can be *very* resource intensive, so

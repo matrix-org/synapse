@@ -81,6 +81,7 @@ from synapse.rest.admin.users import (
     ShadowBanRestServlet,
     UserAdminServlet,
     UserByExternalId,
+    UserByThreePid,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
@@ -277,6 +278,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomMessagesRestServlet(hs).register(http_server)
     RoomTimestampToEventRestServlet(hs).register(http_server)
     UserByExternalId(hs).register(http_server)
+    UserByThreePid(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if hs.config.worker.worker_app is None:

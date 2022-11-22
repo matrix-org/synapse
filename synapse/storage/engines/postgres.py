@@ -81,8 +81,8 @@ class PostgresEngine(
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
-        if not allow_outdated_version and self._version < 100000:
-            raise RuntimeError("Synapse requires PostgreSQL 10 or above.")
+        if not allow_outdated_version and self._version < 110000:
+            raise RuntimeError("Synapse requires PostgreSQL 11 or above.")
 
         with db_conn.cursor() as txn:
             txn.execute("SHOW SERVER_ENCODING")
@@ -169,22 +169,6 @@ class PostgresEngine(
     def supports_returning(self) -> bool:
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return True
-
-    @property
-    def tsquery_func(self) -> str:
-        """
-        Selects a tsquery_* func to use.
-
-        Ref: https://www.postgresql.org/docs/current/textsearch-controls.html
-
-        Returns:
-            The function name.
-        """
-        # Postgres 11 added support for websearch_to_tsquery.
-        assert self._version is not None
-        if self._version >= 110000:
-            return "websearch_to_tsquery"
-        return "plainto_tsquery"
 
     def is_deadlock(self, error: Exception) -> bool:
         if isinstance(error, psycopg2.DatabaseError):
