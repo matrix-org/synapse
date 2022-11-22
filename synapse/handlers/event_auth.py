@@ -180,7 +180,7 @@ class EventAuthHandler:
         this function may return an incorrect result as we are not able to fully
         track server membership in a room without full state.
         """
-        if self._store.is_partial_state_room(room_id):
+        if await self._store.is_partial_state_room(room_id):
             if allow_partial_state_rooms:
                 current_hosts = await self._state_storage_controller.get_current_hosts_in_room_or_partial_state_approximation(
                     room_id
