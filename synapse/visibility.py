@@ -106,22 +106,32 @@ async def filter_events_for_client(
                 [event.event_id for event in events],
             )
 
+    non_outlier_event_ids = event_ids = frozenset(
+        e.event_id for e in events if not e.internal_metadata.outlier
+    )
+
+    # TODO: Remove: We do this just to remove await_full_state from the comparison
+    await storage.state.get_state_group_for_events(
+        non_outlier_event_ids, await_full_state=True
+    )
+
     # Grab the history visibility and membership for each of the events. That's all we
     # need to know in order to filter them.
     event_id_to_state = await storage.state._get_state_for_client_filtering_for_events(
         # we exclude outliers at this point, and then handle them separately later
-        event_ids=frozenset(
-            e.event_id for e in events if not e.internal_metadata.outlier
-        ),
+        event_ids=non_outlier_event_ids,
         user_id_viewing_events=user_id,
     )
 
     # TODO: Remove comparison
+    # TODO: Remove cache invalidation
+    storage.state.stores.state._state_group_cache.invalidate_all()
+    storage.state.stores.state._state_group_members_cache.invalidate_all()
     # logger.info("----------------------------------------------------")
     # logger.info("----------------------------------------------------")
     types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
     event_id_to_state_orig = await storage.state.get_state_for_events(
-        frozenset(e.event_id for e in events if not e.internal_metadata.outlier),
+        non_outlier_event_ids,
         state_filter=StateFilter.from_types(types),
     )
 

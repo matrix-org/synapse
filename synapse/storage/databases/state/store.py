@@ -119,9 +119,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             "*stateGroupMembersCache*",
             500000,
         )
-        # TODO: Remove cache invalidation
-        self._state_group_cache.invalidate_all()
-        self._state_group_members_cache.invalidate_all()
 
         def get_max_state_group_txn(txn: Cursor) -> int:
             txn.execute("SELECT COALESCE(max(id), 0) FROM state_groups")
