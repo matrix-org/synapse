@@ -451,7 +451,7 @@ class FederationClientTests(HomeserverTestCase):
         self.failureResultOf(d)
 
     def test_client_sends_body(self):
-        defer.ensureDeferred(
+        defer.ensureDeferred( # type: ignore[unused-awaitable]
             self.cl.post_json(
                 "testserv:8008", "foo/bar", timeout=10000, data={"a": "b"}
             )
