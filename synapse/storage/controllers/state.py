@@ -201,17 +201,13 @@ class StateStorageController:
         )
 
         groups = set(event_to_groups.values())
-        logger.info(
-            "_get_state_for_client_filtering_for_events: groups=%s",
-            groups,
-        )
         group_to_state = await self.stores.state._get_state_for_client_filtering(
             groups, user_id_viewing_events
         )
-        logger.info(
-            "_get_state_for_client_filtering_for_events: group_to_state=%s",
-            group_to_state,
-        )
+        # logger.info(
+        #     "_get_state_for_client_filtering_for_events: group_to_state=%s",
+        #     group_to_state,
+        # )
 
         state_event_map = await self.stores.main.get_events(
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
@@ -256,11 +252,10 @@ class StateStorageController:
         )
 
         groups = set(event_to_groups.values())
-        logger.info("get_state_for_events: groups=%s", groups)
         group_to_state = await self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
-        logger.info("get_state_for_events: group_to_state=%s", group_to_state)
+        # logger.info("get_state_for_events: group_to_state=%s", group_to_state)
 
         state_event_map = await self.stores.main.get_events(
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],

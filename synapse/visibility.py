@@ -117,8 +117,8 @@ async def filter_events_for_client(
     )
 
     # TODO: Remove comparison
-    logger.info("----------------------------------------------------")
-    logger.info("----------------------------------------------------")
+    # logger.info("----------------------------------------------------")
+    # logger.info("----------------------------------------------------")
     types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
     event_id_to_state_orig = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events if not e.internal_metadata.outlier),

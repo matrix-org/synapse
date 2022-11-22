@@ -374,7 +374,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 _get_state_for_client_filtering_txn,
                 batch,
             )
-            logger.info("group_to_state_mapping=%s", group_to_state_mapping)
 
             # Now lets update the caches
             # Help the cache hit ratio by expanding the filter a bit
