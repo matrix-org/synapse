@@ -2075,13 +2075,14 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: bool = False,
     ) -> Optional[Dict[str, Any]]:
-        select_sql = "SELECT %s FROM %s WHERE %s" % (
-            ", ".join(retcols),
-            table,
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
-        )
+        select_sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
 
-        txn.execute(select_sql, list(keyvalues.values()))
+        if keyvalues:
+            select_sql += " WHERE %s" % (" AND ".join("%s = ?" % k for k in keyvalues),)
+            txn.execute(select_sql, list(keyvalues.values()))
+        else:
+            txn.execute(select_sql)
+
         row = txn.fetchone()
 
         if not row:
