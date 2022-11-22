@@ -100,16 +100,16 @@ class StateFilter:
             The new state filter.
         """
         type_dict: Dict[str, Optional[Set[str]]] = {}
-        for typ, s in types:
+        for typ, state_key in types:
             if typ in type_dict:
                 if type_dict[typ] is None:
                     continue
 
-            if s is None:
+            if state_key is None:
                 type_dict[typ] = None
                 continue
 
-            type_dict.setdefault(typ, set()).add(s)  # type: ignore
+            type_dict.setdefault(typ, set()).add(state_key)  # type: ignore
 
         return StateFilter(
             types=frozendict(

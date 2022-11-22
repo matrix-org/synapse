@@ -106,12 +106,13 @@ async def filter_events_for_client(
                 [event.event_id for event in events],
             )
 
-    types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
-
-    # we exclude outliers at this point, and then handle them separately later
+    # Grab the history visibility and membership for each of the events. That's all we
+    # need to know in order to filter them.
+    filter_types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
     event_id_to_state = await storage.state.get_state_for_events(
+        # we exclude outliers at this point, and then handle them separately later
         frozenset(e.event_id for e in events if not e.internal_metadata.outlier),
-        state_filter=StateFilter.from_types(types),
+        state_filter=StateFilter.from_types(filter_types),
     )
 
     # Get the users who are ignored by the requesting user.
