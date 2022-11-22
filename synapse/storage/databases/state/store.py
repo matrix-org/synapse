@@ -335,8 +335,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     )
                     AND (type = ? AND state_key = ?)
                 ORDER BY
-                    type,
-                    state_key,
                     -- Use the lastest state in the chain (highest numbered state_group in the chain)
                     state_group DESC
                 LIMIT 1
