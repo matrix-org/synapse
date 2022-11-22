@@ -1918,7 +1918,7 @@ class EventCreationHandler:
             if event.type == EventTypes.Message:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
-                run_in_background(self._bump_active_time, requester.user)
+                run_in_background(self._bump_active_time, requester.user) # type: ignore[unused-awaitable]
 
         async def _notify() -> None:
             try:
@@ -1928,7 +1928,7 @@ class EventCreationHandler:
             except Exception:
                 logger.exception("Error notifying about new room events")
 
-        run_in_background(_notify)
+        run_in_background(_notify) # type: ignore[unused-awaitable]
 
         return persisted_events[-1]
 

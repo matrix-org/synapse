@@ -1060,7 +1060,7 @@ class PresenceHandler(BasePresenceHandler):
                 yield
             finally:
                 if affect_presence:
-                    run_in_background(_end)
+                    run_in_background(_end) # type: ignore[unused-awaitable]
 
         return _user_syncing()
 

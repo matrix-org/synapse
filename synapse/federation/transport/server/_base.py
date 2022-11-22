@@ -132,7 +132,7 @@ class Authenticator:
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings.retry_last_ts:
-            run_in_background(self.reset_retry_timings, origin)
+            run_in_background(self.reset_retry_timings, origin) # type: ignore[unused-awaitable]
 
         return origin
 

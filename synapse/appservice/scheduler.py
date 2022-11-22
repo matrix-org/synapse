@@ -406,10 +406,10 @@ class _TransactionController:
                 if sent:
                     await txn.complete(self.store)
                 else:
-                    run_in_background(self._on_txn_fail, service)
+                    run_in_background(self._on_txn_fail, service) # type: ignore[unused-awaitable]
         except Exception:
             logger.exception("Error creating appservice transaction")
-            run_in_background(self._on_txn_fail, service)
+            run_in_background(self._on_txn_fail, service) # type: ignore[unused-awaitable]
 
     async def on_recovered(self, recoverer: "_Recoverer") -> None:
         logger.info(
