@@ -21,11 +21,11 @@ from synapse.api.constants import ReceiptTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.handlers.room import RoomEventSource
-from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.databases.main.event_push_actions import (
     NotifCounts,
     RoomNotifCounts,
 )
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.roommember import GetRoomsForUserWithStreamOrdering, RoomsForUser
 from synapse.types import PersistedEventPosition
 
@@ -58,9 +58,9 @@ def patch__eq__(cls):
     return unpatch
 
 
-class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
+class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
 
-    STORE_TYPE = SlavedEventStore
+    STORE_TYPE = EventsWorkerStore
 
     def setUp(self):
         # Patch up the equality operator for events so that we can check

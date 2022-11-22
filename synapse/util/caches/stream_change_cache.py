@@ -85,7 +85,7 @@ class StreamChangeCache:
         items from the cache.
 
         Returns:
-            bool: Whether the cache changed size or not.
+            Whether the cache changed size or not.
         """
         new_size = math.floor(self._original_max_size * factor)
         if new_size != self._max_size:
@@ -213,17 +213,11 @@ class StreamChangeCache:
         self._entity_to_key[entity] = stream_pos
         self._evict()
 
-        # if the cache is too big, remove entries
-        while len(self._cache) > self._max_size:
-            k, r = self._cache.popitem(0)
-            self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
-            for entity in r:
-                del self._entity_to_key[entity]
-
         if stream_pos > self.max_stream_pos:
             self.max_stream_pos = stream_pos
 
     def _evict(self) -> None:
+        # if the cache is too big, remove entries
         while len(self._cache) > self._max_size:
             k, r = self._cache.popitem(0)
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
@@ -231,7 +225,6 @@ class StreamChangeCache:
                 self._entity_to_key.pop(entity, None)
 
     def get_max_pos_of_last_change(self, entity: EntityType) -> int:
-
         """Returns an upper bound of the stream id of the last change to an
         entity.
         """
