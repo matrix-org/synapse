@@ -304,8 +304,8 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
     // rules take precedence, so if you enable bot notifications (by modifying
     // this rule) notifications will not be sent for muted rooms.
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
-        priority_class: 5,
+        rule_id: Cow::Borrowed("global/underride/.m.rule.suppress_notices"),
+        priority_class: 1,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
             EventMatchCondition {
                 key: Cow::Borrowed("content.msgtype"),
@@ -420,10 +420,9 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
     // Enable notifications for reactions to your own messages *in rooms with less
     // than 20 members*.
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.com.beeper.reaction"),
-        priority_class: 5,
+        rule_id: Cow::Borrowed("global/underride/.com.beeper.reaction"),
+        priority_class: 1,
         conditions: Cow::Borrowed(&[
-
             Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
                 key: Cow::Borrowed("type"),
                 pattern: Some(Cow::Borrowed("m.reaction")),
