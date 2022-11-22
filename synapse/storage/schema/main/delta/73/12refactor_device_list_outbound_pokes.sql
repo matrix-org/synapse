@@ -37,9 +37,6 @@ CREATE TABLE IF NOT EXISTS device_lists_changes_converted_stream_position(
     CHECK (Lock='X')
 );
 
--- TODO: Add `room_id` to the index?
--- "device_lists_changes_in_stream_id_unconverted" btree (stream_id) WHERE NOT converted_to_destinations
-
 INSERT INTO device_lists_changes_converted_stream_position (stream_id, room_id) VALUES (
     (
         SELECT COALESCE(
