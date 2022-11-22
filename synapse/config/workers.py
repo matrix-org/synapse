@@ -377,7 +377,14 @@ class WorkerConfig(Config):
     ) -> List[str]:
         """
         Retrieves the names of the workers handling a given duty, by either legacy
-        option or instance list
+        option or instance list.
+
+        There are two ways of configuring which instances handle a given duty, e.g.
+        for configuring pushers:
+
+        1. The old way where "start_pushers" is set to false and running a
+          `synapse.app.pusher'` worker app.
+        2. Specifying the workers sending federation in `pusher_instances`.
 
         Args:
             config: settings read from yaml.
@@ -385,6 +392,9 @@ class WorkerConfig(Config):
             legacy_app_name: The historical app name. e.g. 'synapse.app.pusher'
             modern_instance_list_name: the string name of the new instance_list. e.g.
             'pusher_instances'
+
+        Returns:
+            A list of worker instance names handling the given duty.
         """
 
         legacy_option = config.get(legacy_option_name, True)
