@@ -160,9 +160,6 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     ORDER BY type, state_key, state_group DESC
                 """
 
-            logger.info("overall_select_clause=%s", overall_select_clause)
-            logger.info("overall_select_query_args=%s", overall_select_query_args)
-
             for group in groups:
                 args: List[Union[int, str]] = [group]
                 args.extend(overall_select_query_args)
