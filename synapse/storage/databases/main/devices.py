@@ -1645,11 +1645,10 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     "user_id": user_id,
                     "device_id": device_id,
                 },
-                values={
-                    "last_seen": self._clock.time_msec(),
-                },
+                values={},
                 insertion_values={
                     "display_name": initial_device_display_name,
+                    "last_seen": self._clock.time_msec(),
                     "hidden": False,
                 },
                 desc="store_device",
