@@ -265,7 +265,6 @@ class SynapseHomeServer(HomeServer):
                     _base.listen_metrics(
                         listener.bind_addresses,
                         listener.port,
-                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
                     )
             else:
                 # this shouldn't happen, as the listener type should have been checked
