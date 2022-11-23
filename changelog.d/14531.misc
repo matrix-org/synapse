@@ -1,0 +1,1 @@
+Remove database differentiation (SQLite vs Postgres specific code) in `_get_state_groups_from_groups_txn`.
