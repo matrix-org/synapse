@@ -912,7 +912,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
-                thumbnail_url = content.get("info", {}).get("thumbnail_url")
+                thumbnail_url = (content.get("info") or {}).get("thumbnail_url")
 
                 for url in (content_url, thumbnail_url):
                     if not url:
