@@ -93,9 +93,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
         results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
 
-        # Temporarily disable sequential scans in this transaction. This is
-        # a temporary hack until we can add the right indices in
-        txn.execute("SET LOCAL enable_seqscan=off")
+        if isinstance(self.database_engine, PostgresEngine):
+            # Temporarily disable sequential scans in this transaction. This is
+            # a temporary hack until we can add the right indices in
+            txn.execute("SET LOCAL enable_seqscan=off")
 
         # The below query walks the state_group tree so that the "state"
         # table includes all state_groups in the tree. It then joins
