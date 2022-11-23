@@ -169,6 +169,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
+        last_seen = self.clock.time_msec()
+
         if after_persisting:
             # Trigger the storage loop
             self.reactor.advance(10)
@@ -189,7 +191,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
                         "device_id": device_id,
                         "ip": None,
                         "user_agent": None,
-                        "last_seen": None,
+                        "last_seen": last_seen,
                     },
                 ],
             )
