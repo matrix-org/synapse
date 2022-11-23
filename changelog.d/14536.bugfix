@@ -1,0 +1,1 @@
+Fix a bug in the media admin room list API crashing when an image event exists with broken thumbnail information. Contributed by @schmop.
