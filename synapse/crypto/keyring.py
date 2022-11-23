@@ -213,7 +213,7 @@ class Keyring:
 
     def verify_json_objects_for_server(
         self, server_and_json: Iterable[Tuple[str, dict, int]]
-    ) -> List[defer.Deferred]:
+    ) -> List["defer.Deferred[None]"]:
         """Bulk verifies signatures of json objects, bulk fetching keys as
         necessary.
 
@@ -226,10 +226,9 @@ class Keyring:
                 valid.
 
         Returns:
-            List<Deferred[None]>: for each input triplet, a deferred indicating success
-                or failure to verify each json object's signature for the given
-                server_name. The deferreds run their callbacks in the sentinel
-                logcontext.
+            For each input triplet, a deferred indicating success or failure to
+            verify each json object's signature for the given server_name. The
+            deferreds run their callbacks in the sentinel logcontext.
         """
         return [
             run_in_background(
@@ -858,7 +857,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 response = await self.client.get_json(
                     destination=server_name,
                     path="/_matrix/key/v2/server/"
-                    + urllib.parse.quote(requested_key_id),
+                    + urllib.parse.quote(requested_key_id, safe=""),
                     ignore_backoff=True,
                     # we only give the remote server 10s to respond. It should be an
                     # easy request to handle, so if it doesn't reply within 10s, it's

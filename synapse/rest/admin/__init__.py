@@ -81,6 +81,7 @@ from synapse.rest.admin.users import (
     ShadowBanRestServlet,
     UserAdminServlet,
     UserByExternalId,
+    UserByThreePid,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
@@ -237,6 +238,10 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     """
     Register all the admin servlets.
     """
+    # Admin servlets aren't registered on workers.
+    if hs.config.worker.worker_app is not None:
+        return
+
     register_servlets_for_client_rest_resource(hs, http_server)
     BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
@@ -253,9 +258,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
-    DeviceRestServlet(hs).register(http_server)
-    DevicesRestServlet(hs).register(http_server)
-    DeleteDevicesRestServlet(hs).register(http_server)
     UserMediaStatisticsRestServlet(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
@@ -277,13 +279,15 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomMessagesRestServlet(hs).register(http_server)
     RoomTimestampToEventRestServlet(hs).register(http_server)
     UserByExternalId(hs).register(http_server)
+    UserByThreePid(hs).register(http_server)
 
-    # Some servlets only get registered for the main process.
-    if hs.config.worker.worker_app is None:
-        SendServerNoticeServlet(hs).register(http_server)
-        BackgroundUpdateEnabledRestServlet(hs).register(http_server)
-        BackgroundUpdateRestServlet(hs).register(http_server)
-        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    DeviceRestServlet(hs).register(http_server)
+    DevicesRestServlet(hs).register(http_server)
+    DeleteDevicesRestServlet(hs).register(http_server)
+    SendServerNoticeServlet(hs).register(http_server)
+    BackgroundUpdateEnabledRestServlet(hs).register(http_server)
+    BackgroundUpdateRestServlet(hs).register(http_server)
+    BackgroundUpdateStartJobRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
@@ -292,9 +296,11 @@ def register_servlets_for_client_rest_resource(
     """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
-    DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
-    ResetPasswordRestServlet(hs).register(http_server)
+    # The following resources can only be run on the main process.
+    if hs.config.worker.worker_app is None:
+        DeactivateAccountRestServlet(hs).register(http_server)
+        ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)

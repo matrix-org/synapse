@@ -16,14 +16,21 @@
     There are two methods of enabling the metrics endpoint in Synapse.
 
     The first serves the metrics as a part of the usual web server and
-    can be enabled by adding the \"metrics\" resource to the existing
-    listener as such:
+    can be enabled by adding the `metrics` resource to the existing
+    listener as such as in this example:
 
     ```yaml
-      resources:
-        - names:
-          - client
-          - metrics
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['::1', '127.0.0.1']
+
+        resources:
+          # added "metrics" in this line
+          - names: [client, federation, metrics]
+            compress: false
     ```
 
     This provides a simple way of adding metrics to your Synapse
@@ -37,14 +44,24 @@
     to just internal networks easier. The served metrics are available
     over HTTP only, and will be available at `/_synapse/metrics`.
 
-    Add a new listener to homeserver.yaml:
+    Add a new listener to homeserver.yaml as in this example:
 
     ```yaml
-      listeners:
-        - type: metrics
-          port: 9000
-          bind_addresses:
-            - '0.0.0.0'
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['::1', '127.0.0.1']
+
+        resources:
+          - names: [client, federation]
+            compress: false
+
+      # beginning of the new metrics listener
+      - port: 9000
+        type: metrics
+        bind_addresses: ['::1', '127.0.0.1']
     ```
 
 1.  Restart Synapse.
@@ -192,6 +209,9 @@ altogether in Synapse v1.73.0.**
 | synapse_http_httppusher_http_pushes_failed_total                             | synapse_http_httppusher_http_pushes_failed                             |
 | synapse_http_httppusher_badge_updates_processed_total                        | synapse_http_httppusher_badge_updates_processed                        |
 | synapse_http_httppusher_badge_updates_failed_total                           | synapse_http_httppusher_badge_updates_failed                           |
+| synapse_admin_mau_current                                                    | synapse_admin_mau:current                                              |
+| synapse_admin_mau_max                                                        | synapse_admin_mau:max                                                  |
+| synapse_admin_mau_registered_reserved_users                                  | synapse_admin_mau:registered_reserved_users                            |
 
 Removal of deprecated metrics & time based counters becoming histograms in 0.31.0
 ---------------------------------------------------------------------------------

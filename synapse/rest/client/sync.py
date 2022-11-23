@@ -100,6 +100,7 @@ class SyncRestServlet(RestServlet):
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
         self._msc2654_enabled = hs.config.experimental.msc2654_enabled
+        self._msc3773_enabled = hs.config.experimental.msc3773_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         # This will always be set by the time Twisted calls us.
@@ -145,12 +146,12 @@ class SyncRestServlet(RestServlet):
         elif filter_id.startswith("{"):
             try:
                 filter_object = json_decoder.decode(filter_id)
-                set_timeline_upper_limit(
-                    filter_object, self.hs.config.server.filter_timeline_limit
-                )
             except Exception:
-                raise SynapseError(400, "Invalid filter JSON")
+                raise SynapseError(400, "Invalid filter JSON", errcode=Codes.NOT_JSON)
             self.filtering.check_valid_filter(filter_object)
+            set_timeline_upper_limit(
+                filter_object, self.hs.config.server.filter_timeline_limit
+            )
             filter_collection = FilterCollection(self.hs, filter_object)
         else:
             try:
@@ -510,9 +511,11 @@ class SyncRestServlet(RestServlet):
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
             if room.unread_thread_notifications:
-                result[
-                    "org.matrix.msc3773.unread_thread_notifications"
-                ] = room.unread_thread_notifications
+                result["unread_thread_notifications"] = room.unread_thread_notifications
+                if self._msc3773_enabled:
+                    result[
+                        "org.matrix.msc3773.unread_thread_notifications"
+                    ] = room.unread_thread_notifications
             result["summary"] = room.summary
             if self._msc2654_enabled:
                 result["org.matrix.msc2654.unread_count"] = room.unread_count

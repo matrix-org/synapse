@@ -324,6 +324,12 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 
 - Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+  - If setting `WORKERS=1`, optionally set `WORKER_TYPES=` to declare which worker
+    types you wish to test. A simple comma-delimited string containing the worker types
+    defined from the `WORKERS_CONFIG` template in
+    [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
+    A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
+    See the [worker documentation](../workers.md) for additional information on workers.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
@@ -333,7 +339,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/compleme
 ### Prettier formatting with `gotestfmt`
 
 If you want to format the output of the tests the same way as it looks in CI,
-install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+install [gotestfmt](https://github.com/GoTestTools/gotestfmt).
 
 You can then use this incantation to format the tests appropriately:
 
@@ -390,7 +396,7 @@ This file will become part of our [changelog](
 https://github.com/matrix-org/synapse/blob/master/CHANGES.md) at the next
 release, so the content of the file should be a short description of your
 change in the same style as the rest of the changelog. The file can contain Markdown
-formatting, and should end with a full stop (.) or an exclamation mark (!) for
+formatting, and must end with a full stop (.) or an exclamation mark (!) for
 consistency.
 
 Adding credits to the changelog is encouraged, we value your

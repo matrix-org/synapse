@@ -219,9 +219,7 @@ def _prepare() -> None:
                 update_branch(repo)
 
             # Create the new release branch
-            # Type ignore will no longer be needed after GitPython 3.1.28.
-            # See https://github.com/gitpython-developers/GitPython/pull/1419
-            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            repo.create_head(release_branch_name, commit=base_branch)
 
         # Special-case SyTest: we don't actually prepare any files so we may
         # as well push it now (and only when we create a release branch;

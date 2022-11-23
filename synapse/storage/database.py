@@ -569,15 +569,15 @@ class DatabasePool:
             retcols=["update_name"],
             desc="check_background_updates",
         )
-        updates = [x["update_name"] for x in updates]
+        background_update_names = [x["update_name"] for x in updates]
 
         for table, update_name in UNIQUE_INDEX_BACKGROUND_UPDATES.items():
-            if update_name not in updates:
+            if update_name not in background_update_names:
                 logger.debug("Now safe to upsert in %s", table)
                 self._unsafe_to_upsert_tables.discard(table)
 
         # If there's any updates still running, reschedule to run.
-        if updates:
+        if background_update_names:
             self._clock.call_later(
                 15.0,
                 run_as_background_process,
@@ -1658,7 +1658,7 @@ class DatabasePool:
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
             retcol: string giving the name of the column to return
-            allow_none: If true, return None instead of failing if the SELECT
+            allow_none: If true, return None instead of raising StoreError if the SELECT
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
@@ -2075,13 +2075,14 @@ class DatabasePool:
         retcols: Collection[str],
         allow_none: bool = False,
     ) -> Optional[Dict[str, Any]]:
-        select_sql = "SELECT %s FROM %s WHERE %s" % (
-            ", ".join(retcols),
-            table,
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
-        )
+        select_sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
 
-        txn.execute(select_sql, list(keyvalues.values()))
+        if keyvalues:
+            select_sql += " WHERE %s" % (" AND ".join("%s = ?" % k for k in keyvalues),)
+            txn.execute(select_sql, list(keyvalues.values()))
+        else:
+            txn.execute(select_sql)
+
         row = txn.fetchone()
 
         if not row:

@@ -36,14 +36,14 @@ from jsonschema import FormatChecker
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.types import JsonDict, RoomID, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "limit": {"type": "number"},
@@ -53,11 +53,17 @@ FILTER_SCHEMA = {
         # check types are valid event types
         "types": {"type": "array", "items": {"type": "string"}},
         "not_types": {"type": "array", "items": {"type": "string"}},
+        # MSC3874, filtering /messages.
+        "org.matrix.msc3874.rel_types": {"type": "array", "items": {"type": "string"}},
+        "org.matrix.msc3874.not_rel_types": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
     },
 }
 
 ROOM_FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "not_rooms": {"$ref": "#/definitions/room_id_array"},
@@ -71,7 +77,7 @@ ROOM_FILTER_SCHEMA = {
 }
 
 ROOM_EVENT_FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "limit": {"type": "number"},
@@ -84,6 +90,7 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "contains_url": {"type": "boolean"},
         "lazy_load_members": {"type": "boolean"},
         "include_redundant_members": {"type": "boolean"},
+        "unread_thread_notifications": {"type": "boolean"},
         "org.matrix.msc3773.unread_thread_notifications": {"type": "boolean"},
         # Include or exclude events with the provided labels.
         # cf https://github.com/matrix-org/matrix-doc/pull/2326
@@ -136,7 +143,7 @@ USER_FILTER_SCHEMA = {
             },
         },
     },
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
 }
 
 
@@ -308,12 +315,16 @@ class Filter:
         self.include_redundant_members = filter_json.get(
             "include_redundant_members", False
         )
-        if hs.config.experimental.msc3773_enabled:
-            self.unread_thread_notifications: bool = filter_json.get(
+        self.unread_thread_notifications: bool = filter_json.get(
+            "unread_thread_notifications", False
+        )
+        if (
+            not self.unread_thread_notifications
+            and hs.config.experimental.msc3773_enabled
+        ):
+            self.unread_thread_notifications = filter_json.get(
                 "org.matrix.msc3773.unread_thread_notifications", False
             )
-        else:
-            self.unread_thread_notifications = False
 
         self.types = filter_json.get("types", None)
         self.not_types = filter_json.get("not_types", [])
@@ -329,8 +340,15 @@ class Filter:
         self.labels = filter_json.get("org.matrix.labels", None)
         self.not_labels = filter_json.get("org.matrix.not_labels", [])
 
-        self.related_by_senders = self.filter_json.get("related_by_senders", None)
-        self.related_by_rel_types = self.filter_json.get("related_by_rel_types", None)
+        self.related_by_senders = filter_json.get("related_by_senders", None)
+        self.related_by_rel_types = filter_json.get("related_by_rel_types", None)
+
+        # For compatibility with _check_fields.
+        self.rel_types = None
+        self.not_rel_types = []
+        if hs.config.experimental.msc3874_enabled:
+            self.rel_types = filter_json.get("org.matrix.msc3874.rel_types", None)
+            self.not_rel_types = filter_json.get("org.matrix.msc3874.not_rel_types", [])
 
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
@@ -381,11 +399,19 @@ class Filter:
             # check if there is a string url field in the content for filtering purposes
             labels = content.get(EventContentFields.LABELS, [])
 
+            # Check if the event has a relation.
+            rel_type = None
+            if isinstance(event, EventBase):
+                relation = relation_from_event(event)
+                if relation:
+                    rel_type = relation.rel_type
+
             field_matchers = {
                 "rooms": lambda v: room_id == v,
                 "senders": lambda v: sender == v,
                 "types": lambda v: _matches_wildcard(ev_type, v),
                 "labels": lambda v: v in labels,
+                "rel_types": lambda v: rel_type == v,
             }
 
             result = self._check_fields(field_matchers)
