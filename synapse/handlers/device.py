@@ -421,7 +421,8 @@ class DeviceHandler(DeviceWorkerHandler):
 
         self._check_device_name_length(initial_device_display_name)
 
-        await self._delete_stale_devices(user_id)
+        # Prune the user's device list if they already have a lot of devices.
+        await self._prune_too_many_devices(user_id)
 
         if device_id is not None:
             new_device = await self.store.store_device(
@@ -454,9 +455,9 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    async def _delete_stale_devices(self, user_id: str) -> None:
+    async def _prune_too_many_devices(self, user_id: str) -> None:
         """Delete any stale devices this user may have."""
-        device_ids = await self.store.get_stale_devices(user_id)
+        device_ids = await self.store.check_too_many_devices_for_user(user_id)
         if not device_ids:
             return
 
