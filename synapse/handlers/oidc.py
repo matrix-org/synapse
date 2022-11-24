@@ -1435,7 +1435,7 @@ class UserAttributeDict(TypedDict):
     localpart: Optional[str]
     confirm_localpart: bool
     display_name: Optional[str]
-    picture: Optional[str]
+    picture: Optional[str]  # may be omitted by older `OidcMappingProviders`
     emails: List[str]
 
 
