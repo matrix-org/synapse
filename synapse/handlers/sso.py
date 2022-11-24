@@ -746,7 +746,7 @@ class SsoHandler:
         try:
             uid = UserID.from_string(user_id)
 
-            def allowed_mime_type(content_type: str) -> bool:
+            def is_allowed_mime_type(content_type: str) -> bool:
                 if (
                     self._profile_handler.allowed_avatar_mimetypes
                     and content_type
@@ -762,7 +762,7 @@ class SsoHandler:
                 url=picture_https_url,
                 output_stream=picture,
                 max_size=self._profile_handler.max_avatar_size,
-                is_allowed_content_type=allowed_mime_type,
+                is_allowed_content_type=is_allowed_mime_type,
             )
 
             if code != 200:
