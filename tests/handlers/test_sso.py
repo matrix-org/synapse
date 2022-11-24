@@ -43,7 +43,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         reg_handler = self.hs.get_registration_handler()
         user_id = self.get_success(reg_handler.register_user(approved=True))
 
-        self.assertTrue(self.get_success(handler.set_avatar(user_id, "http://my.server/me.png")))
+        self.assertTrue(
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        )
 
         # Ensure avatar is set on this newly created user,
         # so no need to compare for the exact image
@@ -59,7 +61,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         # any random user works since image check is supposed to fail
         user_id = "@sso-user:test"
 
-        self.assertFalse(self.get_success(handler.set_avatar(user_id, "http://my.server/me.png")))
+        self.assertFalse(
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        )
 
     @unittest.override_config({"allowed_avatar_mimetypes": ["image/jpeg"]})
     async def test_set_avatar_incorrect_mime_type(self) -> None:
@@ -69,7 +73,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         # any random user works since image check is supposed to fail
         user_id = "@sso-user:test"
 
-        self.assertFalse(self.get_success(handler.set_avatar(user_id, "http://my.server/me.png")))
+        self.assertFalse(
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        )
 
     async def test_skip_saving_avatar_when_not_changed(self) -> None:
         """Tests whether saving of avatar correctly skips if the avatar hasn't
@@ -81,7 +87,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         user_id = self.get_success(reg_handler.register_user(approved=True))
 
         # set avatar for the first time, should be a success
-        self.assertTrue(self.get_success(handler.set_avatar(user_id, "http://my.server/me.png")))
+        self.assertTrue(
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        )
 
         # get avatar picture for comparison after another attempt
         profile_handler = self.hs.get_profile_handler()
@@ -89,7 +97,9 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         url_to_match = profile["avatar_url"]
 
         # set same avatar for the second time, should be a failure
-        self.assertTrue(self.get_success(handler.set_avatar(user_id, "http://my.server/me.png")))
+        self.assertTrue(
+            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        )
 
         # compare avatar picture's url from previous step
         profile = self.get_success(profile_handler.get_profile(user_id))
