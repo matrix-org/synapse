@@ -2391,6 +2391,9 @@ class EventsWorkerStore(SQLBaseStore):
 
         This can happen, for example, when resyncing state during a faster join.
 
+        It is the caller's responsibility to ensure that other workers are
+        sent a notification so that they call `_invalidate_local_get_event_cache()`.
+
         Args:
             txn:
             event_id: ID of event to update
@@ -2429,14 +2432,3 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
         self.invalidate_get_event_cache_after_txn(txn, event_id)
-
-        # TODO(faster_joins): invalidate the cache on workers. Ideally we'd just
-        #   call '_send_invalidation_to_replication', but we actually need the other
-        #   end to call _invalidate_local_get_event_cache() rather than (just)
-        #   _get_event_cache.invalidate().
-        #
-        #   One solution might be to (somehow) get the workers to call
-        #   _invalidate_caches_for_event() (though that will invalidate more than
-        #   strictly necessary).
-        #
-        #   https://github.com/matrix-org/synapse/issues/12994
