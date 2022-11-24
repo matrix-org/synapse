@@ -63,7 +63,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
 
     @unittest.override_config({"allowed_avatar_mimetypes": ["image/jpeg"]})
     async def test_set_avatar_incorrect_mime_type(self) -> None:
-        """Tests saving of avatar failed when not allowed mimetype of image was used"""
+        """Tests that saving an avatar fails when its mime type is not allowed"""
         handler = self.hs.get_sso_handler()
 
         # any random user works since image check is supposed to fail
