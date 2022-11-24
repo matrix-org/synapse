@@ -741,6 +741,10 @@ class SsoHandler:
             picture_https_url: HTTPS url for the picture image file.
         """
         if not self._can_load_media_repo:
+            logger.info(
+                "failed to set user avatar because out-of-process media repositories "
+                "are not supported yet "
+            )
             return False
 
         try:
