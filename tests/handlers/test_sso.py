@@ -51,7 +51,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         profile = self.get_success(profile_handler.get_profile(user_id))
         self.assertIsNot(profile["avatar_url"], None)
 
-    @unittest.override_config({"max_avatar_size": 65})
+    @unittest.override_config({"max_avatar_size": len(SMALL_PNG) - 1})
     async def test_set_avatar_too_big_image(self) -> None:
         """Tests saving of avatar failed when image size is too big"""
         handler = self.hs.get_sso_handler()
@@ -98,11 +98,13 @@ async def mock_get_file(
     if url == "http://my.server/me.png":
         fake_response = FakeResponse(
             code=200,
-            headers=Headers({"Content-Type": ["image/png"], "Content-Length": ["67"]}),
+            headers=Headers(
+                {"Content-Type": ["image/png"], "Content-Length": [str(len(SMALL_PNG))]}
+            ),
             body=SMALL_PNG,
         )
 
-    if max_size is not None and max_size < 67:
+    if max_size is not None and max_size < len(SMALL_PNG):
         raise SynapseError(
             HTTPStatus.BAD_GATEWAY,
             "Requested file is too large > %r bytes" % (max_size,),
@@ -120,4 +122,4 @@ async def mock_get_file(
 
     output_stream.write(fake_response.body)
 
-    return 67, {b"Content-Type": [b"image/png"]}, "", 200
+    return len(SMALL_PNG), {b"Content-Type": [b"image/png"]}, "", 200
