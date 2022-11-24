@@ -82,8 +82,18 @@ class TestSSOHandler(unittest.HomeserverTestCase):
 
         # set avatar for the first time, should be a success
         self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+
+        # get avatar picture for comparison after another attempt
+        profile_handler = self.hs.get_profile_handler()
+        profile = self.get_success(profile_handler.get_profile(user_id))
+        url_to_match = profile["avatar_url"]
+
         # set same avatar for the second time, should be a failure
         self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"), False)
+
+        # compare avatar picture's url from previous step
+        profile = self.get_success(profile_handler.get_profile(user_id))
+        self.assertEqual(profile["avatar_url"], url_to_match)
 
 
 async def mock_get_file(
