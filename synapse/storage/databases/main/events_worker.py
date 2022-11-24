@@ -318,6 +318,67 @@ class EventsWorkerStore(SQLBaseStore):
         #     readers up.
         return self._un_partial_stated_events_stream_id_gen.get_current_token()
 
+    async def get_un_partial_stated_events_from_stream(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, Tuple[str, bool]]], int, bool]:
+        """Get updates for the un-partial-stated events replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
+        """
+
+        if last_id == current_id:
+            return [], current_id, False
+
+        def get_un_partial_stated_events_from_stream_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Tuple[int, Tuple[str, bool]]], int, bool]:
+            sql = """
+                SELECT stream_id, event_id, rejection_status_changed
+                FROM un_partial_stated_event_stream
+                WHERE ? < stream_id AND stream_id <= ? AND instance_name = ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+            txn.execute(sql, (last_id, current_id, instance_name, limit))
+            updates = [
+                (
+                    row[0],
+                    (
+                        row[1],
+                        bool(row[2]),
+                    ),
+                )
+                for row in txn
+            ]
+            limited = False
+            upto_token = current_id
+            if len(updates) >= limit:
+                upto_token = updates[-1][0]
+                limited = True
+
+            return updates, upto_token, limited
+
+        return await self.db_pool.runInteraction(
+            "get_un_partial_stated_events_from_stream",
+            get_un_partial_stated_events_from_stream_txn,
+        )
+
     def process_replication_rows(
         self,
         stream_name: str,
