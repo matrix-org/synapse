@@ -3000,6 +3000,9 @@ Options for each entry include:
        * `picture_claim`: name of the claim containing an url for the user's profile picture.
          Defaults to 'picture', which OpenID Connect compliant providers should provide
          and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+         
+         Currently only supported in server configurations where media repository runs within
+         the Synapse process.
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
