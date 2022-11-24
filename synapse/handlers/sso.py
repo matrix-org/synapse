@@ -739,6 +739,9 @@ class SsoHandler:
             user_id: matrix user ID in the form @localpart:domain as a string.
 
             picture_https_url: HTTPS url for the picture image file.
+
+        Returns: `True` if the user's avatar has been successfully set to the image at
+            `picture_https_url`.
         """
         if not self._can_load_media_repo:
             logger.info(
