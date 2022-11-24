@@ -4,7 +4,7 @@
 name: Store complement synapse image in ghcr.io
 on:
   push:
-    branches: ["main", "develop", "michaelk/push_complement_image"] # TODO do not pass PR review with this in place.
+    branches: ["master", "develop"]
 jobs: 
   build:
     name: Build and push complement image
