@@ -758,18 +758,16 @@ class SsoHandler:
             # download picture, enforcing size limit & mime type check
             picture = io.BytesIO()
 
-            download_response = await self._http_client.get_file(
+            content_length, headers, uri, code = await self._http_client.get_file(
                 url=picture_https_url,
                 output_stream=picture,
                 max_size=self._profile_handler.max_avatar_size,
                 is_allowed_content_type=allowed_mime_type,
             )
 
-            if download_response[3] != 200:
+            if code != 200:
                 raise Exception(
-                    "GET request to download sso avatar image returned {}".format(
-                        download_response[3]
-                    )
+                    "GET request to download sso avatar image returned {}".format(code)
                 )
 
             # upload name includes hash of the image file's content so that we can
@@ -787,10 +785,10 @@ class SsoHandler:
 
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
-                media_type=download_response[1][b"Content-Type"][0].decode("utf-8"),
+                media_type=headers[b"Content-Type"][0].decode("utf-8"),
                 upload_name=upload_name,
                 content=picture,
-                content_length=download_response[0],
+                content_length=content_length,
                 auth_user=uid,
             )
 
