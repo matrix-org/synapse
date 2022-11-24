@@ -720,19 +720,20 @@ class SsoHandler:
     async def set_avatar(self, user_id: str, picture_https_url: str) -> None:
         """Set avatar of the user.
 
-        This downloads the image file from the url provided, store that in
-        the media repository and then sets the avatar on user's profile.
+        This downloads the image file from the URL provided, stores that in
+        the media repository and then sets the avatar on the user's profile.
 
         It can detect if the same image is being saved again and bails early by storing
-        hash of the file in upload_name of the avatar image.
+        the hash of the file in the `upload_name` of the avatar image.
 
-        Currently, it only supports server configurations which runs media repository
+        Currently, it only supports server configurations which run the media repository
         within the same process.
 
-        It silently fails and log a warning by raising exception & catching it internally
-        if it is unable to fetch the image itself (non 200 status code) or
-        if the image supplied is bigger than max allowed size or
-        if the image type is not one of the allowed image types.
+        It silently fails and logs a warning by raising an exception and catching it
+        internally if:
+         * it is unable to fetch the image itself (non 200 status code) or
+         * the image supplied is bigger than max allowed size or
+         * the image type is not one of the allowed image types.
 
         Args:
             user_id: matrix user ID in the form @localpart:domain as a string.
