@@ -774,7 +774,7 @@ class SsoHandler:
 
             # upload name includes hash of the image file's content so that we can
             # easily check if it requires an update or not, the next time user logs in
-            upload_name = "sso_avatar_" + hashlib.md5(picture.read()).hexdigest()
+            upload_name = "sso_avatar_" + hashlib.sha256(picture.read()).hexdigest()
 
             # bail if user already has the same avatar
             profile = await self._profile_handler.get_profile(user_id)
