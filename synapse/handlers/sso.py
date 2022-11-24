@@ -717,7 +717,7 @@ class SsoHandler:
 
         return registered_user_id
 
-    async def set_avatar(self, user_id: str, picture_https_url: str) -> None:
+    async def set_avatar(self, user_id: str, picture_https_url: str) -> bool:
         """Set avatar of the user.
 
         This downloads the image file from the URL provided, stores that in
@@ -741,7 +741,7 @@ class SsoHandler:
             picture_https_url: HTTPS url for the picture image file.
         """
         if not self._can_load_media_repo:
-            return
+            return False
 
         try:
             uid = UserID.from_string(user_id)
@@ -781,7 +781,7 @@ class SsoHandler:
                 media = await self._media_repo.store.get_local_media(media_id)
                 if media is not None and upload_name == media["upload_name"]:
                     logger.info("skipping saving the user avatar")
-                    return
+                    return False
 
             # store it in media repository
             avatar_mxc_url = await self._media_repo.create_content(
@@ -800,8 +800,10 @@ class SsoHandler:
             )
 
             logger.info("successfully saved the user avatar")
+            return True
         except Exception:
             logger.warning("failed to save the user avatar")
+            return False
 
     async def complete_sso_ui_auth_request(
         self,

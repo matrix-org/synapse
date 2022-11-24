@@ -43,12 +43,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         reg_handler = self.hs.get_registration_handler()
         user_id = self.get_success(reg_handler.register_user(approved=True))
 
-        with self.assertLogs() as cm:
-            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
-        self.assertEqual(
-            cm.output[-1],
-            "INFO:synapse.handlers.sso:successfully saved the user avatar",
-        )
+        self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
 
         # Ensure avatar is set on this newly created user,
         # so no need to compare for the exact image
@@ -64,11 +59,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         # any random user works since image check is supposed to fail
         user_id = "@sso-user:test"
 
-        with self.assertLogs() as cm:
-            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
-        self.assertEqual(
-            cm.output, ["WARNING:synapse.handlers.sso:failed to save the user avatar"]
-        )
+        self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
 
     @unittest.override_config({"allowed_avatar_mimetypes": ["image/jpeg"]})
     async def test_set_avatar_incorrect_mime_type(self) -> None:
@@ -78,33 +69,21 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         # any random user works since image check is supposed to fail
         user_id = "@sso-user:test"
 
-        with self.assertLogs() as cm:
-            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
-        self.assertEqual(
-            cm.output, ["WARNING:synapse.handlers.sso:failed to save the user avatar"]
-        )
+        self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"), False)
 
     async def test_skip_saving_avatar_when_not_changed(self) -> None:
-        """Tests whether saving of avatar correctly skips if the avatar hasn't changed"""
+        """Tests whether saving of avatar correctly skips if the avatar hasn't
+        changed"""
         handler = self.hs.get_sso_handler()
 
         # Create a new user to set avatar for
         reg_handler = self.hs.get_registration_handler()
         user_id = self.get_success(reg_handler.register_user(approved=True))
 
-        with self.assertLogs() as cm:
-            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
-        self.assertEqual(
-            cm.output[-1],
-            "INFO:synapse.handlers.sso:successfully saved the user avatar",
-        )
-
-        with self.assertLogs() as cm:
-            self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
-        self.assertEqual(
-            cm.output[-1],
-            "INFO:synapse.handlers.sso:skipping saving the user avatar",
-        )
+        # set avatar for the first time, should be a success
+        self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
+        # set same avatar for the second time, should be a failure
+        self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"), False)
 
 
 async def mock_get_file(
