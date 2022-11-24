@@ -450,9 +450,9 @@ def _flatten_dict(
     ):
         # Room supports extensible events: replace `content.body` with the plain text
         # representation from `m.markup`, as per MSC1767.
-        markup = d.get("content").get("org.matrix.msc1767.markup")
-        if room_version.disposition == RoomDisposition.STABLE:
-            markup = d.get("content").get("m.markup")
+        markup = d.get("content").get("m.markup")
+        if room_version.identifier.startswith("org.matrix.msc1767."):
+            markup = d.get("content").get("org.matrix.msc1767.markup")
         if markup is not None and isinstance(markup, list):
             text = ""
             for rep in markup:
