@@ -96,7 +96,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         profile = self.get_success(profile_handler.get_profile(user_id))
         url_to_match = profile["avatar_url"]
 
-        # set same avatar for the second time, should be a failure
+        # set same avatar for the second time, should be a success
         self.assertTrue(
             self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
         )
