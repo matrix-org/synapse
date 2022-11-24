@@ -51,7 +51,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         profile = self.get_success(profile_handler.get_profile(user_id))
         self.assertIsNot(profile["avatar_url"], None)
 
-    @unittest.override_config({"max_avatar_size": len(SMALL_PNG) - 1})
+    @unittest.override_config({"max_avatar_size": 1})
     async def test_set_avatar_too_big_image(self) -> None:
         """Tests saving of avatar failed when image size is too big"""
         handler = self.hs.get_sso_handler()
