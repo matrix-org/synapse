@@ -70,6 +70,7 @@ from synapse.storage.database import (
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
     AbstractStreamIdTracker,
     MultiWriterIdGenerator,
     StreamIdGenerator,
@@ -290,6 +291,32 @@ class EventsWorkerStore(SQLBaseStore):
             table="event_auth_chains",
             id_column="chain_id",
         )
+
+        self._un_partial_stated_events_stream_id_gen: AbstractStreamIdGenerator
+
+        if isinstance(database.engine, PostgresEngine):
+            self._un_partial_stated_events_stream_id_gen = MultiWriterIdGenerator(
+                db_conn=db_conn,
+                db=database,
+                stream_name="un_partial_stated_event_stream",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    ("un_partial_stated_event_stream", "instance_name", "stream_id")
+                ],
+                sequence_name="un_partial_stated_event_stream_sequence",
+                # TODO(faster_joins, multiple writers) Support multiple writers.
+                writers=["master"],
+            )
+        else:
+            self._un_partial_stated_events_stream_id_gen = StreamIdGenerator(
+                db_conn, "un_partial_stated_event_stream", "stream_id"
+            )
+
+    def get_un_partial_stated_events_token(self) -> int:
+        # TODO(faster_joins, multiple writers): This is inappropriate if there are multiple
+        #     writers because workers that don't write often will hold all
+        #     readers up.
+        return self._un_partial_stated_events_stream_id_gen.get_current_token()
 
     def process_replication_rows(
         self,
