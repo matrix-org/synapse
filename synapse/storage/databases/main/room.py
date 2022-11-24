@@ -912,7 +912,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
-                thumbnail_url = content.get("info", {}).get("thumbnail_url")
+                info = content.get("info")
+                if isinstance(info, dict):
+                    thumbnail_url = info.get("thumbnail_url")
+                else:
+                    thumbnail_url = None
 
                 for url in (content_url, thumbnail_url):
                     if not url:
@@ -2057,7 +2061,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         Args:
             report_id: ID of reported event in database
         Returns:
-            event_report: json list of information from event report
+            JSON dict of information from an event report or None if the
+            report does not exist.
         """
 
         def _get_event_report_txn(
@@ -2130,8 +2135,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             user_id: search for user_id. Ignored if user_id is None
             room_id: search for room_id. Ignored if room_id is None
         Returns:
-            event_reports: json list of event reports
-            count: total number of event reports matching the filter criteria
+            Tuple of:
+                json list of event reports
+                total number of event reports matching the filter criteria
         """
 
         def _get_event_reports_paginate_txn(

@@ -64,7 +64,7 @@ if not IS_PR:
         {
             "python-version": "3.11",
             "database": "postgres",
-            "postgres-version": "14",
+            "postgres-version": "15",
             "extras": "all",
         }
     )

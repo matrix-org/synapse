@@ -787,7 +787,7 @@ class OidcProvider:
                 Must include an ``access_token`` field.
 
         Returns:
-            UserInfo: an object representing the user.
+            an object representing the user.
         """
         logger.debug("Using the OAuth2 access_token to request userinfo")
         metadata = await self.load_metadata()

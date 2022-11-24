@@ -1,0 +1,1 @@
+Faster joins: send events to initial list of servers if we don't have the full state yet.
