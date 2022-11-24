@@ -786,7 +786,6 @@ class SsoHandler:
             if profile["avatar_url"] is not None:
                 server_name = profile["avatar_url"].split("/")[-2]
                 media_id = profile["avatar_url"].split("/")[-1]
-                media = None
                 if server_name == self._server_name:
                     media = await self._media_repo.store.get_local_media(media_id)
                     if media is not None and upload_name == media["upload_name"]:
