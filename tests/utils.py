@@ -125,7 +125,7 @@ def default_config(
     """
     config_dict = {
         "server_name": name,
-        "send_federation": False,
+        "federation_sender_instances": [],
         "media_store_path": "media",
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy

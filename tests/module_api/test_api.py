@@ -336,7 +336,9 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Test sending local online presence to users from the main process
         _test_sending_local_online_presence_to_local_user(self, test_with_workers=False)
 
-    @override_config({"send_federation": True})
+    # default test case disables federation sending. Setting this to None turns it back
+    # on for the main process.
+    @override_config({"federation_sender_instances": None})
     def test_send_local_online_presence_to_federation(self):
         """Tests that send_local_presence_to_users sends local online presence to remote users."""
         # Create a user who will send presence updates
