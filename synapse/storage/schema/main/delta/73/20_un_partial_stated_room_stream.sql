@@ -22,7 +22,7 @@ CREATE TABLE un_partial_stated_room_stream(
     instance_name TEXT NOT NULL,
 
     -- Which room has been un-partial-stated.
-    room_id TEXT NOT NULL REFERENCES rooms(room_id)
+    room_id TEXT NOT NULL REFERENCES rooms(room_id) ON DELETE CASCADE
 );
 
 -- We want an index here because of the foreign key constraint:
