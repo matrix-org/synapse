@@ -55,7 +55,6 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -191,8 +190,6 @@ class SsoHandler:
     _MAPPING_SESSION_VALIDITY_PERIOD_MS = 15 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        self._media_repo: Optional[MediaRepository]
-
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._server_name = hs.hostname
