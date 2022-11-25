@@ -35,7 +35,10 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
 
     def default_config(self):
         conf = super().default_config()
-        conf["send_federation"] = False
+        # default test case disables federation sending. This is duplicated here to
+        # assert that it is disabled and will be enabled explicitly below for each test
+        # case.
+        conf["federation_sender_instances"] = {}
         return conf
 
     def test_send_event_single_sender(self):
