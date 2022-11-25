@@ -29,7 +29,7 @@ from typing import (
 from prometheus_client import Counter
 
 from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
-from synapse.api.room_versions import PushRuleRoomFlag, RoomDisposition, RoomVersion
+from synapse.api.room_versions import PushRuleRoomFlag, RoomVersion
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
