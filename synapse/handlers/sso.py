@@ -55,6 +55,7 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
+    from synapse.rest.media.v1.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -190,6 +191,8 @@ class SsoHandler:
     _MAPPING_SESSION_VALIDITY_PERIOD_MS = 15 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
+        self._media_repo: Optional[MediaRepository]
+
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._server_name = hs.hostname
@@ -199,10 +202,9 @@ class SsoHandler:
         self._error_template = hs.config.sso.sso_error_template
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
-        if hs.config.media.can_load_media_repo:
-            self._media_repo = hs.get_media_repository()
-        else:
-            self._media_repo = None
+        self._media_repo = (
+            hs.get_media_repository() if hs.config.media.can_load_media_repo else None
+        )
         self._http_client = hs.get_proxied_blacklisted_http_client()
 
         # The following template is shown after a successful user interactive
