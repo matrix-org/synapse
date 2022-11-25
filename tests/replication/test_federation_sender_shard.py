@@ -46,8 +46,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client.put_json.return_value = make_awaitable({})
 
         self.make_worker_hs(
-            "synapse.app.federation_sender",
-            {"send_federation": False},
+            "synapse.app.generic_worker",
+            {
+                "worker_name": "sender1",
+                "federation_sender_instances": ["sender1"],
+            },
             federation_http_client=mock_client,
         )
 
@@ -73,9 +76,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client1 = Mock(spec=["put_json"])
         mock_client1.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
                 "worker_name": "sender1",
                 "federation_sender_instances": ["sender1", "sender2"],
             },
@@ -85,9 +87,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client2 = Mock(spec=["put_json"])
         mock_client2.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
                 "worker_name": "sender2",
                 "federation_sender_instances": ["sender1", "sender2"],
             },
@@ -136,9 +137,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client1 = Mock(spec=["put_json"])
         mock_client1.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
                 "worker_name": "sender1",
                 "federation_sender_instances": ["sender1", "sender2"],
             },
@@ -148,9 +148,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client2 = Mock(spec=["put_json"])
         mock_client2.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
                 "worker_name": "sender2",
                 "federation_sender_instances": ["sender1", "sender2"],
             },
