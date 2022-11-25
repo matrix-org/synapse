@@ -33,8 +33,6 @@ class PartialStateStreamsTestCase(BaseMultiWorkerStreamTestCase):
         pending calls to `await_full_state` get unblocked.
         """
 
-        # user_id = self.register_user("bob", "verysecret")
-        # token = self.login("bob", "verysecret")
         # Make a room.
         room_id = self.helper.create_room_as("@bob:test")
         # Mark the room as partial-stated.
