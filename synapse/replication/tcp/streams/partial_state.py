@@ -42,7 +42,7 @@ class UnPartialStatedRoomStream(Stream):
         store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
-            # TODO(multiple writers): we need to account for instance names
+            # TODO(faster joins, multiple writers): we need to account for instance names
             current_token_without_instance(store.get_un_partial_stated_rooms_token),
             store.get_un_partial_stated_rooms_from_stream,
         )

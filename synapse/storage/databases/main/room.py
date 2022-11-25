@@ -132,7 +132,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     ("un_partial_stated_room_stream", "instance_name", "stream_id")
                 ],
                 sequence_name="un_partial_stated_room_stream_sequence",
-                # TODO(multiple writers) Support multiple writers.
+                # TODO(faster joins, multiple writers) Support multiple writers.
                 writers=["master"],
             )
         else:
