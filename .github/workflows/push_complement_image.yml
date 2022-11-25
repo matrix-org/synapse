@@ -4,7 +4,17 @@
 name: Store complement synapse image in ghcr.io
 on:
   push:
-    branches: ["master", "develop"]
+    branches: ["master"]
+  schedule: 
+      - '* 5 * * *'
+
+# Only run this action once per pull request/branch; restart if a new commit arrives.
+# C.f. https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency
+# and https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions#github-context
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs: 
   build:
     name: Build and push complement image
@@ -13,8 +23,16 @@ jobs:
       contents: read
       packages: write
     steps:
-       - name: Checkout clean copy
+       - name: Checkout clean copy of develop (scheduled build)
          uses: actions/checkout@v3
+         if: 'github.event.type == "schedule"'
+         with:
+           ref: develop
+       - name: Checkout clean copy of master (on-push)
+         uses: actions/checkout@v3
+         if: 'github.event.type != "schedule"'
+         with:
+           ref: master
        - name: Login to registry
          uses: docker/login-action@v1
          with:
