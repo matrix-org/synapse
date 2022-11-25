@@ -82,4 +82,5 @@ __all__ = [
     "TagAccountDataStream",
     "AccountDataStream",
     "UserSignatureStream",
+    "UnPartialStatedRoomStream",
 ]
