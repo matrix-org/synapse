@@ -1,0 +1,1 @@
+Add `--editable` flag to `complement.sh` which uses an editable install of Synapse for faster turn-around times whilst developing iteratively.
