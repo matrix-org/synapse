@@ -199,8 +199,10 @@ class SsoHandler:
         self._error_template = hs.config.sso.sso_error_template
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
-        self._can_load_media_repo = hs.config.media.can_load_media_repo
-        self._media_repo = hs.get_media_repository()
+        if hs.config.media.can_load_media_repo:
+            self._media_repo = hs.get_media_repository()
+        else:
+            self._media_repo = None
         self._http_client = hs.get_proxied_blacklisted_http_client()
 
         # The following template is shown after a successful user interactive
@@ -744,7 +746,7 @@ class SsoHandler:
         Returns: `True` if the user's avatar has been successfully set to the image at
             `picture_https_url`.
         """
-        if not self._can_load_media_repo:
+        if self._media_repo is None:
             logger.info(
                 "failed to set user avatar because out-of-process media repositories "
                 "are not supported yet "
