@@ -912,7 +912,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
-                thumbnail_url = content.get("info", {}).get("thumbnail_url")
+                info = content.get("info")
+                if isinstance(info, dict):
+                    thumbnail_url = info.get("thumbnail_url")
+                else:
+                    thumbnail_url = None
 
                 for url in (content_url, thumbnail_url):
                     if not url:

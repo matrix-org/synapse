@@ -266,26 +266,18 @@ def register_start(
     reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))
 
 
-def listen_metrics(
-    bind_addresses: Iterable[str], port: int, enable_legacy_metric_names: bool
-) -> None:
+def listen_metrics(bind_addresses: Iterable[str], port: int) -> None:
     """
     Start Prometheus metrics server.
     """
     from prometheus_client import start_http_server as start_http_server_prometheus
 
-    from synapse.metrics import (
-        RegistryProxy,
-        start_http_server as start_http_server_legacy,
-    )
+    from synapse.metrics import RegistryProxy
 
     for host in bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
-        if enable_legacy_metric_names:
-            start_http_server_legacy(port, addr=host, registry=RegistryProxy)
-        else:
-            _set_prometheus_client_use_created_metrics(False)
-            start_http_server_prometheus(port, addr=host, registry=RegistryProxy)
+        _set_prometheus_client_use_created_metrics(False)
+        start_http_server_prometheus(port, addr=host, registry=RegistryProxy)
 
 
 def _set_prometheus_client_use_created_metrics(new_value: bool) -> None:
