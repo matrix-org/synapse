@@ -37,7 +37,8 @@ from tests import unittest
 from tests.federation.transport.test_knocking import (
     KnockingStrippedStateEventHelperMixin,
 )
-from tests.server import TimedOutException
+
+from tests.server import TimedOutException, FakeChannel
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -797,6 +798,185 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Store the next batch for the next request.
         self.next_batch = channel.json_body["next_batch"]
+
+class RoomPreviewTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        read_marker.register_servlets,
+        room.register_servlets,
+        sync.register_servlets,
+        receipts.register_servlets,
+    ]
+
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["experimental_features"] = {
+            "server_side_room_preview": True,
+        }
+        return config
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.url = "/sync?since=%s"
+        self.next_batches = dict()
+
+        # Register the first user (used to check the unread counts).
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+        self.next_batches[self.tok] = "s0"
+
+        # Create the room we'll check unread counts for.
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+        print(f"Room id: {self.room_id}")
+
+        # Register the second user (used to send events to the room).
+        self.user2 = self.register_user("kermit2", "monkey")
+        self.tok2 = self.login("kermit2", "monkey")
+        self.next_batches[self.tok2] = "s0"
+
+
+        # Change the power levels of the room so that the second user can send state
+        # events.
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.PowerLevels,
+            {
+                "users": {self.user_id: 100, self.user2: 100},
+                "users_default": 0,
+                "events": {
+                    "m.room.name": 50,
+                    "m.room.power_levels": 100,
+                    "m.room.history_visibility": 100,
+                    "m.room.canonical_alias": 50,
+                    "m.room.avatar": 50,
+                    "m.room.tombstone": 100,
+                    "m.room.server_acl": 100,
+                    "m.room.encryption": 100,
+                },
+                "events_default": 0,
+                "state_default": 50,
+                "ban": 50,
+                "kick": 50,
+                "redact": 50,
+                "invite": 0,
+            },
+            tok=self.tok,
+        )
+
+    def _check_preview_event_id(self, expected_preview_event_id: int, auth_token: str) -> None:
+        """Checks the populated preview value against the expected value provided"""
+
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batches[auth_token],
+            access_token=auth_token,
+        )
+
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        room_entry = (
+            channel.json_body.get("rooms", {}).get("join", {}).get(self.room_id, {})
+        )
+
+        preview_id = room_entry.get("com.beeper.inbox.preview", {}).get("event_id", {})
+
+        self.assertEqual(
+            preview_id,
+            expected_preview_event_id,
+            room_entry,
+        )
+
+        # Store the next batch for the next request.
+        self.next_batches[auth_token] = channel.json_body["next_batch"]
+
+    def _redact_event(
+        self,
+        access_token: str,
+        room_id: str,
+        event_id: str,
+        expect_code: int = 200,
+        with_relations: Optional[List[str]] = None,
+    ) -> JsonDict:
+        """Helper function to send a redaction event.
+
+        Returns the json body.
+        """
+        path = "/_matrix/client/r0/rooms/%s/redact/%s" % (room_id, event_id)
+
+        request_content = {}
+        if with_relations:
+            request_content["org.matrix.msc3912.with_relations"] = with_relations
+
+        channel = self.make_request(
+            "POST", path, request_content, access_token=access_token
+        )
+        self.assertEqual(channel.code, expect_code)
+        return channel.json_body
+
+    def test_room_preview(self) -> None:
+        """Tests that /sync returns a room preview with the latest message for room."""
+
+        print("One user hello:")
+        #Check that a message we send returns a preview in the room (i.e. have multiple clients?)
+        send_body = self.helper.send(self.room_id, "hello", tok=self.tok)
+        self._check_preview_event_id(send_body["event_id"], auth_token=self.tok)
+
+        # Join the new user. Should not show as preview.
+        print("Join user no update preview")
+        connect_body = self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+        self._check_preview_event_id(send_body["event_id"], auth_token=self.tok)
+
+        print("Second user hello")
+        # Check that the new user sending a message updates our preview
+        send_2_body = self.helper.send(self.room_id, "hello again!", tok=self.tok2)
+        self._check_preview_event_id(send_2_body["event_id"], self.tok)
+
+        print("Encrypted messages 1")
+        # Beeper: ensure encrypted messages are treated the same.
+        enc_1_body = self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
+        self._check_preview_event_id(enc_1_body["event_id"], auth_token=self.tok)
+
+        print("Encrypted messages 2")
+        enc_2_body = self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
+        self._check_preview_event_id(enc_2_body["event_id"], auth_token=self.tok)
+
+        print("Redact encrypted message 2")
+        redact_result = self._redact_event(self.tok2, self.room_id, enc_2_body["event_id"])
+        self._check_preview_event_id(enc_1_body["event_id"], auth_token=self.tok)
+
+        print("someone react to my message")
+        # Someone else reacted to my message, update preview.
+        reaction_1 = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Reaction,
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": send_body["event_id"],
+                    "key": "👍",
+                }
+            },
+            tok=self.tok2,
+        )
+        self._check_preview_event_id(reaction_1["event_id"], auth_token=self.tok)
+
+
+        print("Someone react to another's message")
+        # Not a reaction to my message, don't update preview.
+        reaction_2 = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Reaction,
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": send_2_body["event_id"],
+                    "key": "👍",
+                }
+            },
+            tok=self.tok,
+        )
+        self._check_preview_event_id(reaction_1["event_id"], auth_token=self.tok)
+        self._check_preview_event_id(reaction_2["event_id"], auth_token=self.tok2)
 
 
 class SyncCacheTestCase(unittest.HomeserverTestCase):
