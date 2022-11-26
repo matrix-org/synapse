@@ -20,6 +20,7 @@ from synapse.rest import admin
 from synapse.rest.client import login, room
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
+from tests.unittest import override_config
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         return event_id
 
+    # Pusher functionality is active on the main process by default. Disable that by
+    # explicitly overriding what 'pusher_instances' will be available so
+    # ShardedWorkerHandlingConfig will be filled out correctly.
+    @override_config({"pusher_instances": ["pusher1"]})
     def test_send_push_single_worker(self):
         """Test that registration works when using a pusher worker."""
         http_client_mock = Mock(spec_set=["post_json_get_json"])
@@ -116,6 +121,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             ],
         )
 
+    # Pusher functionality is active on the main process by default. Disable that by
+    # explicitly overriding what 'pusher_instances' will be available so
+    # ShardedWorkerHandlingConfig will be filled out correctly.
+    @override_config({"pusher_instances": ["pusher1", "pusher2"]})
     def test_send_push_multiple_workers(self):
         """Test that registration works when using sharded pusher workers."""
         http_client_mock1 = Mock(spec_set=["post_json_get_json"])
