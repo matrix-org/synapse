@@ -40,7 +40,10 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         return hs
 
-    @override_config({"send_federation": True})
+    # Default test case disables federation sending. Setting
+    # 'federation_sender_instances' to None turns it back on for the main
+    # process
+    @override_config({"federation_sender_instances": None})
     def test_send_receipts(self):
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
@@ -83,7 +86,10 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             ],
         )
 
-    @override_config({"send_federation": True})
+    # Default test case disables federation sending. Setting
+    # 'federation_sender_instances' to None turns it back on for the main
+    # process
+    @override_config({"federation_sender_instances": None})
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""
@@ -184,7 +190,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def default_config(self):
         c = super().default_config()
-        c["send_federation"] = True
+        # Default test case disables federation sending. Setting
+        # 'federation_sender_instances' to None turns it back on for the main
+        # process
+        c["federation_sender_instances"] = None
         return c
 
     def prepare(self, reactor, clock, hs):

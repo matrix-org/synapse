@@ -200,7 +200,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    @override_config({"send_federation": True})
+    # Default test case disables federation sending. Setting
+    # 'federation_sender_instances' to None turns it back on for the main
+    # process
+    @override_config({"federation_sender_instances": None})
     def test_started_typing_remote_send(self) -> None:
         self.room_members = [U_APPLE, U_ONION]
 
@@ -305,7 +308,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(events[0], [])
         self.assertEqual(events[1], 0)
 
-    @override_config({"send_federation": True})
+    # Default test case disables federation sending. Setting
+    # 'federation_sender_instances' to None turns it back on for the main
+    # process
+    @override_config({"federation_sender_instances": None})
     def test_stopped_typing(self) -> None:
         self.room_members = [U_APPLE, U_BANANA, U_ONION]
 

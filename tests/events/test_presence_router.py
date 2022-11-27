@@ -162,7 +162,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 }
             },
-            "send_federation": True,
+            # Default test case disables federation sending. Setting
+            # 'federation_sender_instances' to None turns it back on for the main
+            # process
+            "federation_sender_instances": None,
         }
     )
     def test_receiving_all_presence_legacy(self):
@@ -180,7 +183,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 },
             ],
-            "send_federation": True,
+            # Default test case disables federation sending. Setting
+            # 'federation_sender_instances' to None turns it back on for the main
+            # process
+            "federation_sender_instances": None,
         }
     )
     def test_receiving_all_presence(self):
@@ -290,7 +296,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 }
             },
-            "send_federation": True,
+            # Default test case disables federation sending. Setting
+            # 'federation_sender_instances' to None turns it back on for the main
+            # process
+            "federation_sender_instances": None,
         }
     )
     def test_send_local_online_presence_to_with_module_legacy(self):
@@ -310,7 +319,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 },
             ],
-            "send_federation": True,
+            # Default test case disables federation sending. Setting
+            # 'federation_sender_instances' to None turns it back on for the main
+            # process
+            "federation_sender_instances": None,
         }
     )
     def test_send_local_online_presence_to_with_module(self):
