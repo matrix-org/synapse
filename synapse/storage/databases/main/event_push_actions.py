@@ -524,9 +524,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             ) AS unthreaded_receipts USING (room_id)
         """
 
-        # First get summary counts by room / thread for the user. We join the max receipt
-        # stream ordering both threaded & unthreaded and use the max to compare against
-        # the summary table.
+        # First get summary counts by room / thread for the user. We use the max receipt
+        # stream ordering of both threaded & unthreaded receipts to compare against the
+        # summary table.
+        #
         # PostgreSQL and SQLite differ in comparing scalar numerics.
         if isinstance(self.database_engine, PostgresEngine):
             # GREATEST ignores NULLs.
