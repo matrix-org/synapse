@@ -995,7 +995,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # Default test case disables federation sending. Setting
         # 'federation_sender_instances' to None turns it back on for the main
         # process
-        config["federation_sender_instances"]: None
+        config["federation_sender_instances"] = None
         return config
 
     def prepare(self, reactor, clock, hs):
