@@ -467,7 +467,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
     async def get_unread_counts_by_room_for_user(self, user_id: str) -> Dict[str, int]:
         """Get the notification count by room for a user. Only considers notifications,
-        no highlights or unreads, and threads are currently aggregated under their room.
+        not highlight or unread counts, and threads are currently aggregated under their room.
 
         This function is intentionally not cached because it is called to calculate the
         unread badge for notifications and thus the result is expected to change.
