@@ -470,7 +470,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         not highlight or unread counts, and threads are currently aggregated under their room.
 
         This function is intentionally not cached because it is called to calculate the
-        unread badge for notifications and thus the result is expected to change.
+        unread badge for push notifications and thus the result is expected to change.
 
         Note that this function assumes the user is a member of the room. Because
         summary rows are not removed when a user leaves a room, the caller must
