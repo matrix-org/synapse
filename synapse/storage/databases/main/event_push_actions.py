@@ -548,11 +548,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             FROM event_push_summary AS eps
             {receipts_joins}
             WHERE user_id = ?
-            AND notif_count != 0
-            AND (
-                (last_receipt_stream_ordering IS NULL AND stream_ordering > {max_clause})
-                OR last_receipt_stream_ordering = {max_clause}
-            )
+	            AND notif_count != 0
+	            AND (
+	                (last_receipt_stream_ordering IS NULL AND stream_ordering > {max_clause})
+	                OR last_receipt_stream_ordering = {max_clause}
+	            )
         """
         txn.execute(sql, args)
 
@@ -570,10 +570,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             FROM event_push_actions AS epa
             {receipts_joins}
             WHERE user_id = ?
-            AND epa.notif = 1
-            AND stream_ordering > (SELECT stream_ordering FROM event_push_summary_stream_ordering)
-            AND (threaded_receipt_stream_ordering IS NULL OR stream_ordering > threaded_receipt_stream_ordering)
-            AND (unthreaded_receipt_stream_ordering IS NULL OR stream_ordering > unthreaded_receipt_stream_ordering)
+	            AND epa.notif = 1
+	            AND stream_ordering > (SELECT stream_ordering FROM event_push_summary_stream_ordering)
+	            AND (threaded_receipt_stream_ordering IS NULL OR stream_ordering > threaded_receipt_stream_ordering)
+	            AND (unthreaded_receipt_stream_ordering IS NULL OR stream_ordering > unthreaded_receipt_stream_ordering)
             GROUP BY epa.room_id, epa.thread_id
         """
         txn.execute(sql, args)
