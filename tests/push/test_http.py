@@ -43,7 +43,6 @@ class HTTPPusherTests(HomeserverTestCase):
 
     def default_config(self) -> Dict[str, Any]:
         config = super().default_config()
-        config["start_pushers"] = True
         return config
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:

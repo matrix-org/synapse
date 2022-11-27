@@ -40,7 +40,6 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
     def default_config(self):
         conf = super().default_config()
-        conf["start_pushers"] = False
         return conf
 
     def _create_pusher_and_send_msg(self, localpart):
@@ -92,8 +91,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         self.make_worker_hs(
-            "synapse.app.pusher",
-            {"start_pushers": False},
+            "synapse.app.generic_worker",
+            {"pusher_instances": ["synapse.app.generic_worker"]},
             proxied_blacklisted_http_client=http_client_mock,
         )
 
@@ -122,9 +121,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         self.make_worker_hs(
-            "synapse.app.pusher",
+            "synapse.app.generic_worker",
             {
-                "start_pushers": True,
                 "worker_name": "pusher1",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
@@ -137,9 +135,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         self.make_worker_hs(
-            "synapse.app.pusher",
+            "synapse.app.generic_worker",
             {
-                "start_pushers": True,
                 "worker_name": "pusher2",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
