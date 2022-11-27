@@ -38,7 +38,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
             badge += 1
         else:
             # Increase badge by number of notifications in room
-            # NOTE: this includes threaded notifications as well as non-threaded
+            # NOTE: this includes threaded and unthreaded notifications.
             badge += notify_count
 
     return badge
