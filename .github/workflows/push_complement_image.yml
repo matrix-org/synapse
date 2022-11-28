@@ -4,9 +4,9 @@
 name: Store complement-synapse image in ghcr.io
 on:
   push:
-    branches: ["master"]
-  schedule: 
-      - cron: '0 5 * * *'
+    branches: [ "master" ]
+  schedule:
+    - cron: '0 5 * * *'
   workflow_dispatch:
     inputs:
       branch:
@@ -24,7 +24,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs: 
+jobs:
   build:
     name: Build and push complement image
     runs-on: ubuntu-latest
@@ -32,37 +32,37 @@ jobs:
       contents: read
       packages: write
     steps:
-       - name: Checkout specific branch (debug build)
-         uses: actions/checkout@v3
-         if: 'github.event.type == "workflow_dispatch"'
-         with:
-           ref: ${{ inputs.branch }}
-       - name: Checkout clean copy of develop (scheduled build)
-         uses: actions/checkout@v3
-         if: 'github.event.type == "schedule"'
-         with:
-           ref: develop
-       - name: Checkout clean copy of master (on-push)
-         uses: actions/checkout@v3
-         if: 'github.event.type == "push"'
-         with:
-           ref: master
-       - name: Login to registry
-         uses: docker/login-action@v1
-         with:
-           registry: ghcr.io
-           username: ${{ github.actor }}
-           password: ${{ secrets.GITHUB_TOKEN }}
-       - name: Work out labels for complement image
-         id: meta
-         uses: docker/metadata-action@v1
-         with: 
-           images: ghcr.io/${{ github.repository }}/complement-synapse
-       - name: Build complement image
-         run: scripts-dev/complement.sh --build-only
-       - name: Tag and push generated image
-         run: |
-           for TAG in ${{ steps.meta.outputs.tags }}; do 
-             docker tag complement-synapse:latest $TAG
-             docker push $TAG
-           done
+      - name: Checkout specific branch (debug build)
+        uses: actions/checkout@v3
+        if: 'github.event.type == "workflow_dispatch"'
+        with:
+          ref: ${{ inputs.branch }}
+      - name: Checkout clean copy of develop (scheduled build)
+        uses: actions/checkout@v3
+        if: 'github.event.type == "schedule"'
+        with:
+          ref: develop
+      - name: Checkout clean copy of master (on-push)
+        uses: actions/checkout@v3
+        if: 'github.event.type == "push"'
+        with:
+          ref: master
+      - name: Login to registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Work out labels for complement image
+        id: meta
+        uses: docker/metadata-action@v1
+        with:
+          images: ghcr.io/${{ github.repository }}/complement-synapse
+      - name: Build complement image
+        run: scripts-dev/complement.sh --build-only
+      - name: Tag and push generated image
+        run: |
+          for TAG in ${{ steps.meta.outputs.tags }}; do 
+            docker tag complement-synapse:latest $TAG
+            docker push $TAG
+          done
