@@ -137,4 +137,6 @@ class ExperimentalConfig(Config):
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
 
         # Server-side preview enabled.
-        self.server_side_room_preview_enabled: bool = experimental.get("server_side_room_preview_enabled", False)
+        self.server_side_room_preview_enabled: bool = experimental.get(
+            "server_side_room_preview_enabled", False
+        )

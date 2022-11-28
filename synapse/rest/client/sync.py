@@ -509,7 +509,7 @@ class SyncRestServlet(RestServlet):
             },
             "state": {"events": serialized_state},
             "account_data": {"events": account_data},
-            "com.beeper.inbox.preview": room.preview
+            "com.beeper.inbox.preview": room.preview,
         }
 
         if joined:

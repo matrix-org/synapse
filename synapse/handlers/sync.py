@@ -40,12 +40,11 @@ from synapse.handlers.relations import BundledAggregations
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.event_push_actions import RoomNotifCounts
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
-from synapse.storage.database import LoggingTransaction
-from synapse.util.caches.descriptors import cached
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
@@ -58,6 +57,7 @@ from synapse.types import (
     UserID,
 )
 from synapse.util.async_helpers import concurrently_execute
+from synapse.util.caches.descriptors import cached
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
@@ -157,6 +157,7 @@ class ArchivedSyncResult:
     timeline: TimelineBatch
     state: StateMap[EventBase]
     account_data: List[JsonDict]
+    preview: Optional[JsonDict]
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -1295,16 +1296,15 @@ class SyncHandler:
                 sync_config.user.to_string(),
             )
 
-    @cached(max_entries=1, iterable=True)
+    @cached(max_entries=50000, iterable=True)
     async def beeper_preview_for_room_id_and_user_id(
         self, room_id: str, user_id: str, to_key: RoomStreamToken
     ) -> JsonDict:
         res = {}
-        def _beeper_preview_for_room_id_and_user_id(
-                txn: LoggingTransaction
-        ):
+
+        def _beeper_preview_for_room_id_and_user_id(txn: LoggingTransaction) -> None:
             sql = """
-            SELECT e.event_id, e.origin_server_ts 
+            SELECT e.event_id, e.origin_server_ts
                 FROM events AS e \
                 LEFT JOIN redactions as r \
                 ON e.event_id = r.redacts
@@ -1321,12 +1321,22 @@ class SyncHandler:
             LIMIT 1
             """
 
-            txn.execute(sql, (to_key.stream,room_id,user_id,))
+            txn.execute(
+                sql,
+                (
+                    to_key.stream,
+                    room_id,
+                    user_id,
+                ),
+            )
             for event_id, origin_server_ts in txn:
                 res["event_id"] = event_id
                 res["origin_server_ts"] = origin_server_ts
 
-        await self.store.db_pool.runInteraction("beeper_preview_for_room_id_and_user_id", _beeper_preview_for_room_id_and_user_id)
+        await self.store.db_pool.runInteraction(
+            "beeper_preview_for_room_id_and_user_id",
+            _beeper_preview_for_room_id_and_user_id,
+        )
 
         return res
 
@@ -2461,8 +2471,6 @@ class SyncHandler:
                     room_id, sync_config, batch, state, now_token
                 )
 
-
-
             if room_builder.rtype == "joined":
                 unread_notifications: Dict[str, int] = {}
                 room_sync = JoinedSyncResult(
@@ -2475,12 +2483,14 @@ class SyncHandler:
                     unread_thread_notifications={},
                     summary=summary,
                     unread_count=0,
-                    preview=dict()
+                    preview={},
                 )
 
                 if self.hs_config.experimental.server_side_room_preview_enabled:
-                    preview: JsonDict = await self.beeper_preview_for_room_id_and_user_id(
-                        room_id=room_id, user_id=user_id, to_key=now_token.room_key
+                    preview: JsonDict = (
+                        await self.beeper_preview_for_room_id_and_user_id(
+                            room_id=room_id, user_id=user_id, to_key=now_token.room_key
+                        )
                     )
                     room_sync.preview = preview
 
