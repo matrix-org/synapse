@@ -156,7 +156,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         last_event_id: str
 
-        def _assert_counts(noitf_count: int, highlight_count: int) -> None:
+        def _assert_counts(notif_count: int, highlight_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
@@ -168,7 +168,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count,
+                    notify_count=notif_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
@@ -182,7 +182,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     user_id,
                 )
             )
-            self.assertEqual(sum(aggregate_counts.values()), noitf_count)
+            self.assertEqual(sum(aggregate_counts.values()), notif_count)
 
         def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
@@ -292,7 +292,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         last_event_id: str
 
         def _assert_counts(
-            noitf_count: int,
+            notif_count: int,
             highlight_count: int,
             thread_notif_count: int,
             thread_highlight_count: int,
@@ -308,7 +308,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count,
+                    notify_count=notif_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
@@ -335,7 +335,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
             self.assertEqual(
-                sum(aggregate_counts.values()), noitf_count + thread_notif_count
+                sum(aggregate_counts.values()), notif_count + thread_notif_count
             )
 
         def _create_event(
@@ -474,7 +474,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         last_event_id: str
 
         def _assert_counts(
-            noitf_count: int,
+            notif_count: int,
             highlight_count: int,
             thread_notif_count: int,
             thread_highlight_count: int,
@@ -490,7 +490,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count,
+                    notify_count=notif_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
@@ -517,7 +517,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
             self.assertEqual(
-                sum(aggregate_counts.values()), noitf_count + thread_notif_count
+                sum(aggregate_counts.values()), notif_count + thread_notif_count
             )
 
         def _create_event(
@@ -677,7 +677,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
             return result["event_id"]
 
-        def _assert_counts(noitf_count: int, thread_notif_count: int) -> None:
+        def _assert_counts(notif_count: int, thread_notif_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
@@ -689,7 +689,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count, unread_count=0, highlight_count=0
+                    notify_count=notif_count, unread_count=0, highlight_count=0
                 ),
             )
             if thread_notif_count:
