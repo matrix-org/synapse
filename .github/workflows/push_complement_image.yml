@@ -7,6 +7,15 @@ on:
     branches: ["master"]
   schedule: 
       - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: true
+        default: 'develop'
+        type: choice
+        options:
+          - develop
+          - master
 
 # Only run this action once per pull request/branch; restart if a new commit arrives.
 # C.f. https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency
@@ -23,6 +32,11 @@ jobs:
       contents: read
       packages: write
     steps:
+       - name: Checkout specific branch (debug build)
+         uses: actions/checkout@v3
+         if: 'github.event.type == "workflow_dispatch"'
+         with:
+           ref: ${{ inputs.branch }}
        - name: Checkout clean copy of develop (scheduled build)
          uses: actions/checkout@v3
          if: 'github.event.type == "schedule"'
@@ -30,7 +44,7 @@ jobs:
            ref: develop
        - name: Checkout clean copy of master (on-push)
          uses: actions/checkout@v3
-         if: 'github.event.type != "schedule"'
+         if: 'github.event.type == "push"'
          with:
            ref: master
        - name: Login to registry
