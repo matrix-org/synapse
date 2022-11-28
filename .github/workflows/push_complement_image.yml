@@ -55,15 +55,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Work out labels for complement image
         id: meta
-        uses: docker/metadata-action@v1
+        uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}/complement-synapse
+          tags: |
+            type=schedule,pattern=nightly,enable=${{ github.event_name == 'schedule'}}
+            type=raw,value=develop,enable=${{ github.event_name == 'schedule' || inputs.branch == 'develop' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' || inputs.branch == 'master' }}
+            type=sha,format=long
       - name: Build complement image
         run: scripts-dev/complement.sh --build-only
       - name: Tag and push generated image
         run: |
           for TAG in ${{ steps.meta.outputs.tags }}; do 
-            echo "$TAG"
-            docker tag complement-synapse:latest $TAG
+            echo "tag and push $TAG"
+            docker tag complement-synapse $TAG
             docker push $TAG
           done
