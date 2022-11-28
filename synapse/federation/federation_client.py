@@ -1691,9 +1691,19 @@ class FederationClient(FederationBase):
                 #   to return events on *both* sides of the timestamp to
                 #   help reconcile the gap faster.
                 _timestamp_to_event_from_destination,
+                # Since this endpoint is new, we should try other servers before giving up.
+                # We can safely remove this in a year (remove after 2023-11-16).
+                failover_on_unknown_endpoint=True,
             )
             return timestamp_to_event_response
-        except SynapseError:
+        except SynapseError as e:
+            logger.warn(
+                "timestamp_to_event(room_id=%s, timestamp=%s, direction=%s): encountered error when trying to fetch from destinations: %s",
+                room_id,
+                timestamp,
+                direction,
+                e,
+            )
             return None
 
     async def _timestamp_to_event_from_destination(
