@@ -63,11 +63,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertDictEqual(
-            res,
-            {
-                "one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0},
-                "one_time_keys_count": {"alg1": 1, "alg2": 2, "signed_curve25519": 0},
-            },
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
         )
 
         # we should be able to change the signature without a problem
@@ -78,11 +74,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertDictEqual(
-            res,
-            {
-                "one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0},
-                "one_time_keys_count": {"alg1": 1, "alg2": 2, "signed_curve25519": 0},
-            },
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
         )
 
     def test_change_one_time_keys(self) -> None:
@@ -102,11 +94,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertDictEqual(
-            res,
-            {
-                "one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0},
-                "one_time_keys_count": {"alg1": 1, "alg2": 2, "signed_curve25519": 0},
-            },
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
         )
 
         # Error when changing string key
@@ -160,11 +148,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertDictEqual(
-            res,
-            {
-                "one_time_key_counts": {"alg1": 1, "signed_curve25519": 0},
-                "one_time_keys_count": {"alg1": 1, "signed_curve25519": 0},
-            },
+            res, {"one_time_key_counts": {"alg1": 1, "signed_curve25519": 0}}
         )
 
         res2 = self.get_success(

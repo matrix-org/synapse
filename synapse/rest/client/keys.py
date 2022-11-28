@@ -80,7 +80,7 @@ class KeyUploadServlet(RestServlet):
     response, e.g.:
 
     {
-        "one_time_keys_count": {
+        "one_time_key_counts": {
             "curve25519": 10,
             "signed_curve25519": 20
         }

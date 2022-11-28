@@ -675,11 +675,7 @@ class E2eKeysHandler:
         result = await self.store.count_e2e_one_time_keys(user_id, device_id)
 
         set_tag("one_time_key_counts", str(result))
-        set_tag("one_time_keys_count", str(result))
-        return {
-            "one_time_key_counts": result,
-            "one_time_keys_count": result,
-        }
+        return {"one_time_key_counts": result}
 
     async def _upload_one_time_keys_for_user(
         self, user_id: str, device_id: str, time_now: int, one_time_keys: JsonDict
