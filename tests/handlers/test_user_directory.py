@@ -56,7 +56,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["update_user_directory"] = True
+        # Remove the value that disables updating the user directory, as that function
+        # is needed below.
+        config.pop("update_user_directory_from_worker")
 
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
@@ -1045,7 +1047,9 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["update_user_directory"] = True
+        # Remove the value that disables updating the user directory, as that function
+        # is needed below. It will be force disabled later
+        config.pop("update_user_directory_from_worker")
         hs = self.setup_test_homeserver(config=config)
 
         self.config = hs.config

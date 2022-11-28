@@ -184,8 +184,9 @@ def default_config(
         # rooms will fail.
         "default_room_version": DEFAULT_ROOM_VERSION,
         # disable user directory updates, because they get done in the
-        # background, which upsets the test runner.
-        "update_user_directory": False,
+        # background, which upsets the test runner. Instead of an actual worker_name,
+        # setting this to 'None' disables updating the user directory as intended.
+        "update_user_directory_from_worker": None,
         "caches": {"global_factor": 1, "sync_response_cache_duration": 0},
         "listeners": [{"port": 0, "type": "http"}],
     }
