@@ -63,6 +63,7 @@ jobs:
       - name: Tag and push generated image
         run: |
           for TAG in ${{ steps.meta.outputs.tags }}; do 
+            echo "$TAG"
             docker tag complement-synapse:latest $TAG
             docker push $TAG
           done
