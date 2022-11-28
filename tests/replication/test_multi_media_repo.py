@@ -52,6 +52,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
     def default_config(self):
         conf = super().default_config()
         conf["federation_custom_ca_list"] = [get_test_ca_cert_file()]
+        conf["enable_media_repo"] = False
         return conf
 
     def _get_media_req(
@@ -124,7 +125,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
 
     def test_basic(self):
         """Test basic fetching of remote media from a single worker."""
-        hs1 = self.make_worker_hs("synapse.app.generic_worker")
+        hs1 = self.make_worker_hs("synapse.app.media_repository")
 
         channel, request = self._get_media_req(hs1, "example.com:443", "ABC123")
 
@@ -142,8 +143,8 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         """Test that fetching remote media from two different processes at the
         same time works.
         """
-        hs1 = self.make_worker_hs("synapse.app.generic_worker")
-        hs2 = self.make_worker_hs("synapse.app.generic_worker")
+        hs1 = self.make_worker_hs("synapse.app.media_repository")
+        hs2 = self.make_worker_hs("synapse.app.media_repository")
 
         start_count = self._count_remote_media()
 
@@ -183,8 +184,8 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
 
         This checks that races generating thumbnails are handled correctly.
         """
-        hs1 = self.make_worker_hs("synapse.app.generic_worker")
-        hs2 = self.make_worker_hs("synapse.app.generic_worker")
+        hs1 = self.make_worker_hs("synapse.app.media_repository")
+        hs2 = self.make_worker_hs("synapse.app.media_repository")
 
         start_count = self._count_remote_thumbnails()
 
