@@ -244,12 +244,13 @@ class PerDestinationQueue:
             )
 
     def flush_read_receipts_for_room(self, room_id: str) -> None:
-        # if we don't have any receipts for this room, it may be that we've already
-        # sent them out, so we don't need to flush.
+        # If there are any pending receipts for this room then force-flush them
+        # in a new transaction.
         for edu in self._pending_receipt_edus:
             if room_id in edu:
                 self._rrs_pending_flush = True
                 self.attempt_new_transaction()
+                # No use in checking remaining EDUs if the room was found.
                 break
 
     def send_keyed_edu(self, edu: Edu, key: Hashable) -> None:
