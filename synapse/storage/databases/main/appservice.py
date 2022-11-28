@@ -451,8 +451,6 @@ class ApplicationServiceTransactionWorkerStore(
             table="application_services_state",
             keyvalues={"as_id": service.id},
             values={f"{stream_type}_stream_id": pos},
-            # no need to lock when emulating upsert: as_id is a unique key
-            lock=False,
             desc="set_appservice_stream_type_pos",
         )
 

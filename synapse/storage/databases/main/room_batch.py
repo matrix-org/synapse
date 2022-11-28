@@ -44,6 +44,4 @@ class RoomBatchStore(SQLBaseStore):
             table="event_to_state_groups",
             keyvalues={"event_id": event_id},
             values={"state_group": state_group_id, "event_id": event_id},
-            # Unique constraint on event_id so we don't have to lock
-            lock=False,
         )
