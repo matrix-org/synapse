@@ -495,8 +495,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         )
         args.extend([user_id, user_id])
 
-        room_to_count: Dict[str, int] = defaultdict(int)
-
         receipts_cte = f"""
             WITH all_receipts AS (
                 SELECT room_id, thread_id, MAX(event_stream_ordering) AS max_receipt_stream_ordering
@@ -557,6 +555,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         txn.execute(sql, args)
 
         seen_thread_ids = set()
+        room_to_count: Dict[str, int] = defaultdict(int)
 
         for room_id, thread_id, notif_count in txn:
             room_to_count[room_id] += notif_count
