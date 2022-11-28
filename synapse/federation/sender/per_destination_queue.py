@@ -687,7 +687,7 @@ class _TransactionQueueManager:
         # First we calculate the EDUs we want to send, if any.
 
         # There's a maximum number of EDUs that can be sent with a transaction,
-        # generally device udates and to-device messages get priority, but we
+        # generally device updates and to-device messages get priority, but we
         # want to ensure that there's room for some other EDUs as well.
         #
         # This is done by:
