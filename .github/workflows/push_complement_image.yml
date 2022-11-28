@@ -6,7 +6,7 @@ on:
   push:
     branches: ["master"]
   schedule: 
-      - '* 5 * * *'
+      - '0 5 * * *'
 
 # Only run this action once per pull request/branch; restart if a new commit arrives.
 # C.f. https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency
