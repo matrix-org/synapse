@@ -250,6 +250,7 @@ class PerDestinationQueue:
             if room_id in edu:
                 self._rrs_pending_flush = True
                 self.attempt_new_transaction()
+                break
 
     def send_keyed_edu(self, edu: Edu, key: Hashable) -> None:
         self._pending_edus_keyed[(edu.edu_type, key)] = edu
