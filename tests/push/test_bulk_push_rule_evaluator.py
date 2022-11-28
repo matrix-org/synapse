@@ -1,5 +1,4 @@
 from unittest.mock import patch
-import yaml
 
 from synapse.api.room_versions import RoomVersions
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
@@ -7,9 +6,8 @@ from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.types import create_requester
 
-from tests import unittest
 from tests.test_utils import simple_async_mock
-from tests.unittest import override_config, HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 class TestBulkPushRuleEvaluator(HomeserverTestCase):
@@ -78,8 +76,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
     @override_config({"push": {"enabled": False}})
     def test_action_for_event_by_user_disabled_by_config(self) -> None:
-        """Ensure that push rules are not calculated when disabled in the config
-        """
+        """Ensure that push rules are not calculated when disabled in the config"""
         # Create a new user and room.
         alice = self.register_user("alice", "pass")
         token = self.login(alice, "pass")
@@ -112,7 +109,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
-        bulk_evaluator._action_for_event_by_user = simple_async_mock()
+        bulk_evaluator._action_for_event_by_user = simple_async_mock()  # type: ignore[assignment]
         # should not raise
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
         bulk_evaluator._action_for_event_by_user.assert_not_called()
