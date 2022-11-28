@@ -1,7 +1,7 @@
 # This task does not run complement tests, see tests.yaml instead.
 # This task does not build docker images for synapse for use on docker hub, see docker.yaml instead
 
-name: Store complement synapse image in ghcr.io
+name: Store complement-synapse image in ghcr.io
 on:
   push:
     branches: ["master"]
