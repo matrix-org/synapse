@@ -27,6 +27,7 @@ jobs:
           rust:
             - 'rust/**'
             - 'Cargo.toml'
+            - 'Cargo.lock'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
