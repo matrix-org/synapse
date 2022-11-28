@@ -135,3 +135,6 @@ class ExperimentalConfig(Config):
 
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
+
+        # Server-side preview enabled.
+        self.server_side_room_preview_enabled: bool = experimental.get("server_side_room_preview_enabled", False)

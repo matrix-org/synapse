@@ -38,7 +38,7 @@ from tests.federation.transport.test_knocking import (
     KnockingStrippedStateEventHelperMixin,
 )
 
-from tests.server import TimedOutException, FakeChannel
+from tests.server import TimedOutException
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -811,8 +811,9 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
 
     def default_config(self) -> JsonDict:
         config = super().default_config()
+
         config["experimental_features"] = {
-            "server_side_room_preview": True,
+            "server_side_room_preview_enabled": True,
         }
         return config
 
@@ -827,7 +828,9 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
 
         # Create the room we'll check unread counts for.
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
-        print(f"Room id: {self.room_id}")
+        self.room_id_2 = self.helper.create_room_as(self.user_id, tok=self.tok)
+        self.room_id_3 = self.helper.create_room_as(self.user_id, tok=self.tok)
+        self.room_id_4 = self.helper.create_room_as(self.user_id, tok=self.tok)
 
         # Register the second user (used to send events to the room).
         self.user2 = self.register_user("kermit2", "monkey")
@@ -863,7 +866,7 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
-    def _check_preview_event_id(self, expected_preview_event_id: int, auth_token: str) -> None:
+    def _check_preview_event_ids(self, auth_token: str, expected: dict) -> None:
         """Checks the populated preview value against the expected value provided"""
 
         channel = self.make_request(
@@ -874,17 +877,18 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
-        room_entry = (
-            channel.json_body.get("rooms", {}).get("join", {}).get(self.room_id, {})
-        )
+        for room_id, expected_entry in expected.items():
+            room_entry = (
+                channel.json_body.get("rooms", {}).get("join", {}).get(room_id, {})
+            )
 
-        preview_id = room_entry.get("com.beeper.inbox.preview", {}).get("event_id", {})
+            preview_id = room_entry.get("com.beeper.inbox.preview", {}).get("event_id", {})
 
-        self.assertEqual(
-            preview_id,
-            expected_preview_event_id,
-            room_entry,
-        )
+            self.assertEqual(
+                preview_id,
+                expected_entry,
+                room_entry,
+            )
 
         # Store the next batch for the next request.
         self.next_batches[auth_token] = channel.json_body["next_batch"]
@@ -913,38 +917,67 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, expect_code)
         return channel.json_body
 
+    def test_room_previews(self) -> None:
+        """Tests that /sync returns all room previews on first sync."""
+
+        # Multiple events in rooms for first sync.
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+        self.helper.join(room=self.room_id_2, user=self.user2, tok=self.tok2)
+        self.helper.join(room=self.room_id_3, user=self.user2, tok=self.tok2)
+        self.helper.join(room=self.room_id_4, user=self.user2, tok=self.tok2)
+
+        send_body = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        send_body2 = self.helper.send(self.room_id_2, "hello 2", tok=self.tok2)
+        send_body3 = self.helper.send(self.room_id_3, "hello 3", tok=self.tok2)
+        send_body4 = self.helper.send(self.room_id_4, "hello 4", tok=self.tok2)
+
+        # Should have previews for all rooms on first sync.
+        self._check_preview_event_ids(auth_token=self.tok, expected={
+            self.room_id: send_body['event_id'],
+            self.room_id_2: send_body2['event_id'],
+            self.room_id_3: send_body3['event_id'],
+            self.room_id_4: send_body4['event_id']
+        })
+
+        # Subsequent - update preview for only room 2"
+        send_body5 = self.helper.send(self.room_id_2, "Sup!", tok=self.tok2)
+
+        self._check_preview_event_ids(auth_token=self.tok, expected={
+            self.room_id_2: send_body5['event_id']
+        })
+
     def test_room_preview(self) -> None:
         """Tests that /sync returns a room preview with the latest message for room."""
 
-        print("One user hello:")
+        # One user hello.
         #Check that a message we send returns a preview in the room (i.e. have multiple clients?)
         send_body = self.helper.send(self.room_id, "hello", tok=self.tok)
-        self._check_preview_event_id(send_body["event_id"], auth_token=self.tok)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:send_body["event_id"]})
 
-        # Join the new user. Should not show as preview.
+        # Join new user. Should not show updated preview.
         print("Join user no update preview")
         connect_body = self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
-        self._check_preview_event_id(send_body["event_id"], auth_token=self.tok)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:send_body["event_id"]})
 
         print("Second user hello")
         # Check that the new user sending a message updates our preview
         send_2_body = self.helper.send(self.room_id, "hello again!", tok=self.tok2)
-        self._check_preview_event_id(send_2_body["event_id"], self.tok)
+        self._check_preview_event_ids(self.tok, {self.room_id:send_2_body["event_id"]})
 
         print("Encrypted messages 1")
         # Beeper: ensure encrypted messages are treated the same.
         enc_1_body = self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
-        self._check_preview_event_id(enc_1_body["event_id"], auth_token=self.tok)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:enc_1_body["event_id"]})
 
         print("Encrypted messages 2")
         enc_2_body = self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
-        self._check_preview_event_id(enc_2_body["event_id"], auth_token=self.tok)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:enc_2_body["event_id"]})
 
         print("Redact encrypted message 2")
         redact_result = self._redact_event(self.tok2, self.room_id, enc_2_body["event_id"])
-        self._check_preview_event_id(enc_1_body["event_id"], auth_token=self.tok)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:enc_1_body["event_id"]})
 
-        print("someone react to my message")
+        print("user 2 react to user 1 message")
         # Someone else reacted to my message, update preview.
         reaction_1 = self.helper.send_event(
             room_id=self.room_id,
@@ -958,10 +991,10 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok2,
         )
-        self._check_preview_event_id(reaction_1["event_id"], auth_token=self.tok)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:reaction_1["event_id"]})
 
 
-        print("Someone react to another's message")
+        print("User 1 react to User 2 message.")
         # Not a reaction to my message, don't update preview.
         reaction_2 = self.helper.send_event(
             room_id=self.room_id,
@@ -975,8 +1008,16 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok,
         )
-        self._check_preview_event_id(reaction_1["event_id"], auth_token=self.tok)
-        self._check_preview_event_id(reaction_2["event_id"], auth_token=self.tok2)
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:reaction_1["event_id"]})
+        self._check_preview_event_ids(auth_token=self.tok2, expected={self.room_id:reaction_2["event_id"]})
+
+        print("Redact user 2 message with reactions.")
+        # Remove redactions as well as reactions from user 2's preview.
+        redact_result_2 = self._redact_event(self.tok2, self.room_id,
+                                           send_2_body["event_id"])
+
+        self._check_preview_event_ids(auth_token=self.tok, expected={self.room_id:reaction_1["event_id"]})
+        self._check_preview_event_ids(auth_token=self.tok2,expected={self.room_id:enc_1_body["event_id"]})
 
 
 class SyncCacheTestCase(unittest.HomeserverTestCase):

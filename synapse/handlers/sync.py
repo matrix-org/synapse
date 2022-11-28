@@ -45,7 +45,7 @@ from synapse.storage.databases.main.roommember import extract_heroes_from_room_s
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.storage.database import LoggingTransaction
-from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
+from synapse.util.caches.descriptors import cached
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
@@ -1306,13 +1306,15 @@ class SyncHandler:
             sql = """
             SELECT e.event_id, e.origin_server_ts 
                 FROM events AS e \
+                LEFT JOIN redactions as r \
+                ON e.event_id = r.redacts
             WHERE e.stream_ordering <= ? AND e.room_id = ? \
             AND (e.type = "m.room.message" \
             OR e.type = "m.room.encrypted" \
             OR e.type = "m.reaction") \
-            AND e.event_id NOT IN (SELECT redacts FROM redactions) \
+            AND r.redacts IS NULL \
             AND CASE WHEN (e.type = "m.reaction") \
-                THEN (SELECT ? = ee.sender FROM events as ee \
+                THEN (SELECT ? = ee.sender AND ee.event_id NOT IN (SELECT redacts FROM redactions WHERE redacts = ee.event_id) FROM events as ee \
                     WHERE ee.event_id = (SELECT er.relates_to_id FROM event_relations AS er \
                     WHERE er.event_id = e.event_id)) ELSE (true) END
             ORDER BY stream_ordering DESC
@@ -1872,7 +1874,6 @@ class SyncHandler:
             if since_token and not ephemeral_by_room and not account_data_by_room:
                 have_changed = await self._have_rooms_changed(sync_result_builder)
                 log_kv({"rooms_have_changed": have_changed})
-
                 if not have_changed:
                     tags_by_room = await self.store.get_updated_tags(
                         user_id, since_token.account_data_key
@@ -1906,7 +1907,6 @@ class SyncHandler:
         # joined or archived).
         async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
-
             await self._generate_room_entry(
                 sync_result_builder,
                 room_entry,
@@ -1916,7 +1916,6 @@ class SyncHandler:
                 always_include=sync_result_builder.full_state,
             )
             logger.debug("Generated room entry for %s", room_entry.room_id)
-
 
         with start_active_span("sync.generate_room_entries"):
             await concurrently_execute(handle_room_entries, room_entries, 10)
@@ -2462,9 +2461,7 @@ class SyncHandler:
                     room_id, sync_config, batch, state, now_token
                 )
 
-            preview: JsonDict = await self.beeper_preview_for_room_id_and_user_id(
-                room_id=room_id, user_id=user_id, to_key=now_token.room_key
-            )
+
 
             if room_builder.rtype == "joined":
                 unread_notifications: Dict[str, int] = {}
@@ -2478,8 +2475,14 @@ class SyncHandler:
                     unread_thread_notifications={},
                     summary=summary,
                     unread_count=0,
-                    preview=preview,
+                    preview=dict()
                 )
+
+                if self.hs_config.experimental.server_side_room_preview_enabled:
+                    preview: JsonDict = await self.beeper_preview_for_room_id_and_user_id(
+                        room_id=room_id, user_id=user_id, to_key=now_token.room_key
+                    )
+                    room_sync.preview = preview
 
                 if room_sync or always_include:
                     notifs = await self.unread_notifs_for_room_id(room_id, sync_config)
