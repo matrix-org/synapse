@@ -67,7 +67,7 @@ jobs:
         run: scripts-dev/complement.sh --build-only
       - name: Tag and push generated image
         run: |
-          for TAG in "${{ steps.meta.outputs.tags }}"; do
+          for TAG in ${{ join(fromJson(steps.meta.outputs.json).tags, '') }}; do 
             echo "tag and push $TAG"
             docker tag complement-synapse $TAG
             docker push $TAG
