@@ -1,1 +1,0 @@
-Fix a long-standing bug where Synapse would error on the optional 'invite_room_state' field not being provided to [`PUT /_matrix/federation/v2/invite/{roomId}/{eventId}`](https://spec.matrix.org/v1.4/server-server-api/#put_matrixfederationv2inviteroomideventid).

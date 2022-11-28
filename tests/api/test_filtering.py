@@ -46,18 +46,35 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.datastore = hs.get_datastores().main
 
     def test_errors_on_invalid_filters(self):
+        # See USER_FILTER_SCHEMA for the filter schema.
         invalid_filters = [
-            {"boom": {}},
+            # `account_data` must be a dictionary
             {"account_data": "Hello World"},
+            # `event_fields` entries must not contain backslashes
             {"event_fields": [r"\\foo"]},
-            {"room": {"timeline": {"limit": 0}, "state": {"not_bars": ["*"]}}},
+            # `event_format` must be "client" or "federation"
             {"event_format": "other"},
+            # `not_rooms` must contain valid room IDs
             {"room": {"not_rooms": ["#foo:pik-test"]}},
+            # `senders` must contain valid user IDs
             {"presence": {"senders": ["@bar;pik.test.com"]}},
         ]
         for filter in invalid_filters:
             with self.assertRaises(SynapseError):
                 self.filtering.check_valid_filter(filter)
+
+    def test_ignores_unknown_filter_fields(self):
+        # For forward compatibility, we must ignore unknown filter fields.
+        # See USER_FILTER_SCHEMA for the filter schema.
+        filters = [
+            {"org.matrix.msc9999.future_option": True},
+            {"presence": {"org.matrix.msc9999.future_option": True}},
+            {"room": {"org.matrix.msc9999.future_option": True}},
+            {"room": {"timeline": {"org.matrix.msc9999.future_option": True}}},
+        ]
+        for filter in filters:
+            self.filtering.check_valid_filter(filter)
+            # Must not raise.
 
     def test_valid_filters(self):
         valid_filters = [

@@ -778,8 +778,11 @@ def _test_sending_local_online_presence_to_local_user(
             worker process. The test users will still sync with the main process. The purpose of testing
             with a worker is to check whether a Synapse module running on a worker can inform other workers/
             the main process that they should include additional presence when a user next syncs.
+            If this argument is True, `test_case` MUST be an instance of BaseMultiWorkerStreamTestCase.
     """
     if test_with_workers:
+        assert isinstance(test_case, BaseMultiWorkerStreamTestCase)
+
         # Create a worker process to make module_api calls against
         worker_hs = test_case.make_worker_hs(
             "synapse.app.generic_worker", {"worker_name": "presence_writer"}

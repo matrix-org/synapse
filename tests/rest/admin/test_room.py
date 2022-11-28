@@ -1857,6 +1857,46 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
         self.assertIn("chunk", channel.json_body)
         self.assertIn("end", channel.json_body)
 
+    def test_room_messages_backward(self) -> None:
+        """Test room messages can be retrieved by an admin that isn't in the room."""
+        latest_event_id = self.helper.send(
+            self.room_id, body="message 1", tok=self.user_tok
+        )["event_id"]
+
+        # Check that we get the first and second message when querying /messages.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?dir=b" % (self.room_id,),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 6, [event["content"] for event in chunk])
+
+        # in backwards, this is the first event
+        self.assertEqual(chunk[0]["event_id"], latest_event_id)
+
+    def test_room_messages_forward(self) -> None:
+        """Test room messages can be retrieved by an admin that isn't in the room."""
+        latest_event_id = self.helper.send(
+            self.room_id, body="message 1", tok=self.user_tok
+        )["event_id"]
+
+        # Check that we get the first and second message when querying /messages.
+        channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v1/rooms/%s/messages?dir=f" % (self.room_id,),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 6, [event["content"] for event in chunk])
+
+        # in forward, this is the last event
+        self.assertEqual(chunk[5]["event_id"], latest_event_id)
+
     def test_room_messages_purge(self) -> None:
         """Test room messages can be retrieved by an admin that isn't in the room."""
         store = self.hs.get_datastores().main
