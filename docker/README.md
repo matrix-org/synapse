@@ -191,7 +191,7 @@ If you need to build the image from a Synapse checkout, use the following `docke
  build` command from the repo's root:
 
 ```
-docker build -t matrixdotorg/synapse -f docker/Dockerfile .
+DOCKER_BUILDKIT=1 docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 ```
 
 You can choose to build a different docker image by changing the value of the `-f` flag to
@@ -241,4 +241,4 @@ healthcheck:
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
 You can read about jemalloc by reading the Synapse
-[README](https://github.com/matrix-org/synapse/blob/HEAD/README.rst#help-synapse-is-slow-and-eats-all-my-ram-cpu).
+[Admin FAQ](https://matrix-org.github.io/synapse/latest/usage/administration/admin_faq.html#help-synapse-is-slow-and-eats-all-my-ramcpu).

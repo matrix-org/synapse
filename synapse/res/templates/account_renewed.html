@@ -1,1 +1,6 @@
-<html><body>Your account has been successfully renewed and is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}.</body><html>
+{% extends "_base.html" %}
+{% block title %}Your account has been successfully renewed and is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}.{% endblock %}
+
+{% block body %}
+<p>Your account has been successfully renewed and is valid until {{ expiration_ts|format_ts("%d-%m-%Y") }}.</p>
+{% endblock %}

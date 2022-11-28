@@ -99,7 +99,7 @@ modules:
     config: {}
 ```
 ---
-## Server ##
+## Server
 
 Define your homeserver name and other base options.
 
@@ -159,7 +159,7 @@ including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
 reverse proxy, this should be the URL to reach Synapse via the proxy.
 Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
-'listeners' below).
+['listeners'](#listeners) below).
 
 Defaults to `https://<server_name>/`.
 
@@ -179,7 +179,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-See https://matrix-org.github.io/synapse/latest/delegate.html for more
+See [Delegation of incoming federation traffic](../../delegate.md) for more
 information.
 
 Example configuration:
@@ -431,12 +431,19 @@ Sub-options for each listener include:
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see the docs [here](../../workers.md)).
-
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-   behind a reverse-proxy.
+   behind a [reverse-proxy](../../reverse_proxy.md).
+
+* `request_id_header`: The header extracted from each incoming request that is
+   used as the basis for the request ID. The request ID is used in
+   [logs](../administration/request_log.md#request-log-format) and tracing to
+   correlate and match up requests. When unset, Synapse will automatically
+   generate sequential request IDs. This option is useful when Synapse is behind
+   a [reverse-proxy](../../reverse_proxy.md).
+
+   _Added in Synapse 1.68.0._
 
 * `resources`: Only valid for an 'http' listener. A list of resources to host
    on this port. Sub-options for each resource are:
@@ -444,7 +451,7 @@ Sub-options for each listener include:
    * `names`: a list of names of HTTP resources. See below for a list of valid resource names.
 
    * `compress`: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
-     `client`, `consent` and `metrics` resources.
+     `client`, `consent`, `metrics` and `federation` resources.
 
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
@@ -563,7 +570,7 @@ Example configuration:
 delete_stale_devices_after: 1y
 ```
 
-## Homeserver blocking ##
+## Homeserver blocking
 Useful options for Synapse admins.
 
 ---
@@ -594,6 +601,8 @@ This option disables/enables monthly active user blocking. Used in cases where t
 server owner wants to limit to the number of monthly active users. When enabled and a limit is
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
+
+See [Monthly Active Users](../administration/monthly_active_users.md) for details on how to configure MAU.
 
 Example configuration:
 ```yaml
@@ -759,6 +768,10 @@ allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.
 
+Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to `0`, Synapse may
+still take up to 5 minutes to purge redacted events from the database.
+
 Defaults to `7d`. Set to `null` to disable.
 
 Example configuration:
@@ -845,7 +858,11 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default.
+The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk. There are known bugs with the implementation
+which can cause database corruption. Setting retention to delete older history
+is less risky than deleting newer history but in general caution is advised when enabling this
+experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -905,7 +922,7 @@ retention:
       interval: 1d
 ```
 ---
-## TLS ##
+## TLS
 
 Options related to TLS.
 
@@ -995,7 +1012,7 @@ federation_custom_ca_list:
   - myCA3.pem
 ```
 ---
-## Federation ##
+## Federation
 
 Options related to federation.
 
@@ -1054,28 +1071,30 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
-## Caching ##
+## Caching
 
-Options related to caching
+Options related to caching.
 
 ---
 ### `event_cache_size`
 
-The number of events to cache in memory. Not affected by
-`caches.global_factor`. Defaults to 10K.
+The number of events to cache in memory. Defaults to 10K. Like other caches,
+this is affected by `caches.global_factor` (see below).
+
+Note that this option is not part of the `caches` section.
 
 Example configuration:
 ```yaml
 event_cache_size: 15K
 ```
 ---
-### `cache` and associated values
+### `caches` and associated values
 
 A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.
 
-Caching can be configured through the following sub-options:
+`caches` can be configured through the following sub-options:
 
 * `global_factor`: Controls the global cache factor, which is the default cache factor
   for all caches if a specific factor for that cache is not otherwise
@@ -1120,7 +1139,7 @@ Caching can be configured through the following sub-options:
 
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory
-   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu)
+   usage and cache entry availability. You must be using [jemalloc](../administration/admin_faq.md#help-synapse-is-slow-and-eats-all-my-ramcpu)
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
@@ -1137,6 +1156,7 @@ Caching can be configured through the following sub-options:
 
 Example configuration:
 ```yaml
+event_cache_size: 15K
 caches:
   global_factor: 1.0
   per_cache_factors:
@@ -1165,7 +1185,7 @@ file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
 `systemctl reload matrix-synapse`.
 
 ---
-## Database ##
+## Database
 Config options related to database settings.
 
 ---
@@ -1312,20 +1332,21 @@ databases:
       cp_max: 10
 ```
 ---
-## Logging ##
+## Logging
 Config options related to logging.
 
 ---
 ### `log_config`
 
-This option specifies a yaml python logging config file as described [here](https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema).
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
 
 Example configuration:
 ```yaml
 log_config: "CONFDIR/SERVERNAME.log.config"
 ```
 ---
-## Ratelimiting ##
+## Ratelimiting
 Options related to ratelimiting in Synapse.
 
 Each ratelimiting configuration is made of two parameters:
@@ -1382,7 +1403,7 @@ This option specifies several limits for login:
   client is attempting to log into. Defaults to `per_second: 0.17`,
   `burst_count: 3`.
 
-* `failted_attempts` ratelimits login requests based on the account the
+* `failed_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
   attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
 
@@ -1556,7 +1577,7 @@ Example configuration:
 federation_rr_transactions_per_room_per_second: 40
 ```
 ---
-## Media Store ##
+## Media Store
 Config options related to Synapse's media store.
 
 ---
@@ -1746,7 +1767,7 @@ url_preview_ip_range_blacklist:
   - 'ff00::/8'
   - 'fec0::/10'
 ```
-----
+---
 ### `url_preview_ip_range_whitelist`
 
 This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
@@ -1840,7 +1861,7 @@ Example configuration:
    - 'fr;q=0.8'
    - '*;q=0.7'
 ```
-----
+---
 ### `oembed`
 
 oEmbed allows for easier embedding content from a website. It can be
@@ -1857,15 +1878,15 @@ oembed:
     - oembed/my_providers.json
 ```
 ---
-## Captcha ##
+## Captcha
 
 See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 
 ---
 ### `recaptcha_public_key`
 
-This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is
-enabled.
+This homeserver's ReCAPTCHA public key. Must be specified if
+[`enable_registration_captcha`](#enable_registration_captcha) is enabled.
 
 Example configuration:
 ```yaml
@@ -1874,7 +1895,8 @@ recaptcha_public_key: "YOUR_PUBLIC_KEY"
 ---
 ### `recaptcha_private_key`
 
-This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is
+This homeserver's ReCAPTCHA private key. Must be specified if
+[`enable_registration_captcha`](#enable_registration_captcha) is
 enabled.
 
 Example configuration:
@@ -1884,9 +1906,11 @@ recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ---
 ### `enable_registration_captcha`
 
-Set to true to enable ReCaptcha checks when registering, preventing signup
-unless a captcha is answered. Requires a valid ReCaptcha public/private key.
-Defaults to false.
+Set to `true` to require users to complete a CAPTCHA test when registering an account.
+Requires a valid ReCaptcha public/private key.
+Defaults to `false`.
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -1903,7 +1927,7 @@ Example configuration:
 recaptcha_siteverify_api: "https://my.recaptcha.site"
 ```
 ---
-## TURN ##
+## TURN
 Options related to adding a TURN server to Synapse.
 
 ---
@@ -1924,7 +1948,7 @@ Example configuration:
 ```yaml
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
-----
+---
 ### `turn_username` and `turn_password`
 
 The Username and password if the TURN server needs them and does not use a token.
@@ -1962,9 +1986,21 @@ Registration can be rate-limited using the parameters in the [Ratelimiting](#rat
 ---
 ### `enable_registration`
 
-Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
-you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
-without any verification, you must also set `enable_registration_without_verification` to true.
+Enable registration for new users. Defaults to `false`.
+
+It is highly recommended that if you enable registration, you set one or more
+or the following options, to avoid abuse of your server by "bots":
+
+ * [`enable_registration_captcha`](#enable_registration_captcha)
+ * [`registrations_require_3pid`](#registrations_require_3pid)
+ * [`registration_requires_token`](#registration_requires_token)
+
+(In order to enable registration without any verification, you must also set
+[`enable_registration_without_verification`](#enable_registration_without_verification).)
+
+Note that even if this setting is disabled, new accounts can still be created
+via the admin API if
+[`registration_shared_secret`](#registration_shared_secret) is set.
 
 Example configuration:
 ```yaml
@@ -1972,88 +2008,21 @@ enable_registration: true
 ```
 ---
 ### `enable_registration_without_verification`
+
 Enable registration without email or captcha verification. Note: this option is *not* recommended,
-as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
-unless `enable_registration` is also enabled.
+as registration without verification is a known vector for spam and abuse. Defaults to `false`. Has no effect
+unless [`enable_registration`](#enable_registration) is also enabled.
 
 Example configuration:
 ```yaml
 enable_registration_without_verification: true
 ```
 ---
-### `session_lifetime`
-
-Time that a user's session remains valid for, after they log in.
-
-Note that this is not currently compatible with guest logins.
-
-Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
-logged in.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-session_lifetime: 24h
-```
-----
-### `refresh_access_token_lifetime`
-
-Time that an access token remains valid for, if the session is using refresh tokens.
-
-For more information about refresh tokens, please see the [manual](user_authentication/refresh_tokens.md).
-
-Note that this only applies to clients which advertise support for refresh tokens.
-
-Note also that this is calculated at login time and refresh time: changes are not applied to
-existing sessions until they are refreshed.
-
-By default, this is 5 minutes.
-
-Example configuration:
-```yaml
-refreshable_access_token_lifetime: 10m
-```
----
-### `refresh_token_lifetime: 24h`
-
-Time that a refresh token remains valid for (provided that it is not
-exchanged for another one first).
-This option can be used to automatically log-out inactive sessions.
-Please see the manual for more information.
-
-Note also that this is calculated at login time and refresh time:
-changes are not applied to existing sessions until they are refreshed.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-refresh_token_lifetime: 24h
-```
----
-### `nonrefreshable_access_token_lifetime`
-
-Time that an access token remains valid for, if the session is NOT
-using refresh tokens.
-
-Please note that not all clients support refresh tokens, so setting
-this to a short value may be inconvenient for some users who will
-then be logged out frequently.
-
-Note also that this is calculated at login time: changes are not applied
-retrospectively to existing sessions for users that have already logged in.
-
-By default, this is infinite.
-
-Example configuration:
-```yaml
-nonrefreshable_access_token_lifetime: 24h
-```
----
 ### `registrations_require_3pid`
 
-If this is set, the user must provide all of the specified types of 3PID when registering.
+If this is set, users must provide all of the specified types of 3PID when registering an account.
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -2101,9 +2070,11 @@ enable_3pid_lookup: false
 
 Require users to submit a token during registration.
 Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
-Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
-Defaults to false. Set to true to enable.
+Defaults to `false`. Set to `true` to enable.
+
+
+Note that [`enable_registration`](#enable_registration) must also be set to allow account registration.
 
 Example configuration:
 ```yaml
@@ -2112,13 +2083,39 @@ registration_requires_token: true
 ---
 ### `registration_shared_secret`
 
-If set, allows registration of standard or admin accounts by anyone who
-has the shared secret, even if registration is otherwise disabled.
+If set, allows registration of standard or admin accounts by anyone who has the
+shared secret, even if [`enable_registration`](#enable_registration) is not
+set.
+
+This is primarily intended for use with the `register_new_matrix_user` script
+(see [Registering a user](../../setup/installation.md#registering-a-user));
+however, the interface is [documented](../../admin_api/register_api.html).
+
+See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
 Example configuration:
 ```yaml
 registration_shared_secret: <PRIVATE STRING>
 ```
+
+---
+### `registration_shared_secret_path`
+
+An alternative to [`registration_shared_secret`](#registration_shared_secret):
+allows the shared secret to be specified in an external file.
+
+The file should be a plain text file, containing only the shared secret.
+
+If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
+
+Example configuration:
+```yaml
+registration_shared_secret_file: /path/to/secrets/file
+```
+
+_Added in Synapse 1.67.0._
+
 ---
 ### `bcrypt_rounds`
 
@@ -2173,7 +2170,10 @@ their account.
 by the Matrix Identity Service API
 [specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-*Updated in Synapse 1.64.0*: The `email` option is deprecated.
+*Deprecated in Synapse 1.64.0*: The `email` option is deprecated.
+
+*Removed in Synapse 1.66.0*: The `email` option has been removed.
+If present, Synapse will report a configuration error on startup.
 
 Example configuration:
 ```yaml
@@ -2230,6 +2230,9 @@ homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.
 
+As Spaces are just rooms under the hood, Space aliases may also be
+used.
+
 Example configuration:
 ```yaml
 auto_join_rooms:
@@ -2241,7 +2244,7 @@ auto_join_rooms:
 
 Where `auto_join_rooms` are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.
+homeserver registers. This option will not create Spaces.
 
 By default the auto-created rooms are publicly joinable from any federated
 server. Use the `autocreate_auto_join_rooms_federated` and
@@ -2259,7 +2262,7 @@ autocreate_auto_join_rooms: false
 ---
 ### `autocreate_auto_join_rooms_federated`
 
-Whether the rooms listen in `auto_join_rooms` that are auto-created are available
+Whether the rooms listed in `auto_join_rooms` that are auto-created are available
 via federation. Only has an effect if `autocreate_auto_join_rooms` is true.
 
 Note that whether a room is federated cannot be modified after
@@ -2347,7 +2350,80 @@ Example configuration:
 inhibit_user_in_use_error: true
 ```
 ---
-## Metrics ###
+## User session management
+---
+### `session_lifetime`
+
+Time that a user's session remains valid for, after they log in.
+
+Note that this is not currently compatible with guest logins.
+
+Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
+logged in.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+session_lifetime: 24h
+```
+---
+### `refresh_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is using refresh tokens.
+
+For more information about refresh tokens, please see the [manual](user_authentication/refresh_tokens.md).
+
+Note that this only applies to clients which advertise support for refresh tokens.
+
+Note also that this is calculated at login time and refresh time: changes are not applied to
+existing sessions until they are refreshed.
+
+By default, this is 5 minutes.
+
+Example configuration:
+```yaml
+refreshable_access_token_lifetime: 10m
+```
+---
+### `refresh_token_lifetime: 24h`
+
+Time that a refresh token remains valid for (provided that it is not
+exchanged for another one first).
+This option can be used to automatically log-out inactive sessions.
+Please see the manual for more information.
+
+Note also that this is calculated at login time and refresh time:
+changes are not applied to existing sessions until they are refreshed.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+refresh_token_lifetime: 24h
+```
+---
+### `nonrefreshable_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is NOT
+using refresh tokens.
+
+Please note that not all clients support refresh tokens, so setting
+this to a short value may be inconvenient for some users who will
+then be logged out frequently.
+
+Note also that this is calculated at login time: changes are not applied
+retrospectively to existing sessions for users that have already logged in.
+
+By default, this is infinite.
+
+Example configuration:
+```yaml
+nonrefreshable_access_token_lifetime: 24h
+```
+
+---
+## Metrics
 Config options related to metrics.
 
 ---
@@ -2419,11 +2495,11 @@ Example configuration:
 report_stats_endpoint: https://example.com/report-usage-stats/push
 ```
 ---
-## API Configuration ##
+## API Configuration
 Config settings related to the client/server API
 
 ---
-### `room_prejoin_state:`
+### `room_prejoin_state`
 
 Controls for the state that is shared with users who receive an invite
 to a room. By default, the following state event types are shared with users who
@@ -2519,13 +2595,16 @@ Example configuration:
 form_secret: <PRIVATE STRING>
 ```
 ---
-## Signing Keys ##
+## Signing Keys
 Config options relating to signing keys
 
 ---
 ### `signing_key_path`
 
-Path to the signing key to sign messages with.
+Path to the signing key to sign events and federation requests with.
+
+*New in Synapse 1.67*: If this file does not exist, Synapse will create a new signing
+key on startup and store it in this file.
 
 Example configuration:
 ```yaml
@@ -2560,7 +2639,7 @@ Example configuration:
 key_refresh_interval: 2d
 ```
 ---
-### `trusted_key_servers:`
+### `trusted_key_servers`
 
 The trusted servers to download signing keys from.
 
@@ -2576,6 +2655,12 @@ is still supported for backwards-compatibility, but it is deprecated.
 `trusted_key_servers` defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
 `suppress_key_server_warning` to true.
+
+If the use of a trusted key server has to be deactivated, e.g. in a private
+federation or for privacy reasons, this can be realised by setting
+an empty array (`trusted_key_servers: []`). Then Synapse will request the keys
+directly from the server that owns the keys. If Synapse does not get keys directly
+from the server, the events of this server will be rejected.
 
 Options for each entry in the list include:
 * `server_name`: the name of the server. Required.
@@ -2625,18 +2710,15 @@ Example configuration:
 key_server_signing_keys_path: "key_server_signing_keys.key"
 ```
 ---
-## Single sign-on integration ##
+## Single sign-on integration
 
 The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.
 
-You will probably also want to set the following options to false to
+You will probably also want to set the following options to `false` to
 disable the regular login/registration flows:
-   * `enable_registration`
-   * `password_config.enabled`
-
-You will also want to investigate the settings under the "sso" configuration
-section below.
+   * [`enable_registration`](#enable_registration)
+   * [`password_config.enabled`](#password_config)
 
 ---
 ### `saml2_config`
@@ -2877,7 +2959,7 @@ Options for each entry include:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
+        See [OpenID Mapping Providers](../../sso_mapping_providers.md#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
@@ -2886,9 +2968,16 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
-       * subject_claim: name of the claim containing a unique identifier
+       * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
+
+       * `picture_claim`: name of the claim containing an url for the user's profile picture.
+         Defaults to 'picture', which OpenID Connect compliant providers should provide
+         and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+         
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
@@ -2914,6 +3003,15 @@ Options for each entry include:
      which is set to the claims returned by the UserInfo Endpoint and/or
      in the ID Token.
 
+* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications. 
+  Those notifications are expected to be received on `/_synapse/client/oidc/backchannel_logout`.
+  Defaults to `false`.
+
+* `backchannel_logout_ignore_sub`: by default, the OIDC Back-Channel Logout feature checks that the
+  `sub` claim matches the subject claim received during login. This check can be disabled by setting
+  this to `true`. Defaults to `false`.
+
+  You might want to disable this if the `subject_claim` returned by the mapping provider is not `sub`.
 
 It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under
@@ -3248,7 +3346,7 @@ email:
     email_validation: "[%(server_name)s] Validate your email"
 ```
 ---
-## Push ##
+## Push
 Configuration settings related to push notifications
 
 ---
@@ -3281,11 +3379,11 @@ push:
   group_unread_count_by_room: false
 ```
 ---
-## Rooms ##
+## Rooms
 Config options relating to rooms.
 
 ---
-### `encryption_enabled_by_default`
+### `encryption_enabled_by_default_for_room_type`
 
 Controls whether locally-created rooms should be end-to-end encrypted by
 default.
@@ -3318,13 +3416,15 @@ This option has the following sub-options:
    the user directory. If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
+
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
+    
     These indexes are built the first time Synapse starts; admins can
-    manually trigger a rebuild via API following the instructions at
-         https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
-    Set to true to return search results containing all known users, even if that
+    manually trigger a rebuild via the API following the instructions
+    [for running background updates](../administration/admin_api/background_updates.md#run),
+    set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
@@ -3343,7 +3443,7 @@ user_directory:
 For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
-`listeners`, in particular `template_dir` and `version`. # TODO: link `listeners`
+[`listeners`](#listeners), in particular `template_dir` and `version`.
 
 * `template_dir`: gives the location of the templates for the HTML forms.
   This directory should contain one subdirectory per language (eg, `en`, `fr`),
@@ -3355,7 +3455,7 @@ Parts of this section are required if enabling the `consent` resource under
    parameter.
 
 * `server_notice_content`: if enabled, will send a user a "Server Notice"
-   asking them to consent to the privacy policy. The `server_notices` section ##TODO: link
+   asking them to consent to the privacy policy. The [`server_notices` section](#server_notices)
    must also be configured for this to work. Notices will *not* be sent to
    guest users unless `send_server_notice_to_guests` is set to true.
 
@@ -3439,9 +3539,9 @@ Example configuration:
 enable_room_list_search: false
 ```
 ---
-### `alias_creation`
+### `alias_creation_rules`
 
-The `alias_creation` option controls who is allowed to create aliases
+The `alias_creation_rules` option controls who is allowed to create aliases
 on this server.
 
 The format of this option is a list of rules that contain globs that
@@ -3525,7 +3625,7 @@ default_power_level_content_override:
 ```
 
 ---
-## Opentracing ##
+## Opentracing
 Configuration options related to Opentracing support.
 
 ---
@@ -3568,14 +3668,71 @@ opentracing:
         false
 ```
 ---
-## Workers ##
-Configuration options related to workers.
+## Coordinating workers
+Configuration options related to workers which belong in the main config file
+(usually called `homeserver.yaml`).
+A Synapse deployment can scale horizontally by running multiple Synapse processes
+called _workers_. Incoming requests are distributed between workers to handle higher
+loads. Some workers are privileged and can accept requests from other workers.
 
+As a result, the worker configuration is divided into two parts.
+
+1. The first part (in this section of the manual) defines which shardable tasks
+   are delegated to privileged workers. This allows unprivileged workers to make
+   request a privileged worker to act on their behalf.
+1. [The second part](#individual-worker-configuration)
+   controls the behaviour of individual workers in isolation.
+
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
+
+---
+### `worker_replication_secret`
+
+A shared secret used by the replication APIs on the main process to authenticate
+HTTP requests from workers.
+
+The default, this value is omitted (equivalently `null`), which means that 
+traffic between the workers and the main process is not authenticated.
+
+Example configuration:
+```yaml
+worker_replication_secret: "secret_secret"
+```
+---
+### `start_pushers`
+
+Controls sending of push notifications on the main process. Set to `false`
+if using a [pusher worker](../../workers.md#synapseapppusher). Defaults to `true`.
+
+Example configuration:
+```yaml
+start_pushers: false
+```
+---
+### `pusher_instances`
+
+It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
+in which case the work is balanced across them. Use this setting to list the pushers by
+[`worker_name`](#worker_name). Ensure the main process and all pusher workers are
+restarted after changing this option.
+
+If no or only one pusher worker is configured, this setting is not necessary.
+The main process will send out push notifications by default if you do not disable
+it by setting [`start_pushers: false`](#start_pushers).
+
+Example configuration:
+```yaml
+start_pushers: false
+pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+```
 ---
 ### `send_federation`
 
 Controls sending of outbound federation transactions on the main process.
-Set to false if using a federation sender worker. Defaults to true.
+Set to `false` if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
+Defaults to `true`.
 
 Example configuration:
 ```yaml
@@ -3584,8 +3741,9 @@ send_federation: false
 ---
 ### `federation_sender_instances`
 
-It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders.
+It is possible to run multiple
+[federation sender worker](../../workers.md#synapseappfederation_sender), in which
+case the work is balanced across them. Use this setting to list the senders.
 
 This configuration setting must be shared between all federation sender workers, and if
 changed all federation sender workers must be stopped at the same time and then
@@ -3594,14 +3752,19 @@ events may be dropped).
 
 Example configuration:
 ```yaml
+send_federation: false
 federation_sender_instances:
   - federation_sender1
 ```
 ---
 ### `instance_map`
 
-When using workers this should be a map from worker name to the
+When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
+Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs 
+a HTTP replication listener, and that listener should be included in the `instance_map`.
+(The main process also needs an HTTP replication listener, but it should not be 
+listed in the `instance_map`.)
 
 Example configuration:
 ```yaml
@@ -3614,8 +3777,11 @@ instance_map:
 ### `stream_writers`
 
 Experimental: When using workers you can define which workers should
-handle event persistence and typing notifications. Any worker
-specified here must also be in the `instance_map`.
+handle writing to streams such as event persistence and typing notifications.
+Any worker specified here must also be in the [`instance_map`](#instance_map).
+
+See the list of available streams in the
+[worker documentation](../../workers.md#stream-writers).
 
 Example configuration:
 ```yaml
@@ -3626,29 +3792,18 @@ stream_writers:
 ---
 ### `run_background_tasks_on`
 
-The worker that is used to run background tasks (e.g. cleaning up expired
-data). If not provided this defaults to the main process.
+The [worker](../../workers.md#background-tasks) that is used to run
+background tasks (e.g. cleaning up expired data). If not provided this
+defaults to the main process.
 
 Example configuration:
 ```yaml
 run_background_tasks_on: worker1
 ```
 ---
-### `worker_replication_secret`
-
-A shared secret used by the replication APIs to authenticate HTTP requests
-from workers.
-
-By default this is unused and traffic is not authenticated.
-
-Example configuration:
-```yaml
-worker_replication_secret: "secret_secret"
-```
 ### `redis`
 
-Configuration for Redis when using workers. This *must* be enabled when
-using workers (unless using old style direct TCP configuration).
+Configuration for Redis when using workers. This *must* be enabled when using workers.
 This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
@@ -3663,7 +3818,143 @@ redis:
   port: 6379
   password: <secret_password>
 ```
-## Background Updates ##
+---
+## Individual worker configuration
+These options configure an individual worker, in its worker configuration file.
+They should be not be provided when configuring the main process.
+
+Note also the configuration above for
+[coordinating a cluster of workers](#coordinating-workers).
+
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
+
+---
+### `worker_app`
+
+The type of worker. The currently available worker applications are listed
+in [worker documentation](../../workers.md#available-worker-applications).
+
+The most common worker is the
+[`synapse.app.generic_worker`](../../workers.md#synapseappgeneric_worker).
+
+Example configuration:
+```yaml
+worker_app: synapse.app.generic_worker
+```
+---
+### `worker_name`
+
+A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files. We strongly recommend
+giving each worker a unique `worker_name`.
+
+Example configuration:
+```yaml
+worker_name: generic_worker1
+```
+---
+### `worker_replication_host`
+
+The HTTP replication endpoint that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_host: 127.0.0.1
+```
+---
+### `worker_replication_http_port`
+
+The HTTP replication port that it should talk to on the main Synapse process.
+The main Synapse process defines this with a `replication` resource in
+[`listeners` option](#listeners).
+
+Example configuration:
+```yaml
+worker_replication_http_port: 9093
+```
+---
+### `worker_replication_http_tls`
+
+Whether TLS should be used for talking to the HTTP replication port on the main
+Synapse process.
+The main Synapse process defines this with the `tls` option on its [listener](#listeners) that
+has the `replication` resource enabled.
+
+**Please note:** by default, it is not safe to expose replication ports to the
+public Internet, even with TLS enabled.
+See [`worker_replication_secret`](#worker_replication_secret).
+
+Defaults to `false`.
+
+*Added in Synapse 1.72.0.*
+
+Example configuration:
+```yaml
+worker_replication_http_tls: true
+```
+---
+### `worker_listeners`
+
+A worker can handle HTTP requests. To do so, a `worker_listeners` option 
+must be declared, in the same way as the [`listeners` option](#listeners) 
+in the shared config.
+
+Workers declared in [`stream_writers`](#stream_writers) will need to include a
+`replication` listener here, in order to accept internal HTTP requests from
+other workers.
+
+Example configuration:
+```yaml
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+```
+---
+### `worker_daemonize`
+
+Specifies whether the worker should be started as a daemon process.
+If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option 
+must be omitted or set to `false`.
+
+Defaults to `false`.
+
+Example configuration:
+```yaml
+worker_daemonize: true
+```
+---
+### `worker_pid_file`
+
+When running a worker as a daemon, we need a place to store the 
+[PID](https://en.wikipedia.org/wiki/Process_identifier) of the worker.
+This option defines the location of that "pid file".
+
+This option is required if `worker_daemonize` is `true` and ignored 
+otherwise. It has no default.
+
+See also the [`pid_file` option](#pid_file) option for the main Synapse process.
+
+Example configuration:
+```yaml
+worker_pid_file: DATADIR/generic_worker1.pid
+```
+---
+### `worker_log_config`
+
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
+See also the [`log_config` option](#log_config) option for the main Synapse process.
+
+Example configuration:
+```yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+```
+---
+## Background Updates
 Configuration settings related to background updates.
 
 ---

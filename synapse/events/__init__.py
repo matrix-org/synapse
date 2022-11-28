@@ -289,6 +289,10 @@ class _EventInternalMetadata:
         """
         return self._dict.get("historical", False)
 
+    def is_notifiable(self) -> bool:
+        """Whether this event can trigger a push notification"""
+        return not self.is_outlier() or self.is_out_of_band_membership()
+
 
 class EventBase(metaclass=abc.ABCMeta):
     @property
@@ -442,7 +446,7 @@ class EventBase(metaclass=abc.ABCMeta):
 
 
 class FrozenEvent(EventBase):
-    format_version = EventFormatVersions.V1  # All events of this type are V1
+    format_version = EventFormatVersions.ROOM_V1_V2  # All events of this type are V1
 
     def __init__(
         self,
@@ -490,7 +494,7 @@ class FrozenEvent(EventBase):
 
 
 class FrozenEventV2(EventBase):
-    format_version = EventFormatVersions.V2  # All events of this type are V2
+    format_version = EventFormatVersions.ROOM_V3  # All events of this type are V2
 
     def __init__(
         self,
@@ -567,7 +571,7 @@ class FrozenEventV2(EventBase):
 class FrozenEventV3(FrozenEventV2):
     """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
 
-    format_version = EventFormatVersions.V3  # All events of this type are V3
+    format_version = EventFormatVersions.ROOM_V4_PLUS  # All events of this type are V3
 
     @property
     def event_id(self) -> str:
@@ -593,15 +597,14 @@ def _event_type_from_format_version(
         format_version: The event format version
 
     Returns:
-        type: A type that can be initialized as per the initializer of
-        `FrozenEvent`
+        A type that can be initialized as per the initializer of `FrozenEvent`
     """
 
-    if format_version == EventFormatVersions.V1:
+    if format_version == EventFormatVersions.ROOM_V1_V2:
         return FrozenEvent
-    elif format_version == EventFormatVersions.V2:
+    elif format_version == EventFormatVersions.ROOM_V3:
         return FrozenEventV2
-    elif format_version == EventFormatVersions.V3:
+    elif format_version == EventFormatVersions.ROOM_V4_PLUS:
         return FrozenEventV3
     else:
         raise Exception("No event format %r" % (format_version,))

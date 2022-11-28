@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tupl
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
-from synapse.http.server import HttpServer, ServletCallback, is_method_cancellable
+from synapse.http.server import HttpServer, ServletCallback
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
@@ -34,6 +34,7 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -223,10 +224,10 @@ class BaseFederationServlet:
 
         With arguments:
 
-            origin (unicode|None): The authenticated server_name of the calling server,
+            origin (str|None): The authenticated server_name of the calling server,
                 unless REQUIRE_AUTH is set to False and authentication failed.
 
-            content (unicode|None): decoded json body of the request. None if the
+            content (str|None): decoded json body of the request. None if the
                 request was a GET.
 
             query (dict[bytes, list[bytes]]): Query params from the request. url-decoded
@@ -375,7 +376,7 @@ class BaseFederationServlet:
             if code is None:
                 continue
 
-            if is_method_cancellable(code):
+            if is_function_cancellable(code):
                 # The wrapper added by `self._wrap` will inherit the cancellable flag,
                 # but the wrapper itself does not support cancellation yet.
                 # Once resolved, the cancellation tests in

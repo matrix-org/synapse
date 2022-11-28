@@ -389,11 +389,11 @@ class LruCache(Generic[KT, VT]):
             cache_name: The name of this cache, for the prometheus metrics. If unset,
                 no metrics will be reported on this cache.
 
-            cache_type (type):
+            cache_type:
                 type of underlying cache to be used. Typically one of dict
                 or TreeCache.
 
-            size_callback (func(V) -> int | None):
+            size_callback:
 
             metrics_collection_callback:
                 metrics collection callback. This is called early in the metrics
@@ -403,7 +403,7 @@ class LruCache(Generic[KT, VT]):
 
                 Ignored if cache_name is None.
 
-            apply_cache_factor_from_config (bool): If true, `max_size` will be
+            apply_cache_factor_from_config: If true, `max_size` will be
                 multiplied by a cache factor derived from the homeserver config
 
             clock:
@@ -796,7 +796,7 @@ class LruCache(Generic[KT, VT]):
         items from the cache.
 
         Returns:
-            bool: Whether the cache changed size or not.
+            Whether the cache changed size or not.
         """
         if not self.apply_cache_factor_from_config:
             return False
@@ -834,7 +834,24 @@ class AsyncLruCache(Generic[KT, VT]):
     ) -> Optional[VT]:
         return self._lru_cache.get(key, update_metrics=update_metrics)
 
+    async def get_external(
+        self,
+        key: KT,
+        default: Optional[T] = None,
+        update_metrics: bool = True,
+    ) -> Optional[VT]:
+        # This method should fetch from any configured external cache, in this case noop.
+        return None
+
+    def get_local(
+        self, key: KT, default: Optional[T] = None, update_metrics: bool = True
+    ) -> Optional[VT]:
+        return self._lru_cache.get(key, update_metrics=update_metrics)
+
     async def set(self, key: KT, value: VT) -> None:
+        self._lru_cache.set(key, value)
+
+    def set_local(self, key: KT, value: VT) -> None:
         self._lru_cache.set(key, value)
 
     async def invalidate(self, key: KT) -> None:

@@ -29,9 +29,16 @@ from synapse.api.constants import (
     JoinRules,
     LoginType,
 )
-from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    ConsentNotGivenError,
+    InvalidClientTokenError,
+    SynapseError,
+)
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.device import DeviceHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
@@ -180,10 +187,7 @@ class RegistrationHandler:
                 )
             if guest_access_token:
                 user_data = await self.auth.get_user_by_access_token(guest_access_token)
-                if (
-                    not user_data.is_guest
-                    or UserID.from_string(user_data.user_id).localpart != localpart
-                ):
+                if not user_data.is_guest or user_data.user.localpart != localpart:
                     raise AuthError(
                         403,
                         "Cannot register taken user ID without valid guest "
@@ -217,6 +221,7 @@ class RegistrationHandler:
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
+        approved: bool = False,
     ) -> str:
         """Registers a new client on the server.
 
@@ -243,6 +248,8 @@ class RegistrationHandler:
             user_agent_ips: Tuples of user-agents and IP addresses used
                 during the registration process.
             auth_provider_id: The SSO IdP the user used, if any.
+            approved: True if the new user should be considered already
+                approved by an administrator.
         Returns:
             The registered user_id.
         Raises:
@@ -304,6 +311,7 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
+                approved=approved,
             )
 
             profile = await self.store.get_profileinfo(localpart)
@@ -618,7 +626,7 @@ class RegistrationHandler:
         user_id = user.to_string()
         service = self.store.get_app_service_by_token(as_token)
         if not service:
-            raise AuthError(403, "Invalid application service token.")
+            raise InvalidClientTokenError()
         if not service.is_interested_in_user(user_id):
             raise SynapseError(
                 400,
@@ -692,6 +700,7 @@ class RegistrationHandler:
         user_type: Optional[str] = None,
         address: Optional[str] = None,
         shadow_banned: bool = False,
+        approved: bool = False,
     ) -> None:
         """Register user in the datastore.
 
@@ -710,6 +719,7 @@ class RegistrationHandler:
                 api.constants.UserTypes, or None for a normal user.
             address: the IP address used to perform the registration.
             shadow_banned: Whether to shadow-ban the user
+            approved: Whether to mark the user as approved by an administrator
         """
         if self.hs.config.worker.worker_app:
             await self._register_client(
@@ -723,6 +733,7 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
+                approved=approved,
             )
         else:
             await self.store.register_user(
@@ -735,6 +746,7 @@ class RegistrationHandler:
                 admin=admin,
                 user_type=user_type,
                 shadow_banned=shadow_banned,
+                approved=approved,
             )
 
             # Only call the account validity module(s) on the main process, to avoid
@@ -829,6 +841,9 @@ class RegistrationHandler:
 
         refresh_token = None
         refresh_token_id = None
+
+        # This can only run on the main process.
+        assert isinstance(self.device_handler, DeviceHandler)
 
         registered_device_id = await self.device_handler.check_device_registered(
             user_id,
@@ -994,7 +1009,7 @@ class RegistrationHandler:
             assert user_tuple
             token_id = user_tuple.token_id
 
-            await self.pusher_pool.add_pusher(
+            await self.pusher_pool.add_or_update_pusher(
                 user_id=user_id,
                 access_token=token_id,
                 kind="email",
@@ -1002,7 +1017,7 @@ class RegistrationHandler:
                 app_display_name="Email Notifications",
                 device_display_name=threepid["address"],
                 pushkey=threepid["address"],
-                lang=None,  # We don't know a user's language here
+                lang=None,
                 data={},
             )
 

@@ -61,6 +61,10 @@ from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
 from synapse.config.database import DatabaseConnectionConfig
+from synapse.events.presence_router import load_legacy_presence_router
+from synapse.events.spamcheck import load_legacy_spam_checkers
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
+from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import ContextResourceUsage
 from synapse.server import HomeServer
@@ -262,7 +266,12 @@ class FakeSite:
     site_tag = "test"
     access_logger = logging.getLogger("synapse.access.http.fake")
 
-    def __init__(self, resource: IResource, reactor: IReactorTime):
+    def __init__(
+        self,
+        resource: IResource,
+        reactor: IReactorTime,
+        experimental_cors_msc3886: bool = False,
+    ):
         """
 
         Args:
@@ -270,6 +279,7 @@ class FakeSite:
         """
         self._resource = resource
         self.reactor = reactor
+        self.experimental_cors_msc3886 = experimental_cors_msc3886
 
     def getResourceFor(self, request):
         return self._resource
@@ -351,6 +361,12 @@ def make_request(
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(0, SEEK_END)
+
+    # Old version of Twisted (<20.3.0) have issues with parsing x-www-form-urlencoded
+    # bodies if the Content-Length header is missing
+    req.requestHeaders.addRawHeader(
+        b"Content-Length", str(len(content)).encode("ascii")
+    )
 
     if access_token:
         req.requestHeaders.addRawHeader(
@@ -912,5 +928,15 @@ def setup_test_homeserver(
 
     # Make the threadpool and database transactions synchronous for testing.
     _make_test_homeserver_synchronous(hs)
+
+    # Load any configured modules into the homeserver
+    module_api = hs.get_module_api()
+    for module, config in hs.config.modules.loaded_modules:
+        module(config=config, api=module_api)
+
+    load_legacy_spam_checkers(hs)
+    load_legacy_third_party_event_rules(hs)
+    load_legacy_presence_router(hs)
+    load_legacy_password_auth_providers(hs)
 
     return hs

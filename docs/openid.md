@@ -49,6 +49,13 @@ setting in your configuration file.
 See the [configuration manual](usage/configuration/config_documentation.md#oidc_providers) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
+## OIDC Back-Channel Logout
+
+Synapse supports receiving [OpenID Connect Back-Channel Logout](https://openid.net/specs/openid-connect-backchannel-1_0.html) notifications.
+
+This lets the OpenID Connect Provider notify Synapse when a user logs out, so that Synapse can end that user session.
+This feature can be enabled by setting the `backchannel_logout_enabled` property to `true` in the provider configuration, and setting the following URL as destination for Back-Channel Logout notifications in your OpenID Connect Provider: `[synapse public baseurl]/_synapse/client/oidc/backchannel_logout`
+
 ## Sample configs
 
 Here are a few configs for providers that should work with Synapse.
@@ -123,6 +130,9 @@ oidc_providers:
 
 [Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat.
 
+Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
+This can be optionally enabled by setting `backchannel_logout_enabled` to `true` in the Synapse configuration, and by setting the "Backchannel Logout URL" in Keycloak.
+
 Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
 
 1. Click `Clients` in the sidebar and click `Create`
@@ -144,6 +154,8 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Client Protocol | `openid-connect` |
 | Access Type | `confidential` |
 | Valid Redirect URIs | `[synapse public baseurl]/_synapse/client/oidc/callback` |
+| Backchannel Logout URL (optional) | `[synapse public baseurl]/_synapse/client/oidc/backchannel_logout` |
+| Backchannel Logout Session Required (optional) | `On` |
 
 5. Click `Save`
 6. On the Credentials tab, update the fields:
@@ -167,14 +179,18 @@ oidc_providers:
       config:
         localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.name }}"
+    backchannel_logout_enabled: true # Optional
 ```
+
 ### Auth0
 
 [Auth0][auth0] is a hosted SaaS IdP solution.
 
 1. Create a regular web application for Synapse
 2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/client/oidc/callback`
-3. Add a rule to add the `preferred_username` claim.
+3. Add a rule with any name to add the `preferred_username` claim. 
+(See https://auth0.com/docs/customize/rules/create-rules for more information on how to create rules.)
+   
    <details>
     <summary>Code sample</summary>
 
@@ -334,11 +350,12 @@ oidc_providers:
        issuer: "https://accounts.google.com/"
        client_id: "your-client-id" # TO BE FILLED
        client_secret: "your-client-secret" # TO BE FILLED
-       scopes: ["openid", "profile"]
+       scopes: ["openid", "profile", "email"] # email is optional, read below
        user_mapping_provider:
          config:
            localpart_template: "{{ user.given_name|lower }}"
            display_name_template: "{{ user.name }}"
+           email_template: "{{ user.email }}" # needs "email" in scopes above
    ```
 4. Back in the Google console, add this Authorized redirect URI: `[synapse
    public baseurl]/_synapse/client/oidc/callback`.
@@ -421,7 +438,7 @@ Synapse config:
     user_mapping_provider:
       config:
         display_name_template: "{{ user.name }}"
-        email_template: "{{ '{{ user.email }}' }}"
+        email_template: "{{ user.email }}"
 ```
 
 Relevant documents:

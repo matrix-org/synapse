@@ -21,7 +21,6 @@ from unittest.mock import Mock
 import synapse
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
-from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.module_api import ModuleApi
 from synapse.rest.client import account, devices, login, logout, register
 from synapse.types import JsonDict, UserID
@@ -166,16 +165,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # we use a global mock device, so make sure we are starting with a clean slate
         mock_password_provider.reset_mock()
         super().setUp()
-
-    def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver()
-        # Load the modules into the homeserver
-        module_api = hs.get_module_api()
-        for module, config in hs.config.modules.loaded_modules:
-            module(config=config, api=module_api)
-        load_legacy_password_auth_providers(hs)
-
-        return hs
 
     @override_config(legacy_providers_config(LegacyPasswordOnlyAuthProvider))
     def test_password_only_auth_progiver_login_legacy(self):

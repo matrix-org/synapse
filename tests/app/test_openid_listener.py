@@ -61,7 +61,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         }
 
         # Listen with the config
-        self.hs._listen_http(parse_listener_def(config))
+        self.hs._listen_http(parse_listener_def(0, config))
 
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
@@ -79,7 +79,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         self.assertEqual(channel.code, 401)
 
 
-@patch("synapse.app.homeserver.KeyApiV2Resource", new=Mock())
+@patch("synapse.app.homeserver.KeyResource", new=Mock())
 class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
@@ -109,7 +109,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         }
 
         # Listen with the config
-        self.hs._listener_http(self.hs.config, parse_listener_def(config))
+        self.hs._listener_http(self.hs.config, parse_listener_def(0, config))
 
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]

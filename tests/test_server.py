@@ -26,12 +26,12 @@ from synapse.http.server import (
     DirectServeJsonResource,
     JsonResource,
     OptionsResource,
-    cancellable,
 )
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict
 from synapse.util import Clock
+from synapse.util.cancellation import cancellable
 
 from tests import unittest
 from tests.http.server._base import test_disconnect
@@ -104,7 +104,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"500")
+        self.assertEqual(channel.code, 500)
 
     def test_callback_indirect_exception(self) -> None:
         """
@@ -130,7 +130,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"500")
+        self.assertEqual(channel.code, 500)
 
     def test_callback_synapseerror(self) -> None:
         """
@@ -150,7 +150,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"403")
+        self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
@@ -174,7 +174,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foobar"
         )
 
-        self.assertEqual(channel.result["code"], b"400")
+        self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
@@ -203,7 +203,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"HEAD", b"/_matrix/foo"
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertNotIn("body", channel.result)
 
 
@@ -222,13 +222,22 @@ class OptionsResourceTests(unittest.TestCase):
         self.resource = OptionsResource()
         self.resource.putChild(b"res", DummyResource())
 
-    def _make_request(self, method: bytes, path: bytes) -> FakeChannel:
+    def _make_request(
+        self, method: bytes, path: bytes, experimental_cors_msc3886: bool = False
+    ) -> FakeChannel:
         """Create a request from the method/path and return a channel with the response."""
         # Create a site and query for the resource.
         site = SynapseSite(
             "test",
             "site_tag",
-            parse_listener_def({"type": "http", "port": 0}),
+            parse_listener_def(
+                0,
+                {
+                    "type": "http",
+                    "port": 0,
+                    "experimental_cors_msc3886": experimental_cors_msc3886,
+                },
+            ),
             self.resource,
             "1.0",
             max_request_body_size=4096,
@@ -239,55 +248,86 @@ class OptionsResourceTests(unittest.TestCase):
         channel = make_request(self.reactor, site, method, path, shorthand=False)
         return channel
 
+    def _check_cors_standard_headers(self, channel: FakeChannel) -> None:
+        # Ensure the correct CORS headers have been added
+        # as per https://spec.matrix.org/v1.4/client-server-api/#web-browser-clients
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Origin"),
+            [b"*"],
+            "has correct CORS Origin header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Methods"),
+            [b"GET, HEAD, POST, PUT, DELETE, OPTIONS"],  # HEAD isn't in the spec
+            "has correct CORS Methods header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
+            [b"X-Requested-With, Content-Type, Authorization, Date"],
+            "has correct CORS Headers header",
+        )
+
+    def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:
+        # Ensure the correct CORS headers have been added
+        # as per https://github.com/matrix-org/matrix-spec-proposals/blob/hughns/simple-rendezvous-capability/proposals/3886-simple-rendezvous-capability.md#cors
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Origin"),
+            [b"*"],
+            "has correct CORS Origin header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Methods"),
+            [b"GET, HEAD, POST, PUT, DELETE, OPTIONS"],  # HEAD isn't in the spec
+            "has correct CORS Methods header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
+            [
+                b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match"
+            ],
+            "has correct CORS Headers header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
+            [b"ETag, Location, X-Max-Bytes"],
+            "has correct CORS Expose Headers header",
+        )
+
     def test_unknown_options_request(self) -> None:
         """An OPTIONS requests to an unknown URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/foo/")
-        self.assertEqual(channel.result["code"], b"204")
+        self.assertEqual(channel.code, 204)
         self.assertNotIn("body", channel.result)
 
-        # Ensure the correct CORS headers have been added
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Origin"),
-            "has CORS Origin header",
-        )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Methods"),
-            "has CORS Methods header",
-        )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Headers"),
-            "has CORS Headers header",
-        )
+        self._check_cors_standard_headers(channel)
 
     def test_known_options_request(self) -> None:
         """An OPTIONS requests to an known URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/res/")
-        self.assertEqual(channel.result["code"], b"204")
+        self.assertEqual(channel.code, 204)
         self.assertNotIn("body", channel.result)
 
-        # Ensure the correct CORS headers have been added
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Origin"),
-            "has CORS Origin header",
+        self._check_cors_standard_headers(channel)
+
+    def test_known_options_request_msc3886(self) -> None:
+        """An OPTIONS requests to an known URL still returns 204 No Content."""
+        channel = self._make_request(
+            b"OPTIONS", b"/res/", experimental_cors_msc3886=True
         )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Methods"),
-            "has CORS Methods header",
-        )
-        self.assertTrue(
-            channel.headers.hasHeader(b"Access-Control-Allow-Headers"),
-            "has CORS Headers header",
-        )
+        self.assertEqual(channel.code, 204)
+        self.assertNotIn("body", channel.result)
+
+        self._check_cors_msc3886_headers(channel)
 
     def test_unknown_request(self) -> None:
         """A non-OPTIONS request to an unknown URL should 404."""
         channel = self._make_request(b"GET", b"/foo/")
-        self.assertEqual(channel.result["code"], b"404")
+        self.assertEqual(channel.code, 404)
 
     def test_known_request(self) -> None:
         """A non-OPTIONS request to an known URL should query the proper resource."""
         channel = self._make_request(b"GET", b"/res/")
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"/res/")
 
 
@@ -314,7 +354,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         body = channel.result["body"]
         self.assertEqual(body, b"response")
 
@@ -334,7 +374,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"301")
+        self.assertEqual(channel.code, 301)
         headers = channel.result["headers"]
         location_headers = [v for k, v in headers if k == b"Location"]
         self.assertEqual(location_headers, [b"/look/an/eagle"])
@@ -357,7 +397,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"304")
+        self.assertEqual(channel.code, 304)
         headers = channel.result["headers"]
         location_headers = [v for k, v in headers if k == b"Location"]
         self.assertEqual(location_headers, [b"/no/over/there"])
@@ -378,7 +418,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"HEAD", b"/path"
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertNotIn("body", channel.result)
 
 

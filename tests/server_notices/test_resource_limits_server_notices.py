@@ -11,16 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from typing import Tuple
 from unittest.mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
+from synapse.server import HomeServer
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -52,7 +56,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         return config
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.server_notices_sender = self.hs.get_server_notices_sender()
 
         # relying on [1] is far from ideal, but the only case where
@@ -251,7 +255,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         c["admin_contact"] = "mailto:user@test.com"
         return c
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = self.hs.get_datastores().main
         self.server_notices_sender = self.hs.get_server_notices_sender()
         self.server_notices_manager = self.hs.get_server_notices_manager()
@@ -347,14 +351,15 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         self.assertTrue(notice_in_room, "No server notice in room")
 
-    def _trigger_notice_and_join(self):
+    def _trigger_notice_and_join(self) -> Tuple[str, str, str]:
         """Creates enough active users to hit the MAU limit and trigger a system notice
         about it, then joins the system notices room with one of the users created.
 
         Returns:
-            user_id (str): The ID of the user that joined the room.
-            tok (str): The access token of the user that joined the room.
-            room_id (str): The ID of the room that's been joined.
+            A tuple of:
+                user_id: The ID of the user that joined the room.
+                tok: The access token of the user that joined the room.
+                room_id: The ID of the room that's been joined.
         """
         user_id = None
         tok = None

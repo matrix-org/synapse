@@ -52,6 +52,7 @@ from twisted.internet.interfaces import (
 )
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.util.cancellation import cancellable
 from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
@@ -142,8 +143,8 @@ class Requester:
         Requester.
 
         Args:
-            store (DataStore): Used to convert AS ID to AS object
-            input (dict): A dict produced by `serialize`
+            store: Used to convert AS ID to AS object
+            input: A dict produced by `serialize`
 
         Returns:
             Requester
@@ -699,7 +700,11 @@ class StreamToken:
     START: ClassVar["StreamToken"]
 
     @classmethod
+    @cancellable
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
+        """
+        Creates a RoomStreamToken from its textual representation.
+        """
         try:
             keys = string.split(cls._SEPARATOR)
             while len(keys) < len(attr.fields(cls)):
@@ -830,6 +835,7 @@ class ReadReceipt:
     receipt_type: str
     user_id: str
     event_ids: List[str]
+    thread_id: Optional[str]
     data: JsonDict
 
 
