@@ -63,7 +63,7 @@ jobs:
             type=raw,value=develop,enable=${{ github.event_name == 'schedule' || inputs.branch == 'develop' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' || inputs.branch == 'master' }}
             type=sha,format=long
-      - name: Build complement image
+      - name: Run scripts-dev/complement.sh to generate complement-synapse:latest image.
         run: scripts-dev/complement.sh --build-only
       - name: Tag and push generated image
         run: |
