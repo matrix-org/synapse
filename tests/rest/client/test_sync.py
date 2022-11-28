@@ -953,7 +953,7 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
     def test_room_preview(self) -> None:
         """Tests that /sync returns a room preview with the latest message for room."""
 
-        # One user hello.
+        # One user says hello.
         # Check that a message we send returns a preview in the room (i.e. have multiple clients?)
         send_body = self.helper.send(self.room_id, "hello", tok=self.tok)
         self._check_preview_event_ids(
@@ -961,18 +961,17 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
         )
 
         # Join new user. Should not show updated preview.
-        print("Join user no update preview")
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
         self._check_preview_event_ids(
             auth_token=self.tok, expected={self.room_id: send_body["event_id"]}
         )
 
-        print("Second user hello")
+        # Second user says hello
         # Check that the new user sending a message updates our preview
         send_2_body = self.helper.send(self.room_id, "hello again!", tok=self.tok2)
         self._check_preview_event_ids(self.tok, {self.room_id: send_2_body["event_id"]})
 
-        print("Encrypted messages 1")
+        # Encrypted messages 1
         # Beeper: ensure encrypted messages are treated the same.
         enc_1_body = self.helper.send_event(
             self.room_id, EventTypes.Encrypted, {}, tok=self.tok2
@@ -981,7 +980,7 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             auth_token=self.tok, expected={self.room_id: enc_1_body["event_id"]}
         )
 
-        print("Encrypted messages 2")
+        # Encrypted messages 2
         enc_2_body = self.helper.send_event(
             self.room_id, EventTypes.Encrypted, {}, tok=self.tok2
         )
@@ -989,13 +988,13 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             auth_token=self.tok, expected={self.room_id: enc_2_body["event_id"]}
         )
 
-        print("Redact encrypted message 2")
+        # Redact encrypted message 2
         self._redact_event(self.tok2, self.room_id, enc_2_body["event_id"])
         self._check_preview_event_ids(
             auth_token=self.tok, expected={self.room_id: enc_1_body["event_id"]}
         )
 
-        print("user 2 react to user 1 message")
+        # User 2 react to user 1 message
         # Someone else reacted to my message, update preview.
         reaction_1 = self.helper.send_event(
             room_id=self.room_id,
@@ -1013,7 +1012,7 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             auth_token=self.tok, expected={self.room_id: reaction_1["event_id"]}
         )
 
-        print("User 1 react to User 2 message.")
+        # User 1 react to User 2 message.
         # Not a reaction to my message, don't update preview.
         reaction_2 = self.helper.send_event(
             room_id=self.room_id,
@@ -1034,7 +1033,7 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
             auth_token=self.tok2, expected={self.room_id: reaction_2["event_id"]}
         )
 
-        print("Redact user 2 message with reactions.")
+        # Redact user 2 message with reactions.
         # Remove redactions as well as reactions from user 2's preview.
         self._redact_event(self.tok2, self.room_id, send_2_body["event_id"])
 
