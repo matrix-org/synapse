@@ -128,3 +128,6 @@ class ExperimentalConfig(Config):
 
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
+
+        # MSC1767 and friends: Extensible Events
+        self.msc1767_enabled: bool = experimental.get("msc1767_enabled", False)

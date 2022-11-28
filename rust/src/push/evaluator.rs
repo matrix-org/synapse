@@ -29,6 +29,10 @@ use super::{
 lazy_static! {
     /// Used to parse the `is` clause in the room member count condition.
     static ref INEQUALITY_EXPR: Regex = Regex::new(r"^([=<>]*)([0-9]+)$").expect("valid regex");
+
+    /// Used to determine which MSC3931 room version feature flags are actually known to
+    /// the push evaluator.
+    static ref KNOWN_RVER_FLAGS: Vec<String> = vec![];
 }
 
 /// Allows running a set of push rules against a particular event.
@@ -57,6 +61,13 @@ pub struct PushRuleEvaluator {
 
     /// If msc3664, push rules for related events, is enabled.
     related_event_match_enabled: bool,
+
+    /// If MSC3931 is applicable, the feature flags for the room version.
+    room_version_feature_flags: Vec<String>,
+
+    /// If MSC3931 (room version feature flags) is enabled. Usually controlled by the same
+    /// flag as MSC1767 (extensible events core).
+    msc3931_enabled: bool,
 }
 
 #[pymethods]
@@ -70,6 +81,8 @@ impl PushRuleEvaluator {
         notification_power_levels: BTreeMap<String, i64>,
         related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
         related_event_match_enabled: bool,
+        room_version_feature_flags: Vec<String>,
+        msc3931_enabled: bool,
     ) -> Result<Self, Error> {
         let body = flattened_keys
             .get("content.body")
@@ -84,6 +97,8 @@ impl PushRuleEvaluator {
             sender_power_level,
             related_events_flattened,
             related_event_match_enabled,
+            room_version_feature_flags,
+            msc3931_enabled,
         })
     }
 
@@ -202,6 +217,15 @@ impl PushRuleEvaluator {
                     *sender_power_level >= required_level
                 } else {
                     false
+                }
+            }
+            KnownCondition::RoomVersionSupports { feature } => {
+                if !self.msc3931_enabled {
+                    false
+                } else {
+                    let flag = feature.to_string();
+                    KNOWN_RVER_FLAGS.contains(&flag)
+                        && self.room_version_feature_flags.contains(&flag)
                 }
             }
         };
@@ -361,6 +385,8 @@ fn push_rule_evaluator() {
         Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
+        true,
+        vec![],
         true,
     )
     .unwrap();

@@ -41,6 +41,8 @@ class PushRuleEvaluator:
         notification_power_levels: Mapping[str, int],
         related_events_flattened: Mapping[str, Mapping[str, str]],
         related_event_match_enabled: bool,
+        room_version_feature_flags: list[str],
+        msc3931_enabled: bool,
     ): ...
     def run(
         self,

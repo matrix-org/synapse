@@ -338,6 +338,10 @@ class BulkPushRuleEvaluator:
             for user_id, level in notification_levels.items():
                 notification_levels[user_id] = int(level)
 
+        room_version_features = event.room_version.msc3931_push_features
+        if not room_version_features:
+            room_version_features = []
+
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
             room_member_count,
@@ -345,6 +349,8 @@ class BulkPushRuleEvaluator:
             notification_levels,
             related_events,
             self._related_event_match_enabled,
+            room_version_features,
+            self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
         )
 
         users = rules_by_user.keys()
