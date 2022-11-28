@@ -27,6 +27,8 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
 
     room_to_count = await store.get_unread_counts_by_room_for_user(user_id)
     for room_id, notify_count in room_to_count.items():
+        # room_to_count may include rooms which the user has left,
+        # ignore those.
         if room_id not in joins:
             continue
 
