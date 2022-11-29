@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import attr
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -131,3 +132,7 @@ class ExperimentalConfig(Config):
 
         # MSC1767 and friends: Extensible Events
         self.msc1767_enabled: bool = experimental.get("msc1767_enabled", False)
+        if self.msc1767_enabled:
+            # Enable room version (and thus applicable push rules from MSC3931/3932)
+            version_id = RoomVersions.MSC1767v10.identifier
+            KNOWN_ROOM_VERSIONS[version_id] = RoomVersions.MSC1767v10
