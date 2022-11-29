@@ -29,6 +29,13 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 class FederationSenderReceiptsTestCases(HomeserverTestCase):
+    """
+    Test federation sending to update receipts.
+
+    By default for test cases federation sending is disabled. This Test class has it
+    re-enabled for the main process.
+    """
+
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
@@ -40,10 +47,11 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         return hs
 
-    # Default test case disables federation sending. Setting
-    # 'federation_sender_instances' to None turns it back on for the main
-    # process
-    @override_config({"federation_sender_instances": None})
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["federation_sender_instances"] = None
+        return config
+
     def test_send_receipts(self):
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
@@ -86,10 +94,6 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             ],
         )
 
-    # Default test case disables federation sending. Setting
-    # 'federation_sender_instances' to None turns it back on for the main
-    # process
-    @override_config({"federation_sender_instances": None})
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""
@@ -176,6 +180,13 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
 
 class FederationSenderDevicesTestCases(HomeserverTestCase):
+    """
+    Test federation sending to update devices.
+
+    By default for test cases federation sending is disabled. This Test class has it
+    re-enabled for the main process.
+    """
+
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -190,9 +201,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def default_config(self):
         c = super().default_config()
-        # Default test case disables federation sending. Setting
-        # 'federation_sender_instances' to None turns it back on for the main
-        # process
+        # Enable federation sending on the main process.
         c["federation_sender_instances"] = None
         return c
 
