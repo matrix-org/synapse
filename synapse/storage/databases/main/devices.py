@@ -1559,6 +1559,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             # that ensures we keep at most 50 devices.
             sql = """
                 SELECT last_seen FROM devices
+                LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
                 WHERE
                     user_id = ?
                     AND NOT hidden
