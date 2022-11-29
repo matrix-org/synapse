@@ -185,9 +185,8 @@ class TransportLayerClient:
         Raises:
             Various exceptions when the request fails
         """
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX,
-            "/org.matrix.msc3030/timestamp_to_event/%s",
+        path = _create_v1_path(
+            "/timestamp_to_event/%s",
             room_id,
         )
 

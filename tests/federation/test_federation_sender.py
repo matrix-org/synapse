@@ -94,6 +94,82 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             ],
         )
 
+    def test_send_receipts_thread(self):
+        mock_send_transaction = (
+            self.hs.get_federation_transport_client().send_transaction
+        )
+        mock_send_transaction.return_value = make_awaitable({})
+
+        # Create receipts for:
+        #
+        # * The same room / user on multiple threads.
+        # * A different user in the same room.
+        sender = self.hs.get_federation_sender()
+        for user, thread in (
+            ("alice", None),
+            ("alice", "thread"),
+            ("bob", None),
+            ("bob", "diff-thread"),
+        ):
+            receipt = ReadReceipt(
+                "room_id",
+                "m.read",
+                user,
+                ["event_id"],
+                thread_id=thread,
+                data={"ts": 1234},
+            )
+            self.successResultOf(
+                defer.ensureDeferred(sender.send_read_receipt(receipt))
+            )
+
+        self.pump()
+
+        # expect a call to send_transaction with two EDUs to separate threads.
+        mock_send_transaction.assert_called_once()
+        json_cb = mock_send_transaction.call_args[0][1]
+        data = json_cb()
+        # Note that the ordering of the EDUs doesn't matter.
+        self.assertCountEqual(
+            data["edus"],
+            [
+                {
+                    "edu_type": EduTypes.RECEIPT,
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "alice": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234, "thread_id": "thread"},
+                                },
+                                "bob": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234, "thread_id": "diff-thread"},
+                                },
+                            }
+                        }
+                    },
+                },
+                {
+                    "edu_type": EduTypes.RECEIPT,
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "alice": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
+                                },
+                                "bob": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
+                                },
+                            }
+                        }
+                    },
+                },
+            ],
+        )
+
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""

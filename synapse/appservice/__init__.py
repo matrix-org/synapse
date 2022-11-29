@@ -32,9 +32,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type for the `device_one_time_key_counts` field in an appservice transaction
+# Type for the `device_one_time_keys_count` field in an appservice transaction
 #   user ID -> {device ID -> {algorithm -> count}}
-TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+TransactionOneTimeKeysCount = Dict[str, Dict[str, Dict[str, int]]]
 
 # Type for the `device_unused_fallback_key_types` field in an appservice transaction
 #   user ID -> {device ID -> [algorithm]}
@@ -376,7 +376,7 @@ class AppServiceTransaction:
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
-        one_time_key_counts: TransactionOneTimeKeyCounts,
+        one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
     ):
@@ -385,7 +385,7 @@ class AppServiceTransaction:
         self.events = events
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
-        self.one_time_key_counts = one_time_key_counts
+        self.one_time_keys_count = one_time_keys_count
         self.unused_fallback_keys = unused_fallback_keys
         self.device_list_summary = device_list_summary
 
@@ -402,7 +402,7 @@ class AppServiceTransaction:
             events=self.events,
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
-            one_time_key_counts=self.one_time_key_counts,
+            one_time_keys_count=self.one_time_keys_count,
             unused_fallback_keys=self.unused_fallback_keys,
             device_list_summary=self.device_list_summary,
             txn_id=self.id,

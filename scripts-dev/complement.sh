@@ -162,9 +162,9 @@ else
   # We only test faster room joins on monoliths, because they are purposefully
   # being developed without worker support to start with.
   #
-  # The tests for importing historical messages (MSC2716) and jump to date (MSC3030)
-  # also only pass with monoliths, currently.
-  test_tags="$test_tags,faster_joins,msc2716,msc3030"
+  # The tests for importing historical messages (MSC2716) also only pass with monoliths,
+  # currently.
+  test_tags="$test_tags,faster_joins,msc2716"
 fi
 
 
