@@ -157,7 +157,6 @@ class ArchivedSyncResult:
     timeline: TimelineBatch
     state: StateMap[EventBase]
     account_data: List[JsonDict]
-    preview: Optional[JsonDict]
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used

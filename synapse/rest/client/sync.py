@@ -500,7 +500,6 @@ class SyncRestServlet(RestServlet):
         )
 
         account_data = room.account_data
-
         result: JsonDict = {
             "timeline": {
                 "events": serialized_timeline,
@@ -509,11 +508,12 @@ class SyncRestServlet(RestServlet):
             },
             "state": {"events": serialized_state},
             "account_data": {"events": account_data},
-            "com.beeper.inbox.preview": room.preview,
         }
+
 
         if joined:
             assert isinstance(room, JoinedSyncResult)
+            result["com.beeper.inbox.preview"] = room.preview
             ephemeral_events = room.ephemeral
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
