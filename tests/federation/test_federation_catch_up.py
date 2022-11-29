@@ -11,7 +11,7 @@ from synapse.types import JsonDict
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable
-from tests.unittest import FederatingHomeserverTestCase, override_config
+from tests.unittest import FederatingHomeserverTestCase
 
 
 class FederationCatchUpTestCases(FederatingHomeserverTestCase):
