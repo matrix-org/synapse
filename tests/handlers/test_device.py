@@ -115,7 +115,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
                 "device_id": "xyz",
                 "display_name": "display 0",
                 "last_seen_ip": None,
-                "last_seen_ts": 1000000,
+                "last_seen_ts": None,
             },
             device_map["xyz"],
         )
