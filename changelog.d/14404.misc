@@ -1,1 +1,0 @@
-Faster joins: filter out non local events when a room doesn't have its full state.

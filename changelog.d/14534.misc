@@ -1,1 +1,0 @@
-Improve DB performance by reducing amount of data that gets read in `device_lists_changes_in_room`.
