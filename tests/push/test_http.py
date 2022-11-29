@@ -41,10 +41,6 @@ class HTTPPusherTests(HomeserverTestCase):
     user_id = True
     hijack_auth = False
 
-    def default_config(self) -> Dict[str, Any]:
-        config = super().default_config()
-        return config
-
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.push_attempts: List[Tuple[Deferred, str, dict]] = []
 

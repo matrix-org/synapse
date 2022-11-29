@@ -27,18 +27,17 @@ logger = logging.getLogger(__name__)
 
 
 class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
+    """
+    Various tests for federation sending on workers.
+
+    Federation sending is disabled by default, it will be enabled in each test by
+    updating 'federation_sender_instances'.
+    """
     servlets = [
         login.register_servlets,
         register_servlets_for_client_rest_resource,
         room.register_servlets,
     ]
-
-    def default_config(self):
-        conf = super().default_config()
-        # Setting this to an empty list disables federation sending. This is actually
-        # declared in super(), so this entire override is probably redundant.
-        conf["federation_sender_instances"] = []
-        return conf
 
     def test_send_event_single_sender(self):
         """Test that using a single federation sender worker correctly sends a
