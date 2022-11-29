@@ -1426,14 +1426,14 @@ class SyncHandler:
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
-        one_time_key_counts: JsonDict = {}
+        one_time_keys_count: JsonDict = {}
         unused_fallback_key_types: List[str] = []
         if device_id:
             # TODO: We should have a way to let clients differentiate between the states of:
             #   * no change in OTK count since the provided since token
             #   * the server has zero OTKs left for this device
             #  Spec issue: https://github.com/matrix-org/matrix-doc/issues/3298
-            one_time_key_counts = await self.store.count_e2e_one_time_keys(
+            one_time_keys_count = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
             unused_fallback_key_types = (
@@ -1463,7 +1463,7 @@ class SyncHandler:
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
             device_lists=device_lists,
-            device_one_time_keys_count=one_time_key_counts,
+            device_one_time_keys_count=one_time_keys_count,
             device_unused_fallback_key_types=unused_fallback_key_types,
             next_batch=sync_result_builder.now_token,
         )

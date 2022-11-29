@@ -912,7 +912,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
-                thumbnail_url = content.get("info", {}).get("thumbnail_url")
+                info = content.get("info")
+                if isinstance(info, dict):
+                    thumbnail_url = info.get("thumbnail_url")
+                else:
+                    thumbnail_url = None
 
                 for url in (content_url, thumbnail_url):
                     if not url:
@@ -1843,9 +1847,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 "creator": room_creator,
                 "has_auth_chain_index": has_auth_chain_index,
             },
-            # rooms has a unique constraint on room_id, so no need to lock when doing an
-            # emulated upsert.
-            lock=False,
         )
 
     async def store_partial_state_room(
@@ -1966,9 +1967,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 "creator": "",
                 "has_auth_chain_index": has_auth_chain_index,
             },
-            # rooms has a unique constraint on room_id, so no need to lock when doing an
-            # emulated upsert.
-            lock=False,
         )
 
     async def set_room_is_public(self, room_id: str, is_public: bool) -> None:

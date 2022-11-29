@@ -191,6 +191,7 @@ information.
     ^/_matrix/federation/(v1|v2)/send_leave/
     ^/_matrix/federation/(v1|v2)/invite/
     ^/_matrix/federation/v1/event_auth/
+    ^/_matrix/federation/v1/timestamp_to_event/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/key/v2/query
@@ -218,6 +219,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
+    ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
