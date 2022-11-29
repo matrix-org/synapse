@@ -35,7 +35,7 @@ Deprecations and Removals
 Internal Changes
 ----------------
 
-- Prune user's old devices on login if they have too many. ([\#14038](https://github.com/matrix-org/synapse/issues/14038))
+- Prune user's old devices on login if they have too many. ([\#14038](https://github.com/matrix-org/synapse/issues/14038), [\#14580](https://github.com/matrix-org/synapse/issues/14580))
 - Add missing type hints to `HomeServer`. ([\#14055](https://github.com/matrix-org/synapse/issues/14055))
 - Remove old stream ID tracking code. Contributed by Nick @Beeper (@fizzadar). ([\#14376](https://github.com/matrix-org/synapse/issues/14376), [\#14468](https://github.com/matrix-org/synapse/issues/14468))
 - Remove the `worker_main_http_uri` configuration setting. This is now handled via internal replication. ([\#14400](https://github.com/matrix-org/synapse/issues/14400), [\#14476](https://github.com/matrix-org/synapse/issues/14476))
