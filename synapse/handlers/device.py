@@ -456,7 +456,7 @@ class DeviceHandler(DeviceWorkerHandler):
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
     async def _prune_too_many_devices(self, user_id: str) -> None:
-        """Delete any stale devices this user may have."""
+        """Delete any excess old devices this user may have."""
         device_ids = await self.store.check_too_many_devices_for_user(user_id)
         if not device_ids:
             return

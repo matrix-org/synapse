@@ -1541,7 +1541,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         )
 
         # We let users have up to ten devices without pruning.
-        if num_devices < 10:
+        if num_devices <= 10:
             return ()
 
         # We prune everything older than N days.
