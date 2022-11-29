@@ -25,7 +25,7 @@ from synapse.rest.client import login
 from synapse.types import JsonDict, ReadReceipt
 
 from tests.test_utils import make_awaitable
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import HomeserverTestCase
 
 
 class FederationSenderReceiptsTestCases(HomeserverTestCase):
