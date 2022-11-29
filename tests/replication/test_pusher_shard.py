@@ -20,7 +20,6 @@ from synapse.rest import admin
 from synapse.rest.client import login, room
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.unittest import override_config
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +37,6 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         # Register a user who sends a message that we'll get notified about
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
-
-    def default_config(self):
-        conf = super().default_config()
-        return conf
 
     def _create_pusher_and_send_msg(self, localpart):
         # Create a user that will get push notifications
@@ -84,10 +79,6 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         return event_id
 
-    # Pusher functionality is active on the main process by default. Disable that by
-    # explicitly overriding what 'pusher_instances' will be available so
-    # ShardedWorkerHandlingConfig will be filled out correctly.
-    @override_config({"pusher_instances": ["pusher1"]})
     def test_send_push_single_worker(self):
         """Test that registration works when using a pusher worker."""
         http_client_mock = Mock(spec_set=["post_json_get_json"])
@@ -97,7 +88,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         self.make_worker_hs(
             "synapse.app.generic_worker",
-            {"pusher_instances": ["synapse.app.generic_worker"]},
+            {"worker_name": "pusher1", "pusher_instances": ["pusher1"]},
             proxied_blacklisted_http_client=http_client_mock,
         )
 
@@ -118,10 +109,6 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             ],
         )
 
-    # Pusher functionality is active on the main process by default. Disable that by
-    # explicitly overriding what 'pusher_instances' will be available so
-    # ShardedWorkerHandlingConfig will be filled out correctly.
-    @override_config({"pusher_instances": ["pusher1", "pusher2"]})
     def test_send_push_multiple_workers(self):
         """Test that registration works when using sharded pusher workers."""
         http_client_mock1 = Mock(spec_set=["post_json_get_json"])
