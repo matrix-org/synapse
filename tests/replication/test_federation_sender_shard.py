@@ -33,6 +33,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
     Federation sending is disabled by default, it will be enabled in each test by
     updating 'federation_sender_instances'.
     """
+
     servlets = [
         login.register_servlets,
         register_servlets_for_client_rest_resource,
@@ -49,8 +50,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.make_worker_hs(
             "synapse.app.generic_worker",
             {
-                "worker_name": "sender1",
-                "federation_sender_instances": ["sender1"],
+                "worker_name": "federation_sender1",
+                "federation_sender_instances": ["federation_sender1"],
             },
             federation_http_client=mock_client,
         )
@@ -79,8 +80,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.make_worker_hs(
             "synapse.app.generic_worker",
             {
-                "worker_name": "sender1",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender1",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client1,
         )
@@ -90,8 +94,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.make_worker_hs(
             "synapse.app.generic_worker",
             {
-                "worker_name": "sender2",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender2",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client2,
         )
@@ -140,8 +147,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.make_worker_hs(
             "synapse.app.generic_worker",
             {
-                "worker_name": "sender1",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender1",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client1,
         )
@@ -151,8 +161,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.make_worker_hs(
             "synapse.app.generic_worker",
             {
-                "worker_name": "sender2",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender2",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client2,
         )
