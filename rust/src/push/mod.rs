@@ -412,6 +412,7 @@ pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
     msc3664_enabled: bool,
+    msc1767_enabled: bool,
 }
 
 #[pymethods]
@@ -421,11 +422,13 @@ impl FilteredPushRules {
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
         msc3664_enabled: bool,
+        msc1767_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
             enabled_map,
             msc3664_enabled,
+            msc1767_enabled,
         }
     }
 
@@ -447,6 +450,10 @@ impl FilteredPushRules {
                 if !self.msc3664_enabled
                     && rule.rule_id == "global/override/.im.nheko.msc3664.reply"
                 {
+                    return false;
+                }
+
+                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
                     return false;
                 }
 
