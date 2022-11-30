@@ -38,6 +38,10 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             return_value=make_awaitable({"test", "host2"})
         )
 
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
+            hs.get_storage_controllers().state.get_current_hosts_in_room
+        )
+
         return hs
 
     @override_config({"send_federation": True})
