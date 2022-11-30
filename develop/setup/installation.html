@@ -207,7 +207,9 @@ the main configuration file at <code>/etc/matrix-synapse/homeserver.yaml</code>.
 By doing that, you won't be asked if you want to replace your configuration
 file when you upgrade the Debian package to a later version.</p>
 <h5 id="downstream-debian-packages"><a class="header" href="#downstream-debian-packages">Downstream Debian packages</a></h5>
-<p>Andrej Shadura maintains a <code>matrix-synapse</code> package in the Debian repositories.
+<p>Andrej Shadura maintains a
+<a href="https://packages.debian.org/sid/matrix-synapse"><code>matrix-synapse</code></a> package in
+the Debian repositories.
 For <code>bookworm</code> and <code>sid</code>, it can be installed simply with:</p>
 <pre><code class="language-sh">sudo apt install matrix-synapse
 </code></pre>
@@ -217,16 +219,18 @@ for information on how to use backports.</p>
 <p><code>matrix-synapse</code> is no longer maintained for <code>buster</code> and older.</p>
 <h5 id="downstream-ubuntu-packages"><a class="header" href="#downstream-ubuntu-packages">Downstream Ubuntu packages</a></h5>
 <p>We do not recommend using the packages in the default Ubuntu repository
-at this time, as they are old and suffer from known security vulnerabilities.
+at this time, as they are <a href="https://bugs.launchpad.net/ubuntu/+source/matrix-synapse/+bug/1848709">old and suffer from known security vulnerabilities</a>.
 The latest version of Synapse can be installed from <a href="#matrixorg-packages">our repository</a>.</p>
 <h4 id="fedora"><a class="header" href="#fedora">Fedora</a></h4>
-<p>Synapse is in the Fedora repositories as <code>matrix-synapse</code>:</p>
+<p>Synapse is in the Fedora repositories as
+<a href="https://src.fedoraproject.org/rpms/matrix-synapse"><code>matrix-synapse</code></a>:</p>
 <pre><code class="language-sh">sudo dnf install matrix-synapse
 </code></pre>
-<p>Oleg Girko provides Fedora RPMs at
+<p>Additionally, Oleg Girko provides Fedora RPMs at
 <a href="https://obs.infoserver.lv/project/monitor/matrix-synapse">https://obs.infoserver.lv/project/monitor/matrix-synapse</a></p>
 <h4 id="opensuse"><a class="header" href="#opensuse">OpenSUSE</a></h4>
-<p>Synapse is in the OpenSUSE repositories as <code>matrix-synapse</code>:</p>
+<p>Synapse is in the OpenSUSE repositories as
+<a href="https://software.opensuse.org/package/matrix-synapse"><code>matrix-synapse</code></a>:</p>
 <pre><code class="language-sh">sudo zypper install matrix-synapse
 </code></pre>
 <h4 id="suse-linux-enterprise-server"><a class="header" href="#suse-linux-enterprise-server">SUSE Linux Enterprise Server</a></h4>
@@ -247,7 +251,8 @@ installing under virtualenv):</p>
 sudo pip install py-bcrypt
 </code></pre>
 <h4 id="void-linux"><a class="header" href="#void-linux">Void Linux</a></h4>
-<p>Synapse can be found in the void repositories as 'synapse':</p>
+<p>Synapse can be found in the void repositories as
+<a href="https://github.com/void-linux/void-packages/tree/master/srcpkgs/synapse">'synapse'</a>:</p>
 <pre><code class="language-sh">xbps-install -Su
 xbps-install -S synapse
 </code></pre>
