@@ -719,7 +719,9 @@ class SsoHandler:
 
         return registered_user_id
 
-    async def set_avatar(self, user_id: str, picture_https_url: str) -> bool:
+    async def set_avatar(
+        self, user_id: str, picture_https_url: str, delete_previous_avatar: bool = True
+    ) -> bool:
         """Set avatar of the user.
 
         This downloads the image file from the URL provided, stores that in
@@ -741,6 +743,8 @@ class SsoHandler:
             user_id: matrix user ID in the form @localpart:domain as a string.
 
             picture_https_url: HTTPS url for the picture image file.
+
+            delete_previous_avatar: whether to delete the previous avatar
 
         Returns: `True` if the user's avatar has been successfully set to the image at
             `picture_https_url`.
@@ -809,6 +813,10 @@ class SsoHandler:
                 create_requester(uid),
                 str(avatar_mxc_url),
             )
+
+            # delete previous avatar
+            if delete_previous_avatar:
+                await self._media_repo.delete_local_media_ids(media_id)
 
             logger.info("successfully saved the user avatar")
             return True
