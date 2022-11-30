@@ -30,7 +30,6 @@ from typing import (
     Iterable,
     Iterator,
     List,
-    NoReturn,
     Optional,
     Pattern,
     Tuple,
@@ -340,7 +339,8 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
             return callback_return
 
-        return _unrecognised_request_handler(request)
+        # A request with an unknown method (for a known endpoint) was received.
+        raise UnrecognizedRequestError(code=405)
 
     @abc.abstractmethod
     def _send_response(
@@ -481,13 +481,14 @@ class JsonResource(DirectServeJsonResource):
         for path_pattern, methods in self._routes.items():
             m = path_pattern.match(request_path)
             if m:
-                # We found a match!
+                # We found a matching path!
                 path_entry = methods.get(request_method)
-                if path_entry:
-                    return path_entry.callback, path_entry.servlet_classname, m.groupdict()
+                if not path_entry:
+                    raise UnrecognizedRequestError(code=405)
+                return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
-        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, "unrecognised_request_handler", {}
+        # Huh. No one wanted to handle that? Fiiiiiine.
+        raise UnrecognizedRequestError(code=404)
 
     async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
@@ -567,19 +568,6 @@ class StaticResource(File):
     def render_GET(self, request: Request) -> bytes:
         set_clickjacking_protection_headers(request)
         return super().render_GET(request)
-
-
-def _unrecognised_request_handler(request: Request) -> NoReturn:
-    """Request handler for unrecognised requests
-
-    This is a request handler suitable for return from
-    _get_handler_for_request. It actually just raises an
-    UnrecognizedRequestError.
-
-    Args:
-        request: Unused, but passed in to match the signature of ServletCallback.
-    """
-    raise UnrecognizedRequestError(code=404)
 
 
 class UnrecognizedRequestResource(resource.Resource):
