@@ -106,6 +106,7 @@ class BulkPushRuleEvaluator:
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
+        self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
 
@@ -269,6 +270,8 @@ class BulkPushRuleEvaluator:
         for each event, check if the message should increment the unread count, and
         insert the results into the event_push_actions_staging table.
         """
+        if not self.should_calculate_push_rules:
+            return
         # For batched events the power level events may not have been persisted yet,
         # so we pass in the batched events. Thus if the event cannot be found in the
         # database we can check in the batch.

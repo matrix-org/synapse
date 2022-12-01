@@ -26,6 +26,7 @@ class PushConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         push_config = config.get("push") or {}
         self.push_include_content = push_config.get("include_content", True)
+        self.enable_push = push_config.get("enabled", True)
         self.push_group_unread_count_by_room = push_config.get(
             "group_unread_count_by_room", True
         )
