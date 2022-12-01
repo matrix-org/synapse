@@ -15,32 +15,11 @@
 import logging
 from typing import Dict
 
-from twisted.python import failure
 from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET, Request
 
-from synapse.api.errors import UnrecognizedRequestError
-from synapse.http.server import return_json_error
-from synapse.http.site import SynapseRequest
+from synapse.http.server import UnrecognizedRequestResource
 
 logger = logging.getLogger(__name__)
-
-
-class _UnrecognizedRequestResource(Resource):
-    """
-    Similar to twisted.web.resource.NoResource, but returns a JSON 404 with an
-    errcode of M_UNRECOGNIZED.
-    """
-
-    def render(self, request: SynapseRequest) -> int:
-        f = failure.Failure(UnrecognizedRequestError(code=404))
-        return_json_error(f, request, None)
-        # A response has already been sent but Twisted requires either NOT_DONE_YET
-        # or the response bytes as a return value.
-        return NOT_DONE_YET
-
-    def getChild(self, name: str, request: Request) -> Resource:
-        return self
 
 
 def create_resource_tree(
@@ -72,7 +51,7 @@ def create_resource_tree(
         for path_seg in full_path.split(b"/")[1:-1]:
             if path_seg not in last_resource.listNames():
                 # resource doesn't exist, so make a "dummy resource"
-                child_resource: Resource = _UnrecognizedRequestResource()
+                child_resource: Resource = UnrecognizedRequestResource()
                 last_resource.putChild(path_seg, child_resource)
                 res_id = _resource_id(last_resource, path_seg)
                 resource_mappings[res_id] = child_resource
