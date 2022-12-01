@@ -992,7 +992,8 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
     def default_config(self):
         config = super().default_config()
-        config["send_federation"] = True
+        # Enable federation sending on the main process.
+        config["federation_sender_instances"] = None
         return config
 
     def prepare(self, reactor, clock, hs):
