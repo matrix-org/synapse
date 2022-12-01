@@ -1,7 +1,16 @@
-Synapse 1.73.0rc1 (2022-11-29)
+Synapse 1.73.0rc2 (2022-12-01)
 ==============================
 
 Please note that legacy Prometheus metric names have been removed in this release; see [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.73/docs/upgrade.md#legacy-prometheus-metric-names-have-now-been-removed) for more details.
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse 1.73.0rc1 where Synapse's main process would stop responding to HTTP requests when a user with a large number of devices logs in. ([\#14582](https://github.com/matrix-org/synapse/issues/14582))
+
+
+Synapse 1.73.0rc1 (2022-11-29)
+==============================
 
 Features
 --------
