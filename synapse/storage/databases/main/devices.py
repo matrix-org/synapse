@@ -842,12 +842,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 user_ids, from_key
             )
 
-        if not user_ids_to_check:
+        # If an empty set was returned, there's nothing to do.
+        if user_ids_to_check is not None and not user_ids_to_check:
             return set()
 
         def _get_users_whose_devices_changed_txn(txn: LoggingTransaction) -> Set[str]:
-            changes: Set[str] = set()
-
             stream_id_where_clause = "stream_id > ?"
             sql_args = [from_key]
 
@@ -858,19 +857,25 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             sql = f"""
                 SELECT DISTINCT user_id FROM device_lists_stream
                 WHERE {stream_id_where_clause}
-                AND
             """
 
-            # Query device changes with a batch of users at a time
-            # Assertion for mypy's benefit; see also
-            # https://mypy.readthedocs.io/en/stable/common_issues.html#narrowing-and-inner-functions
-            assert user_ids_to_check is not None
-            for chunk in batch_iter(user_ids_to_check, 100):
-                clause, args = make_in_list_sql_clause(
-                    txn.database_engine, "user_id", chunk
-                )
-                txn.execute(sql + clause, sql_args + args)
-                changes.update(user_id for user_id, in txn)
+            # If the stream change cache gave us no information, fetch *all*
+            # users between the stream IDs.
+            if user_ids_to_check is None:
+                txn.execute(sql, sql_args)
+                return {user_id for user_id, in txn}
+
+            # Otherwise, fetch changes for the given users.
+            else:
+                changes: Set[str] = set()
+
+                # Query device changes with a batch of users at a time
+                for chunk in batch_iter(user_ids_to_check, 100):
+                    clause, args = make_in_list_sql_clause(
+                        txn.database_engine, "user_id", chunk
+                    )
+                    txn.execute(sql + " AND " + clause, sql_args + args)
+                    changes.update(user_id for user_id, in txn)
 
             return changes
 
