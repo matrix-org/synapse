@@ -6333,6 +6333,10 @@ ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
 <p>This setting defines options for push notifications.</p>
 <p>This option has a number of sub-options. They are as follows:</p>
 <ul>
+<li><code>enable_push</code>: Enables or disables push notification calculation. Note, disabling this will also
+stop unread counts being calculated for rooms. This mode of operation is intended
+for homeservers which may only have bots or appservice users connected, or are otherwise
+not interested in push/unread counters. This is enabled by default.</li>
 <li><code>include_content</code>: Clients requesting push notifications can either have the body of
 the message sent in the notification poke along with other details
 like the sender, or just the event ID and room ID (<code>event_id_only</code>).
@@ -6352,6 +6356,7 @@ of unread messages.</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">push:
+  enable_push: true
   include_content: false
   group_unread_count_by_room: false
 </code></pre>
