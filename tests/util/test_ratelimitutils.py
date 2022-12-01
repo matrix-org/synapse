@@ -22,7 +22,7 @@ from tests.utils import default_config
 
 
 class FederationRateLimiterTestCase(TestCase):
-    def test_ratelimit(self):
+    def test_ratelimit(self) -> None:
         """A simple test with the default values"""
         reactor, clock = get_clock()
         rc_config = build_rc_config()
@@ -32,7 +32,7 @@ class FederationRateLimiterTestCase(TestCase):
             # shouldn't block
             self.successResultOf(d1)
 
-    def test_concurrent_limit(self):
+    def test_concurrent_limit(self) -> None:
         """Test what happens when we hit the concurrent limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config({"rc_federation": {"concurrent": 2}})
@@ -56,7 +56,7 @@ class FederationRateLimiterTestCase(TestCase):
             cm2.__exit__(None, None, None)
             self.successResultOf(d3)
 
-    def test_sleep_limit(self):
+    def test_sleep_limit(self) -> None:
         """Test what happens when we hit the sleep limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config(
