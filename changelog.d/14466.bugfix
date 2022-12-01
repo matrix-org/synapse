@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.70.0 where a receipt's thread ID was not sent over federation.
