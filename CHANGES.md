@@ -23,7 +23,7 @@ Bugfixes
 - Fix a bug introduced in Synapse 1.70.0 where a receipt's thread ID was not sent over federation. ([\#14466](https://github.com/matrix-org/synapse/issues/14466))
 - Fix a long-standing bug where the [List media admin API](https://matrix-org.github.io/synapse/latest/admin_api/media_admin_api.html#list-all-media-in-a-room) would fail when processing an image with broken thumbnail information. ([\#14537](https://github.com/matrix-org/synapse/issues/14537))
 - Fix a bug introduced in Synapse 1.67.0 where two logging context warnings would be logged on startup. ([\#14574](https://github.com/matrix-org/synapse/issues/14574))
-- In application service transactions that include the experimental `org.matrix.msc3202.device_one_time_key_counts` key, include a duplicate key of `org.matrix.msc3202.device_one_time_keys_count` to match the name proposed by [MSC3202](https://github.com/matrix-org/matrix-spec-proposals/blob/travis/msc/otk-dl-appservice/proposals/3202-encrypted-appservices.md). ([\#14565](https://github.com/matrix-org/synapse/issues/14565))
+- In application service transactions that include the experimental `org.matrix.msc3202.device_one_time_key_counts` key, include a duplicate key of `org.matrix.msc3202.device_one_time_keys_count` to match the name proposed by [MSC3202](https://github.com/matrix-org/matrix-spec-proposals/pull/3202). ([\#14565](https://github.com/matrix-org/synapse/issues/14565))
 - Fix a bug introduced in Synapse 0.9 where Synapse would fail to fetch server keys whose IDs contain a forward slash. ([\#14490](https://github.com/matrix-org/synapse/issues/14490))
 
 
