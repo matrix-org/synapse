@@ -1602,13 +1602,6 @@ class SyncHandler:
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
 
-            for message in messages:
-                # We pop here as we shouldn't be sending the message ID down
-                # `/sync`
-                message_id = message.pop("message_id", None)
-                if message_id:
-                    set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
-
             logger.debug(
                 "Returning %d to-device messages between %d and %d (current token: %d)",
                 len(messages),

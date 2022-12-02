@@ -216,9 +216,6 @@ class DeviceMessageHandler:
         """
         sender_user_id = requester.user.to_string()
 
-        message_id = random_string(16)
-        set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
-
         log_kv({"number_of_to_device_messages": len(messages)})
         set_tag("sender", sender_user_id)
         local_messages = {}
@@ -247,7 +244,6 @@ class DeviceMessageHandler:
                         "content": message_content,
                         "type": message_type,
                         "sender": sender_user_id,
-                        "message_id": message_id,
                     }
                     for device_id, message_content in by_device.items()
                 }
@@ -267,7 +263,11 @@ class DeviceMessageHandler:
 
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
-            log_kv({"destination": destination})
+            # The EDU contains a "message_id" property which is used for
+            # idempotence. Make up a random one.
+            message_id = random_string(16)
+            log_kv({"destination": destination, "message_id": message_id})
+
             remote_edu_contents[destination] = {
                 "messages": messages,
                 "sender": sender_user_id,
