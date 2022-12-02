@@ -599,6 +599,8 @@ class FederationHandler:
             except ValueError:
                 pass
 
+            already_partially_joined = await self.store.is_partial_state_room(room_id)
+
             ret = await self.federation_client.send_join(
                 host_list, event, room_version_obj
             )
@@ -629,7 +631,7 @@ class FederationHandler:
                 state_events=state,
             )
 
-            if ret.partial_state:
+            if ret.partial_state and not already_partially_joined:
                 # Mark the room as having partial state.
                 # The background process is responsible for unmarking this flag,
                 # even if the join fails.
@@ -676,7 +678,7 @@ class FederationHandler:
                 # state for the room.
                 # If the join failed, the background process is responsible for
                 # cleaning up — including unmarking the room as a partial state room.
-                if ret.partial_state:
+                if ret.partial_state and not already_partially_joined:
                     # Kick off the process of asynchronously fetching the state for this
                     # room.
                     run_as_background_process(
