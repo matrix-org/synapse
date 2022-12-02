@@ -1764,14 +1764,14 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         Returns:
             A list of presence states for the given user to receive.
         """
+        updated_users = None
         if from_key:
             # Only return updates since the last sync
             updated_users = self.store.presence_stream_cache.get_all_entities_changed(
                 from_key
             )
-            if not updated_users:
-                updated_users = []
 
+        if updated_users is not None:
             # Get the actual presence update for each change
             users_to_state = await self.get_presence_handler().current_state_for_users(
                 updated_users
