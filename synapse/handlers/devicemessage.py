@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
-from synapse.api.constants import EduTypes, ToDeviceEventTypes
+from synapse.api.constants import EduTypes, EventContentFields, ToDeviceEventTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
@@ -216,11 +216,24 @@ class DeviceMessageHandler:
         """
         sender_user_id = requester.user.to_string()
 
-        log_kv({"number_of_to_device_messages": len(messages)})
-        set_tag("sender", sender_user_id)
+        set_tag(SynapseTags.TO_DEVICE_TYPE, message_type)
+        set_tag(SynapseTags.TO_DEVICE_SENDER, sender_user_id)
         local_messages = {}
         remote_messages: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, by_device in messages.items():
+            # add an opentracing log entry for each message
+            for device_id, message_content in by_device.items():
+                log_kv(
+                    {
+                        "event": "send_to_device_message",
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        EventContentFields.TO_DEVICE_MSGID: message_content.get(
+                            EventContentFields.TO_DEVICE_MSGID
+                        ),
+                    }
+                )
+
             # Ratelimit local cross-user key requests by the sending device.
             if (
                 message_type == ToDeviceEventTypes.RoomKeyRequest
@@ -230,6 +243,7 @@ class DeviceMessageHandler:
                     requester, (sender_user_id, requester.device_id)
                 )
                 if not allowed:
+                    log_kv({"message": f"dropping key requests to {user_id}"})
                     logger.info(
                         "Dropping room_key_request from %s to %s due to rate limit",
                         sender_user_id,
@@ -249,12 +263,6 @@ class DeviceMessageHandler:
                 }
                 if messages_by_device:
                     local_messages[user_id] = messages_by_device
-                    log_kv(
-                        {
-                            "user_id": user_id,
-                            "device_id": list(messages_by_device),
-                        }
-                    )
             else:
                 destination = get_domain_from_id(user_id)
                 remote_messages.setdefault(destination, {})[user_id] = by_device
