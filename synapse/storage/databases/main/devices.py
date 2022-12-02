@@ -58,7 +58,10 @@ from synapse.types import JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.util.caches.stream_change_cache import (
+    AllEntitiesChangedResult,
+    StreamChangeCache,
+)
 from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
@@ -799,7 +802,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     def get_cached_device_list_changes(
         self,
         from_key: int,
-    ) -> Optional[List[str]]:
+    ) -> AllEntitiesChangedResult:
         """Get set of users whose devices have changed since `from_key`, or None
         if that information is not in our cache.
         """
@@ -812,13 +815,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         from_key: int,
         to_key: int,
     ) -> Set[str]:
-        user_ids_to_check = self._device_list_stream_cache.get_all_entities_changed(
-            from_key
-        )
+        result = self._device_list_stream_cache.get_all_entities_changed(from_key)
 
-        if user_ids_to_check is not None:
+        if result.hit:
             return await self.get_users_whose_devices_changed(
-                from_key, user_ids_to_check, to_key
+                from_key, result.entities, to_key
             )
 
         sql = """

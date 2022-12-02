@@ -1528,10 +1528,12 @@ class SyncHandler:
             #
             # If we don't have that info cached then we get all the users that
             # share a room with our user and check if those users have changed.
-            changed_users = self.store.get_cached_device_list_changes(
+            cache_result = self.store.get_cached_device_list_changes(
                 since_token.device_list_key
             )
-            if changed_users is not None:
+            if cache_result.hit:
+                changed_users = cache_result.entities
+
                 result = await self.store.get_rooms_for_users(changed_users)
 
                 for changed_user_id, entries in result.items():
