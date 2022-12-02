@@ -842,7 +842,7 @@ the <code>allowed_lifetime_min</code> and <code>allowed_lifetime_max</code> conf
 which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.</p>
-<p>The message retention policies feature is disabled by default. Please be advised 
+<p>The message retention policies feature is disabled by default. Please be advised
 that enabling this feature carries some risk. There are known bugs with the implementation
 which can cause database corruption. Setting retention to delete older history
 is less risky than deleting newer history but in general caution is advised when enabling this
@@ -2657,7 +2657,7 @@ which is set to the claims returned by the UserInfo Endpoint and/or
 in the ID Token.</p>
 </li>
 <li>
-<p><code>backchannel_logout_enabled</code>: set to <code>true</code> to process OIDC Back-Channel Logout notifications. 
+<p><code>backchannel_logout_enabled</code>: set to <code>true</code> to process OIDC Back-Channel Logout notifications.
 Those notifications are expected to be received on <code>/_synapse/client/oidc/backchannel_logout</code>.
 Defaults to <code>false</code>.</p>
 </li>
@@ -3310,7 +3310,7 @@ loads. Some workers are privileged and can accept requests from other workers.</
 <ol>
 <li>The first part (in this section of the manual) defines which shardable tasks
 are delegated to privileged workers. This allows unprivileged workers to make
-request a privileged worker to act on their behalf.</li>
+requests to a privileged worker to act on their behalf.</li>
 <li><a href="#individual-worker-configuration">The second part</a>
 controls the behaviour of individual workers in isolation.</li>
 </ol>
@@ -3319,13 +3319,14 @@ controls the behaviour of individual workers in isolation.</li>
 <h3 id="worker_replication_secret"><a class="header" href="#worker_replication_secret"><code>worker_replication_secret</code></a></h3>
 <p>A shared secret used by the replication APIs on the main process to authenticate
 HTTP requests from workers.</p>
-<p>The default, this value is omitted (equivalently <code>null</code>), which means that 
+<p>The default, this value is omitted (equivalently <code>null</code>), which means that
 traffic between the workers and the main process is not authenticated.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_replication_secret: &quot;secret_secret&quot;
 </code></pre>
 <hr />
 <h3 id="start_pushers"><a class="header" href="#start_pushers"><code>start_pushers</code></a></h3>
+<p>Unnecessary to set if using <a href="#pusher_instances"><code>pusher_instances</code></a> with <a href="../../workers.html#synapseappgeneric_worker"><code>generic_workers</code></a>.</p>
 <p>Controls sending of push notifications on the main process. Set to <code>false</code>
 if using a <a href="../../workers.html#synapseapppusher">pusher worker</a>. Defaults to <code>true</code>.</p>
 <p>Example configuration:</p>
@@ -3333,21 +3334,24 @@ if using a <a href="../../workers.html#synapseapppusher">pusher worker</a>. Defa
 </code></pre>
 <hr />
 <h3 id="pusher_instances"><a class="header" href="#pusher_instances"><code>pusher_instances</code></a></h3>
-<p>It is possible to run multiple <a href="../../workers.html#synapseapppusher">pusher workers</a>,
-in which case the work is balanced across them. Use this setting to list the pushers by
-<a href="#worker_name"><code>worker_name</code></a>. Ensure the main process and all pusher workers are
-restarted after changing this option.</p>
-<p>If no or only one pusher worker is configured, this setting is not necessary.
-The main process will send out push notifications by default if you do not disable
-it by setting <a href="#start_pushers"><code>start_pushers: false</code></a>.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">start_pushers: false
-pusher_instances:
+<p>It is possible to scale the processes that handle sending push notifications to <a href="https://github.com/matrix-org/sygnal">sygnal</a>
+and email by running a <a href="../../workers.html#synapseappgeneric_worker"><code>generic_worker</code></a> and adding it's <a href="#worker_name"><code>worker_name</code></a> to
+a <code>pusher_instances</code> map. Doing so will remove handling of this function from the main
+process. Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.</p>
+<p>Example configuration for a single worker:</p>
+<pre><code class="language-yaml">pusher_instances:
+  - pusher_worker1
+</code></pre>
+<p>And for multiple workers:</p>
+<pre><code class="language-yaml">pusher_instances:
   - pusher_worker1
   - pusher_worker2
 </code></pre>
 <hr />
 <h3 id="send_federation"><a class="header" href="#send_federation"><code>send_federation</code></a></h3>
+<p>Unnecessary to set if using <a href="#federation_sender_instances"><code>federation_sender_instances</code></a> with <a href="../../workers.html#synapseappgeneric_worker"><code>generic_workers</code></a>.</p>
 <p>Controls sending of outbound federation transactions on the main process.
 Set to <code>false</code> if using a <a href="../../workers.html#synapseappfederation_sender">federation sender worker</a>.
 Defaults to <code>true</code>.</p>
@@ -3356,25 +3360,31 @@ Defaults to <code>true</code>.</p>
 </code></pre>
 <hr />
 <h3 id="federation_sender_instances"><a class="header" href="#federation_sender_instances"><code>federation_sender_instances</code></a></h3>
-<p>It is possible to run multiple
-<a href="../../workers.html#synapseappfederation_sender">federation sender worker</a>, in which
-case the work is balanced across them. Use this setting to list the senders.</p>
-<p>This configuration setting must be shared between all federation sender workers, and if
-changed all federation sender workers must be stopped at the same time and then
-started, to ensure that all instances are running with the same config (otherwise
+<p>It is possible to scale the processes that handle sending outbound federation requests
+by running a <a href="../../workers.html#synapseappgeneric_worker"><code>generic_worker</code></a> and adding it's <a href="#worker_name"><code>worker_name</code></a> to
+a <code>federation_sender_instances</code> map. Doing so will remove handling of this function from
+the main process. Multiple workers can be added to this map, in which case the work is
+balanced across them.</p>
+<p>This configuration setting must be shared between all workers handling federation
+sending, and if changed all federation sender workers must be stopped at the same time
+and then started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">send_federation: false
-federation_sender_instances:
+<p>Example configuration for a single worker:</p>
+<pre><code class="language-yaml">federation_sender_instances:
   - federation_sender1
+</code></pre>
+<p>And for multiple workers:</p>
+<pre><code class="language-yaml">federation_sender_instances:
+  - federation_sender1
+  - federation_sender2
 </code></pre>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
 <p>When using workers this should be a map from <a href="#worker_name"><code>worker_name</code></a> to the
 HTTP replication listener of the worker, if configured.
-Each worker declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> needs 
+Each worker declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> needs
 a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
-(The main process also needs an HTTP replication listener, but it should not be 
+(The main process also needs an HTTP replication listener, but it should not be
 listed in the <code>instance_map</code>.)</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
@@ -3475,8 +3485,8 @@ See <a href="#worker_replication_secret"><code>worker_replication_secret</code><
 </code></pre>
 <hr />
 <h3 id="worker_listeners"><a class="header" href="#worker_listeners"><code>worker_listeners</code></a></h3>
-<p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option 
-must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a> 
+<p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
+must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a>
 in the shared config.</p>
 <p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> will need to include a
 <code>replication</code> listener here, in order to accept internal HTTP requests from
@@ -3491,7 +3501,7 @@ other workers.</p>
 <hr />
 <h3 id="worker_daemonize"><a class="header" href="#worker_daemonize"><code>worker_daemonize</code></a></h3>
 <p>Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by <a href="../../systemd-with-workers/README.html">systemd</a>, this option 
+If Synapse is being managed by <a href="../../systemd-with-workers/README.html">systemd</a>, this option
 must be omitted or set to <code>false</code>.</p>
 <p>Defaults to <code>false</code>.</p>
 <p>Example configuration:</p>
@@ -3499,10 +3509,10 @@ must be omitted or set to <code>false</code>.</p>
 </code></pre>
 <hr />
 <h3 id="worker_pid_file"><a class="header" href="#worker_pid_file"><code>worker_pid_file</code></a></h3>
-<p>When running a worker as a daemon, we need a place to store the 
+<p>When running a worker as a daemon, we need a place to store the
 <a href="https://en.wikipedia.org/wiki/Process_identifier">PID</a> of the worker.
 This option defines the location of that &quot;pid file&quot;.</p>
-<p>This option is required if <code>worker_daemonize</code> is <code>true</code> and ignored 
+<p>This option is required if <code>worker_daemonize</code> is <code>true</code> and ignored
 otherwise. It has no default.</p>
 <p>See also the <a href="#pid_file"><code>pid_file</code> option</a> option for the main Synapse process.</p>
 <p>Example configuration:</p>

@@ -589,6 +589,8 @@ after setting this option in the shared configuration!</p>
 <p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
 worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
+<p>It is likely this option will be deprecated in the future and is not recommended for new
+installations. Instead, <a href="usage/configuration/config_documentation.html#pusher_instances">use <code>synapse.app.generic_worker</code> with the <code>pusher_instances</code></a>.</p>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
 <a href="usage/configuration/config_documentation.html#start_pushers"><code>start_pushers: false</code></a> in the
@@ -620,6 +622,8 @@ REST endpoints itself, but you should set <code>notify_appservices: False</code>
 shared configuration file to stop the main synapse sending appservice notifications.</p>
 <p>Note this worker cannot be load-balanced: only one instance should be active.</p>
 <h3 id="synapseappfederation_sender"><a class="header" href="#synapseappfederation_sender"><code>synapse.app.federation_sender</code></a></h3>
+<p>It is likely this option will be deprecated in the future and not recommended for
+new installations. Instead, <a href="usage/configuration/config_documentation.html#federation_sender_instances">use <code>synapse.app.generic_worker</code> with the <code>federation_sender_instances</code></a>. </p>
 <p>Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
 <a href="usage/configuration/config_documentation.html#send_federation"><code>send_federation: false</code></a>
@@ -711,7 +715,9 @@ equivalent to <code>synapse.app.generic_worker</code>:</p>
 <li><code>synapse.app.client_reader</code></li>
 <li><code>synapse.app.event_creator</code></li>
 <li><code>synapse.app.federation_reader</code></li>
+<li><code>synapse.app.federation_sender</code></li>
 <li><code>synapse.app.frontend_proxy</code></li>
+<li><code>synapse.app.pusher</code></li>
 <li><code>synapse.app.synchrotron</code></li>
 </ul>
 <h2 id="migration-from-old-config"><a class="header" href="#migration-from-old-config">Migration from old config</a></h2>
