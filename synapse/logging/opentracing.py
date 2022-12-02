@@ -295,6 +295,13 @@ class SynapseTags:
     # The message ID of any to_device EDU processed
     TO_DEVICE_EDU_ID = "to_device.edu_id"
 
+    # Details about to-device messages
+    TO_DEVICE_TYPE = "to_device.type"
+    TO_DEVICE_SENDER = "to_device.sender"
+    TO_DEVICE_RECIPIENT = "to_device.recipient"
+    TO_DEVICE_RECIPIENT_DEVICE = "to_device.recipient_device"
+    TO_DEVICE_MSGID = "to_device.msgid"  # client-generated ID
+
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
 
