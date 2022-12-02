@@ -603,7 +603,7 @@ The first step is to create an App using the Mastodon's [Create an application A
 
 Send the following request:
 ```sh
-curl -d "client_name=my_synapse_app&redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback" -X POST https://your.mastodon.instance.url/api/v1/apps'
+curl -d "client_name=my_synapse_app&redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback" -X POST https://your.mastodon.instance.url/api/v1/apps
 ```
 
 You should get the following response, and you should write down:
