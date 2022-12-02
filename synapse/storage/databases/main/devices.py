@@ -1538,7 +1538,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         return rows
 
-    async def check_too_many_devices_for_user(self, user_id: str) -> Collection[str]:
+    async def check_too_many_devices_for_user(self, user_id: str) -> List[str]:
         """Check if the user has a lot of devices, and if so return the set of
         devices we can prune.
 
@@ -1554,7 +1554,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         # We let users have up to ten devices without pruning.
         if num_devices <= 10:
-            return ()
+            return []
 
         # We prune everything older than N days.
         max_last_seen = self._clock.time_msec() - 14 * 24 * 60 * 60 * 1000
@@ -1590,13 +1590,14 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
                 AND NOT hidden
                 AND last_seen < ?
                 AND key_json IS NULL
+            ORDER BY last_seen
         """
 
         def check_too_many_devices_for_user_txn(
             txn: LoggingTransaction,
-        ) -> Collection[str]:
+        ) -> List[str]:
             txn.execute(sql, (user_id, max_last_seen))
-            return {device_id for device_id, in txn}
+            return [device_id for device_id, in txn]
 
         return await self.db_pool.runInteraction(
             "check_too_many_devices_for_user",

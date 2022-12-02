@@ -52,6 +52,7 @@ from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.cancellation import cancellable
+from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -461,7 +462,24 @@ class DeviceHandler(DeviceWorkerHandler):
         if not device_ids:
             return
 
-        await self.delete_devices(user_id, device_ids)
+        # We don't want to block and try and delete tonnes of devices at once,
+        # so we cap the number of devices we delete synchronously.
+        first_batch, remaining_device_ids = device_ids[:10], device_ids[10:]
+        await self.delete_devices(user_id, first_batch)
+
+        if not remaining_device_ids:
+            return
+
+        # Now spawn a background loop that deletes the rest.
+        async def _prune_too_many_devices_loop() -> None:
+            for batch in batch_iter(remaining_device_ids, 10):
+                await self.delete_devices(user_id, batch)
+
+                await self.clock.sleep(1)
+
+        run_as_background_process(
+            "_prune_too_many_devices_loop", _prune_too_many_devices_loop
+        )
 
     async def _delete_stale_devices(self) -> None:
         """Background task that deletes devices which haven't been accessed for more than
