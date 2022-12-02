@@ -34,7 +34,7 @@ class DummyDistribution(metadata.Distribution):
     def version(self) -> str:
         return self._version
 
-    def locate_file(self, path: Union[str, PathLike[str]]) -> PathLike[str]:
+    def locate_file(self, path: Union[str, PathLike]) -> PathLike:
         raise NotImplementedError()
 
     def read_text(self, filename: str) -> None:
