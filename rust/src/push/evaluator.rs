@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use crate::push::{PushRule, PushRules};
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -444,6 +442,10 @@ fn push_rule_evaluator() {
 
 #[test]
 fn test_requires_room_version_supports_condition() {
+    use std::borrow::Cow;
+
+    use crate::push::{PushRule, PushRules};
+
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
