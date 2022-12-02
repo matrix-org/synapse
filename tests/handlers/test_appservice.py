@@ -765,7 +765,12 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         fake_device_ids = [f"device_{num}" for num in range(number_of_messages - 1)]
         messages = {
             self.exclusive_as_user: {
-                device_id: to_device_message_content for device_id in fake_device_ids
+                device_id: {
+                    "type": "test_to_device_message",
+                    "sender": "@some:sender",
+                    "content": to_device_message_content,
+                }
+                for device_id in fake_device_ids
             }
         }
 
