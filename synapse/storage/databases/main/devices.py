@@ -807,10 +807,35 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         return self._device_list_stream_cache.get_all_entities_changed(from_key)
 
     @cancellable
+    async def get_all_devices_changed(
+        self,
+        from_key: int,
+        to_key: int,
+    ) -> Set[str]:
+        user_ids_to_check = self._device_list_stream_cache.get_all_entities_changed(
+            from_key
+        )
+
+        if user_ids_to_check is not None:
+            return await self.get_users_whose_devices_changed(
+                from_key, user_ids_to_check, to_key
+            )
+
+        sql = """
+            SELECT DISTINCT user_id FROM device_lists_stream
+            WHERE ? < stream_id AND stream_id <= ?
+        """
+
+        rows = await self.db_pool.execute(
+            "get_all_devices_changed", None, sql, (from_key, to_key)
+        )
+        return {u for u, in rows}
+
+    @cancellable
     async def get_users_whose_devices_changed(
         self,
         from_key: int,
-        user_ids: Optional[Collection[str]] = None,
+        user_ids: Collection[str],
         to_key: Optional[int] = None,
     ) -> Set[str]:
         """Get set of users whose devices have changed since `from_key` that
@@ -830,52 +855,32 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         """
         # Get set of users who *may* have changed. Users not in the returned
         # list have definitely not changed.
-        user_ids_to_check: Optional[Collection[str]]
-        if user_ids is None:
-            # Get set of all users that have had device list changes since 'from_key'
-            user_ids_to_check = self._device_list_stream_cache.get_all_entities_changed(
-                from_key
-            )
-        else:
-            # The same as above, but filter results to only those users in 'user_ids'
-            user_ids_to_check = self._device_list_stream_cache.get_entities_changed(
-                user_ids, from_key
-            )
+        user_ids_to_check = self._device_list_stream_cache.get_entities_changed(
+            user_ids, from_key
+        )
 
         # If an empty set was returned, there's nothing to do.
-        if user_ids_to_check is not None and not user_ids_to_check:
+        if not user_ids_to_check:
             return set()
 
+        if to_key is None:
+            to_key = self._device_list_id_gen.get_current_token()
+
         def _get_users_whose_devices_changed_txn(txn: LoggingTransaction) -> Set[str]:
-            stream_id_where_clause = "stream_id > ?"
-            sql_args = [from_key]
-
-            if to_key:
-                stream_id_where_clause += " AND stream_id <= ?"
-                sql_args.append(to_key)
-
-            sql = f"""
+            sql = """
                 SELECT DISTINCT user_id FROM device_lists_stream
-                WHERE {stream_id_where_clause}
+                WHERE  ? < stream_id AND stream_id <= ? AND %s
             """
 
-            # If the stream change cache gave us no information, fetch *all*
-            # users between the stream IDs.
-            if user_ids_to_check is None:
-                txn.execute(sql, sql_args)
-                return {user_id for user_id, in txn}
+            changes: Set[str] = set()
 
-            # Otherwise, fetch changes for the given users.
-            else:
-                changes: Set[str] = set()
-
-                # Query device changes with a batch of users at a time
-                for chunk in batch_iter(user_ids_to_check, 100):
-                    clause, args = make_in_list_sql_clause(
-                        txn.database_engine, "user_id", chunk
-                    )
-                    txn.execute(sql + " AND " + clause, sql_args + args)
-                    changes.update(user_id for user_id, in txn)
+            # Query device changes with a batch of users at a time
+            for chunk in batch_iter(user_ids_to_check, 100):
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "user_id", chunk
+                )
+                txn.execute(sql % (clause,), [from_key, to_key] + args)
+                changes.update(user_id for user_id, in txn)
 
             return changes
 
