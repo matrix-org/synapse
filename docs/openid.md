@@ -590,3 +590,42 @@ oidc_providers:
         display_name_template: "{{ user.first_name }} {{ user.last_name }}"
         email_template: "{{ user.email }}"
 ```
+
+### Mastodon / Fediverse
+
+Single-Sign On provided by [Mastodon](https://docs.joinmastodon.org/) and other Fediverse websites work with Synapse, provided they have implemented the [Mastodon OAuth API](https://docs.joinmastodon.org/spec/oauth/).
+
+This example assumes 
+* the Mastodon instance website URL is `https://your.mastodon.instance.url/` 
+* you want to create an App titled *my_synapse_app*
+
+The first step is to create an App using the Mastodon's [Create an application API](https://docs.joinmastodon.org/methods/apps/#create). There are several ways to do this but in the example below we are using CURL.
+
+Send the following request:
+```sh
+curl -d "client_name=my_synapse_app&redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback" -X POST https://your.mastodon.instance.url/api/v1/apps'
+```
+
+You should get the following response, and you should write down:
+```json
+{"client_id":"someclientid_123","client_secret":"someclientsecret_123","id":"12345","name":"my_synapse_app","redirect_uri":"https://[synapse_public_baseurl]/_synapse/client/oidc/callback","website":null,"vapid_key":"somerandomvapidkey_123"}
+```
+
+As the Synapse login mechanism needs an attribute to uniquely identify users, and that endpoint does not return a sub property, an alternative subject_claim has to be set. Your Synapse configuration should be the following:
+
+```yaml
+oidc_providers:
+  - idp_id: fediverse
+    idp_name: "Fediverse Example"
+    discover: false
+    issuer: "https://your.mastodon.instance.url/@admin"
+    client_id: "someclientid_123"    
+    client_secret: "someclientsecret_123"
+    authorization_endpoint: "https://your.mastodon.instance.url/oauth/authorize"
+    token_endpoint: "https://your.mastodon.instance.url/oauth/token"
+    userinfo_endpoint: "https://your.mastodon.instance.url/api/v1/accounts/verify_credentials"
+    scopes: ["read"]
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+```
