@@ -831,7 +831,19 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     # Only insert into the local inbox if the device exists on
                     # this server
                     device_id = row["device_id"]
-                    message_json = json_encoder.encode(messages_by_device[device_id])
+
+                    with start_active_span("serialise_to_device_message"):
+                        msg = messages_by_device[device_id]
+                        set_tag(SynapseTags.TO_DEVICE_TYPE, msg["type"])
+                        set_tag(SynapseTags.TO_DEVICE_SENDER, msg["sender"])
+                        set_tag(SynapseTags.TO_DEVICE_RECIPIENT, user_id)
+                        set_tag(SynapseTags.TO_DEVICE_RECIPIENT_DEVICE, device_id)
+                        set_tag(
+                            SynapseTags.TO_DEVICE_MSGID,
+                            msg["content"].get(EventContentFields.TO_DEVICE_MSGID),
+                        )
+                        message_json = json_encoder.encode(msg)
+
                     messages_json_for_user[device_id] = message_json
 
             if messages_json_for_user:
@@ -851,15 +863,20 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             ],
         )
 
-        issue9533_logger.debug(
-            "Stored to-device messages with stream_id %i for %s",
-            stream_id,
-            [
-                (user_id, device_id)
-                for (user_id, messages_by_device) in local_by_user_then_device.items()
-                for device_id in messages_by_device.keys()
-            ],
-        )
+        if issue9533_logger.isEnabledFor(logging.DEBUG):
+            issue9533_logger.debug(
+                "Stored to-device messages with stream_id %i: %s",
+                stream_id,
+                [
+                    f"{user_id}/{device_id} (msgid "
+                    f"{msg['content'].get(EventContentFields.TO_DEVICE_MSGID)})"
+                    for (
+                        user_id,
+                        messages_by_device,
+                    ) in messages_by_user_then_device.items()
+                    for (device_id, msg) in messages_by_device.items()
+                ],
+            )
 
 
 class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
