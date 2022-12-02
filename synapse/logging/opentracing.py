@@ -292,8 +292,8 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseTags:
-    # The message ID of any to_device message processed
-    TO_DEVICE_MESSAGE_ID = "to_device.message_id"
+    # The message ID of any to_device EDU processed
+    TO_DEVICE_EDU_ID = "to_device.edu_id"
 
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
