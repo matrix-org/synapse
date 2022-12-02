@@ -1708,7 +1708,15 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
             raise StoreError(500, "Problem storing device.")
 
-    async def delete_devices(self, user_id: str, device_ids: Collection[str]) -> None:
+    @cached(max_entries=0)
+    async def delete_device(self, user_id: str, device_id: str) -> None:
+        raise NotImplementedError()
+
+    # Note: sometimes deleting rows out of `device_inbox` can take a long time,
+    # so we use a cache so that we deduplicate in flight requests to delete
+    # devices.
+    @cachedList(cached_method_name="delete_device", list_name="device_ids")
+    async def delete_devices(self, user_id: str, device_ids: Collection[str]) -> dict:
         """Deletes several devices.
 
         Args:
@@ -1744,6 +1752,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
+
+        return {}
 
     async def update_device(
         self, user_id: str, device_id: str, new_display_name: Optional[str] = None
