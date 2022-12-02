@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 pub mod push;
+pub mod tree_cache;
 
 /// Returns the hash of all the rust source files at the time it was compiled.
 ///
