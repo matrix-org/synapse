@@ -27,7 +27,6 @@ from typing import (
 )
 
 from synapse.api.constants import AccountDataTypes
-from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import AccountDataStream, TagAccountDataStream
 from synapse.storage._base import db_to_json
 from synapse.storage.database import (
@@ -68,12 +67,11 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         # to write account data. A value of `True` implies that `_account_data_id_gen`
         # is an `AbstractStreamIdGenerator` and not just a tracker.
         self._account_data_id_gen: AbstractStreamIdTracker
+        self._can_write_to_account_data = (
+            self._instance_name in hs.config.worker.writers.account_data
+        )
 
         if isinstance(database.engine, PostgresEngine):
-            self._can_write_to_account_data = (
-                self._instance_name in hs.config.worker.writers.account_data
-            )
-
             self._account_data_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
@@ -95,21 +93,13 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
             # updated over replication. (Multiple writers are not supported for
             # SQLite).
-            if self._instance_name in hs.config.worker.writers.account_data:
-                self._can_write_to_account_data = True
-                self._account_data_id_gen = StreamIdGenerator(
-                    db_conn,
-                    "room_account_data",
-                    "stream_id",
-                    extra_tables=[("room_tags_revisions", "stream_id")],
-                )
-            else:
-                self._account_data_id_gen = SlavedIdTracker(
-                    db_conn,
-                    "room_account_data",
-                    "stream_id",
-                    extra_tables=[("room_tags_revisions", "stream_id")],
-                )
+            self._account_data_id_gen = StreamIdGenerator(
+                db_conn,
+                "room_account_data",
+                "stream_id",
+                extra_tables=[("room_tags_revisions", "stream_id")],
+                is_writer=self._instance_name in hs.config.worker.writers.account_data,
+            )
 
         account_max = self.get_max_account_data_stream_id()
         self._account_data_stream_cache = StreamChangeCache(
@@ -459,9 +449,6 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         content_json = json_encoder.encode(content)
 
         async with self._account_data_id_gen.get_next() as next_id:
-            # no need to lock here as room_account_data has a unique constraint
-            # on (user_id, room_id, account_data_type) so simple_upsert will
-            # retry if there is a conflict.
             await self.db_pool.simple_upsert(
                 desc="add_room_account_data",
                 table="room_account_data",
@@ -471,7 +458,6 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                     "account_data_type": account_data_type,
                 },
                 values={"stream_id": next_id, "content": content_json},
-                lock=False,
             )
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
@@ -527,15 +513,11 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     ) -> None:
         content_json = json_encoder.encode(content)
 
-        # no need to lock here as account_data has a unique constraint on
-        # (user_id, account_data_type) so simple_upsert will retry if
-        # there is a conflict.
         self.db_pool.simple_upsert_txn(
             txn,
             table="account_data",
             keyvalues={"user_id": user_id, "account_data_type": account_data_type},
             values={"stream_id": next_id, "content": content_json},
-            lock=False,
         )
 
         # Ignored users get denormalized into a separate table as an optimisation.

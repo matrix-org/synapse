@@ -434,7 +434,23 @@ class FederationSender(AbstractFederationSender):
                         # If there are no prev event IDs then the state is empty
                         # and so no remote servers in the room
                         destinations = set()
-                    else:
+
+                    if destinations is None:
+                        # During partial join we use the set of servers that we got
+                        # when beginning the join. It's still possible that we send
+                        # events to servers that left the room in the meantime, but
+                        # we consider that an acceptable risk since it is only our own
+                        # events that we leak and not other server's ones.
+                        partial_state_destinations = (
+                            await self.store.get_partial_state_servers_at_join(
+                                event.room_id
+                            )
+                        )
+
+                        if len(partial_state_destinations) > 0:
+                            destinations = partial_state_destinations
+
+                    if destinations is None:
                         # We check the external cache for the destinations, which is
                         # stored per state group.
 
@@ -631,7 +647,7 @@ class FederationSender(AbstractFederationSender):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains_set = await self._storage_controllers.state.get_current_hosts_in_room(
+        domains_set = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
         domains = [

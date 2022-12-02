@@ -38,7 +38,6 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatureStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
@@ -86,28 +85,19 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.worker.worker_app is None:
-            self._device_list_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
-                db_conn,
-                "device_lists_stream",
-                "stream_id",
-                extra_tables=[
-                    ("user_signature_stream", "stream_id"),
-                    ("device_lists_outbound_pokes", "stream_id"),
-                    ("device_lists_changes_in_room", "stream_id"),
-                ],
-            )
-        else:
-            self._device_list_id_gen = SlavedIdTracker(
-                db_conn,
-                "device_lists_stream",
-                "stream_id",
-                extra_tables=[
-                    ("user_signature_stream", "stream_id"),
-                    ("device_lists_outbound_pokes", "stream_id"),
-                    ("device_lists_changes_in_room", "stream_id"),
-                ],
-            )
+        # In the worker store this is an ID tracker which we overwrite in the non-worker
+        # class below that is used on the main process.
+        self._device_list_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+            db_conn,
+            "device_lists_stream",
+            "stream_id",
+            extra_tables=[
+                ("user_signature_stream", "stream_id"),
+                ("device_lists_outbound_pokes", "stream_id"),
+                ("device_lists_changes_in_room", "stream_id"),
+            ],
+            is_writer=hs.config.worker.worker_app is None,
+        )
 
         # Type-ignore: _device_list_id_gen is mixed in from either DataStore (as a
         # StreamIdGenerator) or SlavedDataStore (as a SlavedIdTracker).
@@ -535,7 +525,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             limit: Maximum number of device updates to return
 
         Returns:
-            List: List of device update tuples:
+            List of device update tuples:
                 - user_id
                 - device_id
                 - stream_id
@@ -852,12 +842,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 user_ids, from_key
             )
 
-        if not user_ids_to_check:
+        # If an empty set was returned, there's nothing to do.
+        if user_ids_to_check is not None and not user_ids_to_check:
             return set()
 
         def _get_users_whose_devices_changed_txn(txn: LoggingTransaction) -> Set[str]:
-            changes: Set[str] = set()
-
             stream_id_where_clause = "stream_id > ?"
             sql_args = [from_key]
 
@@ -868,19 +857,25 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             sql = f"""
                 SELECT DISTINCT user_id FROM device_lists_stream
                 WHERE {stream_id_where_clause}
-                AND
             """
 
-            # Query device changes with a batch of users at a time
-            # Assertion for mypy's benefit; see also
-            # https://mypy.readthedocs.io/en/stable/common_issues.html#narrowing-and-inner-functions
-            assert user_ids_to_check is not None
-            for chunk in batch_iter(user_ids_to_check, 100):
-                clause, args = make_in_list_sql_clause(
-                    txn.database_engine, "user_id", chunk
-                )
-                txn.execute(sql + clause, sql_args + args)
-                changes.update(user_id for user_id, in txn)
+            # If the stream change cache gave us no information, fetch *all*
+            # users between the stream IDs.
+            if user_ids_to_check is None:
+                txn.execute(sql, sql_args)
+                return {user_id for user_id, in txn}
+
+            # Otherwise, fetch changes for the given users.
+            else:
+                changes: Set[str] = set()
+
+                # Query device changes with a batch of users at a time
+                for chunk in batch_iter(user_ids_to_check, 100):
+                    clause, args = make_in_list_sql_clause(
+                        txn.database_engine, "user_id", chunk
+                    )
+                    txn.execute(sql + " AND " + clause, sql_args + args)
+                    changes.update(user_id for user_id, in txn)
 
             return changes
 
@@ -1451,6 +1446,13 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             self._remove_duplicate_outbound_pokes,
         )
 
+        self.db_pool.updates.register_background_index_update(
+            "device_lists_changes_in_room_by_room_index",
+            index_name="device_lists_changes_in_room_by_room_idx",
+            table="device_lists_changes_in_room",
+            columns=["room_id", "stream_id"],
+        )
+
     async def _drop_device_list_streams_non_unique_indexes(
         self, progress: JsonDict, batch_size: int
     ) -> int:
@@ -1747,9 +1749,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 table="device_lists_remote_cache",
                 keyvalues={"user_id": user_id, "device_id": device_id},
                 values={"content": json_encoder.encode(content)},
-                # we don't need to lock, because we assume we are the only thread
-                # updating this user's devices.
-                lock=False,
             )
 
         txn.call_after(self._get_cached_user_device.invalidate, (user_id, device_id))
@@ -1763,9 +1762,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             table="device_lists_remote_extremeties",
             keyvalues={"user_id": user_id},
             values={"stream_id": stream_id},
-            # again, we can assume we are the only thread updating this user's
-            # extremity.
-            lock=False,
         )
 
     async def update_remote_device_list_cache(
@@ -1818,9 +1814,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             table="device_lists_remote_extremeties",
             keyvalues={"user_id": user_id},
             values={"stream_id": stream_id},
-            # we don't need to lock, because we can assume we are the only thread
-            # updating this user's extremity.
-            lock=False,
         )
 
     async def add_device_change_to_streams(
@@ -2018,27 +2011,48 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
     async def get_uncoverted_outbound_room_pokes(
-        self, limit: int = 10
+        self, start_stream_id: int, start_room_id: str, limit: int = 10
     ) -> List[Tuple[str, str, str, int, Optional[Dict[str, str]]]]:
         """Get device list changes by room that have not yet been handled and
         written to `device_lists_outbound_pokes`.
 
+        Args:
+            start_stream_id: Together with `start_room_id`, indicates the position after
+                which to return device list changes.
+            start_room_id: Together with `start_stream_id`, indicates the position after
+                which to return device list changes.
+            limit: The maximum number of device list changes to return.
+
         Returns:
-            A list of user ID, device ID, room ID, stream ID and optional opentracing context.
+            A list of user ID, device ID, room ID, stream ID and optional opentracing
+            context, in order of ascending (stream ID, room ID).
         """
 
         sql = """
             SELECT user_id, device_id, room_id, stream_id, opentracing_context
             FROM device_lists_changes_in_room
-            WHERE NOT converted_to_destinations
-            ORDER BY stream_id
+            WHERE
+                (stream_id, room_id) > (?, ?) AND
+                stream_id <= ? AND
+                NOT converted_to_destinations
+            ORDER BY stream_id ASC, room_id ASC
             LIMIT ?
         """
 
         def get_uncoverted_outbound_room_pokes_txn(
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, str, int, Optional[Dict[str, str]]]]:
-            txn.execute(sql, (limit,))
+            txn.execute(
+                sql,
+                (
+                    start_stream_id,
+                    start_room_id,
+                    # Avoid returning rows if there may be uncommitted device list
+                    # changes with smaller stream IDs.
+                    self._device_list_id_gen.get_current_token(),
+                    limit,
+                ),
+            )
 
             return [
                 (
@@ -2060,49 +2074,25 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         user_id: str,
         device_id: str,
         room_id: str,
-        stream_id: Optional[int],
         hosts: Collection[str],
         context: Optional[Dict[str, str]],
     ) -> None:
         """Queue the device update to be sent to the given set of hosts,
         calculated from the room ID.
-
-        Marks the associated row in `device_lists_changes_in_room` as handled,
-        if `stream_id` is provided.
         """
+        if not hosts:
+            return
 
         def add_device_list_outbound_pokes_txn(
             txn: LoggingTransaction, stream_ids: List[int]
         ) -> None:
-            if hosts:
-                self._add_device_outbound_poke_to_stream_txn(
-                    txn,
-                    user_id=user_id,
-                    device_id=device_id,
-                    hosts=hosts,
-                    stream_ids=stream_ids,
-                    context=context,
-                )
-
-            if stream_id:
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="device_lists_changes_in_room",
-                    keyvalues={
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "stream_id": stream_id,
-                        "room_id": room_id,
-                    },
-                    updatevalues={"converted_to_destinations": True},
-                )
-
-        if not hosts:
-            # If there are no hosts then we don't try and generate stream IDs.
-            return await self.db_pool.runInteraction(
-                "add_device_list_outbound_pokes",
-                add_device_list_outbound_pokes_txn,
-                [],
+            self._add_device_outbound_poke_to_stream_txn(
+                txn,
+                user_id=user_id,
+                device_id=device_id,
+                hosts=hosts,
+                stream_ids=stream_ids,
+                context=context,
             )
 
         async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:
@@ -2165,4 +2155,38 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         return await self.db_pool.runInteraction(
             "get_pending_remote_device_list_updates_for_room",
             get_pending_remote_device_list_updates_for_room_txn,
+        )
+
+    async def get_device_change_last_converted_pos(self) -> Tuple[int, str]:
+        """
+        Get the position of the last row in `device_list_changes_in_room` that has been
+        converted to `device_lists_outbound_pokes`.
+
+        Rows with a strictly greater position where `converted_to_destinations` is
+        `FALSE` have not been converted.
+        """
+
+        row = await self.db_pool.simple_select_one(
+            table="device_lists_changes_converted_stream_position",
+            keyvalues={},
+            retcols=["stream_id", "room_id"],
+            desc="get_device_change_last_converted_pos",
+        )
+        return row["stream_id"], row["room_id"]
+
+    async def set_device_change_last_converted_pos(
+        self,
+        stream_id: int,
+        room_id: str,
+    ) -> None:
+        """
+        Set the position of the last row in `device_list_changes_in_room` that has been
+        converted to `device_lists_outbound_pokes`.
+        """
+
+        await self.db_pool.simple_update_one(
+            table="device_lists_changes_converted_stream_position",
+            keyvalues={},
+            updatevalues={"stream_id": stream_id, "room_id": room_id},
+            desc="set_device_change_last_converted_pos",
         )

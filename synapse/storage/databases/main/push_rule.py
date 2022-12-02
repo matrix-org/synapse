@@ -30,7 +30,6 @@ from typing import (
 
 from synapse.api.errors import StoreError
 from synapse.config.homeserver import ExperimentalConfig
-from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import PushRulesStream
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -85,7 +84,10 @@ def _load_rules(
     push_rules = PushRules(ruleslist)
 
     filtered_rules = FilteredPushRules(
-        push_rules, enabled_map, msc3664_enabled=experimental_config.msc3664_enabled
+        push_rules,
+        enabled_map,
+        msc3664_enabled=experimental_config.msc3664_enabled,
+        msc1767_enabled=experimental_config.msc1767_enabled,
     )
 
     return filtered_rules
@@ -111,14 +113,14 @@ class PushRulesWorkerStore(
     ):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.worker.worker_app is None:
-            self._push_rules_stream_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
-                db_conn, "push_rules_stream", "stream_id"
-            )
-        else:
-            self._push_rules_stream_id_gen = SlavedIdTracker(
-                db_conn, "push_rules_stream", "stream_id"
-            )
+        # In the worker store this is an ID tracker which we overwrite in the non-worker
+        # class below that is used on the main process.
+        self._push_rules_stream_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+            db_conn,
+            "push_rules_stream",
+            "stream_id",
+            is_writer=hs.config.worker.worker_app is None,
+        )
 
         push_rules_prefill, push_rules_id = self.db_pool.get_cache_dict(
             db_conn,
