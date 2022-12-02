@@ -44,40 +44,8 @@ from synapse.http.server import JsonResource, OptionsResource
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
+from synapse.rest import ClientRestResource
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client import (
-    account_data,
-    events,
-    initial_sync,
-    login,
-    presence,
-    profile,
-    push_rule,
-    read_marker,
-    receipts,
-    relations,
-    room,
-    room_batch,
-    room_keys,
-    sendtodevice,
-    sync,
-    tags,
-    user_directory,
-    versions,
-    voip,
-)
-from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
-from synapse.rest.client.devices import DevicesRestServlet
-from synapse.rest.client.keys import (
-    KeyChangesServlet,
-    KeyQueryServlet,
-    KeyUploadServlet,
-    OneTimeKeyServlet,
-)
-from synapse.rest.client.register import (
-    RegisterRestServlet,
-    RegistrationTokenValidityRestServlet,
-)
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
@@ -200,45 +168,7 @@ class GenericWorkerServer(HomeServer):
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "client":
-                    resource = JsonResource(self, canonical_json=False)
-
-                    RegisterRestServlet(self).register(resource)
-                    RegistrationTokenValidityRestServlet(self).register(resource)
-                    login.register_servlets(self, resource)
-                    ThreepidRestServlet(self).register(resource)
-                    WhoamiRestServlet(self).register(resource)
-                    DevicesRestServlet(self).register(resource)
-
-                    # Read-only
-                    KeyUploadServlet(self).register(resource)
-                    KeyQueryServlet(self).register(resource)
-                    KeyChangesServlet(self).register(resource)
-                    OneTimeKeyServlet(self).register(resource)
-
-                    voip.register_servlets(self, resource)
-                    push_rule.register_servlets(self, resource)
-                    versions.register_servlets(self, resource)
-
-                    profile.register_servlets(self, resource)
-
-                    sync.register_servlets(self, resource)
-                    events.register_servlets(self, resource)
-                    room.register_servlets(self, resource, is_worker=True)
-                    relations.register_servlets(self, resource)
-                    room.register_deprecated_servlets(self, resource)
-                    initial_sync.register_servlets(self, resource)
-                    room_batch.register_servlets(self, resource)
-                    room_keys.register_servlets(self, resource)
-                    tags.register_servlets(self, resource)
-                    account_data.register_servlets(self, resource)
-                    receipts.register_servlets(self, resource)
-                    read_marker.register_servlets(self, resource)
-
-                    sendtodevice.register_servlets(self, resource)
-
-                    user_directory.register_servlets(self, resource)
-
-                    presence.register_servlets(self, resource)
+                    resource: Resource = ClientRestResource(self)
 
                     resources[CLIENT_API_PREFIX] = resource
 

@@ -109,7 +109,29 @@ jobs:
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo clippy
+      - run: cargo clippy -- -D warnings
+
+  # We also lint against a nightly rustc so that we can lint the benchmark
+  # suite, which requires a nightly compiler.
+  lint-clippy-nightly:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
+        with:
+            toolchain: nightly-2022-12-01
+            components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo clippy --all-features -- -D warnings
 
   lint-rustfmt:
     runs-on: ubuntu-latest
