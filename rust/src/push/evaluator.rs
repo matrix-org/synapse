@@ -152,11 +152,11 @@ impl PushRuleEvaluator {
             let mut has_rver_condition = false;
 
             for condition in push_rule.conditions.iter() {
-                has_rver_condition |= match condition {
+                has_rver_condition |= matches!(
+                    condition,
                     // per MSC3932, we just need *any* room version condition to match
-                    Condition::Known(KnownCondition::RoomVersionSupports { feature: _ }) => true,
-                    _ => false,
-                };
+                    Condition::Known(KnownCondition::RoomVersionSupports { feature: _ }),
+                );
 
                 match self.match_condition(condition, user_id, display_name) {
                     Ok(true) => {}
