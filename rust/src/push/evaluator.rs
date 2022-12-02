@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use crate::push::{PushRule, PushRules};
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -98,6 +96,7 @@ pub struct PushRuleEvaluator {
 #[pymethods]
 impl PushRuleEvaluator {
     /// Create a new `PushRuleEvaluator`. See struct docstring for details.
+    #[allow(clippy::too_many_arguments)]
     #[new]
     pub fn py_new(
         flattened_keys: BTreeMap<String, String>,
@@ -153,15 +152,12 @@ impl PushRuleEvaluator {
             let mut has_rver_condition = false;
 
             for condition in push_rule.conditions.iter() {
-                has_rver_condition = has_rver_condition
-                    || match condition {
-                        Condition::Known(known) => match known {
-                            // per MSC3932, we just need *any* room version condition to match
-                            KnownCondition::RoomVersionSupports { feature: _ } => true,
-                            _ => false,
-                        },
-                        _ => false,
-                    };
+                has_rver_condition |= matches!(
+                    condition,
+                    // per MSC3932, we just need *any* room version condition to match
+                    Condition::Known(KnownCondition::RoomVersionSupports { feature: _ }),
+                );
+
                 match self.match_condition(condition, user_id, display_name) {
                     Ok(true) => {}
                     Ok(false) => continue 'outer,
@@ -444,6 +440,10 @@ fn push_rule_evaluator() {
 
 #[test]
 fn test_requires_room_version_supports_condition() {
+    use std::borrow::Cow;
+
+    use crate::push::{PushRule, PushRules};
+
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
