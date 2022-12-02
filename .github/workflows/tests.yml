@@ -109,7 +109,7 @@ jobs:
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo clippy
+      - run: cargo clippy --all-targets -- -D warnings
 
   lint-rustfmt:
     runs-on: ubuntu-latest
