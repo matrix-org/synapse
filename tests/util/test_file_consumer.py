@@ -57,7 +57,7 @@ class FileConsumerTests(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_push_consumer(self) -> Generator["defer.Deferred[object]", object, None]:
-        string_file = BlockingStringWrite()
+        string_file = BlockingBytesWrite()
         consumer = BackgroundFileConsumer(cast(BinaryIO, string_file), reactor=reactor)
 
         try:
@@ -85,7 +85,7 @@ class FileConsumerTests(unittest.TestCase):
     def test_push_producer_feedback(
         self,
     ) -> Generator["defer.Deferred[object]", object, None]:
-        string_file = BlockingStringWrite()
+        string_file = BlockingBytesWrite()
         consumer = BackgroundFileConsumer(cast(BinaryIO, string_file), reactor=reactor)
 
         try:
@@ -147,7 +147,7 @@ class DummyPullProducer:
         return d
 
 
-class BlockingStringWrite:
+class BlockingBytesWrite:
     def __init__(self) -> None:
         self.buffer = b""
         self.closed = False
