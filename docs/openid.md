@@ -595,7 +595,7 @@ oidc_providers:
 
 Single-Sign On provided by [Mastodon](https://docs.joinmastodon.org/) and other Fediverse websites work with Synapse, provided they have implemented the [Mastodon OAuth API](https://docs.joinmastodon.org/spec/oauth/).
 
-This example assumes 
+This example assumes: 
 * the Mastodon instance website URL is `https://your.mastodon.instance.url/` 
 * you want to create an App titled *my_synapse_app*
 
