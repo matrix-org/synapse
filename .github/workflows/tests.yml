@@ -296,7 +296,7 @@ jobs:
           python-version: '3.7'
           extras: "all test"
 
-      - run: poetry run trial -j2 tests
+      - run: poetry run trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
