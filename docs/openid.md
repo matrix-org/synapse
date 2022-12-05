@@ -629,3 +629,5 @@ oidc_providers:
       config:
         subject_claim: "id"
 ```
+
+Note that the fields `client_id` and `client_secret` are taken from the CURL response above.
