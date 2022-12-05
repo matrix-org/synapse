@@ -126,7 +126,7 @@ export COMPLEMENT_BASE_IMAGE=complement-synapse
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3787"
+test_tags="synapse_blacklist,msc3787,msc3874"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -138,6 +138,9 @@ extra_test_args+=("-timeout=60m")
 if [[ -n "$WORKERS" ]]; then
   # Use workers.
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
+
+  # Pass through the workers defined. If none, it will be an empty string
+  export PASS_SYNAPSE_WORKER_TYPES="$WORKER_TYPES"
 
   # Workers can only use Postgres as a database.
   export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
@@ -159,9 +162,9 @@ else
   # We only test faster room joins on monoliths, because they are purposefully
   # being developed without worker support to start with.
   #
-  # The tests for importing historical messages (MSC2716) and jump to date (MSC3030)
-  # also only pass with monoliths, currently.
-  test_tags="$test_tags,faster_joins,msc2716,msc3030"
+  # The tests for importing historical messages (MSC2716) also only pass with monoliths,
+  # currently.
+  test_tags="$test_tags,faster_joins,msc2716"
 fi
 
 

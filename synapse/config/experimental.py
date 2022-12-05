@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import attr
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -52,9 +53,6 @@ class ExperimentalConfig(Config):
 
         # MSC3266 (room summary api)
         self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)
-
-        # MSC3030 (Jump to date API endpoint)
-        self.msc3030_enabled: bool = experimental.get("msc3030_enabled", False)
 
         # MSC2409 (this setting only relates to optionally sending to-device messages).
         # Presence, typing and read receipt EDUs are already sent to application services that
@@ -98,6 +96,9 @@ class ExperimentalConfig(Config):
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
 
+        # MSC3664: Pushrules to match on related events
+        self.msc3664_enabled: bool = experimental.get("msc3664_enabled", False)
+
         # MSC3848: Introduce errcodes for specific event sending failures
         self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
 
@@ -125,3 +126,13 @@ class ExperimentalConfig(Config):
         self.msc3886_endpoint: Optional[str] = experimental.get(
             "msc3886_endpoint", None
         )
+
+        # MSC3912: Relation-based redactions.
+        self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
+
+        # MSC1767 and friends: Extensible Events
+        self.msc1767_enabled: bool = experimental.get("msc1767_enabled", False)
+        if self.msc1767_enabled:
+            # Enable room version (and thus applicable push rules from MSC3931/3932)
+            version_id = RoomVersions.MSC1767v10.identifier
+            KNOWN_ROOM_VERSIONS[version_id] = RoomVersions.MSC1767v10

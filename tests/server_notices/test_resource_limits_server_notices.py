@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Tuple
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -350,14 +351,15 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         self.assertTrue(notice_in_room, "No server notice in room")
 
-    def _trigger_notice_and_join(self):
+    def _trigger_notice_and_join(self) -> Tuple[str, str, str]:
         """Creates enough active users to hit the MAU limit and trigger a system notice
         about it, then joins the system notices room with one of the users created.
 
         Returns:
-            user_id (str): The ID of the user that joined the room.
-            tok (str): The access token of the user that joined the room.
-            room_id (str): The ID of the room that's been joined.
+            A tuple of:
+                user_id: The ID of the user that joined the room.
+                tok: The access token of the user that joined the room.
+                room_id: The ID of the room that's been joined.
         """
         user_id = None
         tok = None

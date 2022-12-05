@@ -138,7 +138,7 @@ class Thumbnailer:
         """Rescales the image to the given dimensions.
 
         Returns:
-            BytesIO: the bytes of the encoded image ready to be written to disk
+            The bytes of the encoded image ready to be written to disk
         """
         with self._resize(width, height) as scaled:
             return self._encode_image(scaled, output_type)
@@ -155,7 +155,7 @@ class Thumbnailer:
             max_height: The largest possible height.
 
         Returns:
-            BytesIO: the bytes of the encoded image ready to be written to disk
+            The bytes of the encoded image ready to be written to disk
         """
         if width * self.height > height * self.width:
             scaled_width = width

@@ -20,7 +20,7 @@ from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
@@ -157,10 +157,23 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         app_service: "ApplicationService",
         cache_context: _CacheContext,
     ) -> List[str]:
-        users_in_room = await self.get_users_in_room(
+        """
+        Get all users in a room that the appservice controls.
+
+        Args:
+            room_id: The room to check in.
+            app_service: The application service to check interest/control against
+
+        Returns:
+            List of user IDs that the appservice controls.
+        """
+        # We can use `get_local_users_in_room(...)` here because an application service
+        # can only be interested in local users of the server it's on (ignore any remote
+        # users that might match the user namespace regex).
+        local_users_in_room = await self.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
-        return list(filter(app_service.is_interested_in_user, users_in_room))
+        return list(filter(app_service.is_interested_in_user, local_users_in_room))
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
@@ -247,7 +260,7 @@ class ApplicationServiceTransactionWorkerStore(
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
-        one_time_key_counts: TransactionOneTimeKeyCounts,
+        one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
     ) -> AppServiceTransaction:
@@ -260,7 +273,7 @@ class ApplicationServiceTransactionWorkerStore(
             events: A list of persistent events to put in the transaction.
             ephemeral: A list of ephemeral events to put in the transaction.
             to_device_messages: A list of to-device messages to put in the transaction.
-            one_time_key_counts: Counts of remaining one-time keys for relevant
+            one_time_keys_count: Counts of remaining one-time keys for relevant
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
@@ -286,7 +299,7 @@ class ApplicationServiceTransactionWorkerStore(
                 events=events,
                 ephemeral=ephemeral,
                 to_device_messages=to_device_messages,
-                one_time_key_counts=one_time_key_counts,
+                one_time_keys_count=one_time_keys_count,
                 unused_fallback_keys=unused_fallback_keys,
                 device_list_summary=device_list_summary,
             )
@@ -366,7 +379,7 @@ class ApplicationServiceTransactionWorkerStore(
             events=events,
             ephemeral=[],
             to_device_messages=[],
-            one_time_key_counts={},
+            one_time_keys_count={},
             unused_fallback_keys={},
             device_list_summary=DeviceListUpdates(),
         )
@@ -438,8 +451,6 @@ class ApplicationServiceTransactionWorkerStore(
             table="application_services_state",
             keyvalues={"as_id": service.id},
             values={f"{stream_type}_stream_id": pos},
-            # no need to lock when emulating upsert: as_id is a unique key
-            lock=False,
             desc="set_appservice_stream_type_pos",
         )
 

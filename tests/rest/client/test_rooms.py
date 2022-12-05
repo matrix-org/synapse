@@ -54,6 +54,7 @@ from tests.http.server._base import make_request_with_cancellation_test
 from tests.storage.test_stream import PaginationTestCase
 from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import create_event
+from tests.unittest import override_config
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -714,7 +715,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(34, channel.resource_usage.db_txn_count)
+        self.assertEqual(33, channel.resource_usage.db_txn_count)
 
     def test_post_room_initial_state(self) -> None:
         # POST with initial_state config key, expect new room id
@@ -727,7 +728,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(37, channel.resource_usage.db_txn_count)
+        self.assertEqual(36, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
@@ -870,6 +871,41 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         self.assertEqual(join_mock.call_count, 0)
+
+    def _create_basic_room(self) -> Tuple[int, object]:
+        """
+        Tries to create a basic room and returns the response code.
+        """
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        return channel.code, channel.json_body
+
+    @override_config(
+        {
+            "rc_message": {"per_second": 0.2, "burst_count": 10},
+        }
+    )
+    def test_room_creation_ratelimiting(self) -> None:
+        """
+        Regression test for #14312, where ratelimiting was made too strict.
+        Clients should be able to create 10 rooms in a row
+        without hitting rate limits, using default rate limit config.
+        (We override rate limiting config back to its default value.)
+
+        To ensure we don't make ratelimiting too generous accidentally,
+        also check that we can't create an 11th room.
+        """
+
+        for _ in range(10):
+            code, json_body = self._create_basic_room()
+            self.assertEqual(code, HTTPStatus.OK, json_body)
+
+        # The 6th room hits the rate limit.
+        code, json_body = self._create_basic_room()
+        self.assertEqual(code, HTTPStatus.TOO_MANY_REQUESTS, json_body)
 
 
 class RoomTopicTestCase(RoomBase):
@@ -1390,10 +1426,22 @@ class RoomJoinRatelimitTestCase(RoomBase):
     )
     def test_join_local_ratelimit(self) -> None:
         """Tests that local joins are actually rate-limited."""
-        for _ in range(3):
-            self.helper.create_room_as(self.user_id)
+        # Create 4 rooms
+        room_ids = [
+            self.helper.create_room_as(self.user_id, is_public=True) for _ in range(4)
+        ]
 
-        self.helper.create_room_as(self.user_id, expect_code=429)
+        joiner_user_id = self.register_user("joiner", "secret")
+        # Now make a new user try to join some of them.
+
+        # The user can join 3 rooms
+        for room_id in room_ids[0:3]:
+            self.helper.join(room_id, joiner_user_id)
+
+        # But the user cannot join a 4th room
+        self.helper.join(
+            room_ids[3], joiner_user_id, expect_code=HTTPStatus.TOO_MANY_REQUESTS
+        )
 
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
@@ -3498,11 +3546,6 @@ class TimestampLookupTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self) -> JsonDict:
-        config = super().default_config()
-        config["experimental_features"] = {"msc3030_enabled": True}
-        return config
-
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self._storage_controllers = self.hs.get_storage_controllers()
 
@@ -3544,7 +3587,7 @@ class TimestampLookupTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/org.matrix.msc3030/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
+            f"/_matrix/client/v1/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
             access_token=self.room_owner_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)

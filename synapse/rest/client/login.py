@@ -350,7 +350,7 @@ class LoginRestServlet(RestServlet):
             auth_provider_session_id: The session ID got during login from the SSO IdP.
 
         Returns:
-            result: Dictionary of account information after successful login.
+            Dictionary of account information after successful login.
         """
 
         # Before we actually log them in we check if they've already logged in
@@ -436,8 +436,7 @@ class LoginRestServlet(RestServlet):
             The body of the JSON response.
         """
         token = login_submission["token"]
-        auth_handler = self.auth_handler
-        res = await auth_handler.validate_short_term_login_token(token)
+        res = await self.auth_handler.consume_login_token(token)
 
         return await self._complete_login(
             res.user_id,
@@ -537,7 +536,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 
 class RefreshTokenServlet(RestServlet):
-    PATTERNS = (re.compile("^/_matrix/client/v1/refresh$"),)
+    PATTERNS = client_patterns("/refresh$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
