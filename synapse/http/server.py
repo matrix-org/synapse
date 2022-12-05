@@ -577,7 +577,7 @@ def _unrecognised_request_handler(request: Request) -> NoReturn:
     Args:
         request: Unused, but passed in to match the signature of ServletCallback.
     """
-    raise UnrecognizedRequestError()
+    raise UnrecognizedRequestError(code=404)
 
 
 class UnrecognizedRequestResource(resource.Resource):
