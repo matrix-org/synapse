@@ -27,6 +27,7 @@ fn synapse_rust(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rust_file_digest, m)?)?;
 
     push::register_module(py, m)?;
+    tree_cache::binding::register_module(py, m)?;
 
     Ok(())
 }

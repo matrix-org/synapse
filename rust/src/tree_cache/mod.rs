@@ -2,6 +2,8 @@ use std::{collections::HashMap, hash::Hash};
 
 use anyhow::{bail, Error};
 
+pub mod binding;
+
 pub enum TreeCacheNode<K, V> {
     Leaf(V),
     Branch(usize, HashMap<K, TreeCacheNode<K, V>>),
@@ -114,17 +116,25 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
     }
 }
 
+impl<K, V> Default for TreeCacheNode<K, V> {
+    fn default() -> Self {
+        TreeCacheNode::new_branch()
+    }
+}
+
 pub struct TreeCache<K, V> {
     root: TreeCacheNode<K, V>,
 }
 
-impl<'a, K: Eq + Hash + 'a, V> TreeCache<K, V> {
+impl<K, V> TreeCache<K, V> {
     pub fn new() -> Self {
         TreeCache {
             root: TreeCacheNode::new_branch(),
         }
     }
+}
 
+impl<'a, K: Eq + Hash + 'a, V> TreeCache<K, V> {
     pub fn set(&mut self, key: impl IntoIterator<Item = K>, value: V) -> Result<(), Error> {
         self.root.set(key.into_iter(), value)?;
 
@@ -221,6 +231,12 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCache<K, V> {
 
     pub fn items(&self) -> impl Iterator<Item = (Vec<&K>, &V)> {
         self.root.items()
+    }
+}
+
+impl<K, V> Default for TreeCache<K, V> {
+    fn default() -> Self {
+        TreeCache::new()
     }
 }
 
