@@ -815,13 +815,34 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         from_key: int,
         to_key: int,
     ) -> Set[str]:
+        """Get all users whose devices have changed in the given range.
+
+        Args:
+            from_key: The minimum device lists stream token to query device list
+                changes for, exclusive.
+            to_key: The maximum device lists stream token to query device list
+                changes for, inclusive.
+
+        Returns:
+            The set of user_ids whose devices have changed since `from_key`
+            (exclusive) until `to_key` (inclusive).
+        """
+
         result = self._device_list_stream_cache.get_all_entities_changed(from_key)
 
         if result.hit:
+            # We know which users might have changed devices.
+            if not result.entities:
+                # If no users then we can return early.
+                return set()
+
+            # Otherwise we need to filter down the list
             return await self.get_users_whose_devices_changed(
                 from_key, result.entities, to_key
             )
 
+        # If the cache didn't tell us anything, we just need to query the full
+        # range.
         sql = """
             SELECT DISTINCT user_id FROM device_lists_stream
             WHERE ? < stream_id AND stream_id <= ?

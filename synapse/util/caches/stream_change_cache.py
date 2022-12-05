@@ -172,7 +172,8 @@ class StreamChangeCache:
         """Returns all entities that have had new things since the given
         position. If the position is too old it will return None.
 
-        Returns the entities in the order that they were changed.
+        Returns a class indicating if we have the requested data cached, and if
+        so includes the entities in the order they were changed.
         """
         assert type(stream_pos) is int
 
