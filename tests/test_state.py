@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Collection, Dict, List, Optional, cast
+from typing import Any, Collection, Dict, List, Optional, Set, Tuple, cast
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -19,7 +19,7 @@ from twisted.internet import defer
 from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.state import StateHandler, StateResolutionHandler, _make_state_cache_entry
 from synapse.util import Clock
@@ -33,14 +33,14 @@ _next_event_id = 1000
 
 
 def create_event(
-    name=None,
-    type=None,
-    state_key=None,
-    depth=2,
-    event_id=None,
-    prev_events: Optional[List[str]] = None,
-    **kwargs,
-):
+    name: Optional[str] = None,
+    type: Optional[str] = None,
+    state_key: Optional[str] = None,
+    depth: int = 2,
+    event_id: Optional[str] = None,
+    prev_events: Optional[List[Tuple[str, dict]]] = None,
+    **kwargs: Any,
+) -> EventBase:
     global _next_event_id
 
     if not event_id:
@@ -67,9 +67,7 @@ def create_event(
 
     d.update(kwargs)
 
-    event = make_event_from_dict(d)
-
-    return event
+    return make_event_from_dict(d)
 
 
 class _DummyStore:
@@ -158,15 +156,15 @@ class DictObj(dict):
 
 
 class Graph:
-    def __init__(self, nodes, edges):
-        events = {}
-        clobbered = set(events.keys())
+    def __init__(self, nodes: Dict[str, DictObj], edges: Dict[str, List[str]]):
+        events: Dict[str, EventBase] = {}
+        clobbered: Set[str] = set()
 
         for event_id, fields in nodes.items():
             refs = edges.get(event_id)
             if refs:
                 clobbered.difference_update(refs)
-                prev_events = [(r, {}) for r in refs]
+                prev_events: List[Tuple[str, dict]] = [(r, {}) for r in refs]
             else:
                 prev_events = []
 
@@ -179,9 +177,6 @@ class Graph:
 
     def walk(self):
         return iter(self._events)
-
-    def get_leaves(self):
-        return (self._events[i] for i in self._leaves)
 
 
 class StateTestCase(unittest.TestCase):
@@ -645,7 +640,7 @@ class StateTestCase(unittest.TestCase):
         store = _DummyStore()
         store.register_events(old_state_1)
         store.register_events(old_state_2)
-        self.dummy_store.get_events = store.get_events
+        self.dummy_store.get_events = store.get_events  # type: ignore[assignment]
 
         context = yield self._get_context(
             event, prev_event_id1, old_state_1, prev_event_id2, old_state_2
@@ -700,7 +695,7 @@ class StateTestCase(unittest.TestCase):
         store = _DummyStore()
         store.register_events(old_state_1)
         store.register_events(old_state_2)
-        self.dummy_store.get_events = store.get_events
+        self.dummy_store.get_events = store.get_events  # type: ignore[assignment]
 
         context = yield self._get_context(
             event, prev_event_id1, old_state_1, prev_event_id2, old_state_2
