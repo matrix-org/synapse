@@ -849,7 +849,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         """
 
         rows = await self.db_pool.execute(
-            "get_all_devices_changed", None, sql, (from_key, to_key)
+            "get_all_devices_changed",
+            None,
+            sql,
+            from_key,
+            to_key,
         )
         return {u for u, in rows}
 
