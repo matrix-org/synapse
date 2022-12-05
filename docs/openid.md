@@ -615,8 +615,8 @@ As the Synapse login mechanism needs an attribute to uniquely identify users, an
 
 ```yaml
 oidc_providers:
-  - idp_id: fediverse
-    idp_name: "Fediverse Example"
+  - idp_id: my_mastodon
+    idp_name: "Mastodon Instance Example"
     discover: false
     issuer: "https://your.mastodon.instance.url/@admin"
     client_id: "someclientid_123"    
