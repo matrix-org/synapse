@@ -18,8 +18,8 @@ from .. import unittest
 
 
 class WheelTimerTestCase(unittest.TestCase):
-    def test_single_insert_fetch(self):
-        wheel = WheelTimer(bucket_size=5)
+    def test_single_insert_fetch(self) -> None:
+        wheel: WheelTimer[object] = WheelTimer(bucket_size=5)
 
         obj = object()
         wheel.insert(100, obj, 150)
@@ -32,8 +32,8 @@ class WheelTimerTestCase(unittest.TestCase):
         self.assertListEqual(wheel.fetch(156), [obj])
         self.assertListEqual(wheel.fetch(170), [])
 
-    def test_multi_insert(self):
-        wheel = WheelTimer(bucket_size=5)
+    def test_multi_insert(self) -> None:
+        wheel: WheelTimer[object] = WheelTimer(bucket_size=5)
 
         obj1 = object()
         obj2 = object()
@@ -50,15 +50,15 @@ class WheelTimerTestCase(unittest.TestCase):
         self.assertListEqual(wheel.fetch(200), [obj3])
         self.assertListEqual(wheel.fetch(210), [])
 
-    def test_insert_past(self):
-        wheel = WheelTimer(bucket_size=5)
+    def test_insert_past(self) -> None:
+        wheel: WheelTimer[object] = WheelTimer(bucket_size=5)
 
         obj = object()
         wheel.insert(100, obj, 50)
         self.assertListEqual(wheel.fetch(120), [obj])
 
-    def test_insert_past_multi(self):
-        wheel = WheelTimer(bucket_size=5)
+    def test_insert_past_multi(self) -> None:
+        wheel: WheelTimer[object] = WheelTimer(bucket_size=5)
 
         obj1 = object()
         obj2 = object()

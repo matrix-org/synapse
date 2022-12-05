@@ -21,7 +21,7 @@ endblock
 
 block Install Complement Dependencies
   sudo apt-get -qq update && sudo apt-get install -qqy libolm3 libolm-dev
-  go get -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+  go install -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
 endblock
 
 block Install custom gotestfmt template
