@@ -601,7 +601,7 @@ This example assumes that:
 * the Mastodon instance website URL is `https://your.mastodon.instance.url`, and
 * Synapse will be registered as an app named `my_synapse_app`.
 
-Send the following request:
+Send the following request, substituting the value of `synapse_public_baseurl` from your Synapse installation.
 ```sh
 curl -d "client_name=my_synapse_app&redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback" -X POST https://your.mastodon.instance.url/api/v1/apps
 ```
