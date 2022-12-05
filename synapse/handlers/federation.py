@@ -152,6 +152,7 @@ class FederationHandler:
         self._federation_event_handler = hs.get_federation_event_handler()
         self._device_handler = hs.get_device_handler()
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
+        self._notifier = hs.get_notifier()
 
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
             hs
@@ -1692,6 +1693,9 @@ class FederationHandler:
                     self._storage_controllers.state.notify_room_un_partial_stated(
                         room_id
                     )
+                    # Poke the notifier so that other workers see the write to
+                    # the un-partial-stated rooms stream.
+                    self._notifier.notify_replication()
 
                     # TODO(faster_joins) update room stats and user directory?
                     #   https://github.com/matrix-org/synapse/issues/12814
