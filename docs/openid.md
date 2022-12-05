@@ -595,11 +595,11 @@ oidc_providers:
 
 [Mastodon](https://docs.joinmastodon.org/) instances provide an [OAuth API](https://docs.joinmastodon.org/spec/oauth/), allowing those instances to be used as a single sign-on provider for Synapse.
 
-This example assumes: 
-* the Mastodon instance website URL is `https://your.mastodon.instance.url/` 
-* you want to create an App titled *my_synapse_app*
+The first step is to register Synapse as an application with your Mastodon instance, using the [Create an application API](https://docs.joinmastodon.org/methods/apps/#create) (see also [here](https://docs.joinmastodon.org/client/token/)). There are several ways to do this, but in the example below we are using CURL.
 
-The first step is to create an App using the Mastodon's [Create an application API](https://docs.joinmastodon.org/methods/apps/#create). There are several ways to do this but in the example below we are using CURL.
+This example assumes that:
+* the Mastodon instance website URL is `https://your.mastodon.instance.url`, and
+* Synapse will be registered as an app named `my_synapse_app`.
 
 Send the following request:
 ```sh
