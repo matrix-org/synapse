@@ -591,9 +591,9 @@ oidc_providers:
         email_template: "{{ user.email }}"
 ```
 
-### Mastodon / Fediverse
+### Mastodon
 
-Single-Sign On provided by [Mastodon](https://docs.joinmastodon.org/) and other Fediverse websites work with Synapse, provided they have implemented the [Mastodon OAuth API](https://docs.joinmastodon.org/spec/oauth/).
+[Mastodon](https://docs.joinmastodon.org/) instances provide an [OAuth API](https://docs.joinmastodon.org/spec/oauth/), allowing those instances to be used as a single sign-on provider for Synapse.
 
 This example assumes: 
 * the Mastodon instance website URL is `https://your.mastodon.instance.url/` 
