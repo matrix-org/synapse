@@ -3355,7 +3355,7 @@ Configuration settings related to push notifications
 This setting defines options for push notifications.
 
 This option has a number of sub-options. They are as follows:
-* `enable_push`: Enables or disables push notification calculation. Note, disabling this will also
+* `enabled`: Enables or disables push notification calculation. Note, disabling this will also
    stop unread counts being calculated for rooms. This mode of operation is intended
    for homeservers which may only have bots or appservice users connected, or are otherwise
    not interested in push/unread counters. This is enabled by default.
@@ -3379,7 +3379,7 @@ This option has a number of sub-options. They are as follows:
 Example configuration:
 ```yaml
 push:
-  enable_push: true
+  enabled: true
   include_content: false
   group_unread_count_by_room: false
 ```
