@@ -98,6 +98,7 @@ RUN \
     git \
     curl \
     libicu-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 

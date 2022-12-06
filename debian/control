@@ -9,6 +9,7 @@ Build-Depends:
  libsystemd-dev,
  libpq-dev,
  libicu-dev,
+ pkg-config,
  lsb-release,
  python3-dev,
  python3,
