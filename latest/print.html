@@ -1761,6 +1761,21 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
+<h2 id="legacy-prometheus-metric-names-have-now-been-removed"><a class="header" href="#legacy-prometheus-metric-names-have-now-been-removed">Legacy Prometheus metric names have now been removed</a></h2>
+<p>Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.</p>
+<p>This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the <code>enable_legacy_metrics</code> configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.</p>
+<p>If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.</p>
+<p>See <a href="upgrade.html#deprecation-of-legacy-prometheus-metric-names">v1.69.0: Deprecation of legacy Prometheus metric names</a>
+for more context.</p>
 <h1 id="upgrading-to-v1720"><a class="header" href="#upgrading-to-v1720">Upgrading to v1.72.0</a></h1>
 <h2 id="dropping-support-for-postgresql-10"><a class="header" href="#dropping-support-for-postgresql-10">Dropping support for PostgreSQL 10</a></h2>
 <p>In line with our <a href="deprecation_policy.html">deprecation policy</a>, we've dropped
@@ -5414,24 +5429,6 @@ Defaults to false.</p>
 <pre><code class="language-yaml">enable_metrics: true
 </code></pre>
 <hr />
-<h3 id="enable_legacy_metrics"><a class="header" href="#enable_legacy_metrics"><code>enable_legacy_metrics</code></a></h3>
-<p>Set to <code>true</code> to publish both legacy and non-legacy Prometheus metric names,
-or to <code>false</code> to only publish non-legacy Prometheus metric names.
-Defaults to <code>false</code>. Has no effect if <code>enable_metrics</code> is <code>false</code>.
-<strong>In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to <code>true</code>.</strong></p>
-<p>Legacy metric names include:</p>
-<ul>
-<li>metrics containing colons in the name, such as <code>synapse_util_caches_response_cache:hits</code>, because colons are supposed to be reserved for user-defined recording rules;</li>
-<li>counters that don't end with the <code>_total</code> suffix, such as <code>synapse_federation_client_sent_edus</code>, therefore not adhering to the OpenMetrics standard.</li>
-</ul>
-<p>These legacy metric names are unconventional and not compliant with OpenMetrics standards.
-They are included for backwards compatibility.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">enable_legacy_metrics: false
-</code></pre>
-<p>See https://github.com/matrix-org/synapse/issues/11106 for context.</p>
-<p><em>Since v1.67.0.</em></p>
-<h2 id="will-be-removed-in-v1730"><a class="header" href="#will-be-removed-in-v1730"><strong>Will be removed in v1.73.0.</strong></a></h2>
 <h3 id="sentry"><a class="header" href="#sentry"><code>sentry</code></a></h3>
 <p>Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
 with the <code>dsn</code> setting.</p>
@@ -5933,9 +5930,16 @@ module's <code>parse_config</code> method.</p>
 <p>For the default provider, the following settings are available:</p>
 <ul>
 <li>
-<p>subject_claim: name of the claim containing a unique identifier
+<p><code>subject_claim</code>: name of the claim containing a unique identifier
 for the user. Defaults to 'sub', which OpenID Connect
 compliant providers should provide.</p>
+</li>
+<li>
+<p><code>picture_claim</code>: name of the claim containing an url for the user's profile picture.
+Defaults to 'picture', which OpenID Connect compliant providers should provide
+and has to refer to a direct image file such as PNG, JPEG, or GIF image file.</p>
+<p>Currently only supported in monolithic (single-process) server configurations
+where the media repository runs within the Synapse process.</p>
 </li>
 <li>
 <p><code>localpart_template</code>: Jinja2 template for the localpart of the MXID.
@@ -10251,8 +10255,8 @@ The currently available worker applications are listed <a href="workers.html#ava
 <a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>).</li>
 <li>If handling HTTP requests, a <a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a> option
 with an <code>http</code> listener.</li>
-<li>If handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
-the main process (<code>worker_main_http_uri</code>).</li>
+<li><strong>Synapse 1.72 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
+the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.73 and newer.</li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -10311,6 +10315,7 @@ information.</p>
 ^/_matrix/federation/(v1|v2)/send_leave/
 ^/_matrix/federation/(v1|v2)/invite/
 ^/_matrix/federation/v1/event_auth/
+^/_matrix/federation/v1/timestamp_to_event/
 ^/_matrix/federation/v1/exchange_third_party_invite/
 ^/_matrix/federation/v1/user/devices/
 ^/_matrix/key/v2/query
@@ -10338,10 +10343,10 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
+^/_matrix/client/v1/rooms/.*/timestamp_to_event$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
 # Encryption requests
-# Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
 ^/_matrix/client/(r0|v3|unstable)/keys/query$
 ^/_matrix/client/(r0|v3|unstable)/keys/changes$
 ^/_matrix/client/(r0|v3|unstable)/keys/claim$
@@ -10495,7 +10500,7 @@ responsible for</p>
 <li>persisting them to the DB, and finally</li>
 <li>updating the events stream.</li>
 </ul>
-<p>Because load is sharded in this way, you <em>must</em> restart all worker instances when 
+<p>Because load is sharded in this way, you <em>must</em> restart all worker instances when
 adding or removing event persisters.</p>
 <p>An <code>event_persister</code> should not be mistaken for an <code>event_creator</code>.
 An <code>event_creator</code> listens for requests from clients to create new events and does
@@ -10889,7 +10894,7 @@ command. This is a script that is distributed as part of synapse. It is possibly
 already on your <code>$PATH</code> depending on how Synapse was installed.</p>
 <p>Finding your user's <code>access_token</code> is client-dependent, but will usually be shown in the client's settings.</p>
 <h2 id="making-an-admin-api-request"><a class="header" href="#making-an-admin-api-request">Making an Admin API request</a></h2>
-<p>For security reasons, we <a href="usage/administration/admin_api/reverse_proxy.html#synapse-administration-endpoints">recommend</a>
+<p>For security reasons, we <a href="usage/administration/admin_api/../../../reverse_proxy.html#synapse-administration-endpoints">recommend</a>
 that the Admin API (<code>/_synapse/admin/...</code>) should be hidden from public view using a
 reverse proxy. This means you should typically query the Admin API from a terminal on
 the machine which runs Synapse.</p>

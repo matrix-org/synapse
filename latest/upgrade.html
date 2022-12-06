@@ -231,6 +231,21 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
+<h2 id="legacy-prometheus-metric-names-have-now-been-removed"><a class="header" href="#legacy-prometheus-metric-names-have-now-been-removed">Legacy Prometheus metric names have now been removed</a></h2>
+<p>Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.</p>
+<p>This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the <code>enable_legacy_metrics</code> configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.</p>
+<p>If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.</p>
+<p>See <a href="#deprecation-of-legacy-prometheus-metric-names">v1.69.0: Deprecation of legacy Prometheus metric names</a>
+for more context.</p>
 <h1 id="upgrading-to-v1720"><a class="header" href="#upgrading-to-v1720">Upgrading to v1.72.0</a></h1>
 <h2 id="dropping-support-for-postgresql-10"><a class="header" href="#dropping-support-for-postgresql-10">Dropping support for PostgreSQL 10</a></h2>
 <p>In line with our <a href="deprecation_policy.html">deprecation policy</a>, we've dropped
