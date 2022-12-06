@@ -161,8 +161,8 @@ jobs:
         ports:
           - 5000:5000
     steps:
-      # - name: Checkout
-      #  uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Run Docker on tmpfs
         uses: JonasAlfredsson/docker-on-tmpfs@v1
