@@ -1,1 +1,0 @@
-`scripts-dev/federation_client`: Fix routing on servers with `.well-known` files.

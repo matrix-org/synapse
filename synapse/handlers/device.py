@@ -421,9 +421,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         self._check_device_name_length(initial_device_display_name)
 
-        # Prune the user's device list if they already have a lot of devices.
-        await self._prune_too_many_devices(user_id)
-
         if device_id is not None:
             new_device = await self.store.store_device(
                 user_id=user_id,
@@ -455,14 +452,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    async def _prune_too_many_devices(self, user_id: str) -> None:
-        """Delete any excess old devices this user may have."""
-        device_ids = await self.store.check_too_many_devices_for_user(user_id)
-        if not device_ids:
-            return
-
-        await self.delete_devices(user_id, device_ids)
-
     async def _delete_stale_devices(self) -> None:
         """Background task that deletes devices which haven't been accessed for more than
         a configured time period.
@@ -492,7 +481,7 @@ class DeviceHandler(DeviceWorkerHandler):
             device_ids = [d for d in device_ids if d != except_device_id]
         await self.delete_devices(user_id, device_ids)
 
-    async def delete_devices(self, user_id: str, device_ids: Collection[str]) -> None:
+    async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
         """Delete several devices
 
         Args:
@@ -1007,7 +996,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         # Check if we are partially joining any rooms. If so we need to store
         # all device list updates so that we can handle them correctly once we
         # know who is in the room.
-        # TODO(faster joins): this fetches and processes a bunch of data that we don't
+        # TODO(faster_joins): this fetches and processes a bunch of data that we don't
         # use. Could be replaced by a tighter query e.g.
         #   SELECT EXISTS(SELECT 1 FROM partial_state_rooms)
         partial_rooms = await self.store.get_partial_state_room_resync_info()

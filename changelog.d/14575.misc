@@ -1,1 +1,0 @@
-Fix a possible variable shadow in `create_new_client_event`.

@@ -58,7 +58,10 @@ from synapse.types import JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.util.caches.stream_change_cache import (
+    AllEntitiesChangedResult,
+    StreamChangeCache,
+)
 from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
@@ -799,7 +802,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     def get_cached_device_list_changes(
         self,
         from_key: int,
-    ) -> Optional[List[str]]:
+    ) -> AllEntitiesChangedResult:
         """Get set of users whose devices have changed since `from_key`, or None
         if that information is not in our cache.
         """
@@ -807,10 +810,58 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         return self._device_list_stream_cache.get_all_entities_changed(from_key)
 
     @cancellable
+    async def get_all_devices_changed(
+        self,
+        from_key: int,
+        to_key: int,
+    ) -> Set[str]:
+        """Get all users whose devices have changed in the given range.
+
+        Args:
+            from_key: The minimum device lists stream token to query device list
+                changes for, exclusive.
+            to_key: The maximum device lists stream token to query device list
+                changes for, inclusive.
+
+        Returns:
+            The set of user_ids whose devices have changed since `from_key`
+            (exclusive) until `to_key` (inclusive).
+        """
+
+        result = self._device_list_stream_cache.get_all_entities_changed(from_key)
+
+        if result.hit:
+            # We know which users might have changed devices.
+            if not result.entities:
+                # If no users then we can return early.
+                return set()
+
+            # Otherwise we need to filter down the list
+            return await self.get_users_whose_devices_changed(
+                from_key, result.entities, to_key
+            )
+
+        # If the cache didn't tell us anything, we just need to query the full
+        # range.
+        sql = """
+            SELECT DISTINCT user_id FROM device_lists_stream
+            WHERE ? < stream_id AND stream_id <= ?
+        """
+
+        rows = await self.db_pool.execute(
+            "get_all_devices_changed",
+            None,
+            sql,
+            from_key,
+            to_key,
+        )
+        return {u for u, in rows}
+
+    @cancellable
     async def get_users_whose_devices_changed(
         self,
         from_key: int,
-        user_ids: Optional[Collection[str]] = None,
+        user_ids: Collection[str],
         to_key: Optional[int] = None,
     ) -> Set[str]:
         """Get set of users whose devices have changed since `from_key` that
@@ -830,46 +881,31 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         """
         # Get set of users who *may* have changed. Users not in the returned
         # list have definitely not changed.
-        user_ids_to_check: Optional[Collection[str]]
-        if user_ids is None:
-            # Get set of all users that have had device list changes since 'from_key'
-            user_ids_to_check = self._device_list_stream_cache.get_all_entities_changed(
-                from_key
-            )
-        else:
-            # The same as above, but filter results to only those users in 'user_ids'
-            user_ids_to_check = self._device_list_stream_cache.get_entities_changed(
-                user_ids, from_key
-            )
+        user_ids_to_check = self._device_list_stream_cache.get_entities_changed(
+            user_ids, from_key
+        )
 
+        # If an empty set was returned, there's nothing to do.
         if not user_ids_to_check:
             return set()
 
+        if to_key is None:
+            to_key = self._device_list_id_gen.get_current_token()
+
         def _get_users_whose_devices_changed_txn(txn: LoggingTransaction) -> Set[str]:
-            changes: Set[str] = set()
-
-            stream_id_where_clause = "stream_id > ?"
-            sql_args = [from_key]
-
-            if to_key:
-                stream_id_where_clause += " AND stream_id <= ?"
-                sql_args.append(to_key)
-
-            sql = f"""
+            sql = """
                 SELECT DISTINCT user_id FROM device_lists_stream
-                WHERE {stream_id_where_clause}
-                AND
+                WHERE  ? < stream_id AND stream_id <= ? AND %s
             """
 
+            changes: Set[str] = set()
+
             # Query device changes with a batch of users at a time
-            # Assertion for mypy's benefit; see also
-            # https://mypy.readthedocs.io/en/stable/common_issues.html#narrowing-and-inner-functions
-            assert user_ids_to_check is not None
             for chunk in batch_iter(user_ids_to_check, 100):
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "user_id", chunk
                 )
-                txn.execute(sql + clause, sql_args + args)
+                txn.execute(sql % (clause,), [from_key, to_key] + args)
                 changes.update(user_id for user_id, in txn)
 
             return changes
@@ -1533,70 +1569,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         return rows
 
-    async def check_too_many_devices_for_user(self, user_id: str) -> Collection[str]:
-        """Check if the user has a lot of devices, and if so return the set of
-        devices we can prune.
-
-        This does *not* return hidden devices or devices with E2E keys.
-        """
-
-        num_devices = await self.db_pool.simple_select_one_onecol(
-            table="devices",
-            keyvalues={"user_id": user_id, "hidden": False},
-            retcol="COALESCE(COUNT(*), 0)",
-            desc="count_devices",
-        )
-
-        # We let users have up to ten devices without pruning.
-        if num_devices <= 10:
-            return ()
-
-        # We prune everything older than N days.
-        max_last_seen = self._clock.time_msec() - 14 * 24 * 60 * 60 * 1000
-
-        if num_devices > 50:
-            # If the user has more than 50 devices, then we chose a last seen
-            # that ensures we keep at most 50 devices.
-            sql = """
-                SELECT last_seen FROM devices
-                WHERE
-                    user_id = ?
-                    AND NOT hidden
-                    AND last_seen IS NOT NULL
-                    AND key_json IS NULL
-                ORDER BY last_seen DESC
-                LIMIT 1
-                OFFSET 50
-            """
-
-            rows = await self.db_pool.execute(
-                "check_too_many_devices_for_user_last_seen", None, sql, (user_id,)
-            )
-            if rows:
-                max_last_seen = max(rows[0][0], max_last_seen)
-
-        # Now fetch the devices to delete.
-        sql = """
-            SELECT DISTINCT device_id FROM devices
-            LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
-            WHERE
-                user_id = ?
-                AND NOT hidden
-                AND last_seen < ?
-                AND key_json IS NULL
-        """
-
-        def check_too_many_devices_for_user_txn(
-            txn: LoggingTransaction,
-        ) -> Collection[str]:
-            txn.execute(sql, (user_id, max_last_seen))
-            return {device_id for device_id, in txn}
-
-        return await self.db_pool.runInteraction(
-            "check_too_many_devices_for_user",
-            check_too_many_devices_for_user_txn,
-        )
-
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
     # Because we have write access, this will be a StreamIdGenerator
@@ -1655,7 +1627,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 values={},
                 insertion_values={
                     "display_name": initial_device_display_name,
-                    "last_seen": self._clock.time_msec(),
                     "hidden": False,
                 },
                 desc="store_device",
@@ -1701,7 +1672,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
             raise StoreError(500, "Problem storing device.")
 
-    async def delete_devices(self, user_id: str, device_ids: Collection[str]) -> None:
+    async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
         """Deletes several devices.
 
         Args:

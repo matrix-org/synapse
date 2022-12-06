@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.67.0 where two logging context warnings would be logged on startup.
