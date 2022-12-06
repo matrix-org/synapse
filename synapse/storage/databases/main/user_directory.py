@@ -942,12 +942,12 @@ def _parse_words(search_term: str) -> List[str]:
         A list of the words in the search string.
     """
     if USE_ICU:
-        return _parse_words_icu(search_term)
+        return _parse_words_with_icu(search_term)
 
     return re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
 
-def _parse_words_icu(search_term: str) -> List[str]:
+def _parse_words_with_icu(search_term: str) -> List[str]:
     """Break down the provided search string into its individual words using ICU
     (International Components for Unicode).
 
