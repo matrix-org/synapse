@@ -1,7 +1,13 @@
-Synapse 1.73.0rc2 (2022-12-01)
-==============================
+Synapse 1.73.0 (2022-12-06)
+===========================
 
 Please note that legacy Prometheus metric names have been removed in this release; see [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.73/docs/upgrade.md#legacy-prometheus-metric-names-have-now-been-removed) for more details.
+
+No significant changes since 1.73.0rc2.
+
+
+Synapse 1.73.0rc2 (2022-12-01)
+==============================
 
 Bugfixes
 --------
