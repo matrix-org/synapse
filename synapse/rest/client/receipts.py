@@ -56,6 +56,9 @@ class ReceiptRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
+        if not room_id or not event_id:
+            raise SynapseError(400, "A room ID and event ID must be specified")
+
         if receipt_type not in self._known_receipt_types:
             raise SynapseError(
                 400,
