@@ -140,6 +140,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms",
             "^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases",
+            "^/_matrix/client/v1/rooms/.*/timestamp_to_event$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/search",
         ],
         "shared_extra_conf": {},
@@ -163,6 +164,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/federation/(v1|v2)/invite/",
             "^/_matrix/federation/(v1|v2)/query_auth/",
             "^/_matrix/federation/(v1|v2)/event_auth/",
+            "^/_matrix/federation/v1/timestamp_to_event/",
             "^/_matrix/federation/(v1|v2)/exchange_third_party_invite/",
             "^/_matrix/federation/(v1|v2)/user/devices/",
             "^/_matrix/federation/(v1|v2)/get_groups_publicised$",
@@ -213,10 +215,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "listener_resources": ["client", "replication"],
         "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload"],
         "shared_extra_conf": {},
-        "worker_extra_conf": (
-            "worker_main_http_uri: http://127.0.0.1:%d"
-            % (MAIN_PROCESS_HTTP_LISTENER_PORT,)
-        ),
+        "worker_extra_conf": "",
     },
     "account_data": {
         "app": "synapse.app.generic_worker",

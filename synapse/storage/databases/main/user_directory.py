@@ -193,9 +193,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         - who should be in the user_directory.
 
         Args:
-            progress (dict)
-            batch_size (int): Maximum number of state events to process
-                per cycle.
+            progress
+            batch_size: Maximum number of state events to process per cycle.
 
         Returns:
             number of events processed.
@@ -490,7 +489,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 table="user_directory",
                 keyvalues={"user_id": user_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
-                lock=False,  # We're only inserter
             )
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -520,7 +518,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     table="user_directory_search",
                     keyvalues={"user_id": user_id},
                     values={"value": value},
-                    lock=False,  # We're only inserter
                 )
             else:
                 # This should be unreachable.
@@ -716,10 +713,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns the rooms that a user is in.
 
         Args:
-            user_id(str): Must be a local user
+            user_id: Must be a local user
 
         Returns:
-            list: user_id
+            List of room IDs
         """
         rows = await self.db_pool.simple_select_onecol(
             table="users_who_share_private_rooms",

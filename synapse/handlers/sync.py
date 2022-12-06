@@ -1426,14 +1426,14 @@ class SyncHandler:
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
-        one_time_key_counts: JsonDict = {}
+        one_time_keys_count: JsonDict = {}
         unused_fallback_key_types: List[str] = []
         if device_id:
             # TODO: We should have a way to let clients differentiate between the states of:
             #   * no change in OTK count since the provided since token
             #   * the server has zero OTKs left for this device
             #  Spec issue: https://github.com/matrix-org/matrix-doc/issues/3298
-            one_time_key_counts = await self.store.count_e2e_one_time_keys(
+            one_time_keys_count = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
             unused_fallback_key_types = (
@@ -1463,7 +1463,7 @@ class SyncHandler:
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
             device_lists=device_lists,
-            device_one_time_keys_count=one_time_key_counts,
+            device_one_time_keys_count=one_time_keys_count,
             device_unused_fallback_key_types=unused_fallback_key_types,
             next_batch=sync_result_builder.now_token,
         )
@@ -1528,10 +1528,12 @@ class SyncHandler:
             #
             # If we don't have that info cached then we get all the users that
             # share a room with our user and check if those users have changed.
-            changed_users = self.store.get_cached_device_list_changes(
+            cache_result = self.store.get_cached_device_list_changes(
                 since_token.device_list_key
             )
-            if changed_users is not None:
+            if cache_result.hit:
+                changed_users = cache_result.entities
+
                 result = await self.store.get_rooms_for_users(changed_users)
 
                 for changed_user_id, entries in result.items():

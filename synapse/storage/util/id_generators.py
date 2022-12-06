@@ -253,7 +253,7 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
         return _AsyncCtxManagerWrapper(manager())
 
     def get_current_token(self) -> int:
-        if self._is_writer:
+        if not self._is_writer:
             return self._current
 
         with self._lock:

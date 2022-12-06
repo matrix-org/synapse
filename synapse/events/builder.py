@@ -128,6 +128,7 @@ class EventBuilder:
                 state_filter=StateFilter.from_types(
                     auth_types_for_event(self.room_version, self)
                 ),
+                await_full_state=False,
             )
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 self, state_ids

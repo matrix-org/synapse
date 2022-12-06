@@ -150,8 +150,5 @@ class RatelimitConfig(Config):
 
         self.rc_third_party_invite = RatelimitSettings(
             config.get("rc_third_party_invite", {}),
-            defaults={
-                "per_second": self.rc_message.per_second,
-                "burst_count": self.rc_message.burst_count,
-            },
+            defaults={"per_second": 0.0025, "burst_count": 5},
         )

@@ -951,8 +951,7 @@ class MatrixFederationHttpClient:
 
             args: query params
         Returns:
-            dict|list: Succeeds when we get a 2xx HTTP response. The
-            result will be the decoded JSON body.
+            Succeeds when we get a 2xx HTTP response. The result will be the decoded JSON body.
 
         Raises:
             HttpResponseException: If we get an HTTP response code >= 300
