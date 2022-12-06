@@ -578,9 +578,6 @@ class ApplicationServicesHandler:
             device_id,
         ), messages in recipient_device_to_messages.items():
             for message_json in messages:
-                # Remove 'message_id' from the to-device message, as it's an internal ID
-                message_json.pop("message_id", None)
-
                 message_payload.append(
                     {
                         "to_user_id": user_id,
