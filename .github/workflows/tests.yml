@@ -164,11 +164,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Run Docker on tmpfs
-        uses: JonasAlfredsson/docker-on-tmpfs@v1
-        with:
-          tmpfs_size: 5
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -179,12 +174,10 @@ jobs:
         run: |
           docker buildx build -t localhost:5000/matrixdotorg/synapse:latest --push --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION --build-arg TEST_ONLY_IGNORE_POETRY_LOCKFILE -f "docker/Dockerfile" .
 
-      - run: docker images -a
       - name: Build workers
         run: |
           docker buildx build -t localhost:5000/matrixdotorg/synapse-workers:latest --push --build-context=matrixdotorg/synapse:latest=docker-image://localhost:5000/matrixdotorg/synapse:latest -f "docker/Dockerfile-workers" .
 
-      - run: docker images -a
       - name: Build Complement
         run: |
           docker buildx build -t complement-synapse:latest -o "type=docker,dest=/tmp/synapse-prewarm.tar" --build-context=matrixdotorg/synapse-workers:latest=docker-image://localhost:5000/matrixdotorg/synapse-workers:latest -f "docker/complement/Dockerfile" "docker/complement"
