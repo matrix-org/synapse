@@ -28,7 +28,7 @@ from typing import (
 
 try:
     # Figure out if ICU support is available for searching users.
-    import icu  # type: ignore[import]
+    import icu
 
     USE_ICU = True
 except ModuleNotFoundError:
