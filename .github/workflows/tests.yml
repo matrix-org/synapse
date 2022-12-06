@@ -153,6 +153,48 @@ jobs:
 
       - run: cargo fmt --check
 
+  prewarm-cache:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      # - name: Checkout
+      #  uses: actions/checkout@v3
+
+      - name: Run Docker on tmpfs
+        uses: JonasAlfredsson/docker-on-tmpfs@v1
+        with:
+          tmpfs_size: 5
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver-opts: network=host
+
+      - name: Build base
+        run: |
+          docker buildx build -t localhost:5000/matrixdotorg/synapse:latest --push --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION --build-arg TEST_ONLY_IGNORE_POETRY_LOCKFILE -f "docker/Dockerfile" .
+
+      - run: docker images -a
+      - name: Build workers
+        run: |
+          docker buildx build -t localhost:5000/matrixdotorg/synapse-workers:latest --push --build-context=matrixdotorg/synapse:latest=docker-image://localhost:5000/matrixdotorg/synapse:latest -f "docker/Dockerfile-workers" .
+
+      - run: docker images -a
+      - name: Build Complement
+        run: |
+          docker buildx build -t complement-synapse:latest -o "type=docker,dest=/tmp/synapse-prewarm.tar" --build-context=matrixdotorg/synapse-workers:latest=docker-image://localhost:5000/matrixdotorg/synapse-workers:latest -f "docker/complement/Dockerfile" "docker/complement"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: synapse-prewarm
+          path: /tmp/synapse-prewarm.tar
+
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
@@ -165,6 +207,7 @@ jobs:
       - check-schema-delta
       - lint-clippy
       - lint-rustfmt
+      - prewarm-cache
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -508,6 +551,10 @@ jobs:
         with:
           path: synapse
 
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Install Rust
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
@@ -520,9 +567,20 @@ jobs:
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: synapse-prewarm
+          path: /tmp
+
+      - name: Load image
+        run: |
+          docker load --input /tmp/synapse-prewarm.tar
+          docker image ls -a
+
       - run: |
           set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -f -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
         name: Run Complement Tests
 
