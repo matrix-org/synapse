@@ -20,10 +20,10 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
-    Container,
     Dict,
     Iterable,
     List,
+    Mapping,
     MutableMapping,
     Optional,
     Set,
@@ -46,6 +46,7 @@ from synapse.api.room_versions import (
     RoomVersion,
     RoomVersions,
 )
+from synapse.config.api import StateKeyFilter
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
@@ -879,7 +880,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_stripped_room_state_from_event_context(
         self,
         context: EventContext,
-        state_types_to_include: Container[str],
+        state_keys_to_include: Mapping[str, StateKeyFilter],
         membership_user_id: Optional[str] = None,
     ) -> List[JsonDict]:
         """
@@ -892,7 +893,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             context: The event context to retrieve state of the room from.
-            state_types_to_include: The type of state events to include.
+            state_keys_to_include: The state events to include, for each event type.
             membership_user_id: An optional user ID to include the stripped membership state
                 events of. This is useful when generating the stripped state of a room for
                 invites. We want to send membership events of the inviter, so that the
@@ -907,12 +908,22 @@ class EventsWorkerStore(SQLBaseStore):
         # non-None.
         assert current_state_ids is not None
 
+        def should_include(t: str, s: str) -> bool:
+            if t in state_keys_to_include and s in state_keys_to_include[t]:
+                return True
+            if (
+                membership_user_id
+                and t == EventTypes.Member
+                and s == membership_user_id
+            ):
+                return True
+            return False
+
         # The state to include
         state_to_include_ids = [
             e_id
-            for k, e_id in current_state_ids.items()
-            if k[0] in state_types_to_include
-            or (membership_user_id and k == (EventTypes.Member, membership_user_id))
+            for (event_type, state_key), e_id in current_state_ids.items()
+            if should_include(event_type, state_key)
         ]
 
         state_to_include = await self.get_events(state_to_include_ids)
