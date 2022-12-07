@@ -886,7 +886,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
         limited = len(results) > limit
 
-        return {"limited": limited, "results": results}
+        return {"limited": limited, "results": results[0:limit]}
 
 
 def _parse_query_sqlite(search_term: str) -> str:
