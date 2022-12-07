@@ -115,7 +115,7 @@ if [ -n "$use_editable_synapse" ]; then
         trap "mv -f '$synapse_pkg/synapse_rust.abi3.so~host' '$synapse_pkg/synapse_rust.abi3.so'" EXIT
     fi
 
-    editable_mount="$(realpath .):/editable-src"
+    editable_mount="$(realpath .):/editable-src:z"
     if docker inspect complement-synapse-editable &>/dev/null; then
         # complement-synapse-editable already exists: see if we can still use it:
         # - The Rust module must still be importable; it will fail to import if the Rust source has changed.
