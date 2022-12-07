@@ -641,7 +641,7 @@ class PerDestinationQueue:
             if not message_id:
                 continue
 
-            set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+            set_tag(SynapseTags.TO_DEVICE_EDU_ID, message_id)
 
         edus = [
             Edu(

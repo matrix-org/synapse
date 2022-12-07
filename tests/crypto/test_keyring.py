@@ -433,7 +433,7 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         async def get_json(destination, path, **kwargs):
             self.assertEqual(destination, SERVER_NAME)
-            self.assertEqual(path, "/_matrix/key/v2/server/key1")
+            self.assertEqual(path, "/_matrix/key/v2/server")
             return response
 
         self.http_client.get_json.side_effect = get_json
@@ -468,18 +468,6 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         keys = self.get_success(fetcher.get_keys(SERVER_NAME, ["key1"], 0))
         self.assertEqual(keys, {})
-
-    def test_keyid_containing_forward_slash(self) -> None:
-        """We should url-encode any url unsafe chars in key ids.
-
-        Detects https://github.com/matrix-org/synapse/issues/14488.
-        """
-        fetcher = ServerKeyFetcher(self.hs)
-        self.get_success(fetcher.get_keys("example.com", ["key/potato"], 0))
-
-        self.http_client.get_json.assert_called_once()
-        args, kwargs = self.http_client.get_json.call_args
-        self.assertEqual(kwargs["path"], "/_matrix/key/v2/server/key%2Fpotato")
 
 
 class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):

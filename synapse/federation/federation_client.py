@@ -771,17 +771,28 @@ class FederationClient(FederationBase):
         """
         if synapse_error is None:
             synapse_error = e.to_synapse_error()
-        # There is no good way to detect an "unknown" endpoint.
+        # MSC3743 specifies that servers should return a 404 or 405 with an errcode
+        # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
+        # to an unknown method, respectively.
         #
-        # Dendrite returns a 404 (with a body of "404 page not found");
-        # Conduit returns a 404 (with no body); and Synapse returns a 400
-        # with M_UNRECOGNIZED.
-        #
-        # This needs to be rather specific as some endpoints truly do return 404
-        # errors.
+        # Older versions of servers don't properly handle this. This needs to be
+        # rather specific as some endpoints truly do return 404 errors.
         return (
-            e.code == 404 and (not e.response or e.response == b"404 page not found")
-        ) or (e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED)
+            # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
+            (e.code == 404 or e.code == 405)
+            and (
+                # Older Dendrites returned a text or empty body.
+                # Older Conduit returned an empty body.
+                not e.response
+                or e.response == b"404 page not found"
+                # The proper response JSON with M_UNRECOGNIZED errcode.
+                or synapse_error.errcode == Codes.UNRECOGNIZED
+            )
+        ) or (
+            # Older Synapses returned a 400 error.
+            e.code == 400
+            and synapse_error.errcode == Codes.UNRECOGNIZED
+        )
 
     async def _try_destination_list(
         self,
