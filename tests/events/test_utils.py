@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest as stdlib_unittest
+
 from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
@@ -23,8 +25,6 @@ from synapse.events.utils import (
 )
 from synapse.util.frozenutils import freeze
 
-from tests import unittest
-
 
 def MockEvent(**kwargs):
     if "event_id" not in kwargs:
@@ -34,7 +34,7 @@ def MockEvent(**kwargs):
     return make_event_from_dict(kwargs)
 
 
-class PruneEventTestCase(unittest.TestCase):
+class PruneEventTestCase(stdlib_unittest.TestCase):
     def run_test(self, evdict, matchdict, **kwargs):
         """
         Asserts that a new event constructed with `evdict` will look like
@@ -391,7 +391,7 @@ class PruneEventTestCase(unittest.TestCase):
         )
 
 
-class SerializeEventTestCase(unittest.TestCase):
+class SerializeEventTestCase(stdlib_unittest.TestCase):
     def serialize(self, ev, fields):
         return serialize_event(
             ev, 1479807801915, config=SerializeEventConfig(only_event_fields=fields)
@@ -513,7 +513,7 @@ class SerializeEventTestCase(unittest.TestCase):
             )
 
 
-class CopyPowerLevelsContentTestCase(unittest.TestCase):
+class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
     def setUp(self) -> None:
         self.test_content = {
             "ban": 50,
