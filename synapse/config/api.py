@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Iterable
+from typing import Any, Container, Dict, Iterable, Mapping, Optional, Set, Tuple, Type
+
+import attr
 
 from synapse.api.constants import EventTypes
 from synapse.config._base import Config, ConfigError
@@ -23,19 +25,63 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
+@attr.s(auto_attribs=True)
+class StateKeyFilter(Container[str]):
+    """A simpler version of StateFilter which ignores event types.
+
+    Represents an optional constraint that state_keys must belong to a given set of
+    strings called `options`. An empty set of `options` means that there are no
+    restrictions.
+    """
+
+    options: Set[str]
+
+    @classmethod
+    def any(cls: Type["StateKeyFilter"]) -> "StateKeyFilter":
+        return cls(set())
+
+    @classmethod
+    def only(cls: Type["StateKeyFilter"], state_key: str) -> "StateKeyFilter":
+        return cls({state_key})
+
+    def __contains__(self, state_key: object) -> bool:
+        return not self.options or state_key in self.options
+
+    def add(self, state_key: Optional[str]) -> None:
+        if state_key is None:
+            self.options = set()
+        elif self.options:
+            self.options.add(state_key)
+
+
 class ApiConfig(Config):
     section = "api"
 
+    room_prejoin_state: Mapping[str, StateKeyFilter]
+    track_puppetted_users_ips: bool
+
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         validate_config(_MAIN_SCHEMA, config, ())
-        self.room_prejoin_state = list(self._get_prejoin_state_types(config))
+        self.room_prejoin_state = self._build_prejoin_state(config)
         self.track_puppeted_user_ips = config.get("track_puppeted_user_ips", False)
 
-    def _get_prejoin_state_types(self, config: JsonDict) -> Iterable[str]:
-        """Get the event types to include in the prejoin state
+    def _build_prejoin_state(self, config: JsonDict) -> Dict[str, StateKeyFilter]:
+        prejoin_events = {}
+        for event_type, state_key in self._get_prejoin_state_entries(config):
+            if event_type not in prejoin_events:
+                if state_key is None:
+                    filter = StateKeyFilter.any()
+                else:
+                    filter = StateKeyFilter.only(state_key)
+                prejoin_events[event_type] = filter
+            else:
+                prejoin_events[event_type].add(state_key)
+        return prejoin_events
 
-        Parses the config and returns an iterable of the event types to be included.
-        """
+    def _get_prejoin_state_entries(
+        self, config: JsonDict
+    ) -> Iterable[Tuple[str, Optional[str]]]:
+        """Get the event types and state keys to include in the prejoin state."""
         room_prejoin_state_config = config.get("room_prejoin_state") or {}
 
         # backwards-compatibility support for room_invite_state_types
@@ -50,33 +96,39 @@ class ApiConfig(Config):
 
             logger.warning(_ROOM_INVITE_STATE_TYPES_WARNING)
 
-            yield from config["room_invite_state_types"]
+            for event_type in config["room_invite_state_types"]:
+                yield event_type, None
             return
 
         if not room_prejoin_state_config.get("disable_default_event_types"):
-            yield from _DEFAULT_PREJOIN_STATE_TYPES
+            yield from _DEFAULT_PREJOIN_STATE_TYPES_AND_STATE_KEYS
 
-        yield from room_prejoin_state_config.get("additional_event_types", [])
+        for entry in room_prejoin_state_config.get("additional_event_types", []):
+            if isinstance(entry, str):
+                yield entry, None
+            else:
+                yield entry
 
 
 _ROOM_INVITE_STATE_TYPES_WARNING = """\
 WARNING: The 'room_invite_state_types' configuration setting is now deprecated,
 and replaced with 'room_prejoin_state'. New features may not work correctly
-unless 'room_invite_state_types' is removed. See the sample configuration file for
-details of 'room_prejoin_state'.
+unless 'room_invite_state_types' is removed. See the config documentation at
+    https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#room_prejoin_state
+for details of 'room_prejoin_state'.
 --------------------------------------------------------------------------------
 """
 
-_DEFAULT_PREJOIN_STATE_TYPES = [
-    EventTypes.JoinRules,
-    EventTypes.CanonicalAlias,
-    EventTypes.RoomAvatar,
-    EventTypes.RoomEncryption,
-    EventTypes.Name,
+_DEFAULT_PREJOIN_STATE_TYPES_AND_STATE_KEYS = [
+    (EventTypes.JoinRules, ""),
+    (EventTypes.CanonicalAlias, ""),
+    (EventTypes.RoomAvatar, ""),
+    (EventTypes.RoomEncryption, ""),
+    (EventTypes.Name, ""),
     # Per MSC1772.
-    EventTypes.Create,
+    (EventTypes.Create, ""),
     # Per MSC3173.
-    EventTypes.Topic,
+    (EventTypes.Topic, ""),
 ]
 
 
@@ -90,7 +142,17 @@ _ROOM_PREJOIN_STATE_CONFIG_SCHEMA = {
                 "disable_default_event_types": {"type": "boolean"},
                 "additional_event_types": {
                     "type": "array",
-                    "items": {"type": "string"},
+                    "items": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "minItems": 2,
+                                "maxItems": 2,
+                            },
+                        ],
+                    },
                 },
             },
         },
