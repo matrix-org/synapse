@@ -213,15 +213,16 @@ class StreamChangeCache:
         """
         assert isinstance(stream_pos, int)
 
-        if not self._cache:
-            # If the cache is empty, nothing can have changed.
-            return False
-
         # _cache is not valid at or before the earliest known stream position, so
         # return that an entity has changed.
         if stream_pos <= self._earliest_known_stream_pos:
             self.metrics.inc_misses()
             return True
+
+        # If the cache is empty, nothing can have changed.
+        if not self._cache:
+            # TODO Metrics?
+            return False
 
         self.metrics.inc_hits()
         return stream_pos < self._cache.peekitem()[0]
