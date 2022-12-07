@@ -20,6 +20,7 @@ from synapse.events import make_event_from_dict
 from synapse.events.utils import (
     SerializeEventConfig,
     copy_and_fixup_power_levels_contents,
+    maybe_upsert_event_field,
     prune_event,
     serialize_event,
 )
@@ -32,6 +33,30 @@ def MockEvent(**kwargs):
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
     return make_event_from_dict(kwargs)
+
+
+class TestMaybeUpsertEventField(stdlib_unittest.TestCase):
+    def test_update_okay(self) -> None:
+        event = make_event_from_dict({"event_id": "$1234"})
+        success = maybe_upsert_event_field(event, event.unsigned, "key", "value")
+        self.assertTrue(success)
+        self.assertEqual(event.unsigned["key"], "value")
+
+    def test_update_not_okay(self) -> None:
+        event = make_event_from_dict({"event_id": "$1234"})
+        LARGE_STRING = "a" * 100_000
+        success = maybe_upsert_event_field(event, event.unsigned, "key", LARGE_STRING)
+        self.assertFalse(success)
+        self.assertNotIn("key", event.unsigned)
+
+    def test_update_not_okay_leaves_original_value(self) -> None:
+        event = make_event_from_dict(
+            {"event_id": "$1234", "unsigned": {"key": "value"}}
+        )
+        LARGE_STRING = "a" * 100_000
+        success = maybe_upsert_event_field(event, event.unsigned, "key", LARGE_STRING)
+        self.assertFalse(success)
+        self.assertEqual(event.unsigned["key"], "value")
 
 
 class PruneEventTestCase(stdlib_unittest.TestCase):
