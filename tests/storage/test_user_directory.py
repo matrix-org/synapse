@@ -449,6 +449,12 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         )
 
     @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_limit_correct(self) -> None:
+        r = self.get_success(self.store.search_user_dir(ALICE, "bob", 1))
+        self.assertTrue(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+
+    @override_config({"user_directory": {"search_all_users": True}})
     def test_search_user_dir_stop_words(self) -> None:
         """Tests that a user can look up another user by searching for the start if its
         display name even if that name happens to be a common English word that would
