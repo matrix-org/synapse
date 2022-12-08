@@ -1,1 +1,1 @@
-Fix a long-standing bug where a device list update might not be sent to clients in certain circumstances.
+Fix a long-standing bug where the user directory and room/user stats might be out of sync.
