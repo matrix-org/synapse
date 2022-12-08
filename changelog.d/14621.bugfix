@@ -1,0 +1,1 @@
+Return spec-compliant JSON errors when unknown endpoints are requested.
