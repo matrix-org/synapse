@@ -221,7 +221,7 @@ class StreamChangeCache:
 
         # If the cache is empty, nothing can have changed.
         if not self._cache:
-            # TODO Metrics?
+            self.metrics.inc_misses()
             return False
 
         self.metrics.inc_hits()
