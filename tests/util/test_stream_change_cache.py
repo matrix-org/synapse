@@ -144,9 +144,10 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         """
         cache = StreamChangeCache("#test", 1)
 
-        # With no entities, it returns False for the past, present, and future.
-        self.assertFalse(cache.has_any_entity_changed(0))
-        self.assertFalse(cache.has_any_entity_changed(1))
+        # With no entities, it returns True for the past, present, and False for
+        # the future.
+        self.assertTrue(cache.has_any_entity_changed(0))
+        self.assertTrue(cache.has_any_entity_changed(1))
         self.assertFalse(cache.has_any_entity_changed(2))
 
         # We add an entity
