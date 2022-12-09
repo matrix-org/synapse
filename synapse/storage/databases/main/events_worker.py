@@ -208,10 +208,7 @@ class EventsWorkerStore(SQLBaseStore):
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
             #
-            # If this process is the writer than we need to use
-            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
-            # updated over replication. (Multiple writers are not supported for
-            # SQLite).
+            # SQLite/StreamIdGenerator only support a single writer instance (is_writer)
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
                 "events",
@@ -327,6 +324,7 @@ class EventsWorkerStore(SQLBaseStore):
             # NOTE: this must be updated *after* the stream change cache, so other threads don't
             # see a token ahead of the cache.
             self._stream_id_gen.advance(instance_name, token)
+
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
 
