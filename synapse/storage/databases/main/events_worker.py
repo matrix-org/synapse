@@ -314,7 +314,18 @@ class EventsWorkerStore(SQLBaseStore):
         token: int,
         rows: Iterable[Any],
     ) -> None:
+        # Process event stream replication rows, handling both the ID generators from the events
+        # worker store and the stream change caches in this store as the two are interlinked.
         if stream_name == EventsStream.NAME:
+            for row in rows:
+                data = row.data
+                self._events_stream_cache.entity_has_changed(data.room_id, token)
+                if data.type == EventTypes.Member:
+                    self._membership_stream_cache.entity_has_changed(
+                        data.state_key, token
+                    )
+            # NOTE: this must be updated *after* the stream change cache, so other threads don't
+            # see a token ahead of the cache.
             self._stream_id_gen.advance(instance_name, token)
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)

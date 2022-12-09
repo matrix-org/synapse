@@ -235,9 +235,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         # case where we look up an event *before* persisting it.
         self._attempt_to_invalidate_cache("_get_membership_from_event_id", (event_id,))
 
-        if not backfilled:
-            self._events_stream_cache.entity_has_changed(room_id, stream_ordering)
-
         if redacts:
             self._invalidate_local_get_event_cache(redacts)
             # Caches which might leak edits must be invalidated for the event being
@@ -248,7 +245,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_id_for_receipts", (redacts,))
 
         if etype == EventTypes.Member:
-            self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
             self._attempt_to_invalidate_cache(
                 "get_invited_rooms_for_local_user", (state_key,)
             )
