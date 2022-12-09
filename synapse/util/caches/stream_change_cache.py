@@ -19,6 +19,7 @@ from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Un
 import attr
 from sortedcontainers import SortedDict
 
+from synapse.storage.util.id_generators import AbstractStreamIdTracker
 from synapse.util import caches
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ class StreamChangeCache:
         current_stream_pos: int,
         max_size: int = 10000,
         prefilled_cache: Optional[Mapping[EntityType, int]] = None,
+        stream_id_gen: Optional[AbstractStreamIdTracker] = None,
     ) -> None:
         self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
@@ -91,6 +93,8 @@ class StreamChangeCache:
         self.metrics = caches.register_cache(
             "cache", self.name, self._cache, resize_callback=self.set_cache_factor
         )
+
+        self.stream_id_gen = stream_id_gen
 
         if prefilled_cache:
             for entity, stream_pos in prefilled_cache.items():
@@ -270,6 +274,11 @@ class StreamChangeCache:
         # stream position) there's nothing to do.
         if stream_pos <= self._earliest_known_stream_pos:
             return
+
+        # Any change being flagged must be ahead of any current token, otherwise
+        # we have a race condition between token position and stream change cache.
+        if self.stream_id_gen:
+            assert stream_pos > self.stream_id_gen.get_current_token()
 
         old_pos = self._entity_to_key.get(entity, None)
         if old_pos is not None:

@@ -250,9 +250,12 @@ class EventsWorkerStore(SQLBaseStore):
             "EventsRoomStreamChangeCache",
             min_event_val,
             prefilled_cache=event_cache_prefill,
+            stream_id_gen=self._stream_id_gen,
         )
         self._membership_stream_cache = StreamChangeCache(
-            "MembershipStreamChangeCache", events_max
+            "MembershipStreamChangeCache",
+            events_max,
+            stream_id_gen=self._stream_id_gen,
         )
 
         if hs.config.worker.run_background_tasks:
