@@ -62,6 +62,7 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
 from synapse.types import (
@@ -1121,17 +1122,29 @@ class RoomCreationHandler:
             )
 
         creation_content.update({"creator": creator_id})
-        creation_event, creation_context = await create_event(
-            EventTypes.Create, creation_content, False
-        )
 
         logger.debug("Sending %s in new room", EventTypes.Member)
-        ev = await self.event_creation_handler.handle_new_client_event(
-            requester=creator,
-            events_and_context=[(creation_event, creation_context)],
-            ratelimit=False,
-            ignore_shadow_ban=True,
-        )
+
+        # Try 2 times, the first one could fail with PartialStateConflictError
+        # in handle_new_client_event, cf comment in except block.
+        for _ in range(2):
+            try:
+                creation_event, creation_context = await create_event(
+                    EventTypes.Create, creation_content, False
+                )
+
+                ev = await self.event_creation_handler.handle_new_client_event(
+                    requester=creator,
+                    events_and_context=[(creation_event, creation_context)],
+                    ratelimit=False,
+                    ignore_shadow_ban=True,
+                )
+
+                break
+            except PartialStateConflictError:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                pass
         last_sent_event_id = ev.event_id
 
         member_event_id, _ = await self.room_member_handler.update_membership(
@@ -1160,123 +1173,139 @@ class RoomCreationHandler:
         )
         current_state_group = event_to_state[member_event_id]
 
-        events_to_send = []
-        # We treat the power levels override specially as this needs to be one
-        # of the first events that get sent into a room.
-        pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
-        if pl_content is not None:
-            power_event, power_context = await create_event(
-                EventTypes.PowerLevels, pl_content, True
-            )
-            current_state_group = power_context._state_group
-            events_to_send.append((power_event, power_context))
-        else:
-            power_level_content: JsonDict = {
-                "users": {creator_id: 100},
-                "users_default": 0,
-                "events": {
-                    EventTypes.Name: 50,
-                    EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 100,
-                    EventTypes.CanonicalAlias: 50,
-                    EventTypes.RoomAvatar: 50,
-                    EventTypes.Tombstone: 100,
-                    EventTypes.ServerACL: 100,
-                    EventTypes.RoomEncryption: 100,
-                },
-                "events_default": 0,
-                "state_default": 50,
-                "ban": 50,
-                "kick": 50,
-                "redact": 50,
-                "invite": 50,
-                "historical": 100,
-            }
+        # Try 2 times, the first one could fail with PartialStateConflictError
+        # in handle_new_client_event, cf comment in except block.
+        for _ in range(2):
+            try:
+                events_to_send = []
+                # We treat the power levels override specially as this needs to be one
+                # of the first events that get sent into a room.
+                pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
+                if pl_content is not None:
+                    power_event, power_context = await create_event(
+                        EventTypes.PowerLevels, pl_content, True
+                    )
+                    current_state_group = power_context._state_group
+                    events_to_send.append((power_event, power_context))
+                else:
+                    power_level_content: JsonDict = {
+                        "users": {creator_id: 100},
+                        "users_default": 0,
+                        "events": {
+                            EventTypes.Name: 50,
+                            EventTypes.PowerLevels: 100,
+                            EventTypes.RoomHistoryVisibility: 100,
+                            EventTypes.CanonicalAlias: 50,
+                            EventTypes.RoomAvatar: 50,
+                            EventTypes.Tombstone: 100,
+                            EventTypes.ServerACL: 100,
+                            EventTypes.RoomEncryption: 100,
+                        },
+                        "events_default": 0,
+                        "state_default": 50,
+                        "ban": 50,
+                        "kick": 50,
+                        "redact": 50,
+                        "invite": 50,
+                        "historical": 100,
+                    }
 
-            if config["original_invitees_have_ops"]:
-                for invitee in invite_list:
-                    power_level_content["users"][invitee] = 100
+                    if config["original_invitees_have_ops"]:
+                        for invitee in invite_list:
+                            power_level_content["users"][invitee] = 100
 
-            # If the user supplied a preset name e.g. "private_chat",
-            # we apply that preset
-            power_level_content.update(config["power_level_content_override"])
+                    # If the user supplied a preset name e.g. "private_chat",
+                    # we apply that preset
+                    power_level_content.update(config["power_level_content_override"])
 
-            # If the server config contains default_power_level_content_override,
-            # and that contains information for this room preset, apply it.
-            if self._default_power_level_content_override:
-                override = self._default_power_level_content_override.get(preset_config)
-                if override is not None:
-                    power_level_content.update(override)
+                    # If the server config contains default_power_level_content_override,
+                    # and that contains information for this room preset, apply it.
+                    if self._default_power_level_content_override:
+                        override = self._default_power_level_content_override.get(
+                            preset_config
+                        )
+                        if override is not None:
+                            power_level_content.update(override)
 
-            # Finally, if the user supplied specific permissions for this room,
-            # apply those.
-            if power_level_content_override:
-                power_level_content.update(power_level_content_override)
-            pl_event, pl_context = await create_event(
-                EventTypes.PowerLevels,
-                power_level_content,
-                True,
-            )
-            current_state_group = pl_context._state_group
-            events_to_send.append((pl_event, pl_context))
+                    # Finally, if the user supplied specific permissions for this room,
+                    # apply those.
+                    if power_level_content_override:
+                        power_level_content.update(power_level_content_override)
+                    pl_event, pl_context = await create_event(
+                        EventTypes.PowerLevels,
+                        power_level_content,
+                        True,
+                    )
+                    current_state_group = pl_context._state_group
+                    events_to_send.append((pl_event, pl_context))
 
-        if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            room_alias_event, room_alias_context = await create_event(
-                EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True
-            )
-            current_state_group = room_alias_context._state_group
-            events_to_send.append((room_alias_event, room_alias_context))
+                if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
+                    room_alias_event, room_alias_context = await create_event(
+                        EventTypes.CanonicalAlias,
+                        {"alias": room_alias.to_string()},
+                        True,
+                    )
+                    current_state_group = room_alias_context._state_group
+                    events_to_send.append((room_alias_event, room_alias_context))
 
-        if (EventTypes.JoinRules, "") not in initial_state:
-            join_rules_event, join_rules_context = await create_event(
-                EventTypes.JoinRules,
-                {"join_rule": config["join_rules"]},
-                True,
-            )
-            current_state_group = join_rules_context._state_group
-            events_to_send.append((join_rules_event, join_rules_context))
+                if (EventTypes.JoinRules, "") not in initial_state:
+                    join_rules_event, join_rules_context = await create_event(
+                        EventTypes.JoinRules,
+                        {"join_rule": config["join_rules"]},
+                        True,
+                    )
+                    current_state_group = join_rules_context._state_group
+                    events_to_send.append((join_rules_event, join_rules_context))
 
-        if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            visibility_event, visibility_context = await create_event(
-                EventTypes.RoomHistoryVisibility,
-                {"history_visibility": config["history_visibility"]},
-                True,
-            )
-            current_state_group = visibility_context._state_group
-            events_to_send.append((visibility_event, visibility_context))
+                if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
+                    visibility_event, visibility_context = await create_event(
+                        EventTypes.RoomHistoryVisibility,
+                        {"history_visibility": config["history_visibility"]},
+                        True,
+                    )
+                    current_state_group = visibility_context._state_group
+                    events_to_send.append((visibility_event, visibility_context))
 
-        if config["guest_can_join"]:
-            if (EventTypes.GuestAccess, "") not in initial_state:
-                guest_access_event, guest_access_context = await create_event(
-                    EventTypes.GuestAccess,
-                    {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
-                    True,
+                if config["guest_can_join"]:
+                    if (EventTypes.GuestAccess, "") not in initial_state:
+                        guest_access_event, guest_access_context = await create_event(
+                            EventTypes.GuestAccess,
+                            {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
+                            True,
+                        )
+                        current_state_group = guest_access_context._state_group
+                        events_to_send.append(
+                            (guest_access_event, guest_access_context)
+                        )
+
+                for (etype, state_key), content in initial_state.items():
+                    event, context = await create_event(
+                        etype, content, True, state_key=state_key
+                    )
+                    current_state_group = context._state_group
+                    events_to_send.append((event, context))
+
+                if config["encrypted"]:
+                    encryption_event, encryption_context = await create_event(
+                        EventTypes.RoomEncryption,
+                        {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
+                        True,
+                        state_key="",
+                    )
+                    events_to_send.append((encryption_event, encryption_context))
+
+                last_event = await self.event_creation_handler.handle_new_client_event(
+                    creator,
+                    events_to_send,
+                    ignore_shadow_ban=True,
+                    ratelimit=False,
                 )
-                current_state_group = guest_access_context._state_group
-                events_to_send.append((guest_access_event, guest_access_context))
 
-        for (etype, state_key), content in initial_state.items():
-            event, context = await create_event(
-                etype, content, True, state_key=state_key
-            )
-            current_state_group = context._state_group
-            events_to_send.append((event, context))
-
-        if config["encrypted"]:
-            encryption_event, encryption_context = await create_event(
-                EventTypes.RoomEncryption,
-                {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
-                True,
-                state_key="",
-            )
-            events_to_send.append((encryption_event, encryption_context))
-
-        last_event = await self.event_creation_handler.handle_new_client_event(
-            creator,
-            events_to_send,
-            ignore_shadow_ban=True,
-            ratelimit=False,
-        )
+                break
+            except PartialStateConflictError:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                pass
         assert last_event.internal_metadata.stream_ordering is not None
         return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
 
