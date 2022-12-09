@@ -458,9 +458,11 @@ class DeviceHandler(DeviceWorkerHandler):
 
     async def _prune_too_many_devices(self, user_id: str) -> None:
         """Delete any excess old devices this user may have."""
-        device_ids = await self.store.check_too_many_devices_for_user(user_id)
+        device_ids = await self.store.check_too_many_devices_for_user(user_id, 100)
         if not device_ids:
             return
+
+        logger.info("Pruning %d old devices for user %s", len(device_ids), user_id)
 
         # We don't want to block and try and delete tonnes of devices at once,
         # so we cap the number of devices we delete synchronously.
