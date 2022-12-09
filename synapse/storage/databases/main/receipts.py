@@ -999,9 +999,12 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             _remote_duplicate_receipts_txn,
         )
 
-        await self._create_receipts_index(
-            "receipts_linearized_unique_index",
-            "receipts_linearized",
+        await self.db_pool.updates.create_index_in_background(
+            index_name="receipts_linearized_unique_index",
+            table="receipts_linearized",
+            columns=["room_id", "receipt_type", "user_id"],
+            where_clause="thread_id IS NULL",
+            unique=True,
         )
 
         await self.db_pool.updates._end_background_update(
@@ -1050,9 +1053,12 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             _remote_duplicate_receipts_txn,
         )
 
-        await self._create_receipts_index(
-            "receipts_graph_unique_index",
-            "receipts_graph",
+        await self.db_pool.updates.create_index_in_background(
+            index_name="receipts_graph_unique_index",
+            table="receipts_graph",
+            columns=["room_id", "receipt_type", "user_id"],
+            where_clause="thread_id IS NULL",
+            unique=True,
         )
 
         await self.db_pool.updates._end_background_update(
