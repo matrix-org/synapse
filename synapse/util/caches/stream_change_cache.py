@@ -98,7 +98,7 @@ class StreamChangeCache:
 
         if prefilled_cache:
             for entity, stream_pos in prefilled_cache.items():
-                self.entity_has_changed(entity, stream_pos)
+                self.entity_has_changed(entity, stream_pos, check_pos=False)
 
     def set_cache_factor(self, factor: float) -> bool:
         """
@@ -260,7 +260,9 @@ class StreamChangeCache:
             changed_entities.extend(self._cache[k])
         return AllEntitiesChangedResult(changed_entities)
 
-    def entity_has_changed(self, entity: EntityType, stream_pos: int) -> None:
+    def entity_has_changed(
+        self, entity: EntityType, stream_pos: int, check_pos: bool = True
+    ) -> None:
         """
         Informs the cache that the entity has been changed at the given position.
 
@@ -279,7 +281,7 @@ class StreamChangeCache:
         # we have a race condition between token position and stream change cache.
         # NOTE: this checks for equal to allow for a process persisting an event to
         # immediately flag the cache, as it cannot know the ID before generating it.
-        if self.stream_id_gen:
+        if check_pos and self.stream_id_gen:
             assert stream_pos >= self.stream_id_gen.get_current_token()
 
         old_pos = self._entity_to_key.get(entity, None)
