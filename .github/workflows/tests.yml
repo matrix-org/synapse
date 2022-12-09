@@ -197,8 +197,12 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
+        # 1. Mount postgres data files onto a tmpfs in-memory filesystem to reduce overhead of docker's overlayfs layer.
+        # 2. Expose the unix socket for postgres. This removes latency of using docker-proxy for connections.
         run: |
           docker run -d -p 5432:5432 \
+            --tmpfs /var/lib/postgres:rw,size=6144m \
+            --mount 'type=bind,src=/var/run/postgresql,dst=/var/run/postgresql' \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.job.postgres-version }}
@@ -220,10 +224,10 @@ jobs:
         if: ${{ matrix.job.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: poetry run trial --jobs=2 tests
+      - run: poetry run trial --jobs=6 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.job.database == 'postgres' || '' }}
-          SYNAPSE_POSTGRES_HOST: localhost
+          SYNAPSE_POSTGRES_HOST: /var/run/postgresql
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
@@ -292,7 +296,7 @@ jobs:
           python-version: '3.7'
           extras: "all test"
 
-      - run: poetry run trial -j2 tests
+      - run: poetry run trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
