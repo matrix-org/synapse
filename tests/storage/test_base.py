@@ -62,7 +62,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
 
     @defer.inlineCallbacks
-    def test_insert_1col(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_insert_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -76,7 +76,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_insert_3cols(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_insert_3cols(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -92,7 +92,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_select_one_1col(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_select_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
         self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
 
@@ -108,7 +108,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_select_one_3col(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_select_one_3col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
         self.mock_txn.fetchone.return_value = (1, 2, 3)
 
@@ -128,7 +128,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_select_one_missing(
         self,
-    ) -> Generator[defer.Deferred[object], object, None]:
+    ) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 0
         self.mock_txn.fetchone.return_value = None
 
@@ -144,7 +144,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.assertFalse(ret)
 
     @defer.inlineCallbacks
-    def test_select_list(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_select_list(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 3
         self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
         self.mock_txn.description = (("colA", None, None, None, None, None, None),)
@@ -161,7 +161,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_update_one_1col(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_update_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -178,7 +178,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_update_one_4cols(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_update_one_4cols(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -195,7 +197,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_delete_one(self) -> Generator[defer.Deferred[object], object, None]:
+    def test_delete_one(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(

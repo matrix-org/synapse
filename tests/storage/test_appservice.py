@@ -161,7 +161,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
 
     def _insert_txn(
         self, as_id: str, txn_id: int, events: List[Mock]
-    ) -> defer.Deferred:
+    ) -> "defer.Deferred[None]":
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
                 "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
