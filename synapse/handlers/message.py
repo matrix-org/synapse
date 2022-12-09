@@ -1925,11 +1925,6 @@ class EventCreationHandler:
                 # If there's an expiry timestamp on the event, schedule its expiry.
                 self._message_handler.maybe_schedule_expiry(event)
 
-            if event.type == EventTypes.Message:
-                # We don't want to block sending messages on any presence code. This
-                # matters as sometimes presence code can take a while.
-                run_in_background(self._bump_active_time, requester.user)
-
             if dont_notify:
                 # Skip notifying clients, this is used for Beeper's custom
                 # batch sending of non-historical messages.
