@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import traceback
 import math
 from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
@@ -71,10 +72,11 @@ class StreamChangeCache:
         if current_pos and current_pos > self.max_stream_pos:
             logger.warning(
                 "Checking entity in %s stream cache cache with current position %s "
-                "ahead of the max stream cache position %s",
+                "ahead of the max stream cache position %s:\n%s",
                 self.name,
                 current_pos,
                 self.max_stream_pos,
+                "".join(traceback.format_stack()),
             )
 
     def set_cache_factor(self, factor: float) -> bool:
