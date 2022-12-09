@@ -924,39 +924,6 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
 
         return batch_size
 
-    async def _create_receipts_index(self, index_name: str, table: str) -> None:
-        """Adds a unique index on `(room_id, receipt_type, user_id)` to the given
-        receipts table, for non-thread receipts."""
-
-        def _create_index(conn: LoggingDatabaseConnection) -> None:
-            conn.rollback()
-
-            # we have to set autocommit, because postgres refuses to
-            # CREATE INDEX CONCURRENTLY without it.
-            if isinstance(self.database_engine, PostgresEngine):
-                conn.set_session(autocommit=True)
-
-            try:
-                c = conn.cursor()
-
-                # Now that the duplicates are gone, we can create the index.
-                concurrently = (
-                    "CONCURRENTLY"
-                    if isinstance(self.database_engine, PostgresEngine)
-                    else ""
-                )
-                sql = f"""
-                    CREATE UNIQUE INDEX {concurrently} {index_name}
-                    ON {table}(room_id, receipt_type, user_id)
-                    WHERE thread_id IS NULL
-                """
-                c.execute(sql)
-            finally:
-                if isinstance(self.database_engine, PostgresEngine):
-                    conn.set_session(autocommit=False)
-
-        await self.db_pool.runWithConnection(_create_index)
-
     async def _background_receipts_linearized_unique_index(
         self, progress: dict, batch_size: int
     ) -> int:
