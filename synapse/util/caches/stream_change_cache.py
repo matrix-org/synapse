@@ -277,8 +277,10 @@ class StreamChangeCache:
 
         # Any change being flagged must be ahead of any current token, otherwise
         # we have a race condition between token position and stream change cache.
+        # NOTE: this checks for equal to allow for a process persisting an event to
+        # immediately flag the cache, as it cannot know the ID before generating it.
         if self.stream_id_gen:
-            assert stream_pos > self.stream_id_gen.get_current_token()
+            assert stream_pos >= self.stream_id_gen.get_current_token()
 
         old_pos = self._entity_to_key.get(entity, None)
         if old_pos is not None:
