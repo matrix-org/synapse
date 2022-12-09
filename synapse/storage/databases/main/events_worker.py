@@ -242,6 +242,22 @@ class EventsWorkerStore(SQLBaseStore):
             prefilled_cache=curr_state_delta_prefill,
         )
 
+        event_cache_prefill, min_event_val = self.db_pool.get_cache_dict(
+            db_conn,
+            "events",
+            entity_column="room_id",
+            stream_column="stream_ordering",
+            max_value=events_max,
+        )
+        self._events_stream_cache = StreamChangeCache(
+            "EventsRoomStreamChangeCache",
+            min_event_val,
+            prefilled_cache=event_cache_prefill,
+        )
+        self._membership_stream_cache = StreamChangeCache(
+            "MembershipStreamChangeCache", events_max
+        )
+
         if hs.config.worker.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
