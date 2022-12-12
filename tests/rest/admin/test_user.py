@@ -41,14 +41,12 @@ from tests.unittest import override_config
 
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         profile.register_servlets,
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         self.url = "/_synapse/admin/v1/register"
 
         self.registration_handler = Mock()
@@ -446,7 +444,6 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
 
 class UsersListTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -1108,7 +1105,6 @@ class UserDevicesTestCase(unittest.HomeserverTestCase):
 
 
 class DeactivateAccountTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -1382,7 +1378,6 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
 
 class UserRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -2803,7 +2798,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -2960,7 +2954,6 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
 
 
 class PushersRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -3089,7 +3082,6 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
 
 
 class UserMediaRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -3881,7 +3873,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
     ],
 )
 class WhoisRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -3961,7 +3952,6 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
 
 
 class ShadowBanRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -4004,7 +3994,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that shadow-banning for a user that is not a local returns a 400
         """
-        url = "/_synapse/admin/v1/whois/@unknown_person:unknown_domain"
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/shadow_ban"
 
         channel = self.make_request(method, url, access_token=self.admin_user_tok)
         self.assertEqual(400, channel.code, msg=channel.json_body)
@@ -4042,7 +4032,6 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
 
 
 class RateLimitTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -4268,7 +4257,6 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
 
 
 class AccountDataTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -4358,7 +4346,6 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
 
 
 class UsersByExternalIdTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -4430,6 +4417,100 @@ class UsersByExternalIdTestCase(unittest.HomeserverTestCase):
     def test_success_urlencoded(self) -> None:
         """Tests a successful external ID lookup with an url-encoded ID"""
         url = "/_synapse/admin/v1/auth_providers/another-auth-provider/users/a%3Acomplex%40external%2Fid"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            {"user_id": self.other_user},
+            channel.json_body,
+        )
+
+
+class UsersByThreePidTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.get_success(
+            self.store.user_add_threepid(
+                self.other_user, "email", "user@email.com", 1, 1
+            )
+        )
+        self.get_success(
+            self.store.user_add_threepid(self.other_user, "msidn", "+1-12345678", 1, 1)
+        )
+
+    def test_no_auth(self) -> None:
+        """Try to look up a user without authentication."""
+        url = "/_synapse/admin/v1/threepid/email/users/user%40email.com"
+
+        channel = self.make_request(
+            "GET",
+            url,
+        )
+
+        self.assertEqual(401, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_medium_does_not_exist(self) -> None:
+        """Tests that both a lookup for a medium that does not exist and a user that
+        doesn't exist with that third party ID returns a 404"""
+        # test for unknown medium
+        url = "/_synapse/admin/v1/threepid/publickey/users/unknown-key"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+        # test for unknown user with a known medium
+        url = "/_synapse/admin/v1/threepid/email/users/unknown"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_success(self) -> None:
+        """Tests a successful medium + address lookup"""
+        # test for email medium with encoded value of user@email.com
+        url = "/_synapse/admin/v1/threepid/email/users/user%40email.com"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            {"user_id": self.other_user},
+            channel.json_body,
+        )
+
+        # test for msidn medium with encoded value of +1-12345678
+        url = "/_synapse/admin/v1/threepid/msidn/users/%2B1-12345678"
 
         channel = self.make_request(
             "GET",

@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Tuple, Union
+from typing import List, Tuple
 from unittest.case import SkipTest
-from unittest.mock import PropertyMock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -40,7 +39,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def test_null_byte(self):
+    def test_null_byte(self) -> None:
         """
         Postgres/SQLite don't like null bytes going into the search tables. Internally
         we replace those with a space.
@@ -87,7 +86,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("alice", result.get("highlights"))
 
-    def test_non_string(self):
+    def test_non_string(self) -> None:
         """Test that non-string `value`s are not inserted into `event_search`.
 
         This is particularly important when using sqlite, since a sqlite column can hold
@@ -158,7 +157,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         self.assertEqual(f.value.code, 404)
 
     @skip_unless(not USE_POSTGRES_FOR_TESTS, "requires sqlite")
-    def test_sqlite_non_string_deletion_background_update(self):
+    def test_sqlite_non_string_deletion_background_update(self) -> None:
         """Test the background update to delete bad rows from `event_search`."""
         store = self.hs.get_datastores().main
 
@@ -220,10 +219,8 @@ class MessageSearchTest(HomeserverTestCase):
 
     PHRASE = "the quick brown fox jumps over the lazy dog"
 
-    # Each entry is a search query, followed by either a boolean of whether it is
-    # in the phrase OR a tuple of booleans: whether it matches using websearch
-    # and using plain search.
-    COMMON_CASES: List[Tuple[str, Union[bool, Tuple[bool, bool]]]] = [
+    # Each entry is a search query, followed by a boolean of whether it is in the phrase.
+    COMMON_CASES = [
         ("nope", False),
         ("brown", True),
         ("quick brown", True),
@@ -231,13 +228,13 @@ class MessageSearchTest(HomeserverTestCase):
         ("quick \t brown", True),
         ("jump", True),
         ("brown nope", False),
-        ('"brown quick"', (False, True)),
+        ('"brown quick"', False),
         ('"jumps over"', True),
-        ('"quick fox"', (False, True)),
+        ('"quick fox"', False),
         ("nope OR doublenope", False),
-        ("furphy OR fox", (True, False)),
-        ("fox -nope", (True, False)),
-        ("fox -brown", (False, True)),
+        ("furphy OR fox", True),
+        ("fox -nope", True),
+        ("fox -brown", False),
         ('"fox" quick', True),
         ('"quick brown', True),
         ('" quick "', True),
@@ -246,11 +243,11 @@ class MessageSearchTest(HomeserverTestCase):
     # TODO Test non-ASCII cases.
 
     # Case that fail on SQLite.
-    POSTGRES_CASES: List[Tuple[str, Union[bool, Tuple[bool, bool]]]] = [
+    POSTGRES_CASES = [
         # SQLite treats NOT as a binary operator.
-        ("- fox", (False, True)),
-        ("- nope", (True, False)),
-        ('"-fox quick', (False, True)),
+        ("- fox", False),
+        ("- nope", True),
+        ('"-fox quick', False),
         # PostgreSQL skips stop words.
         ('"the quick brown"', True),
         ('"over lazy"', True),
@@ -275,7 +272,7 @@ class MessageSearchTest(HomeserverTestCase):
         if isinstance(main_store.database_engine, PostgresEngine):
             assert main_store.database_engine._version is not None
             found = main_store.database_engine._version < 140000
-        self.COMMON_CASES.append(('"fox quick', (found, True)))
+        self.COMMON_CASES.append(('"fox quick', found))
 
     def test_tokenize_query(self) -> None:
         """Test the custom logic to tokenize a user's query."""
@@ -315,16 +312,10 @@ class MessageSearchTest(HomeserverTestCase):
             )
 
     def _check_test_cases(
-        self,
-        store: DataStore,
-        cases: List[Tuple[str, Union[bool, Tuple[bool, bool]]]],
-        index=0,
+        self, store: DataStore, cases: List[Tuple[str, bool]]
     ) -> None:
         # Run all the test cases versus search_msgs
         for query, expect_to_contain in cases:
-            if isinstance(expect_to_contain, tuple):
-                expect_to_contain = expect_to_contain[index]
-
             result = self.get_success(
                 store.search_msgs([self.room_id], query, ["content.body"])
             )
@@ -343,9 +334,6 @@ class MessageSearchTest(HomeserverTestCase):
 
         # Run them again versus search_rooms
         for query, expect_to_contain in cases:
-            if isinstance(expect_to_contain, tuple):
-                expect_to_contain = expect_to_contain[index]
-
             result = self.get_success(
                 store.search_rooms([self.room_id], query, ["content.body"], 10)
             )
@@ -362,44 +350,21 @@ class MessageSearchTest(HomeserverTestCase):
                 "results array length should match count",
             )
 
-    def test_postgres_web_search_for_phrase(self):
+    def test_postgres_web_search_for_phrase(self) -> None:
         """
         Test searching for phrases using typical web search syntax, as per postgres' websearch_to_tsquery.
         This test is skipped unless the postgres instance supports websearch_to_tsquery.
+
+        See https://www.postgresql.org/docs/current/textsearch-controls.html
         """
 
         store = self.hs.get_datastores().main
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
-        if store.database_engine.tsquery_func != "websearch_to_tsquery":
-            raise SkipTest(
-                "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
-            )
+        self._check_test_cases(store, self.COMMON_CASES + self.POSTGRES_CASES)
 
-        self._check_test_cases(store, self.COMMON_CASES + self.POSTGRES_CASES, index=0)
-
-    def test_postgres_non_web_search_for_phrase(self):
-        """
-        Test postgres searching for phrases without using web search, which is used when websearch_to_tsquery isn't
-        supported by the current postgres version.
-        """
-
-        store = self.hs.get_datastores().main
-        if not isinstance(store.database_engine, PostgresEngine):
-            raise SkipTest("Test only applies when postgres is used as the database")
-
-        # Patch supports_websearch_to_tsquery to always return False to ensure we're testing the plainto_tsquery path.
-        with patch(
-            "synapse.storage.engines.postgres.PostgresEngine.tsquery_func",
-            new_callable=PropertyMock,
-        ) as supports_websearch_to_tsquery:
-            supports_websearch_to_tsquery.return_value = "plainto_tsquery"
-            self._check_test_cases(
-                store, self.COMMON_CASES + self.POSTGRES_CASES, index=1
-            )
-
-    def test_sqlite_search(self):
+    def test_sqlite_search(self) -> None:
         """
         Test sqlite searching for phrases.
         """
@@ -407,4 +372,4 @@ class MessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, Sqlite3Engine):
             raise SkipTest("Test only applies when sqlite is used as the database")
 
-        self._check_test_cases(store, self.COMMON_CASES, index=0)
+        self._check_test_cases(store, self.COMMON_CASES)

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG SYNAPSE_VERSION=latest
+ARG FROM=matrixdotorg/synapse:$SYNAPSE_VERSION
 
 # first of all, we create a base image with an nginx which we can copy into the
 # target image. For repeated rebuilds, this is much faster than apt installing
@@ -23,7 +24,7 @@ FROM debian:bullseye-slim AS deps_base
 FROM redis:6-bullseye AS redis_base
 
 # now build the final image, based on the the regular Synapse docker image
-FROM matrixdotorg/synapse:$SYNAPSE_VERSION
+FROM $FROM
 
     # Install supervisord with pip instead of apt, to avoid installing a second
     # copy of python.

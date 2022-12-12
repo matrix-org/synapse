@@ -20,7 +20,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict
+from synapse.types import EventID, JsonDict, RoomID
 
 from ._base import client_patterns
 
@@ -55,6 +55,9 @@ class ReceiptRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
+
+        if not RoomID.is_valid(room_id) or not event_id.startswith(EventID.SIGIL):
+            raise SynapseError(400, "A valid room ID and event ID must be specified")
 
         if receipt_type not in self._known_receipt_types:
             raise SynapseError(

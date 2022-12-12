@@ -45,9 +45,12 @@ class _EventSourcesInner:
 class EventSources:
     def __init__(self, hs: "HomeServer"):
         self.sources = _EventSourcesInner(
-            # mypy thinks attribute.type is `Optional`, but we know it's never `None` here since
-            # all the attributes of `_EventSourcesInner` are annotated.
-            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))  # type: ignore[misc]
+            # mypy previously warned that attribute.type is `Optional`, but we know it's
+            # never `None` here since all the attributes of `_EventSourcesInner` are
+            # annotated.
+            # As of the stubs in attrs 22.1.0, `attr.fields()` now returns Any,
+            # so the call to `attribute.type` is not checked.
+            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))
         )
         self.store = hs.get_datastores().main
 
@@ -69,6 +72,19 @@ class EventSources:
             groups_key=0,
         )
         return token
+
+    @trace
+    async def get_start_token_for_pagination(self, room_id: str) -> StreamToken:
+        """Get the start token for a given room to be used to paginate
+        events.
+
+        The returned token does not have the current values for fields other
+        than `room`, since they are not used during pagination.
+
+        Returns:
+            The start token for pagination.
+        """
+        return StreamToken.START
 
     @trace
     async def get_current_token_for_pagination(self, room_id: str) -> StreamToken:

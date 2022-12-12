@@ -1,0 +1,1 @@
+Share the `ClientRestResource` for both workers and the main process.

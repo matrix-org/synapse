@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Setup mdbook
-        uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
+        uses: peaceiris/actions-mdbook@adeb05db28a0c0004681db83893d56c0388ea9ea # v1.2.0
         with:
           mdbook-version: '0.4.17'
 
@@ -26,7 +26,7 @@ jobs:
           cp book/welcome_and_overview.html book/index.html
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: book
           path: book

@@ -317,10 +317,9 @@ def setup_logging(
     Set up the logging subsystem.
 
     Args:
-        config (LoggingConfig | synapse.config.worker.WorkerConfig):
-            configuration data
+        config: configuration data
 
-        use_worker_options (bool): True to use the 'worker_log_config' option
+        use_worker_options: True to use the 'worker_log_config' option
             instead of 'log_config'.
 
         logBeginner: The Twisted logBeginner to use.
