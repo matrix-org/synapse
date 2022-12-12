@@ -28,7 +28,7 @@ from tests.unittest import HomeserverTestCase, override_config
 
 @implementer(interfaces.IMessageDelivery)
 class _DummyMessageDelivery:
-    def __init__(self):
+    def __init__(self) -> None:
         # (recipient, message) tuples
         self.messages: List[Tuple[smtp.Address, bytes]] = []
 
@@ -64,12 +64,12 @@ class _DummyMessage:
         self._delivery.record_message(self._user.dest, message)
         return defer.succeed(b"saved")
 
-    def connectionLost(self):
+    def connectionLost(self) -> None:
         pass
 
 
 class SendEmailHandlerTestCase(HomeserverTestCase):
-    def test_send_email(self):
+    def test_send_email(self) -> None:
         """Happy-path test that we can send email to a non-TLS server."""
         h = self.hs.get_send_email_handler()
         d = ensureDeferred(
@@ -119,7 +119,7 @@ class SendEmailHandlerTestCase(HomeserverTestCase):
             },
         }
     )
-    def test_send_email_force_tls(self):
+    def test_send_email_force_tls(self) -> None:
         """Happy-path test that we can send email to an Implicit TLS server."""
         h = self.hs.get_send_email_handler()
         d = ensureDeferred(

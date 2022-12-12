@@ -47,7 +47,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastores().main
 
-    def test_offline_to_online(self):
+    def test_offline_to_online(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -85,7 +85,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_online(self):
+    def test_online_to_online(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -128,7 +128,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_online_last_active_noop(self):
+    def test_online_to_online_last_active_noop(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -173,7 +173,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_online_last_active(self):
+    def test_online_to_online_last_active(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -210,7 +210,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_remote_ping_timer(self):
+    def test_remote_ping_timer(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -244,7 +244,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_online_to_offline(self):
+    def test_online_to_offline(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -266,7 +266,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(wheel_timer.insert.call_count, 0)
 
-    def test_online_to_idle(self):
+    def test_online_to_idle(self) -> None:
         wheel_timer = Mock()
         user_id = "@foo:bar"
         now = 5000000
@@ -300,7 +300,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
-    def test_persisting_presence_updates(self):
+    def test_persisting_presence_updates(self) -> None:
         """Tests that the latest presence state for each user is persisted correctly"""
         # Create some test users and presence states for them
         presence_states = []
@@ -343,7 +343,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 class PresenceTimeoutTestCase(unittest.TestCase):
     """Tests different timers and that the timer does not change `status_msg` of user."""
 
-    def test_idle_timer(self):
+    def test_idle_timer(self) -> None:
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -363,7 +363,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.UNAVAILABLE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_busy_no_idle(self):
+    def test_busy_no_idle(self) -> None:
         """
         Tests that a user setting their presence to busy but idling doesn't turn their
         presence state into unavailable.
@@ -387,7 +387,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.BUSY)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_sync_timeout(self):
+    def test_sync_timeout(self) -> None:
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -407,7 +407,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.OFFLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_sync_online(self):
+    def test_sync_online(self) -> None:
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -429,7 +429,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.ONLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_federation_ping(self):
+    def test_federation_ping(self) -> None:
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -448,7 +448,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertIsNotNone(new_state)
         self.assertEqual(state, new_state)
 
-    def test_no_timeout(self):
+    def test_no_timeout(self) -> None:
         user_id = "@foo:bar"
         now = 5000000
 
@@ -464,7 +464,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
         self.assertIsNone(new_state)
 
-    def test_federation_timeout(self):
+    def test_federation_timeout(self) -> None:
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -487,7 +487,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(new_state.state, PresenceState.OFFLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
-    def test_last_active(self):
+    def test_last_active(self) -> None:
         user_id = "@foo:bar"
         status_msg = "I'm here!"
         now = 5000000
@@ -512,7 +512,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
 
-    def test_external_process_timeout(self):
+    def test_external_process_timeout(self) -> None:
         """Test that if an external process doesn't update the records for a while
         we time out their syncing users presence.
         """
@@ -544,7 +544,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         )
         self.assertEqual(state.state, PresenceState.OFFLINE)
 
-    def test_user_goes_offline_by_timeout_status_msg_remain(self):
+    def test_user_goes_offline_by_timeout_status_msg_remain(self) -> None:
         """Test that if a user doesn't update the records for a while
         users presence goes `OFFLINE` because of timeout and `status_msg` remains.
         """
@@ -576,7 +576,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.state, PresenceState.OFFLINE)
         self.assertEqual(state.status_msg, status_msg)
 
-    def test_user_goes_offline_manually_with_no_status_msg(self):
+    def test_user_goes_offline_manually_with_no_status_msg(self) -> None:
         """Test that if a user change presence manually to `OFFLINE`
         and no status is set, that `status_msg` is `None`.
         """
@@ -601,7 +601,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.state, PresenceState.OFFLINE)
         self.assertEqual(state.status_msg, None)
 
-    def test_user_goes_offline_manually_with_status_msg(self):
+    def test_user_goes_offline_manually_with_status_msg(self) -> None:
         """Test that if a user change presence manually to `OFFLINE`
         and a status is set, that `status_msg` appears.
         """
@@ -618,7 +618,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             user_id, PresenceState.OFFLINE, "And now here."
         )
 
-    def test_user_reset_online_with_no_status(self):
+    def test_user_reset_online_with_no_status(self) -> None:
         """Test that if a user set again the presence manually
         and no status is set, that `status_msg` is `None`.
         """
@@ -644,7 +644,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.state, PresenceState.ONLINE)
         self.assertEqual(state.status_msg, None)
 
-    def test_set_presence_with_status_msg_none(self):
+    def test_set_presence_with_status_msg_none(self) -> None:
         """Test that if a user set again the presence manually
         and status is `None`, that `status_msg` is `None`.
         """
@@ -659,7 +659,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # Mark user as online and `status_msg = None`
         self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
 
-    def test_set_presence_from_syncing_not_set(self):
+    def test_set_presence_from_syncing_not_set(self) -> None:
         """Test that presence is not set by syncing if affect_presence is false"""
         user_id = "@test:server"
         status_msg = "I'm here!"
@@ -680,7 +680,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # and status message should still be the same
         self.assertEqual(state.status_msg, status_msg)
 
-    def test_set_presence_from_syncing_is_set(self):
+    def test_set_presence_from_syncing_is_set(self) -> None:
         """Test that presence is set by syncing if affect_presence is true"""
         user_id = "@test:server"
         status_msg = "I'm here!"
@@ -699,7 +699,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # we should now be online
         self.assertEqual(state.state, PresenceState.ONLINE)
 
-    def test_set_presence_from_syncing_keeps_status(self):
+    def test_set_presence_from_syncing_keeps_status(self) -> None:
         """Test that presence set by syncing retains status message"""
         user_id = "@test:server"
         status_msg = "I'm here!"
@@ -797,7 +797,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         self.queue = self.presence_handler.get_federation_queue()
 
-    def test_send_and_get(self):
+    def test_send_and_get(self) -> None:
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -834,7 +834,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
         self.assertFalse(limited)
         self.assertCountEqual(rows, [])
 
-    def test_send_and_get_split(self):
+    def test_send_and_get_split(self) -> None:
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -877,7 +877,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(rows, expected_rows)
 
-    def test_clear_queue_all(self):
+    def test_clear_queue_all(self) -> None:
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -921,7 +921,7 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(rows, expected_rows)
 
-    def test_partially_clear_queue(self):
+    def test_partially_clear_queue(self) -> None:
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
         state3 = UserPresenceState.default("@user3:test")
@@ -1013,7 +1013,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # random key to use.
         self.random_signing_key = generate_signing_key("ver")
 
-    def test_remote_joins(self):
+    def test_remote_joins(self) -> None:
         # We advance time to something that isn't 0, as we use 0 as a special
         # value.
         self.reactor.advance(1000000000000)
@@ -1061,7 +1061,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations={"server3"}, states=[expected_state]
         )
 
-    def test_remote_gets_presence_when_local_user_joins(self):
+    def test_remote_gets_presence_when_local_user_joins(self) -> None:
         # We advance time to something that isn't 0, as we use 0 as a special
         # value.
         self.reactor.advance(1000000000000)

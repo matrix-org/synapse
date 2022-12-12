@@ -332,7 +332,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {"server_name": "test:8888", "allowed_avatar_mimetypes": ["image/png"]}
     )
-    def test_avatar_constraint_on_local_server_with_port(self):
+    def test_avatar_constraint_on_local_server_with_port(self) -> None:
         """Test that avatar metadata is correctly fetched when the media is on a local
         server and the server has an explicit port.
 

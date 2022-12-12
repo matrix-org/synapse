@@ -161,7 +161,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.hs_patcher.stop()
         return super().tearDown()
 
-    def reset_mocks(self):
+    def reset_mocks(self) -> None:
         """Reset all the Mocks."""
         self.fake_server.reset_mocks()
         self.render_error.reset_mock()

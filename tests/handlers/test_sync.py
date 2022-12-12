@@ -47,7 +47,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # modify its config instead of the hs'
         self.auth_blocking = self.hs.get_auth_blocking()
 
-    def test_wait_for_sync_for_user_auth_blocking(self):
+    def test_wait_for_sync_for_user_auth_blocking(self) -> None:
         user_id1 = "@user1:test"
         user_id2 = "@user2:test"
         sync_config = generate_sync_config(user_id1)
@@ -82,7 +82,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_unknown_room_version(self):
+    def test_unknown_room_version(self) -> None:
         """
         A room with an unknown room version should not break sync (and should be excluded).
         """
@@ -186,7 +186,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertNotIn(invite_room, [r.room_id for r in result.invited])
         self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
-    def test_ban_wins_race_with_join(self):
+    def test_ban_wins_race_with_join(self) -> None:
         """Rooms shouldn't appear under "joined" if a join loses a race to a ban.
 
         A complicated edge case. Imagine the following scenario:

@@ -53,35 +53,35 @@ def _order(*events):
 
 
 class TestSpaceSummarySort(unittest.TestCase):
-    def test_no_order_last(self):
+    def test_no_order_last(self) -> None:
         """An event with no ordering is placed behind those with an ordering."""
         ev1 = _create_event("!abc:test")
         ev2 = _create_event("!xyz:test", "xyz")
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
-    def test_order(self):
+    def test_order(self) -> None:
         """The ordering should be used."""
         ev1 = _create_event("!abc:test", "xyz")
         ev2 = _create_event("!xyz:test", "abc")
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
-    def test_order_origin_server_ts(self):
+    def test_order_origin_server_ts(self) -> None:
         """Origin server  is a tie-breaker for ordering."""
         ev1 = _create_event("!abc:test", origin_server_ts=10)
         ev2 = _create_event("!xyz:test", origin_server_ts=30)
 
         self.assertEqual([ev1, ev2], _order(ev1, ev2))
 
-    def test_order_room_id(self):
+    def test_order_room_id(self) -> None:
         """Room ID is a final tie-breaker for ordering."""
         ev1 = _create_event("!abc:test")
         ev2 = _create_event("!xyz:test")
 
         self.assertEqual([ev1, ev2], _order(ev1, ev2))
 
-    def test_invalid_ordering_type(self):
+    def test_invalid_ordering_type(self) -> None:
         """Invalid orderings are considered the same as missing."""
         ev1 = _create_event("!abc:test", 1)
         ev2 = _create_event("!xyz:test", "xyz")
@@ -97,7 +97,7 @@ class TestSpaceSummarySort(unittest.TestCase):
         ev1 = _create_event("!abc:test", True)
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
-    def test_invalid_ordering_value(self):
+    def test_invalid_ordering_value(self) -> None:
         """Invalid orderings are considered the same as missing."""
         ev1 = _create_event("!abc:test", "foo\n")
         ev2 = _create_event("!xyz:test", "xyz")
@@ -223,7 +223,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             fed_handler.on_invite_request(fed_hostname, event, RoomVersions.V6)
         )
 
-    def test_simple_space(self):
+    def test_simple_space(self) -> None:
         """Test a simple space with a single room."""
         # The result should have the space and the room in it, along with a link
         # from space -> room.
@@ -234,7 +234,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_large_space(self):
+    def test_large_space(self) -> None:
         """Test a space with a large number of rooms."""
         rooms = [self.room]
         # Make at least 51 rooms that are part of the space.
@@ -260,7 +260,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result["rooms"] += result2["rooms"]
         self._assert_hierarchy(result, expected)
 
-    def test_visibility(self):
+    def test_visibility(self) -> None:
         """A user not in a space cannot inspect it."""
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
@@ -403,7 +403,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, room_id, self.token)
         return room_id
 
-    def test_filtering(self):
+    def test_filtering(self) -> None:
         """
         Rooms should be properly filtered to only include rooms the user has access to.
         """
@@ -476,7 +476,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_complex_space(self):
+    def test_complex_space(self) -> None:
         """
         Create a "complex" space to see how it handles things like loops and subspaces.
         """
@@ -516,7 +516,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_pagination(self):
+    def test_pagination(self) -> None:
         """Test simple pagination works."""
         room_ids = []
         for i in range(1, 10):
@@ -553,7 +553,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_hierarchy(result, expected)
         self.assertNotIn("next_batch", result)
 
-    def test_invalid_pagination_token(self):
+    def test_invalid_pagination_token(self) -> None:
         """An invalid pagination token, or changing other parameters, shoudl be rejected."""
         room_ids = []
         for i in range(1, 10):
@@ -604,7 +604,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             SynapseError,
         )
 
-    def test_max_depth(self):
+    def test_max_depth(self) -> None:
         """Create a deep tree to test the max depth against."""
         spaces = [self.space]
         rooms = [self.room]
@@ -659,7 +659,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ]
         self._assert_hierarchy(result, expected)
 
-    def test_unknown_room_version(self):
+    def test_unknown_room_version(self) -> None:
         """
         If a room with an unknown room version is encountered it should not cause
         the entire summary to skip.
@@ -685,7 +685,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_complex(self):
+    def test_fed_complex(self) -> None:
         """
         Return data over federation and ensure that it is handled properly.
         """
@@ -744,7 +744,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_filtering(self):
+    def test_fed_filtering(self) -> None:
         """
         Rooms returned over federation should be properly filtered to only include
         rooms the user has access to.
@@ -892,7 +892,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_invited(self):
+    def test_fed_invited(self) -> None:
         """
         A room which the user was invited to should be included in the response.
 
@@ -936,7 +936,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             )
         self._assert_hierarchy(result, expected)
 
-    def test_fed_caching(self):
+    def test_fed_caching(self) -> None:
         """
         Federation `/hierarchy` responses should be cached.
         """
@@ -1040,12 +1040,12 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
 
-    def test_own_room(self):
+    def test_own_room(self) -> None:
         """Test a simple room created by the requester."""
         result = self.get_success(self.handler.get_room_summary(self.user, self.room))
         self.assertEqual(result.get("room_id"), self.room)
 
-    def test_visibility(self):
+    def test_visibility(self) -> None:
         """A user not in a private room cannot get its summary."""
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
@@ -1093,7 +1093,7 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_room_summary(user2, self.room))
         self.assertEqual(result.get("room_id"), self.room)
 
-    def test_fed(self):
+    def test_fed(self) -> None:
         """
         Return data over federation and ensure that it is handled properly.
         """
