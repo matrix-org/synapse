@@ -17,6 +17,7 @@ worker_listeners:
   #
   #- type: http
   #  port: 8035
+  #  x_forwarded: true
   #  resources:
   #    - names: [client]
 
