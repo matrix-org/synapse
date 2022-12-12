@@ -35,8 +35,8 @@ from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
-from synapse.storage.state import StateFilter
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
+from synapse.types.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
