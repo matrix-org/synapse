@@ -1569,77 +1569,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         return rows
 
-    async def check_too_many_devices_for_user(
-        self, user_id: str, limit: int
-    ) -> List[str]:
-        """Check if the user has a lot of devices, and if so return the set of
-        devices we can prune.
-
-        This does *not* return hidden devices or devices with E2E keys.
-
-        Returns at most `limit` number of devices, ordered by last seen.
-        """
-
-        num_devices = await self.db_pool.simple_select_one_onecol(
-            table="devices",
-            keyvalues={"user_id": user_id, "hidden": False},
-            retcol="COALESCE(COUNT(*), 0)",
-            desc="count_devices",
-        )
-
-        # We let users have up to ten devices without pruning.
-        if num_devices <= 10:
-            return []
-
-        # We prune everything older than N days.
-        max_last_seen = self._clock.time_msec() - 14 * 24 * 60 * 60 * 1000
-
-        if num_devices > 50:
-            # If the user has more than 50 devices, then we chose a last seen
-            # that ensures we keep at most 50 devices.
-            sql = """
-                SELECT last_seen FROM devices
-                LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
-                WHERE
-                    user_id = ?
-                    AND NOT hidden
-                    AND last_seen IS NOT NULL
-                    AND key_json IS NULL
-                ORDER BY last_seen DESC
-                LIMIT 1
-                OFFSET 50
-            """
-
-            rows = await self.db_pool.execute(
-                "check_too_many_devices_for_user_last_seen", None, sql, (user_id,)
-            )
-            if rows:
-                max_last_seen = max(rows[0][0], max_last_seen)
-
-        # Now fetch the devices to delete.
-        sql = """
-            SELECT device_id FROM devices
-            LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
-            WHERE
-                user_id = ?
-                AND NOT hidden
-                AND last_seen < ?
-                AND key_json IS NULL
-            ORDER BY last_seen
-            LIMIT ?
-        """
-
-        def check_too_many_devices_for_user_txn(
-            txn: LoggingTransaction,
-        ) -> List[str]:
-            txn.execute(sql, (user_id, max_last_seen, limit))
-            return [device_id for device_id, in txn]
-
-        return await self.db_pool.runInteraction(
-            "check_too_many_devices_for_user",
-            check_too_many_devices_for_user_txn,
-        )
-
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
     # Because we have write access, this will be a StreamIdGenerator
@@ -1698,7 +1627,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 values={},
                 insertion_values={
                     "display_name": initial_device_display_name,
-                    "last_seen": self._clock.time_msec(),
                     "hidden": False,
                 },
                 desc="store_device",
@@ -1744,15 +1672,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
             raise StoreError(500, "Problem storing device.")
 
-    @cached(max_entries=0)
-    async def delete_device(self, user_id: str, device_id: str) -> None:
-        raise NotImplementedError()
-
-    # Note: sometimes deleting rows out of `device_inbox` can take a long time,
-    # so we use a cache so that we deduplicate in flight requests to delete
-    # devices.
-    @cachedList(cached_method_name="delete_device", list_name="device_ids")
-    async def delete_devices(self, user_id: str, device_ids: Collection[str]) -> dict:
+    async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
         """Deletes several devices.
 
         Args:
@@ -1788,8 +1708,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
-
-        return {}
 
     async def update_device(
         self, user_id: str, device_id: str, new_display_name: Optional[str] = None
