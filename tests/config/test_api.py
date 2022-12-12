@@ -3,40 +3,21 @@ from unittest import TestCase as StdlibTestCase
 import yaml
 
 from synapse.config import ConfigError
-from synapse.config.api import ApiConfig, StateKeyFilter
+from synapse.config.api import ApiConfig
+from synapse.types.state import StateFilter
 
-DEFAULT_PREJOIN_STATE = {
-    "m.room.join_rules": StateKeyFilter.only(""),
-    "m.room.canonical_alias": StateKeyFilter.only(""),
-    "m.room.avatar": StateKeyFilter.only(""),
-    "m.room.encryption": StateKeyFilter.only(""),
-    "m.room.name": StateKeyFilter.only(""),
-    "m.room.create": StateKeyFilter.only(""),
-    "m.room.topic": StateKeyFilter.only(""),
+DEFAULT_PREJOIN_STATE_PAIRS = {
+    ("m.room.join_rules", ""),
+    ("m.room.canonical_alias", ""),
+    ("m.room.avatar", ""),
+    ("m.room.encryption", ""),
+    ("m.room.name", ""),
+    ("m.room.create", ""),
+    ("m.room.topic", ""),
 }
 
 
 class TestRoomPrejoinState(StdlibTestCase):
-    def test_state_key_filter(self) -> None:
-        """Sanity check the StateKeyFilter class."""
-        s = StateKeyFilter.only("foo")
-        self.assertIn("foo", s)
-        self.assertNotIn("bar", s)
-        self.assertNotIn("baz", s)
-        s.add("bar")
-        self.assertIn("foo", s)
-        self.assertIn("bar", s)
-        self.assertNotIn("baz", s)
-
-        s = StateKeyFilter.any()
-        self.assertIn("foo", s)
-        self.assertIn("bar", s)
-        self.assertIn("baz", s)
-        s.add("bar")
-        self.assertIn("foo", s)
-        self.assertIn("bar", s)
-        self.assertIn("baz", s)
-
     def read_config(self, source: str) -> ApiConfig:
         config = ApiConfig()
         config.read_config(yaml.safe_load(source))
@@ -44,7 +25,10 @@ class TestRoomPrejoinState(StdlibTestCase):
 
     def test_no_prejoin_state(self) -> None:
         config = self.read_config("foo: bar")
-        self.assertEqual(config.room_prejoin_state, DEFAULT_PREJOIN_STATE)
+        self.assertFalse(config.room_prejoin_state.has_wildcards())
+        self.assertEqual(
+            set(config.room_prejoin_state.concrete_types()), DEFAULT_PREJOIN_STATE_PAIRS
+        )
 
     def test_disable_default_event_types(self) -> None:
         config = self.read_config(
@@ -53,7 +37,7 @@ room_prejoin_state:
     disable_default_event_types: true
         """
         )
-        self.assertEqual(config.room_prejoin_state, {})
+        self.assertEqual(config.room_prejoin_state, StateFilter.none())
 
     def test_event_without_state_key(self) -> None:
         config = self.read_config(
@@ -64,7 +48,8 @@ room_prejoin_state:
         - foo
         """
         )
-        self.assertEqual(config.room_prejoin_state, {"foo": StateKeyFilter.any()})
+        self.assertEqual(config.room_prejoin_state.wildcard_types(), ["foo"])
+        self.assertEqual(config.room_prejoin_state.concrete_types(), [])
 
     def test_event_with_specific_state_key(self) -> None:
         config = self.read_config(
@@ -75,7 +60,11 @@ room_prejoin_state:
         - [foo, bar]
         """
         )
-        self.assertEqual(config.room_prejoin_state, {"foo": StateKeyFilter.only("bar")})
+        self.assertFalse(config.room_prejoin_state.has_wildcards())
+        self.assertEqual(
+            set(config.room_prejoin_state.concrete_types()),
+            {("foo", "bar")},
+        )
 
     def test_repeated_event_with_specific_state_key(self) -> None:
         config = self.read_config(
@@ -87,8 +76,10 @@ room_prejoin_state:
         - [foo, baz]
         """
         )
+        self.assertFalse(config.room_prejoin_state.has_wildcards())
         self.assertEqual(
-            config.room_prejoin_state, {"foo": StateKeyFilter({"bar", "baz"})}
+            set(config.room_prejoin_state.concrete_types()),
+            {("foo", "bar"), ("foo", "baz")},
         )
 
     def test_no_specific_state_key_overrides_specific_state_key(self) -> None:
@@ -101,7 +92,8 @@ room_prejoin_state:
         - foo
         """
         )
-        self.assertEqual(config.room_prejoin_state, {"foo": StateKeyFilter.any()})
+        self.assertEqual(config.room_prejoin_state.wildcard_types(), ["foo"])
+        self.assertEqual(config.room_prejoin_state.concrete_types(), [])
 
         config = self.read_config(
             """
@@ -112,7 +104,8 @@ room_prejoin_state:
         - [foo, bar]
         """
         )
-        self.assertEqual(config.room_prejoin_state, {"foo": StateKeyFilter.any()})
+        self.assertEqual(config.room_prejoin_state.wildcard_types(), ["foo"])
+        self.assertEqual(config.room_prejoin_state.concrete_types(), [])
 
     def test_bad_event_type_entry_raises(self) -> None:
         with self.assertRaises(ConfigError):
