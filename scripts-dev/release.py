@@ -174,8 +174,6 @@ def _prepare() -> None:
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    # Cast safety: parse() won't return a version.LegacyVersion from our
-    # version string format.
     parsed_new_version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
