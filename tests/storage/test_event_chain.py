@@ -14,6 +14,7 @@
 
 from typing import Dict, List, Set, Tuple
 
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
@@ -22,18 +23,22 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.events import _LinkMap
+from synapse.storage.types import Cursor
 from synapse.types import create_requester
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class EventChainStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self._next_stream_ordering = 1
 
-    def test_simple(self):
+    def test_simple(self) -> None:
         """Test that the example in `docs/auth_chain_difference_algorithm.md`
         works.
         """
@@ -232,7 +237,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
                 ),
             )
 
-    def test_out_of_order_events(self):
+    def test_out_of_order_events(self) -> None:
         """Test that we handle persisting events that we don't have the full
         auth chain for yet (which should only happen for out of band memberships).
         """
@@ -378,7 +383,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
     def persist(
         self,
         events: List[EventBase],
-    ):
+    ) -> None:
         """Persist the given events and check that the links generated match
         those given.
         """
@@ -389,7 +394,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
             e.internal_metadata.stream_ordering = self._next_stream_ordering
             self._next_stream_ordering += 1
 
-        def _persist(txn):
+        def _persist(txn: LoggingTransaction) -> None:
             # We need to persist the events to the events and state_events
             # tables.
             persist_events_store._store_event_txn(
@@ -456,7 +461,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
 
 
 class LinkMapTestCase(unittest.TestCase):
-    def test_simple(self):
+    def test_simple(self) -> None:
         """Basic tests for the LinkMap."""
         link_map = _LinkMap()
 
@@ -492,7 +497,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
@@ -559,7 +564,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
 
         # Delete the chain cover info.
 
-        def _delete_tables(txn):
+        def _delete_tables(txn: Cursor) -> None:
             txn.execute("DELETE FROM event_auth_chains")
             txn.execute("DELETE FROM event_auth_chain_links")
 
@@ -567,7 +572,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
 
         return room_id, [state1, state2]
 
-    def test_background_update_single_room(self):
+    def test_background_update_single_room(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -602,7 +607,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
 
-    def test_background_update_multiple_rooms(self):
+    def test_background_update_multiple_rooms(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -640,7 +645,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
 
-    def test_background_update_single_large_room(self):
+    def test_background_update_single_large_room(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -693,7 +698,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
 
-    def test_background_update_multiple_large_room(self):
+    def test_background_update_multiple_large_room(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """

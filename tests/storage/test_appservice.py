@@ -26,7 +26,7 @@ from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
 from synapse.events import EventBase
 from synapse.server import HomeServer
-from synapse.storage.database import DatabasePool, make_conn
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection, make_conn
 from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
@@ -39,7 +39,7 @@ from tests.test_utils import make_awaitable
 
 
 class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super(ApplicationServiceStoreTestCase, self).setUp()
 
         self.as_yaml_files: List[str] = []
@@ -73,7 +73,9 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
 
         super(ApplicationServiceStoreTestCase, self).tearDown()
 
-    def _add_appservice(self, as_token, id, url, hs_token, sender) -> None:
+    def _add_appservice(
+        self, as_token: str, id: str, url: str, hs_token: str, sender: str
+    ) -> None:
         as_yaml = {
             "url": url,
             "as_token": as_token,
@@ -135,7 +137,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             database, make_conn(db_config, self.engine, "test"), self.hs
         )
 
-    def _add_service(self, url, as_token, id) -> None:
+    def _add_service(self, url: str, as_token: str, id: str) -> None:
         as_yaml = {
             "url": url,
             "as_token": as_token,
@@ -149,7 +151,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    def _set_state(self, id: str, state: ApplicationServiceState):
+    def _set_state(self, id: str, state: ApplicationServiceState) -> defer.Deferred:
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
                 "INSERT INTO application_services_state(as_id, state) VALUES(?,?)"
@@ -157,7 +159,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             (id, state.value),
         )
 
-    def _insert_txn(self, as_id, txn_id, events):
+    def _insert_txn(
+        self, as_id: str, txn_id: int, events: List[Mock]
+    ) -> "defer.Deferred[None]":
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
                 "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
@@ -448,12 +452,14 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
 
 # required for ApplicationServiceTransactionStoreTestCase tests
 class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServiceStore):
-    def __init__(self, database: DatabasePool, db_conn, hs) -> None:
+    def __init__(
+        self, database: DatabasePool, db_conn: LoggingDatabaseConnection, hs: HomeServer
+    ) -> None:
         super().__init__(database, db_conn, hs)
 
 
 class ApplicationServiceStoreConfigTestCase(unittest.HomeserverTestCase):
-    def _write_config(self, suffix, **kwargs) -> str:
+    def _write_config(self, suffix: str, **kwargs: str) -> str:
         vals = {
             "id": "id" + suffix,
             "url": "url" + suffix,
