@@ -118,6 +118,15 @@ class StateFilter:
             )
         )
 
+    def to_types(self) -> Iterable[Tuple[str, Optional[str]]]:
+        """The inverse to `from_types`."""
+        for (event_type, state_keys) in self.types.items():
+            if state_keys is None:
+                yield event_type, None
+            else:
+                for state_key in state_keys:
+                    yield event_type, state_key
+
     @staticmethod
     def from_lazy_load_member_list(members: Iterable[str]) -> "StateFilter":
         """Creates a filter that returns all non-member events, plus the member
@@ -342,6 +351,15 @@ class StateFilter:
             if state_keys is not None
             for s in state_keys
         ]
+
+    def wildcard_types(self) -> List[str]:
+        """Returns a list of event types which require us to fetch all state keys.
+        This will be empty unless `has_wildcards` returns True.
+
+        Returns:
+            A list of event types.
+        """
+        return [t for t, state_keys in self.types.items() if state_keys is None]
 
     def get_member_split(self) -> Tuple["StateFilter", "StateFilter"]:
         """Return the filter split into two: one which assumes it's exclusively
