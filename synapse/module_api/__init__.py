@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -25,7 +26,7 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
-    Union, Collection,
+    Union,
 )
 
 import attr
@@ -136,6 +137,7 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 P = ParamSpec("P")
+F = TypeVar("F", bound=Callable[..., Any])
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -190,7 +192,7 @@ def cached(
     max_entries: int = 1000,
     num_args: Optional[int] = None,
     uncached_args: Optional[Collection[str]] = None,
-):
+) -> Callable[[F], CachedFunction[F]]:
     """Returns a decorator that applies a memoizing cache around the function. This
     decorator behaves similarly to functools.lru_cache.
 
