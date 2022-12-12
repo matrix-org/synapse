@@ -55,9 +55,9 @@ from synapse.logging.opentracing import set_tag
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder
 from synapse.util.cancellation import cancellable
 from synapse.util.stringutils import parse_and_validate_server_name, random_string

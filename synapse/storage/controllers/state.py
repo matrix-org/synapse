@@ -31,12 +31,12 @@ from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
 from synapse.storage.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
 from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
