@@ -912,6 +912,10 @@ class EventsWorkerStore(SQLBaseStore):
             filter = state_keys_to_include
         selected_state_ids = await context.get_current_state_ids(filter)
 
+        # Confusingly, get_current_state_events may return events that are discarded by
+        # the filter, if they're in context._state_delta_due_to_event. Strip these away.
+        selected_state_ids = filter.filter_state(selected_state_ids)
+
         # We know this event is not an outlier, so this must be
         # non-None.
         assert selected_state_ids is not None
