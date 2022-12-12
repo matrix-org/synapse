@@ -30,4 +30,4 @@ done
 
 This would create five generic workers with a unique `worker_name` field in each file and listening on ports 8081-8085.
 
-Customise the script to your needs. Note that `worker_pid_file` is required if you `worker_daemonize` is `true`. Uncomment and/or modify the line if needed.
+Customise the script to your needs. Note that `worker_pid_file` is required if `worker_daemonize` is `true`. Uncomment and/or modify the line if needed.
