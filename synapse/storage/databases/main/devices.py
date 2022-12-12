@@ -1569,15 +1569,11 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         return rows
 
-    async def check_too_many_devices_for_user(
-        self, user_id: str, limit: int
-    ) -> List[str]:
+    async def check_too_many_devices_for_user(self, user_id: str) -> List[str]:
         """Check if the user has a lot of devices, and if so return the set of
         devices we can prune.
 
         This does *not* return hidden devices or devices with E2E keys.
-
-        Returns at most `limit` number of devices, ordered by last seen.
         """
 
         num_devices = await self.db_pool.simple_select_one_onecol(
@@ -1618,7 +1614,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         # Now fetch the devices to delete.
         sql = """
-            SELECT device_id FROM devices
+            SELECT DISTINCT device_id FROM devices
             LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
             WHERE
                 user_id = ?
@@ -1626,13 +1622,12 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
                 AND last_seen < ?
                 AND key_json IS NULL
             ORDER BY last_seen
-            LIMIT ?
         """
 
         def check_too_many_devices_for_user_txn(
             txn: LoggingTransaction,
         ) -> List[str]:
-            txn.execute(sql, (user_id, max_last_seen, limit))
+            txn.execute(sql, (user_id, max_last_seen))
             return [device_id for device_id, in txn]
 
         return await self.db_pool.runInteraction(
