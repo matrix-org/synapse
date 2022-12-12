@@ -45,9 +45,7 @@ CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 ON_THREEPID_BIND_CALLBACK = Callable[[str, str, str], Awaitable]
-ON_THREEPID_UNBIND_CALLBACK = Callable[
-    [str, str, str, str], Awaitable[Tuple[bool, bool]]
-]
+UNBIND_THREEPID_CALLBACK = Callable[[str, str, str, str], Awaitable[Tuple[bool, bool]]]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -177,7 +175,7 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = []
         self._on_threepid_bind_callbacks: List[ON_THREEPID_BIND_CALLBACK] = []
-        self._on_threepid_unbind_callbacks: List[ON_THREEPID_UNBIND_CALLBACK] = []
+        self._unbind_threepid_callbacks: List[UNBIND_THREEPID_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -197,7 +195,7 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
-        on_threepid_unbind: Optional[ON_THREEPID_UNBIND_CALLBACK] = None,
+        unbind_threepid: Optional[UNBIND_THREEPID_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -235,8 +233,8 @@ class ThirdPartyEventRules:
         if on_threepid_bind is not None:
             self._on_threepid_bind_callbacks.append(on_threepid_bind)
 
-        if on_threepid_unbind is not None:
-            self._on_threepid_unbind_callbacks.append(on_threepid_unbind)
+        if unbind_threepid is not None:
+            self._unbind_threepid_callbacks.append(unbind_threepid)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -532,7 +530,7 @@ class ThirdPartyEventRules:
                     "Failed to run module API callback %s: %s", callback, e
                 )
 
-    async def on_threepid_unbind(
+    async def unbind_threepid(
         self, user_id: str, medium: str, address: str, identity_server: str
     ) -> Tuple[bool, bool]:
         """Called before a threepid association is removed.
@@ -555,7 +553,7 @@ class ThirdPartyEventRules:
         """
 
         global_changed = False
-        for callback in self._on_threepid_unbind_callbacks:
+        for callback in self._unbind_threepid_callbacks:
             try:
                 (changed, stop) = await callback(
                     user_id, medium, address, identity_server

@@ -278,10 +278,7 @@ class IdentityHandler:
         medium = threepid["medium"]
         address = threepid["address"]
 
-        (
-            changed,
-            stop,
-        ) = await self.hs.get_third_party_event_rules().on_threepid_unbind(
+        (changed, stop,) = await self.hs.get_third_party_event_rules().unbind_threepid(
             mxid, medium, address, id_server
         )
 

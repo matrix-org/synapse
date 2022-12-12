@@ -933,8 +933,8 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         # Check that the mock was called with the right parameters
         self.assertEqual(args, (user_id, "email", "foo@example.com"))
 
-    def test_on_threepid_unbind(self) -> None:
-        """Tests that the on_threepid_unbind module callback is called correctly before
+    def test_unbind_threepid(self) -> None:
+        """Tests that the unbind_threepid module callback is called correctly before
         removing a 3PID mapping.
         """
 
@@ -972,7 +972,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         # call identityserver.org
         threepid_unbind_mock = Mock(return_value=make_awaitable((True, True)))
         third_party_rules = self.hs.get_third_party_event_rules()
-        third_party_rules._on_threepid_unbind_callbacks.append(threepid_unbind_mock)
+        third_party_rules._unbind_threepid_callbacks.append(threepid_unbind_mock)
 
         # Deactivate the account, this should remove the 3pid mapping
         # and call the module handler.

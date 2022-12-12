@@ -67,7 +67,7 @@ from synapse.events.third_party_rules import (
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
     ON_THREEPID_BIND_CALLBACK,
-    ON_THREEPID_UNBIND_CALLBACK,
+    UNBIND_THREEPID_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
@@ -320,7 +320,7 @@ class ModuleApi:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
-        on_threepid_unbind: Optional[ON_THREEPID_UNBIND_CALLBACK] = None,
+        unbind_threepid: Optional[UNBIND_THREEPID_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -337,7 +337,7 @@ class ModuleApi:
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
             on_threepid_bind=on_threepid_bind,
-            on_threepid_unbind=on_threepid_unbind,
+            unbind_threepid=unbind_threepid,
         )
 
     def register_presence_router_callbacks(

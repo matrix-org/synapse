@@ -265,23 +265,32 @@ server_.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
-### `on_threepid_unbind`
+### `unbind_threepid`
 
-_First introduced in Synapse v1.64.0_
+_First introduced in Synapse v1.74.0_
 
 ```python
-async def on_threepid_unbind(
+async def unbind_threepid(
     user_id: str, medium: str, address: str, identity_server: str
 ) -> Tuple[bool, bool]:
 ```
 
 Called before a threepid association is removed.
 
-It should return a tuple of 2 booleans reporting if a changed happened for the first, and if unbind
-needs to stop there for the second (True value). In this case no other module unbind will be
-called, and the default unbind made to the IS that was used on bind will also be skipped.
-In any case the mapping will be removed from the Synapse 3pid remote table, except if an Exception
-was raised at some point.
+The module is given the Matrix ID of the user to which an association is to be removed,
+as well as the medium (`email` or `msisdn`), address of the third-party identifier and
+the identity server where the threepid was successfully registered.
+
+A module can hence do its own custom unbinding, if for example it did also registered a custom
+binding logic with `on_threepid_bind`.
+
+It should return a tuple of 2 booleans:
+- first one should be `True` on a success calling the identity server, otherwise `False` if
+the identity server doesn't support unbinding (or no identity server found to contact).
+- second one should be `True` if unbind needs to stop there. In this case no other module
+unbind will be called, and the default unbind made to the IS that was used on bind will also be
+skipped. In any case the mapping will be removed from the Synapse 3pid remote table,
+except if an Exception was raised at some point.
 
 ## Example
 
