@@ -58,7 +58,10 @@ class PushRuleRoomFlag:
     EXTENSIBLE_EVENTS = "org.matrix.msc3932.extensible_events"
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+# eq=False means equality and hashing are done using object identity, which suits
+# our purposes because each RoomVersion is instantiated only once and some of
+# the fields are not hashable.
+@attr.s(slots=True, frozen=True, auto_attribs=True, eq=False)
 class RoomVersion:
     """An object which describes the unique attributes of a room version."""
 
