@@ -22,8 +22,8 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
 from synapse.server import HomeServer
-from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, RoomID, StateMap, UserID
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase, TestCase
