@@ -10,7 +10,7 @@ Remember to route necessary endpoints directly to a worker associated with it.
 
 If you run the script as-is, it will create workers with the replication listener starting from port 8034 and another, regular http listener starting from 8044. If you don't need all of the stream writers listed in the script, just remove them from the ```STREAM_WRITERS``` array. 
 
-Hint: Note that `worker_pid_file` is required if you `worker_daemonize` is `true`. Uncomment and/or modify the line if needed.
+Hint: Note that `worker_pid_file` is required if `worker_daemonize` is `true`. Uncomment and/or modify the line if needed.
 
 ```sh
 #!/bin/bash
