@@ -400,7 +400,7 @@ class SynapseRequest(Request):
         be sure to call finished_processing.
 
         Args:
-            servlet_name (str): the name of the servlet which will be
+            servlet_name: the name of the servlet which will be
                 processing this request. This is used in the metrics.
 
                 It is possible to update this afterwards by updating

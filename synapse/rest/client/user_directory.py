@@ -63,8 +63,8 @@ class UserDirectorySearchRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        limit = body.get("limit", 10)
-        limit = min(limit, 50)
+        limit = int(body.get("limit", 10))
+        limit = max(min(limit, 50), 0)
 
         try:
             search_term = body["search_term"]

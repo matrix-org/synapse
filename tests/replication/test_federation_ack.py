@@ -25,8 +25,9 @@ from tests.unittest import HomeserverTestCase
 class FederationAckTestCase(HomeserverTestCase):
     def default_config(self) -> dict:
         config = super().default_config()
-        config["worker_app"] = "synapse.app.federation_sender"
-        config["send_federation"] = False
+        config["worker_app"] = "synapse.app.generic_worker"
+        config["worker_name"] = "federation_sender1"
+        config["federation_sender_instances"] = ["federation_sender1"]
         return config
 
     def make_homeserver(self, reactor, clock):

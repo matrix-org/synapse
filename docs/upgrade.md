@@ -88,6 +88,38 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.73.0
+
+## Legacy Prometheus metric names have now been removed
+
+Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.
+
+This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the `enable_legacy_metrics` configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.
+
+If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names)
+for more context.
+
+
+# Upgrading to v1.72.0
+
+## Dropping support for PostgreSQL 10
+
+In line with our [deprecation policy](deprecation_policy.md), we've dropped
+support for PostgreSQL 10, as it is no longer supported upstream.
+
+This release of Synapse requires PostgreSQL 11+.
+
+
 # Upgrading to v1.71.0
 
 ## Removal of the `generate_short_term_login_token` module API method
@@ -114,6 +146,22 @@ If one of your application service's `users` regex was intending to match a remo
 this will no longer match as you expect. The behavioral mismatch between matching all
 local users and some remote users is why the spec was changed/clarified and this
 caveat is no longer supported.
+
+
+## Legacy Prometheus metric names are now disabled by default
+
+Synapse v1.71.0 disables legacy Prometheus metric names by default.
+For administrators that still rely on them and have not yet had chance to update their
+uses of the metrics, it's still possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and at that point,
+it will no longer be possible to re-enable them.
+
+If you do not use metrics or you have already updated your Grafana dashboard(s),
+Prometheus console(s) and alerting rule(s), there is no action needed.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names).
 
 
 # Upgrading to v1.69.0

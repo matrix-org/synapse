@@ -201,7 +201,7 @@ class BasePresenceHandler(abc.ABC):
         """Get the current presence state for multiple users.
 
         Returns:
-            dict: `user_id` -> `UserPresenceState`
+            A mapping of `user_id` -> `UserPresenceState`
         """
         states = {}
         missing = []
@@ -256,7 +256,7 @@ class BasePresenceHandler(abc.ABC):
         with the app.
         """
 
-    async def update_external_syncs_row(
+    async def update_external_syncs_row(  # noqa: B027 (no-op by design)
         self, process_id: str, user_id: str, is_syncing: bool, sync_time_msec: int
     ) -> None:
         """Update the syncing users for an external process as a delta.
@@ -272,7 +272,9 @@ class BasePresenceHandler(abc.ABC):
             sync_time_msec: Time in ms when the user was last syncing
         """
 
-    async def update_external_syncs_clear(self, process_id: str) -> None:
+    async def update_external_syncs_clear(  # noqa: B027 (no-op by design)
+        self, process_id: str
+    ) -> None:
         """Marks all users that had been marked as syncing by a given process
         as offline.
 
@@ -476,7 +478,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             return _NullContextManager()
 
         prev_state = await self.current_state_for_user(user_id)
-        if prev_state != PresenceState.BUSY:
+        if prev_state.state != PresenceState.BUSY:
             # We set state here but pass ignore_status_msg = True as we don't want to
             # cause the status message to be cleared.
             # Note that this causes last_active_ts to be incremented which is not
@@ -1690,10 +1692,12 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
 
             if from_key is not None:
                 # First get all users that have had a presence update
-                updated_users = stream_change_cache.get_all_entities_changed(from_key)
+                result = stream_change_cache.get_all_entities_changed(from_key)
 
                 # Cross-reference users we're interested in with those that have had updates.
-                if updated_users is not None:
+                if result.hit:
+                    updated_users = result.entities
+
                     # If we have the full list of changes for presence we can
                     # simply check which ones share a room with the user.
                     get_updates_counter.labels("stream").inc()
@@ -1762,14 +1766,14 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         Returns:
             A list of presence states for the given user to receive.
         """
+        updated_users = None
         if from_key:
             # Only return updates since the last sync
-            updated_users = self.store.presence_stream_cache.get_all_entities_changed(
-                from_key
-            )
-            if not updated_users:
-                updated_users = []
+            result = self.store.presence_stream_cache.get_all_entities_changed(from_key)
+            if result.hit:
+                updated_users = result.entities
 
+        if updated_users is not None:
             # Get the actual presence update for each change
             users_to_state = await self.get_presence_handler().current_state_for_users(
                 updated_users

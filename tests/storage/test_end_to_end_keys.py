@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
+from synapse.util import Clock
+
 from tests.unittest import HomeserverTestCase
 
 
 class EndToEndKeyStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
-    def test_key_without_device_name(self):
+    def test_key_without_device_name(self) -> None:
         now = 1470174257070
         json = {"key": "value"}
 
@@ -35,7 +40,7 @@ class EndToEndKeyStoreTestCase(HomeserverTestCase):
         dev = res["user"]["device"]
         self.assertDictContainsSubset(json, dev)
 
-    def test_reupload_key(self):
+    def test_reupload_key(self) -> None:
         now = 1470174257070
         json = {"key": "value"}
 
@@ -53,7 +58,7 @@ class EndToEndKeyStoreTestCase(HomeserverTestCase):
         )
         self.assertFalse(changed)
 
-    def test_get_key_with_device_name(self):
+    def test_get_key_with_device_name(self) -> None:
         now = 1470174257070
         json = {"key": "value"}
 
@@ -70,7 +75,7 @@ class EndToEndKeyStoreTestCase(HomeserverTestCase):
             {"key": "value", "unsigned": {"device_display_name": "display_name"}}, dev
         )
 
-    def test_multiple_devices(self):
+    def test_multiple_devices(self) -> None:
         now = 1470174257070
 
         self.get_success(self.store.store_device("user1", "device1", None))

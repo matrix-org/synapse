@@ -19,7 +19,9 @@ from typing import Optional
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import NotFoundError, SynapseError
-from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN
+from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN, DeviceHandler
+from synapse.rest import admin
+from synapse.rest.client import account, login
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -30,9 +32,17 @@ user2 = "@theresa:bbb"
 
 
 class DeviceTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        admin.register_servlets,
+        account.register_servlets,
+    ]
+
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
-        self.handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.handler = handler
         self.store = hs.get_datastores().main
         return hs
 
@@ -61,6 +71,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(res, "fco")
 
         dev = self.get_success(self.handler.store.get_device("@boris:foo", "fco"))
+        assert dev is not None
         self.assertEqual(dev["display_name"], "display name")
 
     def test_device_is_preserved_if_exists(self) -> None:
@@ -83,6 +94,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(res2, "fco")
 
         dev = self.get_success(self.handler.store.get_device("@boris:foo", "fco"))
+        assert dev is not None
         self.assertEqual(dev["display_name"], "display name")
 
     def test_device_id_is_made_up_if_unspecified(self) -> None:
@@ -95,6 +107,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         )
 
         dev = self.get_success(self.handler.store.get_device("@theresa:foo", device_id))
+        assert dev is not None
         self.assertEqual(dev["display_name"], "display")
 
     def test_get_devices_by_user(self) -> None:
@@ -110,7 +123,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
                 "device_id": "xyz",
                 "display_name": "display 0",
                 "last_seen_ip": None,
-                "last_seen_ts": None,
+                "last_seen_ts": 1000000,
             },
             device_map["xyz"],
         )
@@ -224,6 +237,29 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             NotFoundError,
         )
 
+    def test_login_delete_old_devices(self) -> None:
+        """Delete old devices if the user already has too many."""
+
+        user_id = self.register_user("user", "pass")
+
+        # Create a bunch of devices
+        for _ in range(50):
+            self.login("user", "pass")
+            self.reactor.advance(1)
+
+        # Advance the clock for ages (as we only delete old devices)
+        self.reactor.advance(60 * 60 * 24 * 300)
+
+        # Log in again to start the pruning
+        self.login("user", "pass")
+
+        # Give the background job time to do its thing
+        self.reactor.pump([1.0] * 100)
+
+        # We should now only have the most recent device.
+        devices = self.get_success(self.handler.get_devices_by_user(user_id))
+        self.assertEqual(len(devices), 1)
+
     def _record_users(self) -> None:
         # check this works for both devices which have a recorded client_ip,
         # and those which don't.
@@ -264,7 +300,9 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 class DehydrationTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
-        self.handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.handler = handler
         self.registration = hs.get_registration_handler()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
@@ -284,9 +322,9 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        retrieved_device_id, device_data = self.get_success(
-            self.handler.get_dehydrated_device(user_id=user_id)
-        )
+        result = self.get_success(self.handler.get_dehydrated_device(user_id=user_id))
+        assert result is not None
+        retrieved_device_id, device_data = result
 
         self.assertEqual(retrieved_device_id, stored_dehydrated_device_id)
         self.assertEqual(device_data, {"device_data": {"foo": "bar"}})

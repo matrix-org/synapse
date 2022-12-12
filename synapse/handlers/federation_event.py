@@ -1066,10 +1066,9 @@ class FederationEventHandler:
                 state_res_store=StateResolutionStore(self._store),
             )
 
-        except Exception:
+        except Exception as e:
             logger.warning(
-                "Error attempting to resolve state at missing prev_events",
-                exc_info=True,
+                "Error attempting to resolve state at missing prev_events: %s", e
             )
             raise FederationError(
                 "ERROR",

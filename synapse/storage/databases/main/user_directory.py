@@ -26,6 +26,14 @@ from typing import (
     cast,
 )
 
+try:
+    # Figure out if ICU support is available for searching users.
+    import icu
+
+    USE_ICU = True
+except ModuleNotFoundError:
+    USE_ICU = False
+
 from typing_extensions import TypedDict
 
 from synapse.api.errors import StoreError
@@ -185,9 +193,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         - who should be in the user_directory.
 
         Args:
-            progress (dict)
-            batch_size (int): Maximum number of state events to process
-                per cycle.
+            progress
+            batch_size: Maximum number of state events to process per cycle.
 
         Returns:
             number of events processed.
@@ -482,7 +489,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 table="user_directory",
                 keyvalues={"user_id": user_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
-                lock=False,  # We're only inserter
             )
 
             if isinstance(self.database_engine, PostgresEngine):
@@ -512,7 +518,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     table="user_directory_search",
                     keyvalues={"user_id": user_id},
                     values={"value": value},
-                    lock=False,  # We're only inserter
                 )
             else:
                 # This should be unreachable.
@@ -708,10 +713,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns the rooms that a user is in.
 
         Args:
-            user_id(str): Must be a local user
+            user_id: Must be a local user
 
         Returns:
-            list: user_id
+            List of room IDs
         """
         rows = await self.db_pool.simple_select_onecol(
             table="users_who_share_private_rooms",
@@ -889,7 +894,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
         limited = len(results) > limit
 
-        return {"limited": limited, "results": results}
+        return {"limited": limited, "results": results[0:limit]}
 
 
 def _parse_query_sqlite(search_term: str) -> str:
@@ -903,7 +908,7 @@ def _parse_query_sqlite(search_term: str) -> str:
     """
 
     # Pull out the individual words, discarding any non-word characters.
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    results = _parse_words(search_term)
     return " & ".join("(%s* OR %s)" % (result, result) for result in results)
 
 
@@ -913,12 +918,63 @@ def _parse_query_postgres(search_term: str) -> Tuple[str, str, str]:
     We use this so that we can add prefix matching, which isn't something
     that is supported by default.
     """
-
-    # Pull out the individual words, discarding any non-word characters.
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    results = _parse_words(search_term)
 
     both = " & ".join("(%s:* | %s)" % (result, result) for result in results)
     exact = " & ".join("%s" % (result,) for result in results)
     prefix = " & ".join("%s:*" % (result,) for result in results)
 
     return both, exact, prefix
+
+
+def _parse_words(search_term: str) -> List[str]:
+    """Split the provided search string into a list of its words.
+
+    If support for ICU (International Components for Unicode) is available, use it.
+    Otherwise, fall back to using a regex to detect word boundaries. This latter
+    solution works well enough for most latin-based languages, but doesn't work as well
+    with other languages.
+
+    Args:
+        search_term: The search string.
+
+    Returns:
+        A list of the words in the search string.
+    """
+    if USE_ICU:
+        return _parse_words_with_icu(search_term)
+
+    return re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+
+
+def _parse_words_with_icu(search_term: str) -> List[str]:
+    """Break down the provided search string into its individual words using ICU
+    (International Components for Unicode).
+
+    Args:
+        search_term: The search string.
+
+    Returns:
+        A list of the words in the search string.
+    """
+    results = []
+    breaker = icu.BreakIterator.createWordInstance(icu.Locale.getDefault())
+    breaker.setText(search_term)
+    i = 0
+    while True:
+        j = breaker.nextBoundary()
+        if j < 0:
+            break
+
+        result = search_term[i:j]
+
+        # libicu considers spaces and punctuation between words as words, but we don't
+        # want to include those in results as they would result in syntax errors in SQL
+        # queries (e.g. "foo bar" would result in the search query including "foo &  &
+        # bar").
+        if len(re.findall(r"([\w\-]+)", result, re.UNICODE)):
+            results.append(result)
+
+        i = j
+
+    return results

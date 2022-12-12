@@ -54,7 +54,7 @@ trial_postgres_tests = [
     {
         "python-version": "3.7",
         "database": "postgres",
-        "postgres-version": "10",
+        "postgres-version": "11",
         "extras": "all",
     }
 ]
@@ -64,7 +64,7 @@ if not IS_PR:
         {
             "python-version": "3.11",
             "database": "postgres",
-            "postgres-version": "14",
+            "postgres-version": "15",
             "extras": "all",
         }
     )

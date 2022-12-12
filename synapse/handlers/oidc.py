@@ -787,7 +787,7 @@ class OidcProvider:
                 Must include an ``access_token`` field.
 
         Returns:
-            UserInfo: an object representing the user.
+            an object representing the user.
         """
         logger.debug("Using the OAuth2 access_token to request userinfo")
         metadata = await self.load_metadata()
@@ -1435,6 +1435,7 @@ class UserAttributeDict(TypedDict):
     localpart: Optional[str]
     confirm_localpart: bool
     display_name: Optional[str]
+    picture: Optional[str]  # may be omitted by older `OidcMappingProviders`
     emails: List[str]
 
 
@@ -1520,6 +1521,7 @@ env.filters.update(
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class JinjaOidcMappingConfig:
     subject_claim: str
+    picture_claim: str
     localpart_template: Optional[Template]
     display_name_template: Optional[Template]
     email_template: Optional[Template]
@@ -1539,6 +1541,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
     @staticmethod
     def parse_config(config: dict) -> JinjaOidcMappingConfig:
         subject_claim = config.get("subject_claim", "sub")
+        picture_claim = config.get("picture_claim", "picture")
 
         def parse_template_config(option_name: str) -> Optional[Template]:
             if option_name not in config:
@@ -1572,6 +1575,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
 
         return JinjaOidcMappingConfig(
             subject_claim=subject_claim,
+            picture_claim=picture_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             email_template=email_template,
@@ -1611,10 +1615,13 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if email:
             emails.append(email)
 
+        picture = userinfo.get("picture")
+
         return UserAttributeDict(
             localpart=localpart,
             display_name=display_name,
             emails=emails,
+            picture=picture,
             confirm_localpart=self._config.confirm_localpart,
         )
 

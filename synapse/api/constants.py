@@ -231,6 +231,9 @@ class EventContentFields:
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
+    # an unspecced field added to to-device messages to identify them uniquely-ish
+    TO_DEVICE_MSGID: Final = "org.matrix.msgid"
+
 
 class RoomTypes:
     """Understood values of the room_type field of m.room.create events."""
