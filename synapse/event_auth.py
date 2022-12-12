@@ -359,6 +359,7 @@ LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS = {
     RoomVersions.MSC3787,
     RoomVersions.V10,
     RoomVersions.MSC2716v4,
+    RoomVersions.MSC1767v10,
 }
 
 
