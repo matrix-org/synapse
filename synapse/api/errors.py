@@ -426,7 +426,7 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, msg: str, strict: bool):
+    def __init__(self, msg: str, unpersistable: bool):
         """
         strict:
             if True, the PDU must not be persisted, not even as a rejected PDU
@@ -436,7 +436,7 @@ class EventSizeError(SynapseError):
         """
 
         super().__init__(413, msg, Codes.TOO_LARGE)
-        self.strict = strict
+        self.unpersistable = unpersistable
 
 
 class LoginError(SynapseError):

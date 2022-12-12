@@ -1739,7 +1739,7 @@ class FederationEventHandler:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
                 except EventSizeError as e:
-                    if e.strict:
+                    if e.unpersistable:
                         # A strict event size error means the event is completely
                         # unpersistable.
                         raise e
@@ -1794,7 +1794,7 @@ class FederationEventHandler:
             context.rejected = RejectedReason.AUTH_ERROR
             return
         except EventSizeError as e:
-            if e.strict:
+            if e.unpersistable:
                 # A strict event size error means the event is completely
                 # unpersistable.
                 raise e
