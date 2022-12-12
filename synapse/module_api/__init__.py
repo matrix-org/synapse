@@ -25,7 +25,7 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
-    Union,
+    Union, Collection,
 )
 
 import attr
@@ -126,7 +126,7 @@ from synapse.types import (
 )
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
-from synapse.util.caches.descriptors import CachedFunction, cached
+from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
@@ -183,6 +183,38 @@ class UserIpAndAgent:
     user_agent: str
     # The time at which this user agent/ip was last seen.
     last_seen: int
+
+
+def cached(
+    *,
+    max_entries: int = 1000,
+    num_args: Optional[int] = None,
+    uncached_args: Optional[Collection[str]] = None,
+):
+    """Returns a decorator that caches the value of the decorated function for a given
+    set of arguments. This decorator behaves similarly to functools.lru_cache.
+
+    Example:
+
+        @cached()
+        def foo('a', 'b'):
+            ...
+
+    Args:
+        max_entries: The maximum number of entries in the cache. If the cache is full
+            and a new entry is added, the least recently accessed entry will be evicted
+            from the cache.
+        num_args: The number of positional arguments (excluding `self`) to use as cache
+            keys. Defaults to all named args of the function.
+        uncached_args: A list of argument names to not use as the cache key. (`self` is
+            always ignored.) Cannot be used with num_args.
+
+    """
+    return _cached(
+        max_entries=max_entries,
+        num_args=num_args,
+        uncached_args=uncached_args,
+    )
 
 
 class ModuleApi:
