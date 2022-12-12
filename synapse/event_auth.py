@@ -375,10 +375,10 @@ def _check_size_limits(event: "EventBase") -> None:
         EventSizeError:
             when a size limit has been violated.
 
-            strict=True if Synapse never would have accepted the event and
+            unpersistable=True if Synapse never would have accepted the event and
                 the PDU must NOT be persisted.
 
-            strict=False if a prior version of Synapse would have accepted the
+            unpersistable=False if a prior version of Synapse would have accepted the
                 event and so the PDU must be persisted as rejected to avoid
                 breaking the room.
     """

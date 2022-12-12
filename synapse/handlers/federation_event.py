@@ -1739,10 +1739,9 @@ class FederationEventHandler:
                     context.rejected = RejectedReason.AUTH_ERROR
                 except EventSizeError as e:
                     if e.unpersistable:
-                        # A strict event size error means the event is completely
-                        # unpersistable.
+                        # This event is completely unpersistable.
                         raise e
-                    # Otherwise, for non-strict errors, we just persist the event
+                    # Otherwise, we are somewhat lenient and just persist the event
                     # as rejected, for moderate compatibility with older Synapse
                     # versions.
                     logger.warning("While validating received event %r: %s", event, e)
@@ -1794,10 +1793,9 @@ class FederationEventHandler:
             return
         except EventSizeError as e:
             if e.unpersistable:
-                # A strict event size error means the event is completely
-                # unpersistable.
+                # This event is completely unpersistable.
                 raise e
-            # Otherwise, for non-strict errors, we just persist the event
+            # Otherwise, we are somewhat lenient and just persist the event
             # as rejected, for moderate compatibility with older Synapse
             # versions.
             logger.warning("While validating received event %r: %s", event, e)

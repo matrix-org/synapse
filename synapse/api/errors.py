@@ -426,7 +426,7 @@ class EventSizeError(SynapseError):
 
     def __init__(self, msg: str, unpersistable: bool):
         """
-        strict:
+        unpersistable:
             if True, the PDU must not be persisted, not even as a rejected PDU
             when received over federation.
             This is notably true when the entire PDU exceeds the size limit for a PDU,
