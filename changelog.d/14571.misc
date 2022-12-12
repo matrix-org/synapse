@@ -1,1 +1,0 @@
-Run Rust CI when `Cargo.lock` changes. This is particularly useful for dependabot updates.

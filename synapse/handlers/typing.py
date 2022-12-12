@@ -420,11 +420,11 @@ class TypingWriterHandler(FollowerTypingHandler):
         if last_id == current_id:
             return [], current_id, False
 
-        changed_rooms: Optional[
-            Iterable[str]
-        ] = self._typing_stream_change_cache.get_all_entities_changed(last_id)
+        result = self._typing_stream_change_cache.get_all_entities_changed(last_id)
 
-        if changed_rooms is None:
+        if result.hit:
+            changed_rooms: Iterable[str] = result.entities
+        else:
             changed_rooms = self._room_serials
 
         rows = []

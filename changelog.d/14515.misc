@@ -1,1 +1,0 @@
-Faster joins: use servers list approximation received during `send_join` (potentially updated with received membership events) in `assert_host_in_room`.

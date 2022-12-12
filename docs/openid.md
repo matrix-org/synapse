@@ -590,3 +590,44 @@ oidc_providers:
         display_name_template: "{{ user.first_name }} {{ user.last_name }}"
         email_template: "{{ user.email }}"
 ```
+
+### Mastodon
+
+[Mastodon](https://docs.joinmastodon.org/) instances provide an [OAuth API](https://docs.joinmastodon.org/spec/oauth/), allowing those instances to be used as a single sign-on provider for Synapse.
+
+The first step is to register Synapse as an application with your Mastodon instance, using the [Create an application API](https://docs.joinmastodon.org/methods/apps/#create) (see also [here](https://docs.joinmastodon.org/client/token/)). There are several ways to do this, but in the example below we are using CURL.
+
+This example assumes that:
+* the Mastodon instance website URL is `https://your.mastodon.instance.url`, and
+* Synapse will be registered as an app named `my_synapse_app`.
+
+Send the following request, substituting the value of `synapse_public_baseurl` from your Synapse installation.
+```sh
+curl -d "client_name=my_synapse_app&redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback" -X POST https://your.mastodon.instance.url/api/v1/apps
+```
+
+You should receive a response similar to the following. Make sure to save it.
+```json
+{"client_id":"someclientid_123","client_secret":"someclientsecret_123","id":"12345","name":"my_synapse_app","redirect_uri":"https://[synapse_public_baseurl]/_synapse/client/oidc/callback","website":null,"vapid_key":"somerandomvapidkey_123"}
+```
+
+As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a `sub` property, an alternative `subject_claim` has to be set. Your Synapse configuration should include the following:
+
+```yaml
+oidc_providers:
+  - idp_id: my_mastodon
+    idp_name: "Mastodon Instance Example"
+    discover: false
+    issuer: "https://your.mastodon.instance.url/@admin"
+    client_id: "someclientid_123"    
+    client_secret: "someclientsecret_123"
+    authorization_endpoint: "https://your.mastodon.instance.url/oauth/authorize"
+    token_endpoint: "https://your.mastodon.instance.url/oauth/token"
+    userinfo_endpoint: "https://your.mastodon.instance.url/api/v1/accounts/verify_credentials"
+    scopes: ["read"]
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+```
+
+Note that the fields `client_id` and `client_secret` are taken from the CURL response above.

@@ -1,1 +1,0 @@
-Remove the `worker_main_http_uri` configuration setting. This is now handled via internal replication.

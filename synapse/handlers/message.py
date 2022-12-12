@@ -59,7 +59,6 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
 from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     MutableStateMap,
     PersistedEventPosition,
@@ -70,6 +69,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -1135,11 +1135,13 @@ class EventCreationHandler:
             )
             state_events = await self.store.get_events_as_list(state_event_ids)
             # Create a StateMap[str]
-            state_map = {(e.type, e.state_key): e.event_id for e in state_events}
+            current_state_ids = {
+                (e.type, e.state_key): e.event_id for e in state_events
+            }
             # Actually strip down and only use the necessary auth events
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 event=temp_event,
-                current_state_ids=state_map,
+                current_state_ids=current_state_ids,
                 for_verification=False,
             )
 
