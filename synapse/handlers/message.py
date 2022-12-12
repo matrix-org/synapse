@@ -360,6 +360,8 @@ class MessageHandler:
             user_id: {
                 "avatar_url": profile.avatar_url,
                 "display_name": profile.display_name,
+                "avatar_nft": profile.avatar_nft,
+                "metadata": profile.metadata,
             }
             for user_id, profile in users_with_profile.items()
         }

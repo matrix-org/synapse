@@ -257,6 +257,8 @@ class ServerConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
+        self.amax_rpc_url = config["amax_rpc_url"]
+        self.wallet_sigin_message = config["wallet_sigin_message"]
 
         try:
             parse_and_validate_server_name(self.server_name)
@@ -799,6 +801,13 @@ class ServerConfig(Config):
         return (
             """\
         server_name: "%(server_name)s"
+        
+        amax_rpc_url: https://testnode.amaxscan.io/
+        
+        wallet_sigin_message: "Welcome to amax-synapse!"
+
+        # When running as a daemon, the file to store the pid in
+        #
         pid_file: %(pid_file)s
         listeners:
           %(secure_http_bindings)s

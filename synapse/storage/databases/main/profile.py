@@ -24,7 +24,7 @@ class ProfileWorkerStore(SQLBaseStore):
             profile = await self.db_pool.simple_select_one(
                 table="profiles",
                 keyvalues={"user_id": user_localpart},
-                retcols=("displayname", "avatar_url"),
+                retcols=("displayname", "avatar_url", "avatar_nft", "metadata"),
                 desc="get_profileinfo",
             )
         except StoreError as e:
@@ -35,7 +35,8 @@ class ProfileWorkerStore(SQLBaseStore):
                 raise
 
         return ProfileInfo(
-            avatar_url=profile["avatar_url"], display_name=profile["displayname"]
+            avatar_url=profile["avatar_url"], display_name=profile["displayname"],
+            avatar_nft=profile["avatar_nft"], metadata=profile["metadata"]
         )
 
     async def get_profile_displayname(self, user_localpart: str) -> Optional[str]:
@@ -77,6 +78,17 @@ class ProfileWorkerStore(SQLBaseStore):
             keyvalues={"user_id": user_localpart},
             values={"avatar_url": new_avatar_url},
             desc="set_profile_avatar_url",
+        )
+
+    async def set_profile_info(
+        self, user_localpart: str, new_avatar_nft: Optional[str],
+        new_metadata: Optional[str]
+    ) -> None:
+        await self.db_pool.simple_upsert(
+            table="profiles",
+            keyvalues={"user_id": user_localpart},
+            values={"avatar_nft": new_avatar_nft, "metadata": new_metadata},
+            desc="set_profile_avatar_nft_metadata",
         )
 
 

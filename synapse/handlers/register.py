@@ -195,16 +195,16 @@ class RegistrationHandler:
                         errcode=Codes.FORBIDDEN,
                     )
 
-        if guest_access_token is None:
-            try:
-                int(localpart)
-                raise SynapseError(
-                    400,
-                    "Numeric user IDs are reserved for guest users.",
-                    errcode=Codes.INVALID_USERNAME,
-                )
-            except ValueError:
-                pass
+        # if guest_access_token is None:
+        #     try:
+        #         int(localpart)
+        #         raise SynapseError(
+        #             400,
+        #             "Numeric user IDs are reserved for guest users.",
+        #             errcode=Codes.INVALID_USERNAME,
+        #         )
+        #     except ValueError:
+        #         pass
 
     async def register_user(
         self,
