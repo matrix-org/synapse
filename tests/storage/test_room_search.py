@@ -39,7 +39,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def test_null_byte(self):
+    def test_null_byte(self) -> None:
         """
         Postgres/SQLite don't like null bytes going into the search tables. Internally
         we replace those with a space.
@@ -86,7 +86,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("alice", result.get("highlights"))
 
-    def test_non_string(self):
+    def test_non_string(self) -> None:
         """Test that non-string `value`s are not inserted into `event_search`.
 
         This is particularly important when using sqlite, since a sqlite column can hold
@@ -157,7 +157,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         self.assertEqual(f.value.code, 404)
 
     @skip_unless(not USE_POSTGRES_FOR_TESTS, "requires sqlite")
-    def test_sqlite_non_string_deletion_background_update(self):
+    def test_sqlite_non_string_deletion_background_update(self) -> None:
         """Test the background update to delete bad rows from `event_search`."""
         store = self.hs.get_datastores().main
 
@@ -350,7 +350,7 @@ class MessageSearchTest(HomeserverTestCase):
                 "results array length should match count",
             )
 
-    def test_postgres_web_search_for_phrase(self):
+    def test_postgres_web_search_for_phrase(self) -> None:
         """
         Test searching for phrases using typical web search syntax, as per postgres' websearch_to_tsquery.
         This test is skipped unless the postgres instance supports websearch_to_tsquery.
@@ -364,7 +364,7 @@ class MessageSearchTest(HomeserverTestCase):
 
         self._check_test_cases(store, self.COMMON_CASES + self.POSTGRES_CASES)
 
-    def test_sqlite_search(self):
+    def test_sqlite_search(self) -> None:
         """
         Test sqlite searching for phrases.
         """

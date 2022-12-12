@@ -15,11 +15,16 @@
 import os.path
 from unittest.mock import Mock, patch
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage import prepare_database
+from synapse.storage.types import Cursor
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -29,7 +34,9 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
     Test the background update to clean forward extremities table.
     """
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.store = homeserver.get_datastores().main
         self.room_creator = homeserver.get_room_creation_handler()
 
@@ -39,7 +46,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
-    def run_background_update(self):
+    def run_background_update(self) -> None:
         """Re run the background update to clean up the extremities."""
         # Make sure we don't clash with in progress updates.
         self.assertTrue(
@@ -54,7 +61,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
             "delete_forward_extremities.sql",
         )
 
-        def run_delta_file(txn):
+        def run_delta_file(txn: Cursor) -> None:
             prepare_database.executescript(txn, schema_path)
 
         self.get_success(
@@ -84,7 +91,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
             (room_id,)
         )
 
-    def test_soft_failed_extremities_handled_correctly(self):
+    def test_soft_failed_extremities_handled_correctly(self) -> None:
         """Test that extremities are correctly calculated in the presence of
         soft failed events.
 
@@ -114,7 +121,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         self.assertEqual(latest_event_ids, [event_id_4])
 
-    def test_basic_cleanup(self):
+    def test_basic_cleanup(self) -> None:
         """Test that extremities are correctly calculated in the presence of
         soft failed events.
 
@@ -149,7 +156,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
         self.assertEqual(latest_event_ids, [event_id_b])
 
-    def test_chain_of_fail_cleanup(self):
+    def test_chain_of_fail_cleanup(self) -> None:
         """Test that extremities are correctly calculated in the presence of
         soft failed events.
 
@@ -187,7 +194,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
         self.assertEqual(latest_event_ids, [event_id_b])
 
-    def test_forked_graph_cleanup(self):
+    def test_forked_graph_cleanup(self) -> None:
         r"""Test that extremities are correctly calculated in the presence of
         soft failed events.
 
@@ -252,12 +259,14 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["cleanup_extremities_with_dummy_events"] = True
         return self.setup_test_homeserver(config=config)
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.store = homeserver.get_datastores().main
         self.room_creator = homeserver.get_room_creation_handler()
         self.event_creator_handler = homeserver.get_event_creation_handler()
@@ -273,7 +282,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.event_creator = homeserver.get_event_creation_handler()
         homeserver.config.consent.user_consent_version = self.CONSENT_VERSION
 
-    def test_send_dummy_event(self):
+    def test_send_dummy_event(self) -> None:
         self._create_extremity_rich_graph()
 
         # Pump the reactor repeatedly so that the background updates have a
@@ -286,7 +295,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
 
     @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
-    def test_send_dummy_events_when_insufficient_power(self):
+    def test_send_dummy_events_when_insufficient_power(self) -> None:
         self._create_extremity_rich_graph()
         # Criple power levels
         self.helper.send_state(
@@ -317,7 +326,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
 
     @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=250)
-    def test_expiry_logic(self):
+    def test_expiry_logic(self) -> None:
         """Simple test to ensure that _expire_rooms_to_exclude_from_dummy_event_insertion()
         expires old entries correctly.
         """
@@ -357,7 +366,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
             0,
         )
 
-    def _create_extremity_rich_graph(self):
+    def _create_extremity_rich_graph(self) -> None:
         """Helper method to create bushy graph on demand"""
 
         event_id_start = self.create_and_send_event(self.room_id, self.user)
@@ -372,7 +381,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         self.assertEqual(len(latest_event_ids), 50)
 
-    def _enable_consent_checking(self):
+    def _enable_consent_checking(self) -> None:
         """Helper method to enable consent checking"""
         self.event_creator._block_events_without_consent_error = "No consent from user"
         consent_uri_builder = Mock()

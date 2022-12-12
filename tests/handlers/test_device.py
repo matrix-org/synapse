@@ -20,8 +20,6 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN, DeviceHandler
-from synapse.rest import admin
-from synapse.rest.client import account, login
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -32,12 +30,6 @@ user2 = "@theresa:bbb"
 
 
 class DeviceTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        login.register_servlets,
-        admin.register_servlets,
-        account.register_servlets,
-    ]
-
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
         handler = hs.get_device_handler()
@@ -123,7 +115,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
                 "device_id": "xyz",
                 "display_name": "display 0",
                 "last_seen_ip": None,
-                "last_seen_ts": 1000000,
+                "last_seen_ts": None,
             },
             device_map["xyz"],
         )
@@ -236,29 +228,6 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             self.handler.update_device("user_id", "unknown_device_id", update),
             NotFoundError,
         )
-
-    def test_login_delete_old_devices(self) -> None:
-        """Delete old devices if the user already has too many."""
-
-        user_id = self.register_user("user", "pass")
-
-        # Create a bunch of devices
-        for _ in range(50):
-            self.login("user", "pass")
-            self.reactor.advance(1)
-
-        # Advance the clock for ages (as we only delete old devices)
-        self.reactor.advance(60 * 60 * 24 * 300)
-
-        # Log in again to start the pruning
-        self.login("user", "pass")
-
-        # Give the background job time to do its thing
-        self.reactor.pump([1.0] * 100)
-
-        # We should now only have the most recent device.
-        devices = self.get_success(self.handler.get_devices_by_user(user_id))
-        self.assertEqual(len(devices), 1)
 
     def _record_users(self) -> None:
         # check this works for both devices which have a recorded client_ip,

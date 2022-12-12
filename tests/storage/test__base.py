@@ -106,7 +106,7 @@ class UpdateUpsertManyTests(unittest.HomeserverTestCase):
             {(1, "user1", "hello"), (2, "user2", "bleb")},
         )
 
-    def test_simple_update_many(self):
+    def test_simple_update_many(self) -> None:
         """
         simple_update_many performs many updates at once.
         """

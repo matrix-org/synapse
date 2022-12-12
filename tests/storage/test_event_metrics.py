@@ -20,7 +20,7 @@ from tests.unittest import HomeserverTestCase
 
 
 class ExtremStatisticsTestCase(HomeserverTestCase):
-    def test_exposed_to_prometheus(self):
+    def test_exposed_to_prometheus(self) -> None:
         """
         Forward extremity counts are exposed via Prometheus.
         """

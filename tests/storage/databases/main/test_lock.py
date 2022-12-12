@@ -15,18 +15,20 @@
 from twisted.internet import defer, reactor
 from twisted.internet.base import ReactorBase
 from twisted.internet.defer import Deferred
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
 from synapse.storage.databases.main.lock import _LOCK_TIMEOUT_MS
+from synapse.util import Clock
 
 from tests import unittest
 
 
 class LockTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
-    def test_acquire_contention(self):
+    def test_acquire_contention(self) -> None:
         # Track the number of tasks holding the lock.
         # Should be at most 1.
         in_lock = 0
@@ -34,7 +36,7 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         release_lock: "Deferred[None]" = Deferred()
 
-        async def task():
+        async def task() -> None:
             nonlocal in_lock
             nonlocal max_in_lock
 
@@ -76,7 +78,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         # At most one task should have held the lock at a time.
         self.assertEqual(max_in_lock, 1)
 
-    def test_simple_lock(self):
+    def test_simple_lock(self) -> None:
         """Test that we can take out a lock and that while we hold it nobody
         else can take it out.
         """
@@ -103,7 +105,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         self.get_success(lock3.__aenter__())
         self.get_success(lock3.__aexit__(None, None, None))
 
-    def test_maintain_lock(self):
+    def test_maintain_lock(self) -> None:
         """Test that we don't time out locks while they're still active"""
 
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
@@ -119,7 +121,7 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         self.get_success(lock.__aexit__(None, None, None))
 
-    def test_timeout_lock(self):
+    def test_timeout_lock(self) -> None:
         """Test that we time out locks if they're not updated for ages"""
 
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
@@ -139,7 +141,7 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         self.assertFalse(self.get_success(lock.is_still_valid()))
 
-    def test_drop(self):
+    def test_drop(self) -> None:
         """Test that dropping the context manager means we stop renewing the lock"""
 
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
@@ -153,7 +155,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         lock2 = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNotNone(lock2)
 
-    def test_shutdown(self):
+    def test_shutdown(self) -> None:
         """Test that shutting down Synapse releases the locks"""
         # Acquire two locks
         lock = self.get_success(self.store.try_acquire_lock("name", "key1"))
