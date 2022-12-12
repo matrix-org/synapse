@@ -191,8 +191,8 @@ def cached(
     num_args: Optional[int] = None,
     uncached_args: Optional[Collection[str]] = None,
 ):
-    """Returns a decorator that caches the value of the decorated function for a given
-    set of arguments. This decorator behaves similarly to functools.lru_cache.
+    """Returns a decorator that applies a memoizing cache around the function. This
+    decorator behaves similarly to functools.lru_cache.
 
     Example:
 
@@ -211,6 +211,8 @@ def cached(
         uncached_args: A list of argument names to not use as the cache key. (`self` is
             always ignored.) Cannot be used with num_args.
 
+    Returns:
+        A decorator that applies a memoizing cache around the function.
     """
     return _cached(
         max_entries=max_entries,
