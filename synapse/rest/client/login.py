@@ -472,7 +472,7 @@ class LoginRestServlet(RestServlet):
             auth_provider_session_id: The session ID got during login from the SSO IdP.
 
         Returns:
-            result: Dictionary of account information after successful login.
+            Dictionary of account information after successful login.
         """
 
         # Before we actually log them in we check if they've already logged in

@@ -22,9 +22,8 @@ class FederationStreamTestCase(BaseStreamTestCase):
     def _get_worker_hs_config(self) -> dict:
         # enable federation sending on the worker
         config = super()._get_worker_hs_config()
-        # TODO: make it so we don't need both of these
-        config["send_federation"] = False
-        config["worker_app"] = "synapse.app.federation_sender"
+        config["worker_name"] = "federation_sender1"
+        config["federation_sender_instances"] = ["federation_sender1"]
         return config
 
     def test_catchup(self):

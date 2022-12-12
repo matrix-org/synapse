@@ -170,11 +170,13 @@ class ResourceLimitsServerNotices:
             room_id: The room id of the server notices room
 
         Returns:
-            bool: Is the room currently blocked
-            list: The list of pinned event IDs that are unrelated to limit blocking
-            This list can be used as a convenience in the case where the block
-            is to be lifted and the remaining pinned event references need to be
-            preserved
+            Tuple of:
+                Is the room currently blocked
+
+                The list of pinned event IDs that are unrelated to limit blocking
+                This list can be used as a convenience in the case where the block
+                is to be lifted and the remaining pinned event references need to be
+                preserved
         """
         currently_blocked = False
         pinned_state_event = None

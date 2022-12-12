@@ -135,8 +135,8 @@ In the config file for each worker, you must specify:
    [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)).
  * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners) option
    with an `http` listener.
- * If handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
-   the main process (`worker_main_http_uri`).
+ * **Synapse 1.72 and older:** if handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
+   the main process (`worker_main_http_uri`). This config option is no longer required and is ignored when running Synapse 1.73 and newer.
 
 For example:
 
@@ -191,6 +191,7 @@ information.
     ^/_matrix/federation/(v1|v2)/send_leave/
     ^/_matrix/federation/(v1|v2)/invite/
     ^/_matrix/federation/v1/event_auth/
+    ^/_matrix/federation/v1/timestamp_to_event/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/key/v2/query
@@ -218,10 +219,10 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
+    ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
-    # Note that ^/_matrix/client/(r0|v3|unstable)/keys/upload/ requires `worker_main_http_uri`
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
     ^/_matrix/client/(r0|v3|unstable)/keys/changes$
     ^/_matrix/client/(r0|v3|unstable)/keys/claim$
@@ -305,9 +306,11 @@ may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
-requests from a particular user are routed to a single instance. Extracting a
-user ID from the access token or `Authorization` header is currently left as an
-exercise for the reader. Admins may additionally wish to separate out `/sync`
+requests from a particular user are routed to a single instance. This can
+be done e.g. in nginx via IP `hash $http_x_forwarded_for;` or via
+`hash $http_authorization consistent;` which contains the users access token.
+
+Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
 `/initialSync`), as requests that don't are known as "initial sync" that happens
 when a user logs in on a new device and can be *very* resource intensive, so
@@ -374,7 +377,7 @@ responsible for
 - persisting them to the DB, and finally
 - updating the events stream.
 
-Because load is sharded in this way, you *must* restart all worker instances when 
+Because load is sharded in this way, you *must* restart all worker instances when
 adding or removing event persisters.
 
 An `event_persister` should not be mistaken for an `event_creator`.
@@ -502,6 +505,9 @@ worker application type.
 
 ### `synapse.app.pusher`
 
+It is likely this option will be deprecated in the future and is not recommended for new
+installations. Instead, [use `synapse.app.generic_worker` with the `pusher_instances`](usage/configuration/config_documentation.md#pusher_instances).
+
 Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
 [`start_pushers: false`](usage/configuration/config_documentation.md#start_pushers) in the
@@ -539,6 +545,9 @@ Note this worker cannot be load-balanced: only one instance should be active.
 
 
 ### `synapse.app.federation_sender`
+
+It is likely this option will be deprecated in the future and not recommended for
+new installations. Instead, [use `synapse.app.generic_worker` with the `federation_sender_instances`](usage/configuration/config_documentation.md#federation_sender_instances). 
 
 Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
@@ -636,7 +645,9 @@ equivalent to `synapse.app.generic_worker`:
  * `synapse.app.client_reader`
  * `synapse.app.event_creator`
  * `synapse.app.federation_reader`
+ * `synapse.app.federation_sender`
  * `synapse.app.frontend_proxy`
+ * `synapse.app.pusher`
  * `synapse.app.synchrotron`
 
 

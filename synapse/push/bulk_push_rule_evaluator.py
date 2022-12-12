@@ -29,6 +29,7 @@ from typing import (
 from prometheus_client import Counter
 
 from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
+from synapse.api.room_versions import PushRuleRoomFlag, RoomVersion
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -105,6 +106,7 @@ class BulkPushRuleEvaluator:
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
+        self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
 
@@ -268,6 +270,8 @@ class BulkPushRuleEvaluator:
         for each event, check if the message should increment the unread count, and
         insert the results into the event_push_actions_staging table.
         """
+        if not self.should_calculate_push_rules:
+            return
         # For batched events the power level events may not have been persisted yet,
         # so we pass in the batched events. Thus if the event cannot be found in the
         # database we can check in the batch.
@@ -338,13 +342,19 @@ class BulkPushRuleEvaluator:
             for user_id, level in notification_levels.items():
                 notification_levels[user_id] = int(level)
 
+        room_version_features = event.room_version.msc3931_push_features
+        if not room_version_features:
+            room_version_features = []
+
         evaluator = PushRuleEvaluator(
-            _flatten_dict(event),
+            _flatten_dict(event, room_version=event.room_version),
             room_member_count,
             sender_power_level,
             notification_levels,
             related_events,
             self._related_event_match_enabled,
+            room_version_features,
+            self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
         )
 
         users = rules_by_user.keys()
@@ -420,6 +430,7 @@ StateGroup = Union[object, int]
 
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
+    room_version: Optional[RoomVersion] = None,
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
@@ -431,6 +442,31 @@ def _flatten_dict(
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, Mapping):
+            # do not set `room_version` due to recursion considerations below
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
+
+    # `room_version` should only ever be set when looking at the top level of an event
+    if (
+        room_version is not None
+        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in room_version.msc3931_push_features
+        and isinstance(d, EventBase)
+    ):
+        # Room supports extensible events: replace `content.body` with the plain text
+        # representation from `m.markup`, as per MSC1767.
+        markup = d.get("content").get("m.markup")
+        if room_version.identifier.startswith("org.matrix.msc1767."):
+            markup = d.get("content").get("org.matrix.msc1767.markup")
+        if markup is not None and isinstance(markup, list):
+            text = ""
+            for rep in markup:
+                if not isinstance(rep, dict):
+                    # invalid markup - skip all processing
+                    break
+                if rep.get("mimetype", "text/plain") == "text/plain":
+                    rep_text = rep.get("body")
+                    if rep_text is not None and isinstance(rep_text, str):
+                        text = rep_text.lower()
+                        break
+            result["content.body"] = text
 
     return result

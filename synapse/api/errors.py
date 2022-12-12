@@ -304,10 +304,8 @@ class InteractiveAuthIncompleteError(Exception):
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
-    def __init__(
-        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
-    ):
-        super().__init__(400, msg, errcode)
+    def __init__(self, msg: str = "Unrecognized request", code: int = 400):
+        super().__init__(code, msg, Codes.UNRECOGNIZED)
 
 
 class NotFoundError(SynapseError):
@@ -717,7 +715,7 @@ class HttpResponseException(CodeMessageException):
         set to the reason code from the HTTP response.
 
         Returns:
-            SynapseError:
+            The error converted to a SynapseError.
         """
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
