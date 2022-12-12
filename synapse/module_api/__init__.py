@@ -200,6 +200,8 @@ def cached(
         def foo('a', 'b'):
             ...
 
+    Added in Synapse v1.74.0.
+
     Args:
         max_entries: The maximum number of entries in the cache. If the cache is full
             and a new entry is added, the least recently accessed entry will be evicted
