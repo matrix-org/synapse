@@ -49,7 +49,7 @@ from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import EventContext, UnpersistedEventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
 from synapse.logging import opentracing
@@ -708,7 +708,8 @@ class EventCreationHandler:
 
         builder.internal_metadata.historical = historical
 
-        event, context = await self.create_new_client_event(
+
+        event, unpersisted_context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
             allow_no_prev_events=allow_no_prev_events,
@@ -720,6 +721,8 @@ class EventCreationHandler:
             for_batch=for_batch,
             current_state_group=current_state_group,
         )
+
+        context = await unpersisted_context.persist(event)
 
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
@@ -1179,8 +1182,13 @@ class EventCreationHandler:
             event = await builder.build(
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
-            context = await self.state.compute_event_context_for_batched(
-                event, state_map, current_state_group
+
+            context = UnpersistedEventContext(
+                self._storage_controllers,
+                state_map=state_map,
+                state_handler=self.state,
+                state_group_before_event=current_state_group,
+                for_batch=True,
             )
         else:
             event = await builder.build(
@@ -1231,16 +1239,36 @@ class EventCreationHandler:
 
                     state_map_for_event[(data.event_type, data.state_key)] = state_id
 
-                context = await self.state.compute_event_context(
-                    event,
-                    state_ids_before_event=state_map_for_event,
-                    # TODO(faster_joins): check how MSC2716 works and whether we can have
-                    #   partial state here
-                    #   https://github.com/matrix-org/synapse/issues/13003
-                    partial_state=False,
+                context = UnpersistedEventContext(
+                    self._storage_controllers,
+                    state_map=state_map_for_event,
+                    state_handler=self.state,
                 )
             else:
-                context = await self.state.compute_event_context(event)
+                entry = (
+                    await self.hs.get_state_handler().resolve_state_groups_for_events(
+                        event.room_id,
+                        event.prev_event_ids(),
+                        await_full_state=False,
+                    )
+                )
+
+                if not entry.state_group:
+                    state_before_event = await entry.get_state(
+                        self.state._state_storage_controller, StateFilter.all()
+                    )
+
+                    context = UnpersistedEventContext(
+                        self._storage_controllers,
+                        state_map=state_before_event,
+                        state_handler=self.state,
+                    )
+                else:
+                    context = UnpersistedEventContext(
+                        self._storage_controllers,
+                        state_group_before_event=entry.state_group,
+                        state_handler=self.state,
+                    )
 
         if requester:
             context.app_service = requester.app_service
