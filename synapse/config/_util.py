@@ -33,6 +33,9 @@ def validate_config(
         config: the configuration value to be validated
         config_path: the path within the config file. This will be used as a basis
            for the error message.
+
+    Raises:
+        ConfigError, if validation fails.
     """
     try:
         jsonschema.validate(config, json_schema)

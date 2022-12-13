@@ -111,7 +111,6 @@ from synapse.storage.background_updates import (
 )
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
@@ -124,6 +123,7 @@ from synapse.types import (
     UserProfile,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import CachedFunction, cached

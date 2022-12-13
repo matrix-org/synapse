@@ -28,8 +28,14 @@ from typing import (
 )
 
 import attr
+from canonicaljson import encode_canonical_json
 
-from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.constants import (
+    MAX_PDU_SIZE,
+    EventContentFields,
+    EventTypes,
+    RelationTypes,
+)
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.types import JsonDict
@@ -674,3 +680,27 @@ def validate_canonicaljson(value: Any) -> None:
     elif not isinstance(value, (bool, str)) and value is not None:
         # Other potential JSON values (bool, None, str) are safe.
         raise SynapseError(400, "Unknown JSON value", Codes.BAD_JSON)
+
+
+def maybe_upsert_event_field(
+    event: EventBase, container: JsonDict, key: str, value: object
+) -> bool:
+    """Upsert an event field, but only if this doesn't make the event too large.
+
+    Returns true iff the upsert took place.
+    """
+    if key in container:
+        old_value: object = container[key]
+        container[key] = value
+        # NB: here and below, we assume that passing a non-None `time_now` argument to
+        # get_pdu_json doesn't increase the size of the encoded result.
+        upsert_okay = len(encode_canonical_json(event.get_pdu_json())) <= MAX_PDU_SIZE
+        if not upsert_okay:
+            container[key] = old_value
+    else:
+        container[key] = value
+        upsert_okay = len(encode_canonical_json(event.get_pdu_json())) <= MAX_PDU_SIZE
+        if not upsert_okay:
+            del container[key]
+
+    return upsert_okay
