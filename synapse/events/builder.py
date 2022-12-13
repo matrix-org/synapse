@@ -28,8 +28,8 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
 from synapse.state import StateHandler
 from synapse.storage.databases.main import DataStore
-from synapse.storage.state import StateFilter
 from synapse.types import EventID, JsonDict
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 

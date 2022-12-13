@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import signedjson.key
+import signedjson.types
 import unpaddedbase64
 
 from twisted.internet.defer import Deferred
@@ -22,7 +23,9 @@ from synapse.storage.keys import FetchKeyResult
 import tests.unittest
 
 
-def decode_verify_key_base64(key_id: str, key_base64: str):
+def decode_verify_key_base64(
+    key_id: str, key_base64: str
+) -> signedjson.types.VerifyKey:
     key_bytes = unpaddedbase64.decode_base64(key_base64)
     return signedjson.key.decode_verify_key_bytes(key_id, key_bytes)
 
@@ -36,7 +39,7 @@ KEY_2 = decode_verify_key_base64(
 
 
 class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
-    def test_get_server_verify_keys(self):
+    def test_get_server_verify_keys(self) -> None:
         store = self.hs.get_datastores().main
 
         key_id_1 = "ed25519:key1"
@@ -71,7 +74,7 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         # non-existent result gives None
         self.assertIsNone(res[("server1", "ed25519:key3")])
 
-    def test_cache(self):
+    def test_cache(self) -> None:
         """Check that updates correctly invalidate the cache."""
 
         store = self.hs.get_datastores().main

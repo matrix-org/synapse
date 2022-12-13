@@ -97,6 +97,8 @@ RUN \
     zlib1g-dev \
     git \
     curl \
+    libicu-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 

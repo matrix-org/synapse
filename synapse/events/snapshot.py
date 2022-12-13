@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from synapse.state import StateHandler
     from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
-    from synapse.storage.state import StateFilter
+    from synapse.types.state import StateFilter
 
 
 @attr.s(slots=True, auto_attribs=True)
