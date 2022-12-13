@@ -74,6 +74,7 @@ jobs:
         with:
           repository: matrix-org/complement
           path: complement
+          ref: ab6cf553167e3bfbe98e30531f96ef6d442b0e36
       - name: Install complement dependencies
         run: |-
           sudo apt-get -qq update
