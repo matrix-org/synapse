@@ -31,7 +31,7 @@ from tests import unittest
 
 
 class TupleComparisonClauseTestCase(unittest.TestCase):
-    def test_native_tuple_comparison(self):
+    def test_native_tuple_comparison(self) -> None:
         clause, args = make_tuple_comparison_clause([("a", 1), ("b", 2)])
         self.assertEqual(clause, "(a,b) > (?,?)")
         self.assertEqual(args, [1, 2])

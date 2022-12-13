@@ -2501,32 +2501,53 @@ Config settings related to the client/server API
 ---
 ### `room_prejoin_state`
 
-Controls for the state that is shared with users who receive an invite
-to a room. By default, the following state event types are shared with users who
-receive invites to the room:
-- m.room.join_rules
-- m.room.canonical_alias
-- m.room.avatar
-- m.room.encryption
-- m.room.name
-- m.room.create
-- m.room.topic
+This setting controls the state that is shared with users upon receiving an
+invite to a room, or in reply to a knock on a room. By default, the following
+state events are shared with users:
+
+- `m.room.join_rules`
+- `m.room.canonical_alias`
+- `m.room.avatar`
+- `m.room.encryption`
+- `m.room.name`
+- `m.room.create`
+- `m.room.topic`
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: set to true to disable the above defaults. If this
-   is enabled, only the event types listed in `additional_event_types` are shared.
-   Defaults to false.
-* `additional_event_types`: Additional state event types to share with users when they are invited
-   to a room. By default, this list is empty (so only the default event types are shared).
+* `disable_default_event_types`: boolean. Set to `true` to disable the above 
+  defaults. If this is enabled, only the event types listed in
+  `additional_event_types` are shared. Defaults to `false`.
+* `additional_event_types`: A list of additional state events to include in the 
+  events to be shared. By default, this list is empty (so only the default event 
+  types are shared).
+
+  Each entry in this list should be either a single string or a list of two
+  strings. 
+  * A standalone string `t` represents all events with type `t` (i.e.
+    with no restrictions on state keys).
+  * A pair of strings `[t, s]` represents a single event with type `t` and 
+    state key `s`. The same type can appear in two entries with different state
+    keys: in this situation, both state keys are included in prejoin state.
 
 Example configuration:
 ```yaml
 room_prejoin_state:
-   disable_default_event_types: true
+   disable_default_event_types: false
    additional_event_types:
-     - org.example.custom.event.type
-     - m.room.join_rules
+     # Share all events of type `org.example.custom.event.typeA`
+     - org.example.custom.event.typeA
+     # Share only events of type `org.example.custom.event.typeB` whose
+     # state_key is "foo"
+     - ["org.example.custom.event.typeB", "foo"]
+     # Share only events of type `org.example.custom.event.typeC` whose
+     # state_key is "bar" or "baz"
+     - ["org.example.custom.event.typeC", "bar"]
+     - ["org.example.custom.event.typeC", "baz"]
 ```
+
+*Changed in Synapse 1.74:* admins can filter the events in prejoin state based
+on their state key.
+
 ---
 ### `track_puppeted_user_ips`
 

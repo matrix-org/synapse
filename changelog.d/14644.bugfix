@@ -1,0 +1,1 @@
+Fix the *MAU Limits* section of the Grafana dashboard relying on a specific `job` name for the workers of a Synapse deployment.
