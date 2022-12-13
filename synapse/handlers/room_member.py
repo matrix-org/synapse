@@ -393,9 +393,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 event_pos = await self.store.get_position_for_event(existing_event_id)
                 return existing_event_id, event_pos.stream
 
-        # Try 2 times, the first one could fail with PartialStateConflictError,
-        # cf comment in except block.
-        for _ in range(2):
+        # Try until success, handle_new_client_event could fail with PartialStateConflictError
+        while True:
             try:
                 event, context = await self.event_creation_handler.create_event(
                     requester,
@@ -1884,9 +1883,8 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             list(previous_membership_event.auth_event_ids()) + prev_event_ids
         )
 
-        # Try 2 times, the first one could fail with PartialStateConflictError
-        # in handle_new_client_event, cf comment in except block.
-        for _ in range(2):
+        # Try until success, handle_new_client_event could fail with PartialStateConflictError
+        while True:
             try:
                 event, context = await self.event_creation_handler.create_event(
                     requester,

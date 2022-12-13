@@ -998,9 +998,8 @@ class EventCreationHandler:
                         event.internal_metadata.stream_ordering,
                     )
 
-        # Try 2 times, the first one could fail with PartialStateConflictError
-        # in handle_new_client_event, cf comment in except block.
-        for _ in range(2):
+        # Try until success, handle_new_client_event could fail with PartialStateConflictError
+        while True:
             try:
                 event, context = await self.create_event(
                     requester,
@@ -2010,9 +2009,8 @@ class EventCreationHandler:
         for user_id in members:
             requester = create_requester(user_id, authenticated_entity=self.server_name)
             try:
-                # Try 2 times, the first one could fail with PartialStateConflictError
-                # in handle_new_client_event, cf comment in except block.
-                for _ in range(2):
+                # Try until success, handle_new_client_event could fail with PartialStateConflictError
+                while True:
                     try:
                         event, context = await self.create_event(
                             requester,
