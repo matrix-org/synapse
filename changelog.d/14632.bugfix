@@ -1,1 +1,0 @@
-Reject invalid read receipt requests with empty room or event IDs. Contributed by Nick @ Beeper (@fizzadar).
