@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import logging
-import traceback
 import math
+import traceback
 from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 from sortedcontainers import SortedDict
