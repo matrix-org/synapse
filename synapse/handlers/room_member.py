@@ -35,7 +35,6 @@ from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.logging import opentracing
 from synapse.module_api import NOT_SPAM
 from synapse.storage.databases.main.events import PartialStateConflictError
-from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
     Requester,
