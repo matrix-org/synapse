@@ -313,6 +313,9 @@ class UnpersistedEventContext:
                 event, self.state_map, self.state_group_before_event
             )
         elif event.type == EventTypes.MSC2716_INSERTION:
+            # TODO(faster_joins): check how MSC2716 works and whether we can have
+            #   partial state here
+            #   https://github.com/matrix-org/synapse/issues/13003
             return await self.state_handler.compute_event_context(
                 event, state_ids_before_event=self.state_map, partial_state=False
             )
