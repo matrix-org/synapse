@@ -1148,7 +1148,7 @@ number of entries that can be stored.
      * `max_cache_memory_usage` sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
         They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
         the setting below, or until the `min_cache_ttl` is hit. There is no default value for this option.
-     * `target_memory_usage` sets a rough target for the desired memory usage of the caches. There is no default value
+     * `target_cache_memory_usage` sets a rough target for the desired memory usage of the caches. There is no default value
         for this option.
      * `min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
         caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
