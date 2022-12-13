@@ -275,15 +275,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             )
 
         self.db_pool.updates.register_background_index_update(
-            "event_push_summary_unique_index",
-            index_name="event_push_summary_unique_index",
-            table="event_push_summary",
-            columns=["user_id", "room_id"],
-            unique=True,
-            replaces_index="event_push_summary_user_rm",
-        )
-
-        self.db_pool.updates.register_background_index_update(
             "event_push_summary_unique_index2",
             index_name="event_push_summary_unique_index2",
             table="event_push_summary",
