@@ -71,7 +71,6 @@ class StateStoreTestCase(HomeserverTestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-
         context = self.get_success(unpersisted_context.persist(event))
 
         assert self.storage.persistence is not None
