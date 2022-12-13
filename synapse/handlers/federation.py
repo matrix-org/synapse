@@ -56,7 +56,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import EventContext, UnpersistedEventContext
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
@@ -1123,7 +1123,7 @@ class FederationHandler:
             },
         )
 
-        event, context = await self.event_creation_handler.create_new_client_event(
+        event, _ = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
 
@@ -1173,12 +1173,14 @@ class FederationHandler:
             },
         )
 
-        event, context = await self.event_creation_handler.create_new_client_event(
-            builder=builder
-        )
+
+        (
+            event,
+            unpersisted_context,
+        ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
         event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
-            event, context
+            event, unpersisted_context
         )
         if not event_allowed:
             logger.warning("Creation of knock %s forbidden by third-party rules", event)
@@ -1343,13 +1345,18 @@ class FederationHandler:
             )
 
             EventValidator().validate_builder(builder)
-            event, context = await self.event_creation_handler.create_new_client_event(
+            event, unpersisted_context = await self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
 
-            event, context = await self.add_display_name_to_third_party_invite(
-                room_version_obj, event_dict, event, context
+            (
+                event,
+                unpersisted_context,
+            ) = await self.add_display_name_to_third_party_invite(
+                room_version_obj, event_dict, event, unpersisted_context
             )
+
+            context = await unpersisted_context.persist(event)
 
             EventValidator().validate_new(event, self.config)
 
@@ -1400,12 +1407,16 @@ class FederationHandler:
             room_version_obj, event_dict
         )
 
-        event, context = await self.event_creation_handler.create_new_client_event(
-            builder=builder
+        (
+            event,
+            unpersisted_context,
+        ) = await self.event_creation_handler.create_new_client_event(builder=builder)
+
+        event, unpersisted_context = await self.add_display_name_to_third_party_invite(
+            room_version_obj, event_dict, event, unpersisted_context
         )
-        event, context = await self.add_display_name_to_third_party_invite(
-            room_version_obj, event_dict, event, context
-        )
+
+        context = await unpersisted_context.persist(event)
 
         try:
             validate_event_for_room_version(event)
@@ -1428,8 +1439,8 @@ class FederationHandler:
         room_version_obj: RoomVersion,
         event_dict: JsonDict,
         event: EventBase,
-        context: EventContext,
-    ) -> Tuple[EventBase, EventContext]:
+        context: UnpersistedEventContext,
+    ) -> Tuple[EventBase, UnpersistedEventContext]:
         key = (
             EventTypes.ThirdPartyInvite,
             event.content["third_party_invite"]["signed"]["token"],
@@ -1463,11 +1474,14 @@ class FederationHandler:
             room_version_obj, event_dict
         )
         EventValidator().validate_builder(builder)
-        event, context = await self.event_creation_handler.create_new_client_event(
-            builder=builder
-        )
+
+        (
+            event,
+            unpersisted_context,
+        ) = await self.event_creation_handler.create_new_client_event(builder=builder)
+
         EventValidator().validate_new(event, self.config)
-        return event, context
+        return event, unpersisted_context
 
     async def _check_signature(self, event: EventBase, context: EventContext) -> None:
         """
