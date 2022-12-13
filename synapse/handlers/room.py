@@ -78,6 +78,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import stringutils
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name

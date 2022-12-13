@@ -46,6 +46,7 @@ from synapse.types import (
     create_requester,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 

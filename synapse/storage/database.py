@@ -667,7 +667,8 @@ class DatabasePool:
                 )
         # also check variables referenced in func's closure
         if inspect.isfunction(func):
-            f = cast(types.FunctionType, func)
+            # Keep the cast for now---it helps PyCharm to understand what `func` is.
+            f = cast(types.FunctionType, func)  # type: ignore[redundant-cast]
             if f.__closure__:
                 for i, cell in enumerate(f.__closure__):
                     if inspect.isgenerator(cell.cell_contents):
