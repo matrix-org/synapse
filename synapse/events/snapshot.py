@@ -16,11 +16,13 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 import attr
 from frozendict import frozendict
 
+from synapse.api.constants import EventTypes
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
+    from synapse.state import StateHandler
     from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
     from synapse.storage.state import StateFilter
@@ -252,6 +254,83 @@ class EventContext:
         return await self._storage.state.get_state_ids_for_group(
             self.state_group_before_event, state_filter
         )
+
+
+@attr.s(slots=True, auto_attribs=True)
+class UnpersistedEventContext:
+    """
+    This is a version of an EventContext before the new state group (if any) has been
+    computed and stored. It contains information about the state before the event (which
+    also may be the information after the event, if the event is not a state event). The
+    UnpersistedEventContext must be converted into an EventContext by calling the method
+    'persist' on it before it is suitable to be sent to the DB for processing.
+
+        state_handler:
+            an instance of the class StateHandler, this is required for all
+            but outlier instances
+        state_group_before_event:
+            the state group at/before the event. This is required if `for_batch` is True.
+        state_map:
+             the current state of the room
+        for_batch:
+            whether the context is part of a group of events being created for batch persisting
+            to the DB.
+        app_service: If this event is being sent by a (local) application service, that
+            app service.
+
+    """
+    _storage: "StorageControllers"
+    state_handler: Optional["StateHandler"] = None
+    state_group_before_event: Optional[int] = None
+    state_map: Optional[StateMap[str]] = None
+    for_batch: bool = False
+    app_service: Optional[ApplicationService] = None
+
+    @staticmethod
+    def for_outlier(
+        storage: "StorageControllers",
+    ) -> "UnpersistedEventContext":
+        """Returns an UnpersistedEventContext instance suitable for an outlier event"""
+        return UnpersistedEventContext(storage=storage)
+
+    async def persist(
+        self,
+        event: EventBase,
+    ) -> "EventContext":
+        """
+        Converts an UnpersistedEventContext into an EventContext, which is now suitable for
+        sending to the DB along with the event.
+        """
+        if event.internal_metadata.is_outlier():
+            return EventContext.for_outlier(self._storage)
+
+        assert self.state_handler is not None
+        if self.for_batch:
+            assert self.state_group_before_event is not None
+            assert self.state_map is not None
+            return await self.state_handler.compute_event_context_for_batched(
+                event, self.state_map, self.state_group_before_event
+            )
+        elif event.type == EventTypes.MSC2716_INSERTION:
+            return await self.state_handler.compute_event_context(
+                event, state_ids_before_event=self.state_map, partial_state=False
+            )
+        return await self.state_handler.compute_event_context(event)
+
+    async def get_prev_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> StateMap[str]:
+        """
+        Returns the state at/before the event (which also may be the same as after the event
+        if the event is not a state event.)
+        """
+        if self.state_map is not None:
+            return self.state_map
+        else:
+            assert self.state_group_before_event is not None
+            return await self._storage.state.get_state_ids_for_group(
+                self.state_group_before_event, state_filter
+            )
 
 
 def _encode_state_dict(
