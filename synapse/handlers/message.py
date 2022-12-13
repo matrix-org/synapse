@@ -708,7 +708,6 @@ class EventCreationHandler:
 
         builder.internal_metadata.historical = historical
 
-
         event, unpersisted_context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
@@ -1073,7 +1072,7 @@ class EventCreationHandler:
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
         current_state_group: Optional[int] = None,
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContext]:
         """Create a new event for a local client. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
         the event using the parameters state_map and current_state_group, thus these parameters
@@ -1201,7 +1200,7 @@ class EventCreationHandler:
             # after it is created
             if builder.internal_metadata.outlier:
                 event.internal_metadata.outlier = True
-                context = EventContext.for_outlier(self._storage_controllers)
+                context = UnpersistedEventContext.for_outlier(self._storage_controllers)
             elif (
                 event.type == EventTypes.MSC2716_INSERTION
                 and state_event_ids
@@ -1287,7 +1286,7 @@ class EventCreationHandler:
         elif new_content is not None:
             # the third-party rules want to replace the event. We'll need to build a new
             # event.
-            event, context = await self._rebuild_event_after_third_party_rules(
+            event = await self._rebuild_event_after_third_party_rules(
                 new_content, event
             )
 
@@ -2076,9 +2075,9 @@ class EventCreationHandler:
 
     async def _rebuild_event_after_third_party_rules(
         self, third_party_result: dict, original_event: EventBase
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> EventBase:
         # the third_party_event_rules want to replace the event.
-        # we do some basic checks, and then return the replacement event and context.
+        # we do some basic checks, and then return the replacement event.
 
         # Construct a new EventBuilder and validate it, which helps with the
         # rest of these checks.
@@ -2130,7 +2129,4 @@ class EventCreationHandler:
             auth_event_ids=None,
         )
 
-        # we rebuild the event context, to be on the safe side. If nothing else,
-        # delta_ids might need an update.
-        context = await self.state.compute_event_context(event)
-        return event, context
+        return event

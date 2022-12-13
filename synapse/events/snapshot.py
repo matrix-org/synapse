@@ -279,6 +279,7 @@ class UnpersistedEventContext:
             app service.
 
     """
+
     _storage: "StorageControllers"
     state_handler: Optional["StateHandler"] = None
     state_group_before_event: Optional[int] = None
