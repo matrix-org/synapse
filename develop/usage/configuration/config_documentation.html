@@ -2160,33 +2160,56 @@ Defaults to https://matrix.org/report-usage-stats/push</p>
 <p>Config settings related to the client/server API</p>
 <hr />
 <h3 id="room_prejoin_state"><a class="header" href="#room_prejoin_state"><code>room_prejoin_state</code></a></h3>
-<p>Controls for the state that is shared with users who receive an invite
-to a room. By default, the following state event types are shared with users who
-receive invites to the room:</p>
+<p>This setting controls the state that is shared with users upon receiving an
+invite to a room, or in reply to a knock on a room. By default, the following
+state events are shared with users:</p>
 <ul>
-<li>m.room.join_rules</li>
-<li>m.room.canonical_alias</li>
-<li>m.room.avatar</li>
-<li>m.room.encryption</li>
-<li>m.room.name</li>
-<li>m.room.create</li>
-<li>m.room.topic</li>
+<li><code>m.room.join_rules</code></li>
+<li><code>m.room.canonical_alias</code></li>
+<li><code>m.room.avatar</code></li>
+<li><code>m.room.encryption</code></li>
+<li><code>m.room.name</code></li>
+<li><code>m.room.create</code></li>
+<li><code>m.room.topic</code></li>
 </ul>
 <p>To change the default behavior, use the following sub-options:</p>
 <ul>
-<li><code>disable_default_event_types</code>: set to true to disable the above defaults. If this
-is enabled, only the event types listed in <code>additional_event_types</code> are shared.
-Defaults to false.</li>
-<li><code>additional_event_types</code>: Additional state event types to share with users when they are invited
-to a room. By default, this list is empty (so only the default event types are shared).</li>
+<li>
+<p><code>disable_default_event_types</code>: boolean. Set to <code>true</code> to disable the above 
+defaults. If this is enabled, only the event types listed in
+<code>additional_event_types</code> are shared. Defaults to <code>false</code>.</p>
+</li>
+<li>
+<p><code>additional_event_types</code>: A list of additional state events to include in the 
+events to be shared. By default, this list is empty (so only the default event 
+types are shared).</p>
+<p>Each entry in this list should be either a single string or a list of two
+strings. </p>
+<ul>
+<li>A standalone string <code>t</code> represents all events with type <code>t</code> (i.e.
+with no restrictions on state keys).</li>
+<li>A pair of strings <code>[t, s]</code> represents a single event with type <code>t</code> and 
+state key <code>s</code>. The same type can appear in two entries with different state
+keys: in this situation, both state keys are included in prejoin state.</li>
+</ul>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">room_prejoin_state:
-   disable_default_event_types: true
+   disable_default_event_types: false
    additional_event_types:
-     - org.example.custom.event.type
-     - m.room.join_rules
+     # Share all events of type `org.example.custom.event.typeA`
+     - org.example.custom.event.typeA
+     # Share only events of type `org.example.custom.event.typeB` whose
+     # state_key is &quot;foo&quot;
+     - [&quot;org.example.custom.event.typeB&quot;, &quot;foo&quot;]
+     # Share only events of type `org.example.custom.event.typeC` whose
+     # state_key is &quot;bar&quot; or &quot;baz&quot;
+     - [&quot;org.example.custom.event.typeC&quot;, &quot;bar&quot;]
+     - [&quot;org.example.custom.event.typeC&quot;, &quot;baz&quot;]
 </code></pre>
+<p><em>Changed in Synapse 1.74:</em> admins can filter the events in prejoin state based
+on their state key.</p>
 <hr />
 <h3 id="track_puppeted_user_ips"><a class="header" href="#track_puppeted_user_ips"><code>track_puppeted_user_ips</code></a></h3>
 <p>We record the IP address of clients used to access the API for various
