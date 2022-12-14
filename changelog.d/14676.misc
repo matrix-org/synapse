@@ -1,0 +1,1 @@
+Faster joins: make `computer_state_after_events` consistent with other state-fetching functions that take a `StateFilter`.
