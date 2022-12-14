@@ -1344,8 +1344,9 @@ class FederationHandler:
 
             EventValidator().validate_builder(builder)
 
-            # Try until success, send_membership_event could fail with PartialStateConflictError
-            while True:
+            # Try 2 times, the first one could fail with PartialStateConflictError
+            # in send_membership_event, cf comment in except block.
+            for _ in range(2):
                 try:
                     (
                         event,
@@ -1417,8 +1418,9 @@ class FederationHandler:
             room_version_obj, event_dict
         )
 
-        # Try until success, send_membership_event could fail with PartialStateConflictError
-        while True:
+        # Try 2 times, the first one could fail with PartialStateConflictError
+        # in send_membership_event, cf comment in except block.
+        for _ in range(2):
             try:
                 (
                     event,
