@@ -24,7 +24,7 @@
 -- Stop the index from being scheduled for creation in the background.
 DELETE FROM background_updates WHERE update_name = 'event_push_summary_unique_index';
 
--- The above background job also replaces another index, if blah ensure that side-effect
+-- The above background job also replaces another index, so ensure that side-effect
 -- is applied.
 DROP INDEX IF EXISTS event_push_summary_user_rm;
 
