@@ -208,8 +208,9 @@ class RoomCreationHandler:
 
         new_room_id = self._generate_room_id()
 
-        # Try until success, _upgrade_room could fail with PartialStateConflictError
-        while True:
+        # Try several times, it could fail with PartialStateConflictError
+        # in _upgrade_room, cf comment in except block.
+        for _ in range(5):
             try:
                 # Check whether the user has the power level to carry out the upgrade.
                 # `check_auth_rules_from_context` will check that they are in the room and have
