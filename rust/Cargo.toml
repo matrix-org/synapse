@@ -21,14 +21,24 @@ name = "synapse.synapse_rust"
 
 [dependencies]
 anyhow = "1.0.63"
+futures = "0.3.25"
+futures-util = "0.3.25"
+http = "0.2.8"
+hyper = { version = "0.14.23", features = ["client", "http1", "http2", "runtime", "server", "full"] }
+hyper-tls = "0.5.0"
 lazy_static = "1.4.0"
 log = "0.4.17"
+native-tls = "0.2.11"
 pyo3 = { version = "0.17.1", features = ["extension-module", "macros", "anyhow", "abi3", "abi3-py37"] }
+pyo3-asyncio = { version = "0.17.0", features = ["tokio", "tokio-runtime"] }
 pyo3-log = "0.7.0"
 pythonize = "0.17.0"
 regex = "1.6.0"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0.85"
+tokio = "1.23.0"
+tokio-native-tls = "0.3.0"
+trust-dns-resolver = "0.22.0"
 
 [build-dependencies]
 blake2 = "0.10.4"

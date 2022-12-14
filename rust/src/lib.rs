@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 
+pub mod http;
 pub mod push;
 
 /// Returns the hash of all the rust source files at the time it was compiled.
@@ -26,6 +27,7 @@ fn synapse_rust(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rust_file_digest, m)?)?;
 
     push::register_module(py, m)?;
+    http::register_module(py, m)?;
 
     Ok(())
 }

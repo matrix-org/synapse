@@ -29,7 +29,7 @@ if sys.version_info < (3, 7):
     sys.exit(1)
 
 # Allow using the asyncio reactor via env var.
-if strtobool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", "0")):
+if strtobool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", "0")) or True:
     from incremental import Version
 
     import twisted

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import asyncio
 import cgi
 import codecs
 import logging
@@ -42,14 +43,18 @@ from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 from typing_extensions import Literal
+from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import IReactorTime
+from twisted.internet.protocol import Protocol
 from twisted.internet.task import Cooperator
-from twisted.web.client import ResponseFailed
+from twisted.internet.testing import StringTransport
+from twisted.python.failure import Failure
+from twisted.web.client import Response, ResponseDone, ResponseFailed
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IBodyProducer, IResponse
+from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IResponse
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -75,6 +80,7 @@ from synapse.http.types import QueryParams
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.synapse_rust.http import HttpClient
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import AwakenableSleeper, timeout_deferred
@@ -197,6 +203,33 @@ class JsonParser(ByteParser[Union[JsonDict, list]]):
 
     def finish(self) -> Union[JsonDict, list]:
         return json_decoder.decode(self._buffer.getvalue())
+
+
+@attr.s(auto_attribs=True)
+@implementer(IResponse)
+class RustResponse:
+    version: tuple
+
+    code: int
+
+    phrase: bytes
+
+    headers: Headers
+
+    length: Union[int, UNKNOWN_LENGTH]
+
+    # request: Optional[IClientRequest]
+
+    # previousResponse: Optional[IResponse]
+
+    _data: bytes
+
+    def deliverBody(self, protocol: Protocol):
+        protocol.dataReceived(self._data)
+        protocol.connectionLost(Failure(ResponseDone("Response body fully received")))
+
+    def setPreviousResponse(self, response: IResponse):
+        pass
 
 
 async def _handle_response(
@@ -371,6 +404,8 @@ class MatrixFederationHttpClient:
         self._cooperator = Cooperator(scheduler=_make_scheduler(self.reactor))
 
         self._sleeper = AwakenableSleeper(self.reactor)
+
+        self._rust_client = HttpClient()
 
     def wake_destination(self, destination: str) -> None:
         """Called when the remote server may have come back online."""
@@ -556,11 +591,8 @@ class MatrixFederationHttpClient:
                             destination_bytes, method_bytes, url_to_sign_bytes, json
                         )
                         data = encode_canonical_json(json)
-                        producer: Optional[IBodyProducer] = QuieterFileBodyProducer(
-                            BytesIO(data), cooperator=self._cooperator
-                        )
                     else:
-                        producer = None
+                        data = None
                         auth_headers = self.build_auth_headers(
                             destination_bytes, method_bytes, url_to_sign_bytes
                         )
@@ -591,23 +623,32 @@ class MatrixFederationHttpClient:
                             # * The `Deferred` that joins the forks back together is
                             #   wrapped in `make_deferred_yieldable` to restore the
                             #   logging context regardless of the path taken.
-                            request_deferred = run_in_background(
-                                self.agent.request,
-                                method_bytes,
-                                url_bytes,
-                                headers=Headers(headers_dict),
-                                bodyProducer=producer,
-                            )
-                            request_deferred = timeout_deferred(
-                                request_deferred,
-                                timeout=_sec_timeout,
-                                reactor=self.reactor,
-                            )
+                            # request_deferred = run_in_background(
+                            #     self._rust_client.request,
+                            #     url_str,
+                            #     request.method,
+                            #     headers_dict,
+                            #     data,
+                            # )
+                            # request_deferred = timeout_deferred(
+                            #     request_deferred,
+                            #     timeout=_sec_timeout,
+                            #     reactor=self.reactor,
+                            # )
 
-                            response = await make_deferred_yieldable(request_deferred)
+                            # response = await make_deferred_yieldable(request_deferred)
+
+                            response_d = self._rust_client.request(
+                                url_str,
+                                request.method,
+                                headers_dict,
+                                data,
+                            )
+                            response = await defer.Deferred.fromFuture(response_d)
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
+                        logger.exception("ERROR")
                         raise RequestSendFailed(e, can_retry=True) from e
 
                     incoming_responses_counter.labels(
@@ -615,7 +656,7 @@ class MatrixFederationHttpClient:
                     ).inc()
 
                     set_tag(tags.HTTP_STATUS_CODE, response.code)
-                    response_phrase = response.phrase.decode("ascii", errors="replace")
+                    response_phrase = response.phrase
 
                     if 200 <= response.code < 300:
                         logger.debug(
@@ -635,25 +676,7 @@ class MatrixFederationHttpClient:
                         )
                         # :'(
                         # Update transactions table?
-                        d = treq.content(response)
-                        d = timeout_deferred(
-                            d, timeout=_sec_timeout, reactor=self.reactor
-                        )
-
-                        try:
-                            body = await make_deferred_yieldable(d)
-                        except Exception as e:
-                            # Eh, we're already going to raise an exception so lets
-                            # ignore if this fails.
-                            logger.warning(
-                                "{%s} [%s] Failed to get error response: %s %s: %s",
-                                request.txn_id,
-                                request.destination,
-                                request.method,
-                                url_str,
-                                _flatten_response_never_received(e),
-                            )
-                            body = None
+                        body = response.content
 
                         exc = HttpResponseException(
                             response.code, response_phrase, body
@@ -715,7 +738,19 @@ class MatrixFederationHttpClient:
                         _flatten_response_never_received(e),
                     )
                     raise
-        return response
+
+        headers = Headers()
+        for key, value in response.headers.items():
+            headers.addRawHeader(key, value)
+
+        return RustResponse(
+            ("HTTP", 1, 1),
+            response.code,
+            response.phrase.encode("ascii"),
+            headers,
+            UNKNOWN_LENGTH,
+            response.content,
+        )
 
     def build_auth_headers(
         self,
