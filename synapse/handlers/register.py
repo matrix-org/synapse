@@ -38,6 +38,7 @@ from synapse.api.errors import (
 )
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.device import DeviceHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
@@ -45,8 +46,8 @@ from synapse.replication.http.register import (
     ReplicationRegisterServlet,
 )
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types.state import StateFilter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -840,6 +841,9 @@ class RegistrationHandler:
 
         refresh_token = None
         refresh_token_id = None
+
+        # This can only run on the main process.
+        assert isinstance(self.device_handler, DeviceHandler)
 
         registered_device_id = await self.device_handler.check_device_registered(
             user_id,

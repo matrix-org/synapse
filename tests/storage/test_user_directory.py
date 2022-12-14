@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
 from typing import Any, Dict, Set, Tuple
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -29,6 +30,12 @@ from synapse.util import Clock
 
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
+
+try:
+    import icu
+except ImportError:
+    icu = None  # type: ignore
+
 
 ALICE = "@alice:a"
 BOB = "@bob:b"
@@ -449,6 +456,12 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         )
 
     @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_limit_correct(self) -> None:
+        r = self.get_success(self.store.search_user_dir(ALICE, "bob", 1))
+        self.assertTrue(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+
+    @override_config({"user_directory": {"search_all_users": True}})
     def test_search_user_dir_stop_words(self) -> None:
         """Tests that a user can look up another user by searching for the start if its
         display name even if that name happens to be a common English word that would
@@ -460,4 +473,40 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         self.assertDictEqual(
             r["results"][0],
             {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
+        )
+
+
+class UserDirectoryICUTestCase(HomeserverTestCase):
+    if not icu:
+        skip = "Requires PyICU"
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+        self.user_dir_helper = GetUserDirectoryTables(self.store)
+
+    def test_icu_word_boundary(self) -> None:
+        """Tests that we correctly detect word boundaries when ICU (International
+        Components for Unicode) support is available.
+        """
+
+        display_name = "Gáo"
+
+        # This word is not broken down correctly by Python's regular expressions,
+        # likely because á is actually a lowercase a followed by a U+0301 combining
+        # acute accent. This is specifically something that ICU support fixes.
+        matches = re.findall(r"([\w\-]+)", display_name, re.UNICODE)
+        self.assertEqual(len(matches), 2)
+
+        self.get_success(
+            self.store.update_profile_in_user_dir(ALICE, display_name, None)
+        )
+        self.get_success(self.store.add_users_in_public_rooms("!room:id", (ALICE,)))
+
+        # Check that searching for this user yields the correct result.
+        r = self.get_success(self.store.search_user_dir(BOB, display_name, 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(len(r["results"]), 1)
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": ALICE, "display_name": display_name, "avatar_url": None},
         )

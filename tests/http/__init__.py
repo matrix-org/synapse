@@ -13,6 +13,7 @@
 # limitations under the License.
 import os.path
 import subprocess
+from typing import List
 
 from zope.interface import implementer
 
@@ -70,14 +71,14 @@ subjectAltName = %(sanentries)s
 """
 
 
-def create_test_cert_file(sanlist):
+def create_test_cert_file(sanlist: List[bytes]) -> str:
     """build an x509 certificate file
 
     Args:
-        sanlist: list[bytes]: a list of subjectAltName values for the cert
+        sanlist: a list of subjectAltName values for the cert
 
     Returns:
-        str: the path to the file
+        The path to the file
     """
     global cert_file_count
     csr_filename = "server.csr"

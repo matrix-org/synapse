@@ -58,13 +58,13 @@ from synapse.storage.controllers.state import StateStorageController
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import ObservableDeferred, yieldable_gather_results
 from synapse.util.metrics import Measure
 
@@ -204,9 +204,8 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
         process to to so, calling the per_item_callback for each item.
 
         Args:
-            room_id (str):
-            task (_EventPersistQueueTask): A _PersistEventsTask or
-                _UpdateCurrentStateTask to process.
+            room_id:
+            task: A _PersistEventsTask or _UpdateCurrentStateTask to process.
 
         Returns:
             the result returned by the `_per_item_callback` passed to
@@ -716,8 +715,6 @@ class EventsPersistenceStorageController:
                             )
                             if not is_still_joined:
                                 logger.info("Server no longer in room %s", room_id)
-                                latest_event_ids = set()
-                                current_state = {}
                                 delta.no_longer_in_room = True
 
                             state_delta_for_room[room_id] = delta

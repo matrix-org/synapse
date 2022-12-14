@@ -36,12 +36,14 @@ from synapse.replication.tcp.streams import (
     TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
+    UnPartialStatedRoomStream,
 )
 from synapse.replication.tcp.streams.events import (
     EventsStream,
     EventsStreamEventRow,
     EventsStreamRow,
 )
+from synapse.replication.tcp.streams.partial_state import UnPartialStatedRoomStreamRow
 from synapse.types import PersistedEventPosition, ReadReceipt, StreamKeyType, UserID
 from synapse.util.async_helpers import Linearizer, timeout_deferred
 from synapse.util.metrics import Measure
@@ -117,6 +119,7 @@ class ReplicationDataHandler:
         self._streams = hs.get_replication_streams()
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
+        self._state_storage_controller = hs.get_storage_controllers().state
 
         self._notify_pushers = hs.config.worker.start_pushers
         self._pusher_pool = hs.get_pusherpool()
@@ -236,6 +239,14 @@ class ReplicationDataHandler:
                     self.notifier.notify_user_joined_room(
                         row.data.event_id, row.data.room_id
                     )
+        elif stream_name == UnPartialStatedRoomStream.NAME:
+            for row in rows:
+                assert isinstance(row, UnPartialStatedRoomStreamRow)
+
+                # Wake up any tasks waiting for the room to be un-partial-stated.
+                self._state_storage_controller.notify_room_un_partial_stated(
+                    row.room_id
+                )
 
         await self._presence_handler.process_replication_rows(
             stream_name, instance_name, token, rows

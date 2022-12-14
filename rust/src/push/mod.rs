@@ -267,6 +267,8 @@ pub enum Condition {
 #[serde(tag = "kind")]
 pub enum KnownCondition {
     EventMatch(EventMatchCondition),
+    #[serde(rename = "im.nheko.msc3664.related_event_match")]
+    RelatedEventMatch(RelatedEventMatchCondition),
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -275,15 +277,9 @@ pub enum KnownCondition {
     SenderNotificationPermission {
         key: Cow<'static, str>,
     },
-    #[serde(rename = "org.matrix.msc3772.relation_match")]
-    RelationMatch {
-        rel_type: Cow<'static, str>,
-        #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
-        event_type_pattern: Option<Cow<'static, str>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender: Option<Cow<'static, str>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender_type: Option<Cow<'static, str>>,
+    #[serde(rename = "org.matrix.msc3931.room_version_supports")]
+    RoomVersionSupports {
+        feature: Cow<'static, str>,
     },
 }
 
@@ -307,6 +303,20 @@ pub struct EventMatchCondition {
     pub pattern: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_type: Option<Cow<'static, str>>,
+}
+
+/// The body of a [`Condition::RelatedEventMatch`]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RelatedEventMatchCondition {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<Cow<'static, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<Cow<'static, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_type: Option<Cow<'static, str>>,
+    pub rel_type: Cow<'static, str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_fallbacks: Option<bool>,
 }
 
 /// The collection of push rules for a user.
@@ -401,7 +411,8 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
-    msc3772_enabled: bool,
+    msc3664_enabled: bool,
+    msc1767_enabled: bool,
 }
 
 #[pymethods]
@@ -410,12 +421,14 @@ impl FilteredPushRules {
     pub fn py_new(
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
-        msc3772_enabled: bool,
+        msc3664_enabled: bool,
+        msc1767_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3772_enabled,
+            msc3664_enabled,
+            msc1767_enabled,
         }
     }
 
@@ -434,9 +447,13 @@ impl FilteredPushRules {
             .iter()
             .filter(|rule| {
                 // Ignore disabled experimental push rules
-                if !self.msc3772_enabled
-                    && rule.rule_id == "global/underride/.org.matrix.msc3772.thread_reply"
+                if !self.msc3664_enabled
+                    && rule.rule_id == "global/override/.im.nheko.msc3664.reply"
                 {
+                    return false;
+                }
+
+                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
                     return false;
                 }
 
@@ -472,6 +489,29 @@ fn test_deserialize_condition() {
     let json = r#"{"kind":"event_match","key":"content.body","pattern":"coffee"}"#;
 
     let _: Condition = serde_json::from_str(json).unwrap();
+}
+
+#[test]
+fn test_deserialize_unstable_msc3664_condition() {
+    let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern":"coffee","rel_type":"m.in_reply_to"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RelatedEventMatch(_))
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3931_condition() {
+    let json =
+        r#"{"kind":"org.matrix.msc3931.room_version_supports","feature":"org.example.feature"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RoomVersionSupports { feature: _ })
+    ));
 }
 
 #[test]

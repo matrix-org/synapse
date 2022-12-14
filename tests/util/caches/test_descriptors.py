@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Iterable, Set, Tuple
+from typing import Iterable, Set, Tuple, cast
 from unittest import mock
 
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError, Deferred
+from twisted.internet.interfaces import IReactorTime
 
 from synapse.api.errors import SynapseError
 from synapse.logging.context import (
@@ -28,7 +29,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.util.caches import descriptors
-from synapse.util.caches.descriptors import cached, cachedList, lru_cache
+from synapse.util.caches.descriptors import cached, cachedList
 
 from tests import unittest
 from tests.test_utils import get_awaitable_result
@@ -36,41 +37,9 @@ from tests.test_utils import get_awaitable_result
 logger = logging.getLogger(__name__)
 
 
-class LruCacheDecoratorTestCase(unittest.TestCase):
-    def test_base(self):
-        class Cls:
-            def __init__(self):
-                self.mock = mock.Mock()
-
-            @lru_cache()
-            def fn(self, arg1, arg2):
-                return self.mock(arg1, arg2)
-
-        obj = Cls()
-        obj.mock.return_value = "fish"
-        r = obj.fn(1, 2)
-        self.assertEqual(r, "fish")
-        obj.mock.assert_called_once_with(1, 2)
-        obj.mock.reset_mock()
-
-        # a call with different params should call the mock again
-        obj.mock.return_value = "chips"
-        r = obj.fn(1, 3)
-        self.assertEqual(r, "chips")
-        obj.mock.assert_called_once_with(1, 3)
-        obj.mock.reset_mock()
-
-        # the two values should now be cached
-        r = obj.fn(1, 2)
-        self.assertEqual(r, "fish")
-        r = obj.fn(1, 3)
-        self.assertEqual(r, "chips")
-        obj.mock.assert_not_called()
-
-
 def run_on_reactor():
-    d = defer.Deferred()
-    reactor.callLater(0, d.callback, 0)
+    d: "Deferred[int]" = defer.Deferred()
+    cast(IReactorTime, reactor).callLater(0, d.callback, 0)
     return make_deferred_yieldable(d)
 
 
@@ -256,7 +225,8 @@ class DescriptorTestCase(unittest.TestCase):
         callbacks: Set[str] = set()
 
         # set off an asynchronous request
-        obj.result = origin_d = defer.Deferred()
+        origin_d: Deferred = defer.Deferred()
+        obj.result = origin_d
 
         d1 = obj.fn(1, on_invalidate=lambda: callbacks.add("d1"))
         self.assertFalse(d1.called)
@@ -294,7 +264,7 @@ class DescriptorTestCase(unittest.TestCase):
         """Check that logcontexts are set and restored correctly when
         using the cache."""
 
-        complete_lookup = defer.Deferred()
+        complete_lookup: Deferred = defer.Deferred()
 
         class Cls:
             @descriptors.cached()
@@ -478,10 +448,10 @@ class DescriptorTestCase(unittest.TestCase):
 
             @cached(cache_context=True)
             async def func2(self, key, cache_context):
-                return self.func3(key, on_invalidate=cache_context.invalidate)
+                return await self.func3(key, on_invalidate=cache_context.invalidate)
 
-            @lru_cache(cache_context=True)
-            def func3(self, key, cache_context):
+            @cached(cache_context=True)
+            async def func3(self, key, cache_context):
                 self.invalidate = cache_context.invalidate
                 return 42
 
@@ -804,10 +774,14 @@ class CachedListDescriptorTestCase(unittest.TestCase):
 
             @descriptors.cachedList(cached_method_name="fn", list_name="args1")
             async def list_fn(self, args1, arg2):
-                assert current_context().name == "c1"
+                context = current_context()
+                assert isinstance(context, LoggingContext)
+                assert context.name == "c1"
                 # we want this to behave like an asynchronous function
                 await run_on_reactor()
-                assert current_context().name == "c1"
+                context = current_context()
+                assert isinstance(context, LoggingContext)
+                assert context.name == "c1"
                 return self.mock(args1, arg2)
 
         with LoggingContext("c1") as c1:
@@ -866,7 +840,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
                 return self.mock(args1)
 
         obj = Cls()
-        deferred_result = Deferred()
+        deferred_result: "Deferred[dict]" = Deferred()
         obj.mock.return_value = deferred_result
 
         # start off several concurrent lookups of the same key
@@ -1037,5 +1011,5 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         obj = Cls()
 
         # Make sure this raises an error about the arg mismatch
-        with self.assertRaises(Exception):
+        with self.assertRaises(TypeError):
             obj.list_fn([("foo", "bar")])

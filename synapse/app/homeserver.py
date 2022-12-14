@@ -31,14 +31,13 @@ from synapse.api.urls import (
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
     MEDIA_V3_PREFIX,
-    SERVER_KEY_V2_PREFIX,
+    SERVER_KEY_PREFIX,
     STATIC_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
     handle_startup_exception,
-    listen_ssl,
-    listen_tcp,
+    listen_http,
     max_request_body_size,
     redirect_stdio_to_logs,
     register_start,
@@ -53,14 +52,13 @@ from synapse.http.server import (
     RootOptionsRedirectResource,
     StaticResource,
 )
-from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
@@ -83,8 +81,6 @@ class SynapseHomeServer(HomeServer):
         self, config: HomeServerConfig, listener_config: ListenerConfig
     ) -> Iterable[Port]:
         port = listener_config.port
-        bind_addresses = listener_config.bind_addresses
-        tls = listener_config.tls
         # Must exist since this is an HTTP listener.
         assert listener_config.http_options is not None
         site_tag = listener_config.http_options.tag
@@ -140,36 +136,14 @@ class SynapseHomeServer(HomeServer):
         else:
             root_resource = OptionsResource()
 
-        site = SynapseSite(
-            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
-            site_tag,
+        ports = listen_http(
             listener_config,
             create_resource_tree(resources, root_resource),
             self.version_string,
-            max_request_body_size=max_request_body_size(self.config),
+            max_request_body_size(self.config),
+            self.tls_server_context_factory,
             reactor=self.get_reactor(),
         )
-
-        if tls:
-            # refresh_certificate should have been called before this.
-            assert self.tls_server_context_factory is not None
-            ports = listen_ssl(
-                bind_addresses,
-                port,
-                site,
-                self.tls_server_context_factory,
-                reactor=self.get_reactor(),
-            )
-            logger.info("Synapse now listening on TCP port %d (TLS)", port)
-
-        else:
-            ports = listen_tcp(
-                bind_addresses,
-                port,
-                site,
-                reactor=self.get_reactor(),
-            )
-            logger.info("Synapse now listening on TCP port %d", port)
 
         return ports
 
@@ -215,30 +189,22 @@ class SynapseHomeServer(HomeServer):
             consent_resource: Resource = ConsentResource(self)
             if compress:
                 consent_resource = gz_wrap(consent_resource)
-            resources.update({"/_matrix/consent": consent_resource})
+            resources["/_matrix/consent"] = consent_resource
 
         if name == "federation":
             federation_resource: Resource = TransportLayerServer(self)
             if compress:
                 federation_resource = gz_wrap(federation_resource)
-            resources.update({FEDERATION_PREFIX: federation_resource})
+            resources[FEDERATION_PREFIX] = federation_resource
 
         if name == "openid":
-            resources.update(
-                {
-                    FEDERATION_PREFIX: TransportLayerServer(
-                        self, servlet_groups=["openid"]
-                    )
-                }
+            resources[FEDERATION_PREFIX] = TransportLayerServer(
+                self, servlet_groups=["openid"]
             )
 
         if name in ["static", "client"]:
-            resources.update(
-                {
-                    STATIC_PREFIX: StaticResource(
-                        os.path.join(os.path.dirname(synapse.__file__), "static")
-                    )
-                }
+            resources[STATIC_PREFIX] = StaticResource(
+                os.path.join(os.path.dirname(synapse.__file__), "static")
             )
 
         if name in ["media", "federation", "client"]:
@@ -257,7 +223,7 @@ class SynapseHomeServer(HomeServer):
                 )
 
         if name in ["keys", "federation"]:
-            resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
+            resources[SERVER_KEY_PREFIX] = KeyResource(self)
 
         if name == "metrics" and self.config.metrics.enable_metrics:
             metrics_resource: Resource = MetricsResource(RegistryProxy)
@@ -299,7 +265,6 @@ class SynapseHomeServer(HomeServer):
                     _base.listen_metrics(
                         listener.bind_addresses,
                         listener.port,
-                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
                     )
             else:
                 # this shouldn't happen, as the listener type should have been checked
