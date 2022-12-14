@@ -1263,12 +1263,14 @@ class EventCreationHandler:
                         self._storage_controllers,
                         state_map=state_before_event,
                         state_handler=self.state,
+                        state_entry=entry,
                     )
                 else:
                     context = UnpersistedEventContext(
                         self._storage_controllers,
                         state_group_before_event=entry.state_group,
                         state_handler=self.state,
+                        state_entry=entry,
                     )
 
         if requester:

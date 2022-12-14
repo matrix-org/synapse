@@ -261,6 +261,7 @@ class StateHandler:
         event: EventBase,
         state_ids_before_event: Optional[StateMap[str]] = None,
         partial_state: Optional[bool] = None,
+        entry: Optional[_StateCacheEntry] = None,
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event.
 
@@ -281,6 +282,9 @@ class StateHandler:
                 `False` if `state_ids_before_event` is the full state.
                 `None` when `state_ids_before_event` is not provided. In this case, the
                 flag will be calculated based on `event`'s prev events.
+            entry:
+                A state cache entry for the resolved state across the prev events. We may
+                have already calculated this, so if it's available pass it in
         Returns:
             The event context.
 
@@ -339,11 +343,12 @@ class StateHandler:
             logger.debug("calling resolve_state_groups from compute_event_context")
             # we've already taken into account partial state, so no need to wait for
             # complete state here.
-            entry = await self.resolve_state_groups_for_events(
-                event.room_id,
-                event.prev_event_ids(),
-                await_full_state=False,
-            )
+            if not entry:
+                entry = await self.resolve_state_groups_for_events(
+                    event.room_id,
+                    event.prev_event_ids(),
+                    await_full_state=False,
+                )
 
             state_group_before_event_prev_group = entry.prev_group
             deltas_to_state_group_before_event = entry.delta_ids
@@ -396,6 +401,7 @@ class StateHandler:
         if state_ids_before_event is not None:
             replaces = state_ids_before_event.get(key)
         else:
+            assert entry is not None
             replaces_state_map = await entry.get_state(
                 self._state_storage_controller, StateFilter.from_types([key])
             )

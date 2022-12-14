@@ -22,7 +22,7 @@ from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
-    from synapse.state import StateHandler
+    from synapse.state import StateHandler, _StateCacheEntry
     from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
     from synapse.types.state import StateFilter
@@ -275,6 +275,9 @@ class UnpersistedEventContext:
         for_batch:
             whether the context is part of a group of events being created for batch persisting
             to the DB.
+        state_entry:
+            if a state entry is created while calculating this context, it can be stored and
+            passed in when persisting the context to avoid duplicated work
         app_service: If this event is being sent by a (local) application service, that
             app service.
 
@@ -285,6 +288,7 @@ class UnpersistedEventContext:
     state_group_before_event: Optional[int] = None
     state_map: Optional[StateMap[str]] = None
     for_batch: bool = False
+    state_entry: Optional["_StateCacheEntry"] = None
     app_service: Optional[ApplicationService] = None
 
     @staticmethod
@@ -323,7 +327,9 @@ class UnpersistedEventContext:
             return await self.state_handler.compute_event_context(
                 event, state_ids_before_event=self.state_map, partial_state=False
             )
-        return await self.state_handler.compute_event_context(event)
+        return await self.state_handler.compute_event_context(
+            event, entry=self.state_entry
+        )
 
     async def get_prev_state_ids(
         self, state_filter: Optional["StateFilter"] = None
