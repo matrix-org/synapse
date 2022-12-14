@@ -58,28 +58,28 @@ class RelationsStoreTestCase(unittest.HomeserverTestCase):
         Ensure that get_thread_id only searches up the tree for threads.
         """
         # The thread itself and children of it return the thread.
-        thread_id = self.get_success(self._main_store.get_thread_id("B"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("B"))
         self.assertEqual("A", thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id("C"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("C"))
         self.assertEqual("A", thread_id)
 
         # But the root and events related to the root do not.
-        thread_id = self.get_success(self._main_store.get_thread_id("A"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("A"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id("D"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("D"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id("E"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("E"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
 
         # Events which are not related to a thread at all should return the
         # main timeline.
-        thread_id = self.get_success(self._main_store.get_thread_id("F"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("F"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id("G"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("G"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
 
     def test_get_thread_id_for_receipts(self) -> None:
@@ -87,25 +87,35 @@ class RelationsStoreTestCase(unittest.HomeserverTestCase):
         Ensure that get_thread_id_for_receipts searches up and down the tree for a thread.
         """
         # All of the events are considered related to this thread.
-        thread_id = self.get_success(self._main_store.get_thread_id_for_receipts("A"))
+        thread_id = self.get_success(
+            self._main_store.relations.get_thread_id_for_receipts("A")
+        )
         self.assertEqual("A", thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id_for_receipts("B"))
+        thread_id = self.get_success(
+            self._main_store.relations.get_thread_id_for_receipts("B")
+        )
         self.assertEqual("A", thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id_for_receipts("C"))
+        thread_id = self.get_success(
+            self._main_store.relations.get_thread_id_for_receipts("C")
+        )
         self.assertEqual("A", thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id_for_receipts("D"))
+        thread_id = self.get_success(
+            self._main_store.relations.get_thread_id_for_receipts("D")
+        )
         self.assertEqual("A", thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id_for_receipts("E"))
+        thread_id = self.get_success(
+            self._main_store.relations.get_thread_id_for_receipts("E")
+        )
         self.assertEqual("A", thread_id)
 
         # Events which are not related to a thread at all should return the
         # main timeline.
-        thread_id = self.get_success(self._main_store.get_thread_id("F"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("F"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
 
-        thread_id = self.get_success(self._main_store.get_thread_id("G"))
+        thread_id = self.get_success(self._main_store.relations.get_thread_id("G"))
         self.assertEqual(MAIN_TIMELINE, thread_id)
