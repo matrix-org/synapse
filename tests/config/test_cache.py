@@ -19,16 +19,16 @@ from tests.unittest import TestCase
 
 
 class CacheConfigTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Reset caches before each test since there's global state involved.
         self.config = CacheConfig()
         self.config.reset()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Also reset the caches after each test to leave state pristine.
         self.config.reset()
 
-    def test_individual_caches_from_environ(self):
+    def test_individual_caches_from_environ(self) -> None:
         """
         Individual cache factors will be loaded from the environment.
         """
@@ -42,7 +42,7 @@ class CacheConfigTests(TestCase):
 
         self.assertEqual(dict(self.config.cache_factors), {"something_or_other": 2.0})
 
-    def test_config_overrides_environ(self):
+    def test_config_overrides_environ(self) -> None:
         """
         Individual cache factors defined in the environment will take precedence
         over those in the config.
@@ -60,7 +60,7 @@ class CacheConfigTests(TestCase):
             {"foo": 1.0, "bar": 3.0, "something_or_other": 2.0},
         )
 
-    def test_individual_instantiated_before_config_load(self):
+    def test_individual_instantiated_before_config_load(self) -> None:
         """
         If a cache is instantiated before the config is read, it will be given
         the default cache size in the interim, and then resized once the config
@@ -77,7 +77,7 @@ class CacheConfigTests(TestCase):
 
         self.assertEqual(cache.max_size, 300)
 
-    def test_individual_instantiated_after_config_load(self):
+    def test_individual_instantiated_after_config_load(self) -> None:
         """
         If a cache is instantiated after the config is read, it will be
         immediately resized to the correct size given the per_cache_factor if
@@ -91,7 +91,7 @@ class CacheConfigTests(TestCase):
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 200)
 
-    def test_global_instantiated_before_config_load(self):
+    def test_global_instantiated_before_config_load(self) -> None:
         """
         If a cache is instantiated before the config is read, it will be given
         the default cache size in the interim, and then resized to the new
@@ -107,7 +107,7 @@ class CacheConfigTests(TestCase):
 
         self.assertEqual(cache.max_size, 400)
 
-    def test_global_instantiated_after_config_load(self):
+    def test_global_instantiated_after_config_load(self) -> None:
         """
         If a cache is instantiated after the config is read, it will be
         immediately resized to the correct size given the global factor if there
@@ -121,7 +121,7 @@ class CacheConfigTests(TestCase):
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 150)
 
-    def test_cache_with_asterisk_in_name(self):
+    def test_cache_with_asterisk_in_name(self) -> None:
         """Some caches have asterisks in their name, test that they are set correctly."""
 
         config = {
@@ -148,7 +148,7 @@ class CacheConfigTests(TestCase):
         add_resizable_cache("*cache_c*", cache_resize_callback=cache_c.set_cache_factor)
         self.assertEqual(cache_c.max_size, 200)
 
-    def test_apply_cache_factor_from_config(self):
+    def test_apply_cache_factor_from_config(self) -> None:
         """Caches can disable applying cache factor updates, mainly used by
         event cache size.
         """

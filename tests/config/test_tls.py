@@ -27,7 +27,7 @@ from tests.unittest import TestCase
 class FakeServer(Config):
     section = "server"
 
-    def has_tls_listener(self):
+    def has_tls_listener(self) -> bool:
         return False
 
 
@@ -36,7 +36,7 @@ class TestConfig(RootConfig):
 
 
 class TLSConfigTests(TestCase):
-    def test_tls_client_minimum_default(self):
+    def test_tls_client_minimum_default(self) -> None:
         """
         The default client TLS version is 1.0.
         """
@@ -46,7 +46,7 @@ class TLSConfigTests(TestCase):
 
         self.assertEqual(t.tls.federation_client_minimum_tls_version, "1")
 
-    def test_tls_client_minimum_set(self):
+    def test_tls_client_minimum_set(self) -> None:
         """
         The default client TLS version can be set to 1.0, 1.1, and 1.2.
         """
@@ -76,7 +76,7 @@ class TLSConfigTests(TestCase):
         t.tls.read_config(config, config_dir_path="", data_dir_path="")
         self.assertEqual(t.tls.federation_client_minimum_tls_version, "1.2")
 
-    def test_tls_client_minimum_1_point_3_missing(self):
+    def test_tls_client_minimum_1_point_3_missing(self) -> None:
         """
         If TLS 1.3 support is missing and it's configured, it will raise a
         ConfigError.
@@ -100,7 +100,7 @@ class TLSConfigTests(TestCase):
             ),
         )
 
-    def test_tls_client_minimum_1_point_3_exists(self):
+    def test_tls_client_minimum_1_point_3_exists(self) -> None:
         """
         If TLS 1.3 support exists and it's configured, it will be settable.
         """
@@ -115,7 +115,7 @@ class TLSConfigTests(TestCase):
         t.tls.read_config(config, config_dir_path="", data_dir_path="")
         self.assertEqual(t.tls.federation_client_minimum_tls_version, "1.3")
 
-    def test_tls_client_minimum_set_passed_through_1_2(self):
+    def test_tls_client_minimum_set_passed_through_1_2(self) -> None:
         """
         The configured TLS version is correctly configured by the ContextFactory.
         """
@@ -131,7 +131,7 @@ class TLSConfigTests(TestCase):
         self.assertNotEqual(options & SSL.OP_NO_TLSv1_1, 0)
         self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
-    def test_tls_client_minimum_set_passed_through_1_0(self):
+    def test_tls_client_minimum_set_passed_through_1_0(self) -> None:
         """
         The configured TLS version is correctly configured by the ContextFactory.
         """
@@ -147,7 +147,7 @@ class TLSConfigTests(TestCase):
         self.assertEqual(options & SSL.OP_NO_TLSv1_1, 0)
         self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
-    def test_whitelist_idna_failure(self):
+    def test_whitelist_idna_failure(self) -> None:
         """
         The federation certificate whitelist will not allow IDNA domain names.
         """
@@ -163,7 +163,7 @@ class TLSConfigTests(TestCase):
         )
         self.assertIn("IDNA domain names", str(e))
 
-    def test_whitelist_idna_result(self):
+    def test_whitelist_idna_result(self) -> None:
         """
         The federation certificate whitelist will match on IDNA encoded names.
         """
