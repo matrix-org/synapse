@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Optional, cast
 from unittest.mock import Mock, call
 
 from parameterized import parameterized
 from signedjson.key import generate_signing_key
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.presence import UserPresenceState
@@ -35,7 +37,9 @@ from synapse.handlers.presence import (
 )
 from synapse.rest import admin
 from synapse.rest.client import room
-from synapse.types import UserID, get_domain_from_id
+from synapse.server import HomeServer
+from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.util import Clock
 
 from tests import unittest
 from tests.replication._base import BaseMultiWorkerStreamTestCase
@@ -44,7 +48,9 @@ from tests.replication._base import BaseMultiWorkerStreamTestCase
 class PresenceUpdateTestCase(unittest.HomeserverTestCase):
     servlets = [admin.register_servlets]
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.store = homeserver.get_datastores().main
 
     def test_offline_to_online(self) -> None:
@@ -322,7 +328,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.update_presence(presence_states))
 
         # Check that each update is present in the database
-        db_presence_states = self.get_success(
+        db_presence_states_raw = self.get_success(
             self.store.get_all_presence_updates(
                 instance_name="master",
                 last_id=0,
@@ -332,7 +338,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         # Extract presence update user ID and state information into lists of tuples
-        db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states[0]]
+        db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states_raw[0]]
         presence_states_compare = [(ps.user_id, ps.state) for ps in presence_states]
 
         # Compare what we put into the storage with what we got out.
@@ -508,7 +514,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
 
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
 
@@ -516,7 +522,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         """Test that if an external process doesn't update the records for a while
         we time out their syncing users presence.
         """
-        process_id = 1
+        process_id = "1"
         user_id = "@test:server"
 
         # Notify handler that a user is now syncing.
@@ -726,7 +732,9 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             },
         }
     )
-    def test_set_presence_from_syncing_keeps_busy(self, test_with_workers: bool):
+    def test_set_presence_from_syncing_keeps_busy(
+        self, test_with_workers: bool
+    ) -> None:
         """Test that presence set by syncing doesn't affect busy status
 
         Args:
@@ -767,7 +775,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
     def _set_presencestate_with_status_msg(
         self, user_id: str, state: str, status_msg: Optional[str]
-    ):
+    ) -> None:
         """Set a PresenceState and status_msg and check the result.
 
         Args:
@@ -790,7 +798,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
 
 class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
         self.instance_name = hs.get_instance_name()
@@ -982,7 +990,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
     servlets = [room.register_servlets]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver(
             "server",
             federation_http_client=None,
@@ -990,14 +998,14 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         return hs
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         # Enable federation sending on the main process.
         config["federation_sender_instances"] = None
         return config
 
-    def prepare(self, reactor, clock, hs):
-        self.federation_sender = hs.get_federation_sender()
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.federation_sender = cast(Mock, hs.get_federation_sender())
         self.event_builder_factory = hs.get_event_builder_factory()
         self.federation_event_handler = hs.get_federation_event_handler()
         self.presence_handler = hs.get_presence_handler()
@@ -1110,7 +1118,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations={"server2", "server3"}, states=[expected_state]
         )
 
-    def _add_new_user(self, room_id, user_id):
+    def _add_new_user(self, room_id: str, user_id: str) -> None:
         """Add new user to the room by creating an event and poking the federation API."""
 
         hostname = get_domain_from_id(user_id)

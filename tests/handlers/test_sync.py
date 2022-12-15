@@ -14,6 +14,8 @@
 from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import Filtering
@@ -23,6 +25,7 @@ from synapse.rest import admin
 from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 
 import tests.unittest
 import tests.utils
@@ -39,7 +42,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.sync_handler = self.hs.get_sync_handler()
         self.store = self.hs.get_datastores().main
 

@@ -376,7 +376,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.get_success(self.handler.check_avatar_size_and_mime_type(remote_mxc))
         )
 
-    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
+    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]) -> None:
         """Stores metadata about files in the database.
 
         Args:

@@ -31,7 +31,7 @@ from synapse.appservice import (
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.rest.client import login, receipts, register, room, sendtodevice
 from synapse.server import HomeServer
-from synapse.types import RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -241,7 +241,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         service_one = self._mkservice(False, ["my-protocol"])
         service_two = self._mkservice(False, ["my-protocol"])
 
-        async def get_3pe_protocol(service, unusedProtocol):
+        async def get_3pe_protocol(
+            service: ApplicationService, protocol: str
+        ) -> Optional[JsonDict]:
             if service == service_one:
                 return {
                     "x-protocol-data": 42,
@@ -390,7 +392,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         receipts.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.hs = hs
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track any outgoing ephemeral events
@@ -443,7 +445,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     )
     def test_match_interesting_room_members(
         self, interesting_user: str, should_notify: bool
-    ):
+    ) -> None:
         """
         Test to make sure that a interesting user (local or remote) in the room is
         notified as expected when someone else in the room sends a message.
@@ -915,7 +917,7 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
         experimental_feature_enabled: bool,
         as_supports_txn_extensions: bool,
         as_should_receive_device_list_updates: bool,
-    ):
+    ) -> None:
         """
         Tests that an application service receives notice of changed device
         lists for a user, when a user changes their device lists.

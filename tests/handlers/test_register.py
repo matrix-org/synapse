@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Collection, List, Optional, Tuple
 from unittest.mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
@@ -22,8 +25,18 @@ from synapse.api.errors import (
     ResourceLimitError,
     SynapseError,
 )
+from synapse.module_api import ModuleApi
+from synapse.server import HomeServer
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias, RoomID, UserID, create_requester
+from synapse.types import (
+    JsonDict,
+    Requester,
+    RoomAlias,
+    RoomID,
+    UserID,
+    create_requester,
+)
+from synapse.util import Clock
 
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
@@ -33,94 +46,98 @@ from .. import unittest
 
 
 class TestSpamChecker:
-    def __init__(self, config, api):
+    def __init__(self, config: None, api: ModuleApi):
         api.register_spam_checker_callbacks(
             check_registration_for_spam=self.check_registration_for_spam,
         )
 
     @staticmethod
-    def parse_config(config):
-        return config
+    def parse_config(config: JsonDict) -> None:
+        return None
 
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-        auth_provider_id,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str],
+    ) -> RegistrationBehaviour:
         pass
 
 
 class DenyAll(TestSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-        auth_provider_id,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.DENY
 
 
 class BanAll(TestSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-        auth_provider_id,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.SHADOW_BAN
 
 
 class BanBadIdPUser(TestSpamChecker):
     async def check_registration_for_spam(
-        self, email_threepid, username, request_info, auth_provider_id=None
-    ):
+        self,
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str] = None,
+    ) -> RegistrationBehaviour:
         # Reject any user coming from CAS and whose username contains profanity
-        if auth_provider_id == "cas" and "flimflob" in username:
+        if auth_provider_id == "cas" and username and "flimflob" in username:
             return RegistrationBehaviour.DENY
         return RegistrationBehaviour.ALLOW
 
 
 class TestLegacyRegistrationSpamChecker:
-    def __init__(self, config, api):
+    def __init__(self, config: None, api: ModuleApi):
         pass
 
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
         pass
 
 
 class LegacyAllowAll(TestLegacyRegistrationSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.ALLOW
 
 
 class LegacyDenyAll(TestLegacyRegistrationSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.DENY
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """Tests the RegistrationHandler."""
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs_config = self.default_config()
 
         # some of the tests rely on us having a user consent version
@@ -145,7 +162,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastores().main
         self.lots_of_users = 100
@@ -680,8 +697,12 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
     async def get_or_create_user(
-        self, requester, localpart, displayname, password_hash=None
-    ):
+        self,
+        requester: Requester,
+        localpart: str,
+        displayname: Optional[str],
+        password_hash: Optional[str] = None,
+    ) -> Tuple[str, str]:
         """Creates a new user if the user does not exist,
         else revokes all previous access tokens and generates a new one.
 
@@ -736,13 +757,15 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
     """Tests auto-join on remote rooms."""
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.room_id = "!roomid:remotetest"
 
-        async def update_membership(*args, **kwargs):
+        async def update_membership(*args: Any, **kwargs: Any) -> None:
             pass
 
-        async def lookup_room_alias(*args, **kwargs):
+        async def lookup_room_alias(
+            *args: Any, **kwargs: Any
+        ) -> Tuple[RoomID, List[str]]:
             return RoomID.from_string(self.room_id), ["remotetest"]
 
         self.room_member_handler = Mock(spec=["update_membership", "lookup_room_alias"])
@@ -752,7 +775,7 @@ class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(room_member_handler=self.room_member_handler)
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastores().main
 

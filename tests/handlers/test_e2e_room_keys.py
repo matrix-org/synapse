@@ -17,7 +17,11 @@
 import copy
 from unittest import mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.errors import SynapseError
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -39,10 +43,10 @@ room_keys = {
 
 
 class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(replication_layer=mock.Mock())
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_e2e_room_keys_handler()
         self.local_user = "@boris:" + hs.hostname
 
@@ -69,7 +73,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
 
     def test_create_version(self) -> None:
         """Check that we can create and then retrieve versions."""
-        res = self.get_success(
+        version = self.get_success(
             self.handler.create_version(
                 self.local_user,
                 {
@@ -78,7 +82,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.assertEqual(res, "1")
+        self.assertEqual(version, "1")
 
         # check we can retrieve it as the current version
         res = self.get_success(self.handler.get_version_info(self.local_user))
@@ -110,7 +114,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         # upload a new one...
-        res = self.get_success(
+        version = self.get_success(
             self.handler.create_version(
                 self.local_user,
                 {
@@ -119,7 +123,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.assertEqual(res, "2")
+        self.assertEqual(version, "2")
 
         # check we can retrieve it as the current version
         res = self.get_success(self.handler.get_version_info(self.local_user))
@@ -271,7 +275,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
 
     def test_delete_version(self) -> None:
         """Check that we can create and then delete versions."""
-        res = self.get_success(
+        version = self.get_success(
             self.handler.create_version(
                 self.local_user,
                 {
@@ -280,7 +284,7 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.assertEqual(res, "1")
+        self.assertEqual(version, "1")
 
         # check we can delete it
         self.get_success(self.handler.delete_version(self.local_user, "1"))
@@ -449,9 +453,11 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_room_keys(self.local_user, version, new_room_keys)
         )
 
-        res = self.get_success(self.handler.get_room_keys(self.local_user, version))
+        res_keys = self.get_success(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertEqual(
-            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
+            res_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
             "SSBBTSBBIEZJU0gK",
         )
 
@@ -465,9 +471,12 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_room_keys(self.local_user, version, new_room_keys)
         )
 
-        res = self.get_success(self.handler.get_room_keys(self.local_user, version))
+        res_keys = self.get_success(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertEqual(
-            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
+            res_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
+            "new",
         )
 
         # the etag should NOT be equal now, since the key changed
@@ -483,9 +492,12 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_room_keys(self.local_user, version, new_room_keys)
         )
 
-        res = self.get_success(self.handler.get_room_keys(self.local_user, version))
+        res_keys = self.get_success(
+            self.handler.get_room_keys(self.local_user, version)
+        )
         self.assertEqual(
-            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
+            res_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
+            "new",
         )
 
         # the etag should be the same since the session did not change

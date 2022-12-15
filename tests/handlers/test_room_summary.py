@@ -11,10 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from unittest import mock
 
 from twisted.internet.defer import ensureDeferred
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import (
     EventContentFields,
@@ -34,11 +35,14 @@ from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID, create_requester
+from synapse.util import Clock
 
 from tests import unittest
 
 
-def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0):
+def _create_event(
+    room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0
+) -> mock.Mock:
     result = mock.Mock(name=room_id)
     result.room_id = room_id
     result.content = {}
@@ -48,7 +52,7 @@ def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: i
     return result
 
 
-def _order(*events):
+def _order(*events: mock.Mock) -> List[mock.Mock]:
     return sorted(events, key=_child_events_comparison_key)
 
 
@@ -115,7 +119,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.hs = hs
         self.handler = self.hs.get_room_summary_handler()
 
@@ -380,7 +384,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_hierarchy(result2, [(self.space, [self.room])])
 
     def _create_room_with_join_rule(
-        self, join_rule: str, room_version: Optional[str] = None, **extra_content
+        self, join_rule: str, room_version: Optional[str] = None, **extra_content: Any
     ) -> str:
         """Create a room with the given join rule and add it to the space."""
         room_id = self.helper.create_room_as(
@@ -722,7 +726,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             "world_readable": True,
         }
 
-        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+        async def summarize_remote_room_hierarchy(
+            _self: Any, room: Any, suggested_only: bool
+        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
             return requested_room_entry, {subroom: child_room}, set()
 
         # Add a room to the space which is on another server.
@@ -853,7 +859,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+        async def summarize_remote_room_hierarchy(
+            _self: Any, room: Any, suggested_only: bool
+        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
             return subspace_room_entry, dict(children_rooms), set()
 
         # Add a room to the space which is on another server.
@@ -915,7 +923,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+        async def summarize_remote_room_hierarchy(
+            _self: Any, room: Any, suggested_only: bool
+        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
             return fed_room_entry, {}, set()
 
         # Add a room to the space which is on another server.
@@ -1023,7 +1033,7 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.hs = hs
         self.handler = self.hs.get_room_summary_handler()
 
@@ -1105,7 +1115,9 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
             {"room_id": fed_room, "world_readable": True},
         )
 
-        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+        async def summarize_remote_room_hierarchy(
+            _self: Any, room: Any, suggested_only: bool
+        ) -> Tuple[Optional[_RoomEntry], Dict[str, JsonDict], Set[str]]:
             return requested_room_entry, {}, set()
 
         with mock.patch(
