@@ -127,6 +127,7 @@ class SyncRestServlet(RestServlet):
         )
         filter_id = parse_string(request, "filter")
         full_state = parse_boolean(request, "full_state", default=False)
+        beeper_previews = parse_boolean(request, "beeper_previews", default=False)
 
         logger.debug(
             "/sync: user=%r, timeout=%r, since=%r, "
@@ -170,6 +171,7 @@ class SyncRestServlet(RestServlet):
             is_guest=requester.is_guest,
             request_key=request_key,
             device_id=device_id,
+            beeper_previews=beeper_previews,
         )
 
         since_token = None
@@ -509,7 +511,6 @@ class SyncRestServlet(RestServlet):
             "state": {"events": serialized_state},
             "account_data": {"events": account_data},
         }
-
 
         if joined:
             assert isinstance(room, JoinedSyncResult)

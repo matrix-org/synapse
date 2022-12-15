@@ -809,16 +809,8 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
         receipts.register_servlets,
     ]
 
-    def default_config(self) -> JsonDict:
-        config = super().default_config()
-
-        config["experimental_features"] = {
-            "server_side_room_preview_enabled": True,
-        }
-        return config
-
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.url = "/sync?since=%s"
+        self.url = "/sync?beeper_previews=true&since=%s"
         self.next_batches = {}
 
         # Register the first user (used to check the unread counts).

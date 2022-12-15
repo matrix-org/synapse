@@ -98,6 +98,7 @@ class SyncConfig:
     is_guest: bool
     request_key: SyncRequestKey
     device_id: Optional[str]
+    beeper_previews: bool
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -2439,7 +2440,7 @@ class SyncHandler:
                     preview={},
                 )
 
-                if self.hs_config.experimental.server_side_room_preview_enabled:
+                if sync_config.beeper_previews:
                     preview: JsonDict = (
                         await self.store.beeper_preview_for_room_id_and_user_id(
                             room_id=room_id, user_id=user_id, to_key=now_token.room_key
