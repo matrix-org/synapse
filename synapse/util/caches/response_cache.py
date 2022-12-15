@@ -180,7 +180,7 @@ class ResponseCache(Generic[KV]):
         return entry
 
     def unset(self, key: KV) -> None:
-        """Remove cached value for this key from the cache, if any.
+        """Remove the cached value for this key from the cache, if any.
 
         Args:
             key: key used to remove the cached value
