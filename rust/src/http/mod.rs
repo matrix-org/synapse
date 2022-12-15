@@ -110,8 +110,6 @@ impl HttpClient {
         let bytes = hyper::body::to_bytes(body).await?;
         let content = Bytes(bytes.to_vec());
 
-        info!("DONE");
-
         Ok(MatrixResponse {
             code,
             phrase,
@@ -137,7 +135,6 @@ impl HttpClient {
         body: Option<Vec<u8>>,
     ) -> PyResult<&'a PyAny> {
         pyo3::prepare_freethreaded_python();
-        info!("REQUEST");
 
         let client = self.clone();
 

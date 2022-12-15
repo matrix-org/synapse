@@ -638,7 +638,8 @@ class MatrixFederationHttpClient:
 
                             # response = await make_deferred_yieldable(request_deferred)
 
-                            response_d = self._rust_client.request(
+                            response_d = run_in_background(
+                                self._rust_client.request,
                                 url_str,
                                 request.method,
                                 headers_dict,
