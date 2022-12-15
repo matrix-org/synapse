@@ -679,12 +679,8 @@ class FederationHandler:
                 if ret.partial_state:
                     # Kick off the process of asynchronously fetching the state for this
                     # room.
-                    run_as_background_process(
-                        desc="sync_partial_state_room",
-                        func=self._sync_partial_state_room,
-                        initial_destination=origin,
-                        other_destinations=ret.servers_in_room,
-                        room_id=room_id,
+                    await self._start_partial_state_resync(
+                        origin, ret.servers_in_room, room_id
                     )
 
             # We wait here until this instance has seen the events come down
@@ -1627,14 +1623,20 @@ class FederationHandler:
 
         partial_state_rooms = await self.store.get_partial_state_room_resync_info()
         for room_id, resync_info in partial_state_rooms.items():
-            run_as_background_process(
-                desc="sync_partial_state_room",
-                func=self._sync_partial_state_room,
-                initial_destination=resync_info.joined_via,
-                other_destinations=resync_info.servers_in_room,
-                room_id=room_id,
+            await self._start_partial_state_resync(
+                resync_info.joined_via, resync_info.servers_in_room, room_id
             )
 
+    async def _start_partial_state_resync(
+        self, origin: Optional[str], servers_in_room: List[str], room_id: str
+    ) -> None:
+        d = run_as_background_process(
+            desc="sync_partial_state_room",
+            func=self._sync_partial_state_room,
+            initial_destination=origin,
+            other_destinations=servers_in_room,
+            room_id=room_id,
+        )
     async def _sync_partial_state_room(
         self,
         initial_destination: Optional[str],
