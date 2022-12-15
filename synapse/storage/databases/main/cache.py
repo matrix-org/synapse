@@ -198,14 +198,8 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 backfilled=False,
             )
         elif row.type == EventsStreamCurrentStateRow.TypeId:
-            assert isinstance(data, EventsStreamCurrentStateRow)
-            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)
-
-            if data.type == EventTypes.Member:
-                self.get_rooms_for_user_with_stream_ordering.invalidate(
-                    (data.state_key,)
-                )
-                self.get_rooms_for_user.invalidate((data.state_key,))
+            # TODO: Nothing to do here, handled in events_worker, cleanup?
+            pass
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 
