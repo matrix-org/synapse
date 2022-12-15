@@ -16,16 +16,16 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, List, Match, Optional, Tuple, Type, cast
+from typing import TYPE_CHECKING, List, Match, Optional, Tuple, Type, cast
 
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor

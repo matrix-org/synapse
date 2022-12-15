@@ -147,11 +147,15 @@ class ReceiptRestServlet(RestServlet):
         # If the receipt is on the main timeline, it is enough to check whether
         # the event is directly related to a thread.
         if thread_id == MAIN_TIMELINE:
-            return MAIN_TIMELINE == await self._main_store.get_thread_id(event_id)
+            return MAIN_TIMELINE == await self._main_store.relations.get_thread_id(
+                event_id
+            )
 
         # Otherwise, check if the event is directly part of a thread, or is the
         # root message (or related to the root message) of a thread.
-        return thread_id == await self._main_store.get_thread_id_for_receipts(event_id)
+        return thread_id == await self._main_store.relations.get_thread_id_for_receipts(
+            event_id
+        )
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

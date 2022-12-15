@@ -1361,7 +1361,9 @@ class EventCreationHandler:
         else:
             # There must be some reason that the client knows the event exists,
             # see if there are existing relations. If so, assume everything is fine.
-            if not await self.store.event_is_target_of_relation(relation.parent_id):
+            if not await self.store.relations.event_is_target_of_relation(
+                relation.parent_id
+            ):
                 # Otherwise, the client can't know about the parent event!
                 raise SynapseError(400, "Can't send relation to unknown event")
 
@@ -1377,7 +1379,7 @@ class EventCreationHandler:
             if len(aggregation_key) > 500:
                 raise SynapseError(400, "Aggregation key is too long")
 
-            already_exists = await self.store.has_user_annotated_event(
+            already_exists = await self.store.relations.has_user_annotated_event(
                 relation.parent_id, event.type, aggregation_key, event.sender
             )
             if already_exists:
@@ -1389,7 +1391,7 @@ class EventCreationHandler:
 
         # Don't attempt to start a thread if the parent event is a relation.
         elif relation.rel_type == RelationTypes.THREAD:
-            if await self.store.event_includes_relation(relation.parent_id):
+            if await self.store.relations.event_includes_relation(relation.parent_id):
                 raise SynapseError(
                     400, "Cannot start threads from an event with a relation"
                 )
