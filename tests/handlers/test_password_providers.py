@@ -45,7 +45,7 @@ class LegacyPasswordOnlyAuthProvider:
     """A legacy password_provider which only implements `check_password`."""
 
     @staticmethod
-    def parse_config() -> None:
+    def parse_config(config: JsonDict) -> None:
         pass
 
     def __init__(self, config: None, account_handler: AccountHandler):
@@ -59,7 +59,7 @@ class LegacyCustomAuthProvider:
     """A legacy password_provider which implements a custom login type."""
 
     @staticmethod
-    def parse_config() -> None:
+    def parse_config(config: JsonDict) -> None:
         pass
 
     def __init__(self, config: None, account_handler: AccountHandler):
@@ -76,7 +76,7 @@ class CustomAuthProvider:
     """A module which registers password_auth_provider callbacks for a custom login type."""
 
     @staticmethod
-    def parse_config() -> None:
+    def parse_config(config: JsonDict) -> None:
         pass
 
     def __init__(self, config: None, api: ModuleApi):
@@ -93,7 +93,7 @@ class LegacyPasswordCustomAuthProvider:
     as a custom type."""
 
     @staticmethod
-    def parse_config() -> None:
+    def parse_config(config: JsonDict) -> None:
         pass
 
     def __init__(self, config: None, account_handler: AccountHandler):
@@ -111,7 +111,7 @@ class PasswordCustomAuthProvider:
     as well as a password login"""
 
     @staticmethod
-    def parse_config() -> None:
+    def parse_config(config: JsonDict) -> None:
         pass
 
     def __init__(self, config: None, api: ModuleApi):

@@ -92,10 +92,10 @@ class TestMappingProvider:
 
 
 class TestMappingProviderExtra(TestMappingProvider):
-    async def map_user_attributes(
+    async def get_extra_attributes(
         self, userinfo: "UserInfo", token: Token
-    ) -> UserAttributeDict:
-        return {"phone": userinfo["phone"]}  # type: ignore[typeddict-item]
+    ) -> JsonDict:
+        return {"phone": userinfo["phone"]}
 
 
 class TestMappingProviderFailures(TestMappingProvider):
