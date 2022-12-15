@@ -645,7 +645,7 @@ class MatrixFederationHttpClient:
                                 headers_dict,
                                 data,
                             )
-                            response = await defer.Deferred.fromFuture(response_d)
+                            response = await make_deferred_yieldable(response_d)
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:

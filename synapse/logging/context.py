@@ -26,6 +26,7 @@ import logging
 import threading
 import typing
 import warnings
+from asyncio import Future
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -814,6 +815,8 @@ def run_in_background(  # type: ignore[misc]
         res = defer.ensureDeferred(res)
     elif isinstance(res, defer.Deferred):
         pass
+    elif isinstance(res, Future):
+        res = defer.Deferred.fromFuture(res)
     elif isinstance(res, Awaitable):
         # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
         # or `Future` from `make_awaitable`.
