@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from typing import Any, Awaitable, ContextManager, Dict, Optional, Tuple, TypeVar
+from typing import Any, Awaitable, ContextManager, Dict, Optional, Tuple
 from unittest.mock import ANY, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -71,15 +71,12 @@ EXPLICIT_ENDPOINT_CONFIG = {
 }
 
 
-T = TypeVar("T")
-
-
 class TestMappingProvider:
     @staticmethod
     def parse_config(config: JsonDict) -> None:
         return None
 
-    def __init__(self, config: T):
+    def __init__(self, config: None):
         pass
 
     def get_remote_user_id(self, userinfo: "UserInfo") -> str:
