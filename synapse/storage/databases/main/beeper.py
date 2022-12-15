@@ -50,7 +50,7 @@ class BeeperStore(SQLBaseStore):
                         )
                     )
                     ELSE (true) END
-            ORDER BY stream_ordering DESC
+            ORDER BY e.stream_ordering DESC
             LIMIT 1
             """
 
