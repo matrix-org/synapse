@@ -215,6 +215,9 @@ class StreamChangeCache:
         self._entity_to_key[entity] = stream_pos
         self._evict()
 
+        self.have_seen_position(stream_pos)
+
+    def have_seen_position(self, stream_pos: int) -> None:
         if stream_pos > self.max_stream_pos:
             self.max_stream_pos = stream_pos
 

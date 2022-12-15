@@ -138,16 +138,23 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         if stream_name == ToDeviceStream.NAME:
             # If replication is happening than postgres must be being used.
             assert isinstance(self._device_inbox_id_gen, MultiWriterIdGenerator)
-            self._device_inbox_id_gen.advance(instance_name, token)
             for row in rows:
+                # NOTE: here we always tell both stream change caches, either about
+                # the entity or just the known position.
                 if row.entity.startswith("@"):
                     self._device_inbox_stream_cache.entity_has_changed(
                         row.entity, token
                     )
+                    self._device_federation_outbox_stream_cache.have_seen_position(
+                        token
+                    )
                 else:
+                    self._device_inbox_stream_cache.have_seen_position(token)
                     self._device_federation_outbox_stream_cache.entity_has_changed(
                         row.entity, token
                     )
+            # Important that the ID gen advances after stream change caches
+            self._device_inbox_id_gen.advance(instance_name, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def get_to_device_stream_token(self) -> int:
