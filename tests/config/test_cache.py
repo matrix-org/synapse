@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from synapse.config.cache import CacheConfig, add_resizable_cache
+from synapse.types import JsonDict
 from synapse.util.caches.lrucache import LruCache
 
 from tests.unittest import TestCase
@@ -32,8 +33,8 @@ class CacheConfigTests(TestCase):
         """
         Individual cache factors will be loaded from the environment.
         """
-        config = {}
-        self.config._environ = {
+        config: JsonDict = {}
+        self.config._environ = {  # type: ignore[assignment]
             "SYNAPSE_CACHE_FACTOR_SOMETHING_OR_OTHER": "2",
             "SYNAPSE_NOT_CACHE": "BLAH",
         }
@@ -47,8 +48,8 @@ class CacheConfigTests(TestCase):
         Individual cache factors defined in the environment will take precedence
         over those in the config.
         """
-        config = {"caches": {"per_cache_factors": {"foo": 2, "bar": 3}}}
-        self.config._environ = {
+        config: JsonDict = {"caches": {"per_cache_factors": {"foo": 2, "bar": 3}}}
+        self.config._environ = {  # type: ignore[assignment]
             "SYNAPSE_CACHE_FACTOR_SOMETHING_OR_OTHER": "2",
             "SYNAPSE_CACHE_FACTOR_FOO": 1,
         }
@@ -66,12 +67,12 @@ class CacheConfigTests(TestCase):
         the default cache size in the interim, and then resized once the config
         is loaded.
         """
-        cache = LruCache(100)
+        cache: LruCache = LruCache(100)
 
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 50)
 
-        config = {"caches": {"per_cache_factors": {"foo": 3}}}
+        config: JsonDict = {"caches": {"per_cache_factors": {"foo": 3}}}
         self.config.read_config(config)
         self.config.resize_all_caches()
 
@@ -83,11 +84,11 @@ class CacheConfigTests(TestCase):
         immediately resized to the correct size given the per_cache_factor if
         there is one.
         """
-        config = {"caches": {"per_cache_factors": {"foo": 2}}}
+        config: JsonDict = {"caches": {"per_cache_factors": {"foo": 2}}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
         self.config.resize_all_caches()
 
-        cache = LruCache(100)
+        cache: LruCache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 200)
 
@@ -97,11 +98,11 @@ class CacheConfigTests(TestCase):
         the default cache size in the interim, and then resized to the new
         default cache size once the config is loaded.
         """
-        cache = LruCache(100)
+        cache: LruCache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 50)
 
-        config = {"caches": {"global_factor": 4}}
+        config: JsonDict = {"caches": {"global_factor": 4}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
         self.config.resize_all_caches()
 
@@ -113,38 +114,38 @@ class CacheConfigTests(TestCase):
         immediately resized to the correct size given the global factor if there
         is no per-cache factor.
         """
-        config = {"caches": {"global_factor": 1.5}}
+        config: JsonDict = {"caches": {"global_factor": 1.5}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
         self.config.resize_all_caches()
 
-        cache = LruCache(100)
+        cache: LruCache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 150)
 
     def test_cache_with_asterisk_in_name(self) -> None:
         """Some caches have asterisks in their name, test that they are set correctly."""
 
-        config = {
+        config: JsonDict = {
             "caches": {
                 "per_cache_factors": {"*cache_a*": 5, "cache_b": 6, "cache_c": 2}
             }
         }
-        self.config._environ = {
+        self.config._environ = {  # type: ignore[assignment]
             "SYNAPSE_CACHE_FACTOR_CACHE_A": "2",
-            "SYNAPSE_CACHE_FACTOR_CACHE_B": 3,
+            "SYNAPSE_CACHE_FACTOR_CACHE_B": "3",
         }
         self.config.read_config(config, config_dir_path="", data_dir_path="")
         self.config.resize_all_caches()
 
-        cache_a = LruCache(100)
+        cache_a: LruCache = LruCache(100)
         add_resizable_cache("*cache_a*", cache_resize_callback=cache_a.set_cache_factor)
         self.assertEqual(cache_a.max_size, 200)
 
-        cache_b = LruCache(100)
+        cache_b: LruCache = LruCache(100)
         add_resizable_cache("*Cache_b*", cache_resize_callback=cache_b.set_cache_factor)
         self.assertEqual(cache_b.max_size, 300)
 
-        cache_c = LruCache(100)
+        cache_c: LruCache = LruCache(100)
         add_resizable_cache("*cache_c*", cache_resize_callback=cache_c.set_cache_factor)
         self.assertEqual(cache_c.max_size, 200)
 
@@ -153,11 +154,11 @@ class CacheConfigTests(TestCase):
         event cache size.
         """
 
-        config = {"caches": {"event_cache_size": "10k"}}
+        config: JsonDict = {"caches": {"event_cache_size": "10k"}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
         self.config.resize_all_caches()
 
-        cache = LruCache(
+        cache: LruCache = LruCache(
             max_size=self.config.event_cache_size,
             apply_cache_factor_from_config=False,
         )
