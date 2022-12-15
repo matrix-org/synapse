@@ -98,7 +98,7 @@ class SyncConfig:
     is_guest: bool
     request_key: SyncRequestKey
     device_id: Optional[str]
-    beeper_previews: bool
+    beeper_previews: bool = False
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
