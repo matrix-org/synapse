@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from typing import Any, Awaitable, Dict, Optional, Tuple, TypeVar
-from unittest.mock import ANY, Mock, _patch, patch
+from typing import Any, Awaitable, ContextManager, Dict, Optional, Tuple, TypeVar
+from unittest.mock import ANY, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pymacaroons
@@ -181,7 +181,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.render_error.reset_mock()
         self.complete_sso_login.reset_mock()
 
-    def metadata_edit(self, values: dict) -> _patch[Mock]:
+    def metadata_edit(self, values: dict) -> ContextManager[Mock]:
         """Modify the result that will be returned by the well-known query"""
 
         metadata = self.fake_server.get_metadata()
