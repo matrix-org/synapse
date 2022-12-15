@@ -460,6 +460,12 @@ class PaginationHandler:
 
         if pagin_config.from_token:
             from_token = pagin_config.from_token
+        elif pagin_config.direction == "f":
+            from_token = (
+                await self.hs.get_event_sources().get_start_token_for_pagination(
+                    room_id
+                )
+            )
         else:
             from_token = (
                 await self.hs.get_event_sources().get_current_token_for_pagination(

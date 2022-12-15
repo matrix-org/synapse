@@ -64,7 +64,7 @@ from typing import (
 from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.appservice.api import ApplicationServiceApi
@@ -258,7 +258,7 @@ class _ServiceQueuer:
                 ):
                     return
 
-                one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None
+                one_time_keys_count: Optional[TransactionOneTimeKeysCount] = None
                 unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None
 
                 if (
@@ -269,7 +269,7 @@ class _ServiceQueuer:
                     # for the users which are mentioned in this transaction,
                     # as well as the appservice's sender.
                     (
-                        one_time_key_counts,
+                        one_time_keys_count,
                         unused_fallback_keys,
                     ) = await self._compute_msc3202_otk_counts_and_fallback_keys(
                         service, events, ephemeral, to_device_messages_to_send
@@ -281,7 +281,7 @@ class _ServiceQueuer:
                         events,
                         ephemeral,
                         to_device_messages_to_send,
-                        one_time_key_counts,
+                        one_time_keys_count,
                         unused_fallback_keys,
                         device_list_summary,
                     )
@@ -296,7 +296,7 @@ class _ServiceQueuer:
         events: Iterable[EventBase],
         ephemerals: Iterable[JsonDict],
         to_device_messages: Iterable[JsonDict],
-    ) -> Tuple[TransactionOneTimeKeyCounts, TransactionUnusedFallbackKeys]:
+    ) -> Tuple[TransactionOneTimeKeysCount, TransactionUnusedFallbackKeys]:
         """
         Given a list of the events, ephemeral messages and to-device messages,
         - first computes a list of application services users that may have
@@ -367,7 +367,7 @@ class _TransactionController:
         events: List[EventBase],
         ephemeral: Optional[List[JsonDict]] = None,
         to_device_messages: Optional[List[JsonDict]] = None,
-        one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None,
+        one_time_keys_count: Optional[TransactionOneTimeKeysCount] = None,
         unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
         device_list_summary: Optional[DeviceListUpdates] = None,
     ) -> None:
@@ -380,7 +380,7 @@ class _TransactionController:
             events: The persistent events to include in the transaction.
             ephemeral: The ephemeral events to include in the transaction.
             to_device_messages: The to-device messages to include in the transaction.
-            one_time_key_counts: Counts of remaining one-time keys for relevant
+            one_time_keys_count: Counts of remaining one-time keys for relevant
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
@@ -397,7 +397,7 @@ class _TransactionController:
                 events=events,
                 ephemeral=ephemeral or [],
                 to_device_messages=to_device_messages or [],
-                one_time_key_counts=one_time_key_counts or {},
+                one_time_keys_count=one_time_keys_count or {},
                 unused_fallback_keys=unused_fallback_keys or {},
                 device_list_summary=device_list_summary or DeviceListUpdates(),
             )

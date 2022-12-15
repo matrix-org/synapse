@@ -20,7 +20,7 @@ from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
@@ -261,7 +261,7 @@ class ApplicationServiceTransactionWorkerStore(
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
-        one_time_key_counts: TransactionOneTimeKeyCounts,
+        one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
     ) -> AppServiceTransaction:
@@ -274,7 +274,7 @@ class ApplicationServiceTransactionWorkerStore(
             events: A list of persistent events to put in the transaction.
             ephemeral: A list of ephemeral events to put in the transaction.
             to_device_messages: A list of to-device messages to put in the transaction.
-            one_time_key_counts: Counts of remaining one-time keys for relevant
+            one_time_keys_count: Counts of remaining one-time keys for relevant
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
@@ -300,7 +300,7 @@ class ApplicationServiceTransactionWorkerStore(
                 events=events,
                 ephemeral=ephemeral,
                 to_device_messages=to_device_messages,
-                one_time_key_counts=one_time_key_counts,
+                one_time_keys_count=one_time_keys_count,
                 unused_fallback_keys=unused_fallback_keys,
                 device_list_summary=device_list_summary,
             )
@@ -382,7 +382,7 @@ class ApplicationServiceTransactionWorkerStore(
             events=events,
             ephemeral=[],
             to_device_messages=[],
-            one_time_key_counts={},
+            one_time_keys_count={},
             unused_fallback_keys={},
             device_list_summary=DeviceListUpdates(),
         )
@@ -454,8 +454,6 @@ class ApplicationServiceTransactionWorkerStore(
             table="application_services_state",
             keyvalues={"as_id": service.id},
             values={f"{stream_type}_stream_id": pos},
-            # no need to lock when emulating upsert: as_id is a unique key
-            lock=False,
             desc="set_appservice_stream_type_pos",
         )
 

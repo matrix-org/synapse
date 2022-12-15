@@ -267,7 +267,7 @@ class HttpServer(Protocol):
                 request. The first argument will be the request object and
                 subsequent arguments will be any matched groups from the regex.
                 This should return either tuple of (code, response), or None.
-            servlet_classname (str): The name of the handler to be used in prometheus
+            servlet_classname: The name of the handler to be used in prometheus
                 and opentracing logs.
         """
 

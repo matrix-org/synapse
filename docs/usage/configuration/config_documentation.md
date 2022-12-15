@@ -2437,31 +2437,6 @@ Example configuration:
 enable_metrics: true
 ```
 ---
-### `enable_legacy_metrics`
-
-Set to `true` to publish both legacy and non-legacy Prometheus metric names,
-or to `false` to only publish non-legacy Prometheus metric names.
-Defaults to `false`. Has no effect if `enable_metrics` is `false`.
-**In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to `true`.**
-
-Legacy metric names include:
-- metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
-- counters that don't end with the `_total` suffix, such as `synapse_federation_client_sent_edus`, therefore not adhering to the OpenMetrics standard.
-
-These legacy metric names are unconventional and not compliant with OpenMetrics standards.
-They are included for backwards compatibility.
-
-Example configuration:
-```yaml
-enable_legacy_metrics: false
-```
-
-See https://github.com/matrix-org/synapse/issues/11106 for context.
-
-*Since v1.67.0.*
-
-**Will be removed in v1.73.0.**
----
 ### `sentry`
 
 Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
@@ -2993,9 +2968,16 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
-       * subject_claim: name of the claim containing a unique identifier
+       * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
+
+       * `picture_claim`: name of the claim containing an url for the user's profile picture.
+         Defaults to 'picture', which OpenID Connect compliant providers should provide
+         and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+         
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their

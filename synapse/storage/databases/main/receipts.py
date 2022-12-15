@@ -28,7 +28,6 @@ from typing import (
 
 from synapse.api.constants import EduTypes
 from synapse.api.errors import StoreError
-from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
@@ -63,6 +62,9 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         hs: "HomeServer",
     ):
         self._instance_name = hs.get_instance_name()
+
+        # In the worker store this is an ID tracker which we overwrite in the non-worker
+        # class below that is used on the main process.
         self._receipts_id_gen: AbstractStreamIdTracker
 
         if isinstance(database.engine, PostgresEngine):
@@ -89,14 +91,12 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
             # updated over replication. (Multiple writers are not supported for
             # SQLite).
-            if hs.get_instance_name() in hs.config.worker.writers.receipts:
-                self._receipts_id_gen = StreamIdGenerator(
-                    db_conn, "receipts_linearized", "stream_id"
-                )
-            else:
-                self._receipts_id_gen = SlavedIdTracker(
-                    db_conn, "receipts_linearized", "stream_id"
-                )
+            self._receipts_id_gen = StreamIdGenerator(
+                db_conn,
+                "receipts_linearized",
+                "stream_id",
+                is_writer=hs.get_instance_name() in hs.config.worker.writers.receipts,
+            )
 
         super().__init__(database, db_conn, hs)
 

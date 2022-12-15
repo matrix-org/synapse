@@ -1284,17 +1284,14 @@ class TimestampLookupRestServlet(RestServlet):
     `dir` can be `f` or `b` to indicate forwards and backwards in time from the
     given timestamp.
 
-    GET /_matrix/client/unstable/org.matrix.msc3030/rooms/<roomID>/timestamp_to_event?ts=<timestamp>&dir=<direction>
+    GET /_matrix/client/v1/rooms/<roomID>/timestamp_to_event?ts=<timestamp>&dir=<direction>
     {
         "event_id": ...
     }
     """
 
     PATTERNS = (
-        re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc3030"
-            "/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"
-        ),
+        re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"),
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -1421,8 +1418,7 @@ def register_servlets(
     RoomAliasListServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
-    if hs.config.experimental.msc3030_enabled:
-        TimestampLookupRestServlet(hs).register(http_server)
+    TimestampLookupRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:

@@ -14,14 +14,12 @@
 # limitations under the License.
 import logging
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
-from twisted.internet import address
 from twisted.web.resource import Resource
 
 import synapse
 import synapse.events
-from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
@@ -43,8 +41,6 @@ from synapse.config.logger import setup_logging
 from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.http.site import SynapseRequest
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
@@ -70,12 +66,12 @@ from synapse.rest.client import (
     versions,
     voip,
 )
-from synapse.rest.client._base import client_patterns
 from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
 from synapse.rest.client.devices import DevicesRestServlet
 from synapse.rest.client.keys import (
     KeyChangesServlet,
     KeyQueryServlet,
+    KeyUploadServlet,
     OneTimeKeyServlet,
 )
 from synapse.rest.client.register import (
@@ -132,105 +128,10 @@ from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
-from synapse.types import JsonDict
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.httpresourcetree import create_resource_tree
 
 logger = logging.getLogger("synapse.app.generic_worker")
-
-
-class KeyUploadServlet(RestServlet):
-    """An implementation of the `KeyUploadServlet` that responds to read only
-    requests, but otherwise proxies through to the master instance.
-    """
-
-    PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
-
-    def __init__(self, hs: HomeServer):
-        """
-        Args:
-            hs: server
-        """
-        super().__init__()
-        self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
-        self.http_client = hs.get_simple_http_client()
-        self.main_uri = hs.config.worker.worker_main_http_uri
-
-    async def on_POST(
-        self, request: SynapseRequest, device_id: Optional[str]
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        user_id = requester.user.to_string()
-        body = parse_json_object_from_request(request)
-
-        if device_id is not None:
-            # passing the device_id here is deprecated; however, we allow it
-            # for now for compatibility with older clients.
-            if requester.device_id is not None and device_id != requester.device_id:
-                logger.warning(
-                    "Client uploading keys for a different device "
-                    "(logged in as %s, uploading for %s)",
-                    requester.device_id,
-                    device_id,
-                )
-        else:
-            device_id = requester.device_id
-
-        if device_id is None:
-            raise SynapseError(
-                400, "To upload keys, you must pass device_id when authenticating"
-            )
-
-        if body:
-            # They're actually trying to upload something, proxy to main synapse.
-
-            # Proxy headers from the original request, such as the auth headers
-            # (in case the access token is there) and the original IP /
-            # User-Agent of the request.
-            headers: Dict[bytes, List[bytes]] = {
-                header: list(request.requestHeaders.getRawHeaders(header, []))
-                for header in (b"Authorization", b"User-Agent")
-            }
-            # Add the previous hop to the X-Forwarded-For header.
-            x_forwarded_for = list(
-                request.requestHeaders.getRawHeaders(b"X-Forwarded-For", [])
-            )
-            # we use request.client here, since we want the previous hop, not the
-            # original client (as returned by request.getClientAddress()).
-            if isinstance(request.client, (address.IPv4Address, address.IPv6Address)):
-                previous_host = request.client.host.encode("ascii")
-                # If the header exists, add to the comma-separated list of the first
-                # instance of the header. Otherwise, generate a new header.
-                if x_forwarded_for:
-                    x_forwarded_for = [x_forwarded_for[0] + b", " + previous_host]
-                    x_forwarded_for.extend(x_forwarded_for[1:])
-                else:
-                    x_forwarded_for = [previous_host]
-            headers[b"X-Forwarded-For"] = x_forwarded_for
-
-            # Replicate the original X-Forwarded-Proto header. Note that
-            # XForwardedForRequest overrides isSecure() to give us the original protocol
-            # used by the client, as opposed to the protocol used by our upstream proxy
-            # - which is what we want here.
-            headers[b"X-Forwarded-Proto"] = [
-                b"https" if request.isSecure() else b"http"
-            ]
-
-            try:
-                result = await self.http_client.post_json_get_json(
-                    self.main_uri + request.uri.decode("ascii"), body, headers=headers
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error() from e
-            except RequestSendFailed as e:
-                raise SynapseError(502, "Failed to talk to master") from e
-
-            return 200, result
-        else:
-            # Just interested in counts.
-            result = await self.store.count_e2e_one_time_keys(user_id, device_id)
-            return 200, {"one_time_key_counts": result}
 
 
 class GenericWorkerSlavedStore(
@@ -419,7 +320,6 @@ class GenericWorkerServer(HomeServer):
                     _base.listen_metrics(
                         listener.bind_addresses,
                         listener.port,
-                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
                     )
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)

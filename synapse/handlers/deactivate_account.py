@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import Codes, Requester, UserID, create_requester
 
@@ -75,6 +76,9 @@ class DeactivateAccountHandler:
         Returns:
             True if identity server supports removing threepids, otherwise False.
         """
+
+        # This can only be called on the main process.
+        assert isinstance(self._device_handler, DeviceHandler)
 
         # Check if this user can be deactivated
         if not await self._third_party_rules.check_can_deactivate_user(

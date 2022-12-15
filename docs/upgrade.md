@@ -88,6 +88,28 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.73.0
+
+## Legacy Prometheus metric names have now been removed
+
+Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.
+
+This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the `enable_legacy_metrics` configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.
+
+If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names)
+for more context.
+
+
 # Upgrading to v1.72.0
 
 ## Dropping support for PostgreSQL 10

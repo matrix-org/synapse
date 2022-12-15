@@ -441,7 +441,7 @@ class DefaultSamlMappingProvider:
             client_redirect_url: where the client wants to redirect to
 
         Returns:
-            dict: A dict containing new user attributes. Possible keys:
+            A dict containing new user attributes. Possible keys:
                 * mxid_localpart (str): Required. The localpart of the user's mxid
                 * displayname (str): The displayname of the user
                 * emails (list[str]): Any emails for the user
@@ -483,7 +483,7 @@ class DefaultSamlMappingProvider:
         Args:
             config: A dictionary containing configuration options for this provider
         Returns:
-            SamlConfig: A custom config object for this module
+            A custom config object for this module
         """
         # Parse config options and use defaults where necessary
         mxid_source_attribute = config.get("mxid_source_attribute", "uid")

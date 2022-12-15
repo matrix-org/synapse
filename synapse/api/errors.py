@@ -711,7 +711,7 @@ class HttpResponseException(CodeMessageException):
         set to the reason code from the HTTP response.
 
         Returns:
-            SynapseError:
+            The error converted to a SynapseError.
         """
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
