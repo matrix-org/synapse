@@ -210,7 +210,8 @@ class RoomCreationHandler:
 
         # Try several times, it could fail with PartialStateConflictError
         # in _upgrade_room, cf comment in except block.
-        for _ in range(5):
+        max_retries = 5
+        for i in range(max_retries):
             try:
                 # Check whether the user has the power level to carry out the upgrade.
                 # `check_auth_rules_from_context` will check that they are in the room and have
@@ -254,10 +255,15 @@ class RoomCreationHandler:
                 )
 
                 return ret
-            except PartialStateConflictError:
+            except PartialStateConflictError as e:
                 # Persisting couldn't happen because the room got un-partial stated
                 # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
                 pass
+        
+        # This is to satisfy mypy and should never happen
+        return ""
 
     async def _upgrade_room(
         self,

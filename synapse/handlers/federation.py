@@ -1346,7 +1346,8 @@ class FederationHandler:
 
             # Try several times, it could fail with PartialStateConflictError
             # in send_membership_event, cf comment in except block.
-            for _ in range(5):
+            max_retries = 5
+            for i in range(max_retries):
                 try:
                     (
                         event,
@@ -1383,9 +1384,11 @@ class FederationHandler:
                     await member_handler.send_membership_event(None, event, context)
 
                     break
-                except PartialStateConflictError:
+                except PartialStateConflictError as e:
                     # Persisting couldn't happen because the room got un-partial stated
                     # in the meantime and context needs to be recomputed, so let's do so.
+                    if i == max_retries - 1:
+                        raise e
                     pass
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
@@ -1420,7 +1423,8 @@ class FederationHandler:
 
         # Try several times, it could fail with PartialStateConflictError
         # in send_membership_event, cf comment in except block.
-        for _ in range(5):
+        max_retries = 5
+        for i in range(max_retries):
             try:
                 (
                     event,
@@ -1451,9 +1455,11 @@ class FederationHandler:
                 await member_handler.send_membership_event(None, event, context)
 
                 break
-            except PartialStateConflictError:
+            except PartialStateConflictError as e:
                 # Persisting couldn't happen because the room got un-partial stated
                 # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
                 pass
 
     async def add_display_name_to_third_party_invite(

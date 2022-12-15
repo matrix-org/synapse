@@ -1000,7 +1000,8 @@ class EventCreationHandler:
 
         # Try several times, it could fail with PartialStateConflictError
         # in handle_new_client_event, cf comment in except block.
-        for _ in range(5):
+        max_retries = 5
+        for i in range(max_retries):
             try:
                 event, context = await self.create_event(
                     requester,
@@ -1058,9 +1059,11 @@ class EventCreationHandler:
                 )
 
                 break
-            except PartialStateConflictError:
+            except PartialStateConflictError as e:
                 # Persisting couldn't happen because the room got un-partial stated
                 # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
                 pass
 
         # we know it was persisted, so must have a stream ordering
@@ -2012,7 +2015,8 @@ class EventCreationHandler:
             try:
                 # Try several times, it could fail with PartialStateConflictError
                 # in handle_new_client_event, cf comment in except block.
-                for _ in range(5):
+                max_retries = 5
+                for i in range(max_retries):
                     try:
                         event, context = await self.create_event(
                             requester,
@@ -2036,9 +2040,11 @@ class EventCreationHandler:
                         )
 
                         break
-                    except PartialStateConflictError:
+                    except PartialStateConflictError as e:
                         # Persisting couldn't happen because the room got un-partial stated
                         # in the meantime and context needs to be recomputed, so let's do so.
+                        if i == max_retries - 1:
+                            raise e
                         pass
                 return True
             except AuthError:
