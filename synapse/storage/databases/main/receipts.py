@@ -595,12 +595,13 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         rows: Iterable[Any],
     ) -> None:
         if stream_name == ReceiptsStream.NAME:
-            self._receipts_id_gen.advance(instance_name, token)
             for row in rows:
                 self.invalidate_caches_for_receipt(
                     row.room_id, row.receipt_type, row.user_id
                 )
                 self._receipts_stream_cache.entity_has_changed(row.room_id, token)
+            # Important that the ID gen advances after stream change caches
+            self._receipts_id_gen.advance(instance_name, token)
 
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
