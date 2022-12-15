@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class BeeperStore(SQLBaseStore):
-    @cached(max_entries=50000, iterable=True)
+    @cached(max_entries=50000, iterable=True, num_args=2, tree=True)
     async def beeper_preview_for_room_id_and_user_id(
         self, room_id: str, user_id: str, to_key: RoomStreamToken
     ) -> JsonDict:
