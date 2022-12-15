@@ -791,9 +791,17 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             each thread.
         """
 
+        # This happens when no event is associated with an event which happens
+        # due to unknown reasons: https://github.com/matrix-org/synapse/commit/9f797a24a452a513628263b1b03172cee20a9856
+        # We are assuming here that the receipt is for the latest event in the
+        # room which is the most regular situation.
+        # TODO: fix this? Why does it not affect matrix.org?
+        if stream_ordering is None:
+            return []
+
         # If there have been no events in the room since the stream ordering,
         # there can't be any push actions either.
-        if stream_ordering and not self._events_stream_cache.has_entity_changed(
+        if not self._events_stream_cache.has_entity_changed(
             room_id, stream_ordering, max_stream_ordering
         ):
             return []
