@@ -256,6 +256,8 @@ class RoomCreationHandler:
 
                 return ret
             except PartialStateConflictError as e:
+                # Clean up the cache so we can retry properly
+                self._upgrade_response_cache.unset((old_room_id, user_id))
                 # Persisting couldn't happen because the room got un-partial stated
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
