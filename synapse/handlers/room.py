@@ -265,7 +265,7 @@ class RoomCreationHandler:
                 pass
 
         # This is to satisfy mypy and should never happen
-        return ""
+        raise PartialStateConflictError()
 
     async def _upgrade_room(
         self,
