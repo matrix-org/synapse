@@ -37,6 +37,8 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
+from twisted.internet.defer import Deferred
+
 from synapse import event_auth
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
@@ -178,6 +180,12 @@ class FederationHandler:
             run_as_background_process(
                 "resume_sync_partial_state_room", self._resume_sync_partial_state_room
             )
+
+        # The resync processes currently in progress, keyed by room ID.
+        # Keep track of these so we can cancel them and cleanup if all local users leave
+        # that room.
+        # TODO(faster_joins): actually cancel them! https://github.com/matrix-org/synapse/issues/12802
+        self._partial_state_resyncs: Dict[str, "Deferred[None]"] = {}
 
     @trace
     async def maybe_backfill(
@@ -1630,6 +1638,9 @@ class FederationHandler:
     async def _start_partial_state_resync(
         self, origin: Optional[str], servers_in_room: List[str], room_id: str
     ) -> None:
+        # We shouldn't start a second resync if one is already in progress.
+        assert room_id not in self._partial_state_resyncs
+
         d = run_as_background_process(
             desc="sync_partial_state_room",
             func=self._sync_partial_state_room,
@@ -1637,6 +1648,8 @@ class FederationHandler:
             other_destinations=servers_in_room,
             room_id=room_id,
         )
+        self._partial_state_resyncs[room_id] = d
+
     async def _sync_partial_state_room(
         self,
         initial_destination: Optional[str],
@@ -1766,6 +1779,10 @@ class FederationHandler:
         # TODO(faster_joins) update room stats and user directory?
         #   https://github.com/matrix-org/synapse/issues/12814
         #   https://github.com/matrix-org/synapse/issues/12815
+
+        # This resync has completed---stop tracking its progress.
+        self._partial_state_resyncs.pop(room_id, None)
+
 
 def _prioritise_destinations_for_partial_state_resync(
     initial_destination: Optional[str],
