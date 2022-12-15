@@ -20,7 +20,6 @@ import pymacaroons
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.handlers.oidc import Token, UserAttributeDict
 from synapse.handlers.sso import MappingException
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
@@ -37,6 +36,8 @@ try:
     import authlib  # noqa: F401
     from authlib.oidc.core import UserInfo
     from authlib.oidc.discovery import OpenIDProviderMetadata
+
+    from synapse.handlers.oidc import Token, UserAttributeDict
 
     HAS_OIDC = True
 except ImportError:
@@ -83,8 +84,8 @@ class TestMappingProvider:
         return userinfo["sub"]
 
     async def map_user_attributes(
-        self, userinfo: "UserInfo", token: Token
-    ) -> UserAttributeDict:
+        self, userinfo: "UserInfo", token: "Token"
+    ) -> "UserAttributeDict":
         # This is testing not providing the full map.
         return {"localpart": userinfo["username"], "display_name": None}  # type: ignore[typeddict-item]
 
@@ -93,7 +94,7 @@ class TestMappingProvider:
 
 class TestMappingProviderExtra(TestMappingProvider):
     async def get_extra_attributes(
-        self, userinfo: "UserInfo", token: Token
+        self, userinfo: "UserInfo", token: "Token"
     ) -> JsonDict:
         return {"phone": userinfo["phone"]}
 
@@ -101,8 +102,8 @@ class TestMappingProviderExtra(TestMappingProvider):
 class TestMappingProviderFailures(TestMappingProvider):
     # Superclass is testing the legacy interface for map_user_attributes.
     async def map_user_attributes(  # type: ignore[override]
-        self, userinfo: "UserInfo", token: Token, failures: int
-    ) -> UserAttributeDict:
+        self, userinfo: "UserInfo", token: "Token", failures: int
+    ) -> "UserAttributeDict":
         return {  # type: ignore[typeddict-item]
             "localpart": userinfo["username"] + (str(failures) if failures else ""),
             "display_name": None,
