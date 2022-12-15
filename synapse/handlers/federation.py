@@ -1689,19 +1689,7 @@ class FederationHandler:
                 logger.info("Clearing partial-state flag for %s", room_id)
                 success = await self.store.clear_partial_state_room(room_id)
                 if success:
-                    logger.info("State resync complete for %s", room_id)
-                    self._storage_controllers.state.notify_room_un_partial_stated(
-                        room_id
-                    )
-                    # Poke the notifier so that other workers see the write to
-                    # the un-partial-stated rooms stream.
-                    self._notifier.notify_replication()
-
-                    # TODO(faster_joins) update room stats and user directory?
-                    #   https://github.com/matrix-org/synapse/issues/12814
-                    #   https://github.com/matrix-org/synapse/issues/12815
-                    return
-
+                    break
                 # we raced against more events arriving with partial state. Go round
                 # the loop again. We've already logged a warning, so no need for more.
                 continue
@@ -1767,6 +1755,15 @@ class FederationHandler:
                             destination,
                         )
 
+        logger.info("State resync complete for %s", room_id)
+        self._storage_controllers.state.notify_room_un_partial_stated(room_id)
+        # Poke the notifier so that other workers see the write to
+        # the un-partial-stated rooms stream.
+        self._notifier.notify_replication()
+
+        # TODO(faster_joins) update room stats and user directory?
+        #   https://github.com/matrix-org/synapse/issues/12814
+        #   https://github.com/matrix-org/synapse/issues/12815
 
 def _prioritise_destinations_for_partial_state_resync(
     initial_destination: Optional[str],
