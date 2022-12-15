@@ -62,7 +62,11 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
-from synapse.replication.tcp.streams.events import EventsStream
+from synapse.replication.tcp.streams.events import (
+    EventsStream,
+    EventsStreamCurrentStateRow,
+    EventsStreamEventRow,
+)
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -334,7 +338,23 @@ class EventsWorkerStore(SQLBaseStore):
         token: int,
         rows: Iterable[Any],
     ) -> None:
+        # Process event stream replication rows, handling both the ID generators from the events
+        # worker store and the stream change caches in this store as the two are interlinked.
         if stream_name == EventsStream.NAME:
+            for row in rows:
+                if row.type == EventsStreamEventRow.TypeId:
+                    self._events_stream_cache.entity_has_changed(
+                        row.data.room_id, token
+                    )
+                    if row.data.type == EventTypes.Member:
+                        self._membership_stream_cache.entity_has_changed(
+                            row.data.state_key, token
+                        )
+                if row.type == EventsStreamCurrentStateRow.TypeId:
+                    self._curr_state_delta_stream_cache.entity_has_changed(
+                        row.data.room_id, token
+                    )
+            # Important that the ID gen advances after stream change caches
             self._stream_id_gen.advance(instance_name, token)
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
