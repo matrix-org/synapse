@@ -34,7 +34,7 @@ class CacheConfigTests(TestCase):
         Individual cache factors will be loaded from the environment.
         """
         config: JsonDict = {}
-        self.config._environ = {  # type: ignore[assignment]
+        self.config._environ = {
             "SYNAPSE_CACHE_FACTOR_SOMETHING_OR_OTHER": "2",
             "SYNAPSE_NOT_CACHE": "BLAH",
         }
@@ -49,9 +49,9 @@ class CacheConfigTests(TestCase):
         over those in the config.
         """
         config: JsonDict = {"caches": {"per_cache_factors": {"foo": 2, "bar": 3}}}
-        self.config._environ = {  # type: ignore[assignment]
+        self.config._environ = {
             "SYNAPSE_CACHE_FACTOR_SOMETHING_OR_OTHER": "2",
-            "SYNAPSE_CACHE_FACTOR_FOO": 1,
+            "SYNAPSE_CACHE_FACTOR_FOO": "1",
         }
         self.config.read_config(config, config_dir_path="", data_dir_path="")
         self.config.resize_all_caches()
@@ -130,7 +130,7 @@ class CacheConfigTests(TestCase):
                 "per_cache_factors": {"*cache_a*": 5, "cache_b": 6, "cache_c": 2}
             }
         }
-        self.config._environ = {  # type: ignore[assignment]
+        self.config._environ = {
             "SYNAPSE_CACHE_FACTOR_CACHE_A": "2",
             "SYNAPSE_CACHE_FACTOR_CACHE_B": "3",
         }
