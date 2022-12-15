@@ -20,7 +20,7 @@ use hyper::service::Service;
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use hyper_tls::MaybeHttpsStream;
-use log::info;
+use log::{debug, info};
 use native_tls::TlsConnector;
 use serde::Deserialize;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -28,6 +28,7 @@ use tokio::net::TcpStream;
 use tokio_native_tls::TlsConnector as AsyncTlsConnector;
 use trust_dns_resolver::error::ResolveErrorKind;
 
+#[derive(Debug, Clone)]
 pub struct Endpoint {
     pub host: String,
     pub port: u16,
@@ -213,6 +214,7 @@ impl Service<Uri> for MatrixConnector {
         let resolver = self.resolver.clone();
 
         if dst.scheme_str() != Some("matrix") {
+            debug!("Got non-matrix scheme");
             return HttpsConnector::new()
                 .call(dst)
                 .map_err(|e| Error::msg(e))
@@ -226,6 +228,8 @@ impl Service<Uri> for MatrixConnector {
                     dst.port_u16(),
                 )
                 .await?;
+
+            debug!("Got endpoints: {:?}", endpoints);
 
             for endpoint in endpoints {
                 match try_connecting(&dst, &endpoint).await {

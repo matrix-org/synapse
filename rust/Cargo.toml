@@ -21,6 +21,7 @@ name = "synapse.synapse_rust"
 
 [dependencies]
 anyhow = "1.0.63"
+env_logger = "0.10.0"
 futures = "0.3.25"
 futures-util = "0.3.25"
 http = "0.2.8"
