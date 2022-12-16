@@ -131,16 +131,25 @@ class SyncRestServlet(RestServlet):
 
         logger.debug(
             "/sync: user=%r, timeout=%r, since=%r, "
-            "set_presence=%r, filter_id=%r, device_id=%r",
+            "set_presence=%r, filter_id=%r, device_id=%r, beeper_previews=%r",
             user,
             timeout,
             since,
             set_presence,
             filter_id,
             device_id,
+            beeper_previews,
         )
 
-        request_key = (user, timeout, since, filter_id, full_state, device_id)
+        request_key = (
+            user,
+            timeout,
+            since,
+            filter_id,
+            full_state,
+            device_id,
+            beeper_previews,
+        )
 
         if filter_id is None:
             filter_collection = self.filtering.DEFAULT_FILTER_COLLECTION
