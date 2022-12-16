@@ -17,15 +17,15 @@ from tests.config.utils import ConfigFileTestCase
 
 
 class ConfigMainFileTestCase(ConfigFileTestCase):
-    def test_executes_without_an_action(self):
+    def test_executes_without_an_action(self) -> None:
         self.generate_config()
         main(["", "-c", self.config_file])
 
-    def test_read__error_if_key_not_found(self):
+    def test_read__error_if_key_not_found(self) -> None:
         self.generate_config()
         with self.assertRaises(SystemExit):
             main(["", "read", "foo.bar.hello", "-c", self.config_file])
 
-    def test_read__passes_if_key_found(self):
+    def test_read__passes_if_key_found(self) -> None:
         self.generate_config()
         main(["", "read", "server.server_name", "-c", self.config_file])
