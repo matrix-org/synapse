@@ -288,7 +288,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         r = self.hs.get_datastores().main.store_server_verify_keys(
             "server9",
             time.time() * 1000,
-            [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), None))],
+            [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), None))],  # type: ignore[arg-type]
         )
         self.get_success(r)
 
