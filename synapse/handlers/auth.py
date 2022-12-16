@@ -2031,7 +2031,7 @@ class PasswordAuthProvider:
         self.is_3pid_allowed_callbacks: List[IS_3PID_ALLOWED_CALLBACK] = []
 
         # Mapping from login type to login parameters
-        self._supported_login_types: Dict[str, Iterable[str]] = {}
+        self._supported_login_types: Dict[str, Tuple[str, ...]] = {}
 
         # Mapping from login type to auth checker callbacks
         self.auth_checker_callbacks: Dict[str, List[CHECK_AUTH_CALLBACK]] = {}
