@@ -338,6 +338,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if not self.hs.config.registration.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         if not self.config.email.can_verify_email:
             logger.warning(
                 "Adding emails have been disabled due to lack of an email config"
