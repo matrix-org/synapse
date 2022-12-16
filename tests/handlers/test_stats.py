@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict, List, Optional
+
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage.databases.main import stats
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -32,11 +38,11 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.handler = self.hs.get_stats_handler()
 
-    def _add_background_updates(self):
+    def _add_background_updates(self) -> None:
         """
         Add the background updates we need to run.
         """
@@ -63,12 +69,14 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-    async def get_all_room_state(self):
+    async def get_all_room_state(self) -> List[Dict[str, Any]]:
         return await self.store.db_pool.simple_select_list(
             "room_stats_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
-    def _get_current_stats(self, stats_type, stat_id):
+    def _get_current_stats(
+        self, stats_type: str, stat_id: str
+    ) -> Optional[Dict[str, Any]]:
         table, id_col = stats.TYPE_TO_TABLE[stats_type]
 
         cols = list(stats.ABSOLUTE_STATS_FIELDS[stats_type])
@@ -82,13 +90,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-    def _perform_background_initial_update(self):
+    def _perform_background_initial_update(self) -> None:
         # Do the initial population of the stats via the background update
         self._add_background_updates()
 
         self.wait_for_background_updates()
 
-    def test_initial_room(self):
+    def test_initial_room(self) -> None:
         """
         The background updates will build the table from scratch.
         """
@@ -125,7 +133,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["topic"], "foo")
 
-    def test_create_user(self):
+    def test_create_user(self) -> None:
         """
         When we create a user, it should have statistics already ready.
         """
@@ -134,12 +142,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         u1stats = self._get_current_stats("user", u1)
 
-        self.assertIsNotNone(u1stats)
+        assert u1stats is not None
 
         # not in any rooms by default
         self.assertEqual(u1stats["joined_rooms"], 0)
 
-    def test_create_room(self):
+    def test_create_room(self) -> None:
         """
         When we create a room, it should have statistics already ready.
         """
@@ -153,8 +161,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         r2 = self.helper.create_room_as(u1, tok=u1token, is_public=False)
         r2stats = self._get_current_stats("room", r2)
 
-        self.assertIsNotNone(r1stats)
-        self.assertIsNotNone(r2stats)
+        assert r1stats is not None
+        assert r2stats is not None
 
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
@@ -171,7 +179,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(r2stats["invited_members"], 0)
         self.assertEqual(r2stats["banned_members"], 0)
 
-    def test_updating_profile_information_does_not_increase_joined_members_count(self):
+    def test_updating_profile_information_does_not_increase_joined_members_count(
+        self,
+    ) -> None:
         """
         Check that the joined_members count does not increase when a user changes their
         profile information (which is done by sending another join membership event into
@@ -186,6 +196,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # Get the current room stats
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         # Send a profile update into the room
         new_profile = {"displayname": "bob"}
@@ -195,6 +206,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # Get the new room stats
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         # Ensure that the user count did not changed
         self.assertEqual(r1stats_post["joined_members"], r1stats_ante["joined_members"])
@@ -202,7 +214,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["local_users_in_room"], r1stats_ante["local_users_in_room"]
         )
 
-    def test_send_state_event_nonoverwriting(self):
+    def test_send_state_event_nonoverwriting(self) -> None:
         """
         When we send a non-overwriting state event, it increments current_state_events
         """
@@ -218,19 +230,21 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.send_state(
             r1, "cat.hissing", {"value": False}, tok=u1token, state_key="moggy"
         )
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             1,
         )
 
-    def test_join_first_time(self):
+    def test_join_first_time(self) -> None:
         """
         When a user joins a room for the first time, current_state_events and
         joined_members should increase by exactly 1.
@@ -246,10 +260,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u2token = self.login("u2", "pass")
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -259,7 +275,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["joined_members"] - r1stats_ante["joined_members"], 1
         )
 
-    def test_join_after_leave(self):
+    def test_join_after_leave(self) -> None:
         """
         When a user joins a room after being previously left,
         joined_members should increase by exactly 1.
@@ -280,10 +296,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.helper.leave(r1, u2, tok=u2token)
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -296,7 +314,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["left_members"] - r1stats_ante["left_members"], -1
         )
 
-    def test_invited(self):
+    def test_invited(self) -> None:
         """
         When a user invites another user, current_state_events and
         invited_members should increase by exactly 1.
@@ -311,10 +329,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u2 = self.register_user("u2", "pass")
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.invite(r1, u1, u2, tok=u1token)
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -324,7 +344,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["invited_members"] - r1stats_ante["invited_members"], +1
         )
 
-    def test_join_after_invite(self):
+    def test_join_after_invite(self) -> None:
         """
         When a user joins a room after being invited and
         joined_members should increase by exactly 1.
@@ -344,10 +364,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.helper.invite(r1, u1, u2, tok=u1token)
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -360,7 +382,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["invited_members"] - r1stats_ante["invited_members"], -1
         )
 
-    def test_left(self):
+    def test_left(self) -> None:
         """
         When a user leaves a room after joining and
         left_members should increase by exactly 1.
@@ -380,10 +402,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.leave(r1, u2, tok=u2token)
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -396,7 +420,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["joined_members"] - r1stats_ante["joined_members"], -1
         )
 
-    def test_banned(self):
+    def test_banned(self) -> None:
         """
         When a user is banned from a room after joining and
         left_members should increase by exactly 1.
@@ -416,10 +440,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_ante = self._get_current_stats("room", r1)
+        assert r1stats_ante is not None
 
         self.helper.change_membership(r1, u1, u2, "ban", tok=u1token)
 
         r1stats_post = self._get_current_stats("room", r1)
+        assert r1stats_post is not None
 
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -432,7 +458,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_post["joined_members"] - r1stats_ante["joined_members"], -1
         )
 
-    def test_initial_background_update(self):
+    def test_initial_background_update(self) -> None:
         """
         Test that statistics can be generated by the initial background update
         handler.
@@ -462,6 +488,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         r1stats = self._get_current_stats("room", r1)
         u1stats = self._get_current_stats("user", u1)
 
+        assert r1stats is not None
+        assert u1stats is not None
+
         self.assertEqual(r1stats["joined_members"], 1)
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
@@ -469,7 +498,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertEqual(u1stats["joined_rooms"], 1)
 
-    def test_incomplete_stats(self):
+    def test_incomplete_stats(self) -> None:
         """
         This tests that we track incomplete statistics.
 
@@ -533,8 +562,11 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.wait_for_background_updates()
 
         r1stats_complete = self._get_current_stats("room", r1)
+        assert r1stats_complete is not None
         u1stats_complete = self._get_current_stats("user", u1)
+        assert u1stats_complete is not None
         u2stats_complete = self._get_current_stats("user", u2)
+        assert u2stats_complete is not None
 
         # now we make our assertions
 
