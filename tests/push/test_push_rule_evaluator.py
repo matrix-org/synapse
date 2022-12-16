@@ -700,17 +700,19 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
             {},
             {"m.annotation": _flatten_dict(message_event)},
             True,
+            reaction_event.room_version.msc3931_push_features,
+            True,
         )
 
         # Reaction to Brad's message, should be an action for Brad
         actions = dm_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True), "@brad:beeper.com", "Brad"
+            FilteredPushRules(PushRules([]), {}, True, True), "@brad:beeper.com", "Brad"
         )
         self.assertTrue("notify" in actions)
 
         # Reaction to Brad's message, should not be an action for Nick
         actions = dm_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True), "@nick:beeper.com", "Nick"
+            FilteredPushRules(PushRules([]), {}, True, True), "@nick:beeper.com", "Nick"
         )
         self.assertEqual(actions, [])
 
@@ -721,15 +723,17 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
             {},
             {"m.annotation": _flatten_dict(message_event)},
             True,
+            reaction_event.room_version.msc3931_push_features,
+            True,
         )
 
         # Large rooms should never have emoji reaction notifications
         actions = large_room_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True), "@brad:beeper.com", "Brad"
+            FilteredPushRules(PushRules([]), {}, True, True), "@brad:beeper.com", "Brad"
         )
         self.assertEqual(actions, [])
         actions = large_room_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True), "@nick:beeper.com", "Nick"
+            FilteredPushRules(PushRules([]), {}, True, True), "@nick:beeper.com", "Nick"
         )
         self.assertEqual(actions, [])
 
@@ -751,10 +755,19 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
             RoomVersions.V1,
         )
 
-        evaluator = PushRuleEvaluator(_flatten_dict(event), 0, 0, {}, {}, True)
+        evaluator = PushRuleEvaluator(
+            _flatten_dict(event),
+            0,
+            0,
+            {},
+            {},
+            True,
+            event.room_version.msc3931_push_features,
+            True,
+        )
 
         actions = evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True),
+            FilteredPushRules(PushRules([]), {}, True, True),
             "@brad:beeper.com",
             "Brad Murray",
         )
