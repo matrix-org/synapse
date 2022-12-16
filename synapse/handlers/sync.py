@@ -98,6 +98,7 @@ class SyncConfig:
     is_guest: bool
     request_key: SyncRequestKey
     device_id: Optional[str]
+    beeper_previews: bool = False
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -131,6 +132,7 @@ class JoinedSyncResult:
     unread_notifications: JsonDict
     unread_thread_notifications: JsonDict
     summary: Optional[JsonDict]
+    preview: Optional[JsonDict]
     unread_count: int
 
     def __bool__(self) -> bool:
@@ -142,6 +144,7 @@ class JoinedSyncResult:
             or self.state
             or self.ephemeral
             or self.account_data
+            or self.preview
             # nb the notification count does not, er, count: if there's nothing
             # else in the result, we don't need to send it.
         )
@@ -2335,6 +2338,9 @@ class SyncHandler:
                 }
             )
 
+            # Retrieve user_id for current sync.
+            user_id = sync_result_builder.sync_config.user.to_string()
+
             # Note: `batch` can be both empty and limited here in the case where
             # `_load_filtered_recents` can't find any events the user should see
             # (e.g. due to having ignored the sender of the last 50 events).
@@ -2344,7 +2350,6 @@ class SyncHandler:
             # newly joined room, unless either a) they've joined before or b) the
             # tag was added by synapse e.g. for server notice rooms.
             if full_state:
-                user_id = sync_result_builder.sync_config.user.to_string()
                 tags = await self.store.get_tags_for_room(user_id, room_id)
 
                 # If there aren't any tags, don't send the empty tags list down
@@ -2432,7 +2437,16 @@ class SyncHandler:
                     unread_thread_notifications={},
                     summary=summary,
                     unread_count=0,
+                    preview={},
                 )
+
+                if sync_config.beeper_previews:
+                    preview: JsonDict = (
+                        await self.store.beeper_preview_for_room_id_and_user_id(
+                            room_id=room_id, user_id=user_id, to_key=now_token.room_key
+                        )
+                    )
+                    room_sync.preview = preview
 
                 if room_sync or always_include:
                     notifs = await self.unread_notifs_for_room_id(room_id, sync_config)

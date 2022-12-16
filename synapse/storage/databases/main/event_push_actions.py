@@ -797,7 +797,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # room which is the most regular situation.
         # TODO: fix this? Why does it not affect matrix.org?
         if stream_ordering is None:
-            return []
+            return []  # type: ignore
 
         # If there have been no events in the room since the stream ordering,
         # there can't be any push actions either.

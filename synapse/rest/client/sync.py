@@ -127,19 +127,29 @@ class SyncRestServlet(RestServlet):
         )
         filter_id = parse_string(request, "filter")
         full_state = parse_boolean(request, "full_state", default=False)
+        beeper_previews = parse_boolean(request, "beeper_previews", default=False)
 
         logger.debug(
             "/sync: user=%r, timeout=%r, since=%r, "
-            "set_presence=%r, filter_id=%r, device_id=%r",
+            "set_presence=%r, filter_id=%r, device_id=%r, beeper_previews=%r",
             user,
             timeout,
             since,
             set_presence,
             filter_id,
             device_id,
+            beeper_previews,
         )
 
-        request_key = (user, timeout, since, filter_id, full_state, device_id)
+        request_key = (
+            user,
+            timeout,
+            since,
+            filter_id,
+            full_state,
+            device_id,
+            beeper_previews,
+        )
 
         if filter_id is None:
             filter_collection = self.filtering.DEFAULT_FILTER_COLLECTION
@@ -170,6 +180,7 @@ class SyncRestServlet(RestServlet):
             is_guest=requester.is_guest,
             request_key=request_key,
             device_id=device_id,
+            beeper_previews=beeper_previews,
         )
 
         since_token = None
@@ -500,7 +511,6 @@ class SyncRestServlet(RestServlet):
         )
 
         account_data = room.account_data
-
         result: JsonDict = {
             "timeline": {
                 "events": serialized_timeline,
@@ -513,6 +523,7 @@ class SyncRestServlet(RestServlet):
 
         if joined:
             assert isinstance(room, JoinedSyncResult)
+            result["com.beeper.inbox.preview"] = room.preview
             ephemeral_events = room.ephemeral
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
