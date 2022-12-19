@@ -38,6 +38,11 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
+from synapse.hacks.selective_scalene_profiling import (
+    CpuUtimeTracker,
+    ProfilingDecider,
+    SelectiveProfiling,
+)
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
@@ -313,6 +318,19 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         return 200, ret
 
 
+_sep_cpu = CpuUtimeTracker()
+
+
+def _sep_cond() -> bool:
+    utime = _sep_cpu.update_return_utime()
+    if utime is None:
+        return False
+    return True
+
+
+send_event_profiler = ProfilingDecider("send_event", _sep_cond)
+
+
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs: "HomeServer"):
@@ -333,33 +351,37 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        content = parse_json_object_from_request(request)
+        with SelectiveProfiling(
+            send_event_profiler,
+            enable=requester.user.to_string() == "@reivilibre.element:librepush.net",
+        ):
+            content = parse_json_object_from_request(request)
 
-        event_dict: JsonDict = {
-            "type": event_type,
-            "content": content,
-            "room_id": room_id,
-            "sender": requester.user.to_string(),
-        }
+            event_dict: JsonDict = {
+                "type": event_type,
+                "content": content,
+                "room_id": room_id,
+                "sender": requester.user.to_string(),
+            }
 
-        if requester.app_service:
-            origin_server_ts = parse_integer(request, "ts")
-            if origin_server_ts is not None:
-                event_dict["origin_server_ts"] = origin_server_ts
+            if requester.app_service:
+                origin_server_ts = parse_integer(request, "ts")
+                if origin_server_ts is not None:
+                    event_dict["origin_server_ts"] = origin_server_ts
 
-        try:
-            (
-                event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester, event_dict, txn_id=txn_id
-            )
-            event_id = event.event_id
-        except ShadowBanError:
-            event_id = "$" + random_string(43)
+            try:
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+                event_id = event.event_id
+            except ShadowBanError:
+                event_id = "$" + random_string(43)
 
-        set_tag("event_id", event_id)
-        return 200, {"event_id": event_id}
+            set_tag("event_id", event_id)
+            return 200, {"event_id": event_id}
 
     def on_GET(
         self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
