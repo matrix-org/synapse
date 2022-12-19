@@ -210,6 +210,8 @@ parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
 pyicu = { version = ">=2.10.2", optional = true }
 
+scalene = { version = ">=1.5.16", optional = true, python = ">=3.8,<4.0.0" }
+
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
 # twice: once here, and once in the `all` extra.
@@ -235,6 +237,8 @@ test = ["parameterized", "idna"]
 # requires libicu's development headers installed on the system (e.g. libicu-dev on
 # Debian-based distributions).
 user-search = ["pyicu"]
+
+scalene = ["scalene"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
 # to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
