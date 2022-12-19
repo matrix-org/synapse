@@ -1,7 +1,7 @@
 # How do faster joins work?
 
-This is a work-in progress set of notes with two goals:
-- act as a reference, explainig how Synapse implements faster joins; and
+This is a work-in-progress set of notes with two goals:
+- act as a reference, explaining how Synapse implements faster joins; and
 - record the rationale behind our choices.
 
 See also [MSC3902](https:ithub.com/matrix-org/matrix-spec-proposals/pull/3902).
@@ -114,7 +114,7 @@ When is our partial state likely to be correct?
   knock events for our users. We can't be completely confident in the
   correctness of bans, invites and kicks from other homeservers, but the resync
   process should correct any mistakes.
-- Remote member's memberships: we did not receive these in the /send_join
+- Remote members' memberships: we did not receive these in the /send_join
   response, so we have essentially no idea if these are correct or not.
 
 In short, we deem it acceptable to trust the partial state for non-membership
@@ -166,7 +166,7 @@ Normally: send out in a fed txn to all HSes in the room.
 We only know that some HSes were in the room at some point. Wat do.
 Send it out to the list of servers from the first join.
 **TODO** what do we do here if we have full state?
-If the prev event was created by us, we can risk sending it to the wrong HS. (Motivation: privacy concern of the content. Not such a big deal for a public room or an encyrpted room. But non-encrypted invite-only...)
+If the prev event was created by us, we can risk sending it to the wrong HS. (Motivation: privacy concern of the content. Not such a big deal for a public room or an encrypted room. But non-encrypted invite-only...)
 But don't want to send out sensitive data in other HS's events in this way.
 
 Suppose we discover after resync that we shouldn't have sent out one our events (not a prev_event) to a target HS. Not much we can do.
