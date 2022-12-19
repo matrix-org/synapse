@@ -238,6 +238,9 @@ class E2eKeysHandler:
             # Now fetch any devices that we don't have in our cache
             # TODO It might make sense to propagate cancellations into the
             #      deferreds which are querying remote homeservers.
+            logger.debug(
+                "%d destinations to query devices for", len(remote_queries_not_in_cache)
+            )
             await make_deferred_yieldable(
                 delay_cancellation(
                     defer.gatherResults(
@@ -309,6 +312,12 @@ class E2eKeysHandler:
             for (user_id, device_list) in destination_query.items()
             if (not device_list) and (await self.store.get_rooms_for_user(user_id))
         }
+
+        logger.debug(
+            "%d users to resync devices for from destination %s",
+            len(users_to_resync_devices),
+            destination,
+        )
 
         for user_id in users_to_resync_devices:
             # We've decided we're sharing a room with this user and should
