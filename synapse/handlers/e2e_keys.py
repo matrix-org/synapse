@@ -310,6 +310,12 @@ class E2eKeysHandler:
             if (not device_list) and (await self.store.get_rooms_for_user(user_id))
         }
 
+        logger.debug(
+            "%d users to resync devices for from destination %s",
+            len(users_to_resync_devices),
+            destination,
+        )
+
         for user_id in users_to_resync_devices:
             # We've decided we're sharing a room with this user and should
             # probably be tracking their device lists. However, we haven't
