@@ -226,7 +226,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         )
 
         self._attempt_to_invalidate_cache(
-            "beeper_preview_for_room_id_and_user_id", (room_id,)
+            "beeper_preview_event_for_room_id_and_user_id", (room_id,)
         )
 
         # The `_get_membership_from_event_id` is immutable, except for the

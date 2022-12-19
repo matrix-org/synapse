@@ -1,23 +1,22 @@
 # Beep beep!
 
 import logging
+from typing import Optional, Tuple, cast
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import RoomStreamToken
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
 
 class BeeperStore(SQLBaseStore):
-    @cached(max_entries=50000, iterable=True, num_args=2, tree=True)
-    async def beeper_preview_for_room_id_and_user_id(
+    @cached(max_entries=50000, num_args=2, tree=True)
+    async def beeper_preview_event_for_room_id_and_user_id(
         self, room_id: str, user_id: str, to_key: RoomStreamToken
-    ) -> JsonDict:
-        res = {}
-
-        def _beeper_preview_for_room_id_and_user_id(txn: LoggingTransaction) -> None:
+    ) -> Optional[Tuple[str, int]]:
+        def beeper_preview_txn(txn: LoggingTransaction) -> Optional[Tuple[str, int]]:
             sql = """
             SELECT e.event_id, COALESCE(re.origin_server_ts, e.origin_server_ts) as origin_server_ts
             FROM events AS e
@@ -62,13 +61,10 @@ class BeeperStore(SQLBaseStore):
                     user_id,
                 ),
             )
-            for event_id, origin_server_ts in txn:
-                res["event_id"] = event_id
-                res["origin_server_ts"] = origin_server_ts
 
-        await self.db_pool.runInteraction(
+            return cast(Optional[Tuple[str, int]], txn.fetchone())
+
+        return await self.db_pool.runInteraction(
             "beeper_preview_for_room_id_and_user_id",
-            _beeper_preview_for_room_id_and_user_id,
+            beeper_preview_txn,
         )
-
-        return res

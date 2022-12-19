@@ -523,7 +523,6 @@ class SyncRestServlet(RestServlet):
 
         if joined:
             assert isinstance(room, JoinedSyncResult)
-            result["com.beeper.inbox.preview"] = room.preview
             ephemeral_events = room.ephemeral
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
@@ -536,6 +535,14 @@ class SyncRestServlet(RestServlet):
             result["summary"] = room.summary
             if self._msc2654_enabled:
                 result["org.matrix.msc2654.unread_count"] = room.unread_count
+
+            if room.preview and "event" in room.preview:
+                room.preview["event"] = self._event_serializer.serialize_events(
+                    [room.preview["event"]],
+                    time_now,
+                    config=serialize_options,
+                )[0]
+            result["com.beeper.inbox.preview"] = room.preview
 
         return result
 
