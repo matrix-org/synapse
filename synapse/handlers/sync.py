@@ -2441,12 +2441,30 @@ class SyncHandler:
                 )
 
                 if sync_config.beeper_previews:
-                    preview: JsonDict = (
-                        await self.store.beeper_preview_for_room_id_and_user_id(
+                    preview = (
+                        await self.store.beeper_preview_event_for_room_id_and_user_id(
                             room_id=room_id, user_id=user_id, to_key=now_token.room_key
                         )
                     )
-                    room_sync.preview = preview
+
+                    if preview:
+                        preview_event_id, preview_origin_server_ts = preview
+                        room_sync.preview = {
+                            "event_id": preview_event_id,
+                            "origin_server_ts": preview_origin_server_ts,
+                        }
+
+                        # Check if we already have the event in the batch, in which
+                        # case we needn't add it here. No point in checking state as
+                        # we don't preview state events.
+                        for ev in batch.events:
+                            if ev.event_id == preview_event_id:
+                                break
+                        else:
+                            room_sync.preview["event"] = await self.store.get_event(
+                                preview_event_id,
+                                allow_none=True,
+                            )
 
                 if room_sync or always_include:
                     notifs = await self.unread_notifs_for_room_id(room_id, sync_config)

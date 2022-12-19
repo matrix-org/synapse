@@ -159,18 +159,22 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
     ) -> None:
         if stream_name == DeviceListsStream.NAME:
-            self._device_list_id_gen.advance(instance_name, token)
             self._invalidate_caches_for_devices(token, rows)
-        elif stream_name == UserSignatureStream.NAME:
+            # Important that the ID gen advances after stream change caches
             self._device_list_id_gen.advance(instance_name, token)
+        elif stream_name == UserSignatureStream.NAME:
             for row in rows:
                 self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
+            # Important that the ID gen advances after stream change caches
+            self._device_list_id_gen.advance(instance_name, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def _invalidate_caches_for_devices(
         self, token: int, rows: Iterable[DeviceListsStream.DeviceListsStreamRow]
     ) -> None:
         for row in rows:
+            # NOTE: here we always tell both stream change caches, either about
+            # the entity or just the known position.
             # The entities are either user IDs (starting with '@') whose devices
             # have changed, or remote servers that we need to tell about
             # changes.
@@ -179,11 +183,13 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 self.get_cached_devices_for_user.invalidate((row.entity,))
                 self._get_cached_user_device.invalidate((row.entity,))
                 self.get_device_list_last_stream_id_for_remote.invalidate((row.entity,))
+                self._device_list_federation_stream_cache.have_seen_position(token)
 
             else:
                 self._device_list_federation_stream_cache.entity_has_changed(
                     row.entity, token
                 )
+                self._device_list_stream_cache.have_seen_position(token)
 
     def get_device_stream_token(self) -> int:
         return self._device_list_id_gen.get_current_token()
