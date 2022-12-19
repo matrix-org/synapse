@@ -358,8 +358,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         ):
             content = parse_json_object_from_request(request)
 
-            print(len(sorted(random_string(1_000_000))))
-
             event_dict: JsonDict = {
                 "type": event_type,
                 "content": content,
