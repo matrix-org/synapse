@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import os
 import time
 from typing import Any, Callable, Dict, Optional
 
 from scalene import scalene_profiler
+
+logger = logging.getLogger(__name__)
 
 
 class ProfilingDecider:
@@ -24,16 +27,20 @@ class ProfilingDecider:
     def __init__(self, name: str, cond: Callable[[], bool]) -> None:
         ProfilingDecider.INSTANCES[name] = self
 
+        logger.warning("Setting up profiler %r", name)
+
         # Default to being armed if SCALENE is available as an env var.
         self.armed = b"SCALENE" in os.environb
 
         self._cond = cond
 
     def decide(self) -> bool:
+        logger.warning("Decide? Armed? %r", self.armed)
         if not self.armed:
             return False
 
         if not self._cond():
+            logger.warning("Cond fail")
             return False
 
         self.armed = False
@@ -62,6 +69,7 @@ class CpuUtimeTracker:
         wall = time.time()
         elapsed = wall - self._last_wall
         if elapsed < self.min_elapse:
+            logger.warning("Not enough elapsed %r", elapsed)
             return None
 
         last_utime = self._last_utime
@@ -71,9 +79,11 @@ class CpuUtimeTracker:
 
         if elapsed > self.max_elapse:
             # the average will be a bit skewy if so much time has elapsed. Ignore.
+            logger.warning("Too much elapsed %r", elapsed)
             return None
 
         usage = (self._last_utime - last_utime) / (self._last_elapsed - last_elapsed)
+        logger.info("Usage %r", usage)
         return usage
 
 
@@ -81,6 +91,7 @@ class SelectiveProfiling:
     def __init__(self, decider: ProfilingDecider, enable: bool = False):
         self._decider = decider
         self._enable = enable
+        logger.info("selective enable %r", enable)
 
     def __enter__(self) -> None:
         if not self._enable:
@@ -88,8 +99,11 @@ class SelectiveProfiling:
         if not self._decider.decide():
             self._enable = False
             return
+        logger.info("STARTING")
         scalene_profiler.start()
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if not self._enable:
-            scalene_profiler.stop()
+            return
+        scalene_profiler.stop()
+        logger.info("STOPPED")

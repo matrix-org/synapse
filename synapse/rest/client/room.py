@@ -351,6 +351,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        logger.info("SP!!!")
         with SelectiveProfiling(
             send_event_profiler,
             enable=requester.user.to_string() == "@reivilibre.element:librepush.net",
