@@ -336,18 +336,19 @@ header files for Python C extensions.</p>
 <p>Installing prerequisites on Ubuntu or Debian:</p>
 <pre><code class="language-sh">sudo apt install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev
 </code></pre>
 <h5 id="archlinux-1"><a class="header" href="#archlinux-1">ArchLinux</a></h5>
 <p>Installing prerequisites on ArchLinux:</p>
 <pre><code class="language-sh">sudo pacman -S base-devel python python-pip \
-               python-setuptools python-virtualenv sqlite3
+               python-setuptools python-virtualenv sqlite3 icu
 </code></pre>
 <h5 id="centosfedora"><a class="header" href="#centosfedora">CentOS/Fedora</a></h5>
 <p>Installing prerequisites on CentOS or Fedora Linux:</p>
 <pre><code class="language-sh">sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel libxml2-devel libxslt-devel libpq-devel \
-                 python3-virtualenv libffi-devel openssl-devel python3-devel
+                 python3-virtualenv libffi-devel openssl-devel python3-devel \
+                 libicu-devel
 sudo dnf groupinstall &quot;Development Tools&quot;
 </code></pre>
 <h5 id="macos"><a class="header" href="#macos">macOS</a></h5>
@@ -355,8 +356,10 @@ sudo dnf groupinstall &quot;Development Tools&quot;
 <p>You may need to install the latest Xcode developer tools:</p>
 <pre><code class="language-sh">xcode-select --install
 </code></pre>
-<p>On ARM-based Macs you may need to install libjpeg and libpq. 
-You can use Homebrew (https://brew.sh):</p>
+<p>Some extra dependencies may be needed. You can use Homebrew (https://brew.sh) for them.</p>
+<p>You may need to install icu, and make the icu binaries and libraries accessible.
+Please follow <a href="https://pypi.org/project/PyICU/">the official instructions of PyICU</a> to do so.</p>
+<p>On ARM-based Macs you may also need to install libjpeg and libpq:</p>
 <pre><code class="language-sh"> brew install jpeg libpq
 </code></pre>
 <p>On macOS Catalina (10.15) you may need to explicitly install OpenSSL
@@ -369,7 +372,8 @@ export CPPFLAGS=&quot;-I/usr/local/opt/openssl/include&quot;
 <p>Installing prerequisites on openSUSE:</p>
 <pre><code class="language-sh">sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
-               python-devel libffi-devel libopenssl-devel libjpeg62-devel
+               python-devel libffi-devel libopenssl-devel libjpeg62-devel \
+               libicu-devel
 </code></pre>
 <h5 id="openbsd-1"><a class="header" href="#openbsd-1">OpenBSD</a></h5>
 <p>A port of Synapse is available under <code>net/synapse</code>. The filesystem
