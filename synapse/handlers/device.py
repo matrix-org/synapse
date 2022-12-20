@@ -917,7 +917,8 @@ class DeviceListWorkerUpdater:
         Returns:
             Dict from User ID to the same Dict as `user_device_resync`.
         """
-        # TODO(BUG): mark_failed_as_stale is not sent.
+        # mark_failed_as_stale is not sent. Ensure this doesn't break expectations.
+        assert mark_failed_as_stale
         try:
             return await self._multi_user_device_resync_client(user_ids=user_ids)
         except SynapseError as err:
@@ -946,7 +947,8 @@ class DeviceListWorkerUpdater:
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
-        # TODO(BUG): mark_failed_as_stale is not sent.
+        # mark_failed_as_stale is not sent. Ensure this doesn't break expectations.
+        assert mark_failed_as_stale
         return await self._user_device_resync_client(user_id=user_id)
 
 
