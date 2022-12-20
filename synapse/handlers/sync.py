@@ -803,9 +803,10 @@ class SyncHandler:
         ).count
 
         # Beeper TODO: remove once synapse no longer handles bridges
-        summary[
-            "com.beeper.m.joined_users_without_bots"
-        ] = self.store.get_number_joined_non_bot_users_in_room(room_id)
+        if sync_config.beeper_previews:
+            summary[
+                "com.beeper.m.joined_users_without_bots"
+            ] = self.store.get_number_joined_non_bot_users_in_room(room_id)
 
         # if the room has a name or canonical_alias set, we can skip
         # calculating heroes. Empty strings are falsey, so we check
