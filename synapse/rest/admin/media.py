@@ -482,6 +482,8 @@ def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) 
     ProtectMediaByID(hs).register(http_server)
     UnprotectMediaByID(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
-    DeleteMediaByID(hs).register(http_server)
+    # XXX DeleteMediaByDateSize must be registered before DeleteMediaByID as
+    #     their URL routes overlap.
     DeleteMediaByDateSize(hs).register(http_server)
+    DeleteMediaByID(hs).register(http_server)
     UserMediaRestServlet(hs).register(http_server)
