@@ -346,7 +346,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             desc="get_number_joined_users_in_room",
         )
 
-    @cached()
+    @cached(max_entries=100000)
     async def get_number_joined_non_bot_users_in_room(self, room_id: str) -> int:
         def _get_number_joined_non_bot_users_in_room_txn(
             txn: LoggingTransaction,
