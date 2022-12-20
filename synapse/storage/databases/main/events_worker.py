@@ -2276,6 +2276,10 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         def get_event_id_for_timestamp_txn(txn: LoggingTransaction) -> Optional[str]:
+            if isinstance(self.database_engine, PostgresEngine):
+                # Temporary: make sure these queries can't last more than 30s
+                txn.execute("SET LOCAL statement_timeout = 30000")
+
             txn.execute(
                 sql_template,
                 (room_id, timestamp),
