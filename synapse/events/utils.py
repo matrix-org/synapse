@@ -387,6 +387,11 @@ def serialize_event(
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
 
+    # Beeper: include internal stream ordering as HS order unsigned hint
+    stream_ordering = getattr(e.internal_metadata, "stream_ordering", None)
+    if stream_ordering:
+        d["unsigned"]["com.beeper.hs.order"] = stream_ordering
+
     return d
 
 
