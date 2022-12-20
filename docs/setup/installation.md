@@ -311,7 +311,7 @@ You may need to install the latest Xcode developer tools:
 xcode-select --install
 ```
 
-Some extra dependencies may be needed, you can use Homebrew (https://brew.sh) for that.
+Some extra dependencies may be needed. You can use Homebrew (https://brew.sh) for them.
 
 You may need to install icu, and make the icu binaries and libraries accessible.
 Please follow [the official instructions of PyICU](https://pypi.org/project/PyICU/) to do so.
