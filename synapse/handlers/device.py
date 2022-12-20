@@ -1212,9 +1212,18 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
             raise InvalidAPICallError(f"Only one origin permitted, got {origins!r}")
 
         result = {}
+        failed = set()
         # TODO(Perf): Actually batch these up
         for user_id in user_ids:
-            result[user_id] = await self.user_device_resync(user_id)
+            user_result, user_failed = await self._user_device_resync_returning_failed(
+                user_id
+            )
+            result[user_id] = user_result
+            if user_failed:
+                failed.add(user_id)
+
+        if mark_failed_as_stale:
+            await self.store.mark_remote_users_device_caches_as_stale(failed)
 
         return result
 
@@ -1226,7 +1235,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         if failed and mark_failed_as_stale:
             # Mark the remote user's device list as stale so we know we need to retry
             # it later.
-            await self.store.mark_remote_user_device_cache_as_stale(user_id)
+            await self.store.mark_remote_users_device_caches_as_stale((user_id,))
 
         return result
 
