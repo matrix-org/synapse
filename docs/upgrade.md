@@ -96,8 +96,8 @@ This version introduces optional support for an [improved user search dealing wi
 
 To do so it uses the ICU library through PyICU.
 If you want to take advantage of this feature you need to install PyICU
-but also ICU native dependency and its development headers
-so that PyICU can build since no prebuild wheels is available.
+but also the ICU native dependency and its development headers
+so that PyICU can build since no prebuilt wheels are available.
 You can follow [PyICU documentation](https://pypi.org/project/PyICU/) to do so.
 
 # Upgrading to v1.73.0
