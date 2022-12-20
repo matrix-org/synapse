@@ -676,6 +676,37 @@ needed to add OAuth2 capabilities to your Django projects. It supports
         display_name_template: &quot;{{ user.first_name }} {{ user.last_name }}&quot;
         email_template: &quot;{{ user.email }}&quot;
 </code></pre>
+<h3 id="mastodon"><a class="header" href="#mastodon">Mastodon</a></h3>
+<p><a href="https://docs.joinmastodon.org/">Mastodon</a> instances provide an <a href="https://docs.joinmastodon.org/spec/oauth/">OAuth API</a>, allowing those instances to be used as a single sign-on provider for Synapse.</p>
+<p>The first step is to register Synapse as an application with your Mastodon instance, using the <a href="https://docs.joinmastodon.org/methods/apps/#create">Create an application API</a> (see also <a href="https://docs.joinmastodon.org/client/token/">here</a>). There are several ways to do this, but in the example below we are using CURL.</p>
+<p>This example assumes that:</p>
+<ul>
+<li>the Mastodon instance website URL is <code>https://your.mastodon.instance.url</code>, and</li>
+<li>Synapse will be registered as an app named <code>my_synapse_app</code>.</li>
+</ul>
+<p>Send the following request, substituting the value of <code>synapse_public_baseurl</code> from your Synapse installation.</p>
+<pre><code class="language-sh">curl -d &quot;client_name=my_synapse_app&amp;redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback&quot; -X POST https://your.mastodon.instance.url/api/v1/apps
+</code></pre>
+<p>You should receive a response similar to the following. Make sure to save it.</p>
+<pre><code class="language-json">{&quot;client_id&quot;:&quot;someclientid_123&quot;,&quot;client_secret&quot;:&quot;someclientsecret_123&quot;,&quot;id&quot;:&quot;12345&quot;,&quot;name&quot;:&quot;my_synapse_app&quot;,&quot;redirect_uri&quot;:&quot;https://[synapse_public_baseurl]/_synapse/client/oidc/callback&quot;,&quot;website&quot;:null,&quot;vapid_key&quot;:&quot;somerandomvapidkey_123&quot;}
+</code></pre>
+<p>As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set. Your Synapse configuration should include the following:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: my_mastodon
+    idp_name: &quot;Mastodon Instance Example&quot;
+    discover: false
+    issuer: &quot;https://your.mastodon.instance.url/@admin&quot;
+    client_id: &quot;someclientid_123&quot;    
+    client_secret: &quot;someclientsecret_123&quot;
+    authorization_endpoint: &quot;https://your.mastodon.instance.url/oauth/authorize&quot;
+    token_endpoint: &quot;https://your.mastodon.instance.url/oauth/token&quot;
+    userinfo_endpoint: &quot;https://your.mastodon.instance.url/api/v1/accounts/verify_credentials&quot;
+    scopes: [&quot;read&quot;]
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;id&quot;
+</code></pre>
+<p>Note that the fields <code>client_id</code> and <code>client_secret</code> are taken from the CURL response above.</p>
 
                     </main>
 

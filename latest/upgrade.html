@@ -231,6 +231,16 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1740"><a class="header" href="#upgrading-to-v1740">Upgrading to v1.74.0</a></h1>
+<h2 id="unicode-support-in-user-search"><a class="header" href="#unicode-support-in-user-search">Unicode support in user search</a></h2>
+<p>This version introduces optional support for an <a href="https://github.com/matrix-org/synapse/pull/14464">improved user search dealing with Unicode characters</a>.</p>
+<p>If you want to take advantage of this feature you need to install PyICU,
+the ICU native dependency and its development headers
+so that PyICU can build since no prebuilt wheels are available.</p>
+<p>You can follow <a href="https://pypi.org/project/PyICU/">the PyICU documentation</a> to do so,
+and then do <code>pip install matrix-synapse[icu]</code> for a PyPI install.</p>
+<p>Docker images and Debian packages need nothing specific as they already
+include or specify ICU as an explicit dependency.</p>
 <h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
 <h2 id="legacy-prometheus-metric-names-have-now-been-removed"><a class="header" href="#legacy-prometheus-metric-names-have-now-been-removed">Legacy Prometheus metric names have now been removed</a></h2>
 <p>Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
