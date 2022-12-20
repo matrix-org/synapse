@@ -79,7 +79,7 @@ jobs:
       # want them causingo our tests to fail all the time.
       - name: Remove flakey TestPartialStateJoin tests
         run: |-
-          rm -f complement/federation_room_join_partial_state_test.go
+          rm -f complement/tests/federation_room_join_partial_state_test.go
       - name: Install complement dependencies
         run: |-
           sudo apt-get -qq update
