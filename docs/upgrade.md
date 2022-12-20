@@ -95,10 +95,15 @@ process, for example:
 This version introduces optional support for an [improved user search dealing with Unicode characters](https://github.com/matrix-org/synapse/pull/14464).
 
 To do so it uses the ICU library through PyICU.
-If you want to take advantage of this feature you need to install PyICU
-but also the ICU native dependency and its development headers
-so that PyICU can build since no prebuilt wheels are available.
-You can follow [PyICU documentation](https://pypi.org/project/PyICU/) to do so.
+If you are installing from source or PyPI and want to take advantage of this
+feature you need to install PyICU but also the ICU native dependency and its
+development headers so that PyICU can build since no prebuilt wheels are available.
+
+You can follow [PyICU documentation](https://pypi.org/project/PyICU/) to do so,
+and then do `pip install matrix-synapse[icu]` for a PyPI install.
+
+Docker images and Debian packages need nothing specific as they already
+include or specify ICU as an explicit dependency.
 
 # Upgrading to v1.73.0
 
