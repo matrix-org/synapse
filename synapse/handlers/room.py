@@ -1125,42 +1125,91 @@ class RoomCreationHandler:
             EventTypes.Create, creation_content, False
         )
 
-        logger.debug("Sending %s in new room", EventTypes.Member)
-        ev = await self.event_creation_handler.handle_new_client_event(
+        await self.event_creation_handler.handle_new_client_event(
             requester=creator,
             events_and_context=[(creation_event, creation_context)],
             ratelimit=False,
             ignore_shadow_ban=True,
         )
-        last_sent_event_id = ev.event_id
+        logger.debug("Sending %s in new room", EventTypes.Member)
 
-        member_event_id, _ = await self.room_member_handler.update_membership(
-            creator,
-            creator.user,
-            room_id,
-            "join",
-            ratelimit=False,
-            content=creator_join_profile,
-            new_room=True,
-            prev_event_ids=[last_sent_event_id],
-            depth=depth,
+        # Do some checks and create a membership event
+        if creator_join_profile is None:
+            creator_join_profile = {}
+        else:
+            # We do a copy here as we potentially change some keys
+            # later on.
+            creator_join_profile = dict(creator_join_profile)
+
+        # allow the server notices mxid to set room-level profile
+        is_requester_server_notices_user = (
+            self._server_notices_mxid is not None
+            and creator.user.to_string() == self._server_notices_mxid
         )
-        prev_event = [member_event_id]
+        room_handler = self.hs.get_room_member_handler()
 
-        # update the depth and state map here as the membership event has been created
-        # through a different code path
-        depth += 1
-        state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
+        if (
+            not room_handler.allow_per_room_profiles
+            and not is_requester_server_notices_user
+        ) or creator.shadow_banned:
+            # Strip profile data, knowing that new profile data will be added to the
+            # event's content in event_creation_handler.create_event() using the target's
+            # global profile.
+            creator_join_profile.pop("displayname", None)
+            creator_join_profile.pop("avatar_url", None)
 
-        # we need the state group of the membership event as it is the current state group
+        if len(creator_join_profile.get("displayname") or "") > 256:
+            raise SynapseError(
+                400,
+                f"Displayname is too long (max {256})",
+                errcode=Codes.BAD_JSON,
+            )
+
+        if len(creator_join_profile.get("avatar_url") or "") > 1000:
+            raise SynapseError(
+                400,
+                f"Avatar URL is too long (max {1000})",
+                errcode=Codes.BAD_JSON,
+            )
+
+        if (
+            "avatar_url" in creator_join_profile
+            and creator_join_profile.get("avatar_url") is not None
+        ):
+            profile_handler = self.hs.get_profile_handler()
+            if not await profile_handler.check_avatar_size_and_mime_type(
+                creator_join_profile["avatar_url"],
+            ):
+                raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
+
+        # The event content should *not* include the authorising user as
+        # it won't be properly signed. Strip it out since it might come
+        # back from a client updating a display name / avatar.
+        #
+        # This only applies to restricted rooms, but there should be no reason
+        # for a client to include it. Unconditionally remove it.
+        creator_join_profile.pop(EventContentFields.AUTHORISING_USER, None)
+        creator_join_profile["membership"] = "join"
+
+        # we need the state group of the creation event as it is the current state group
         event_to_state = (
             await self._storage_controllers.state.get_state_group_for_events(
-                [member_event_id]
+                [creation_event.event_id]
             )
         )
-        current_state_group = event_to_state[member_event_id]
+        current_state_group = event_to_state[creation_event.event_id]
 
         events_to_send = []
+        member_event, member_context = await create_event(
+            EventTypes.Member,
+            creator_join_profile,
+            True,
+            state_key=creator.user.to_string(),
+            room_id=room_id,
+        )
+        current_state_group = member_context._state_group
+        events_to_send.append((member_event, member_context))
+
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
