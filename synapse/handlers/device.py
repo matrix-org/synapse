@@ -1221,16 +1221,27 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
     async def user_device_resync(
         self, user_id: str, mark_failed_as_stale: bool = True
     ) -> Optional[JsonDict]:
+        result, failed = await self._user_device_resync_returning_failed(user_id)
+
+        if failed and mark_failed_as_stale:
+            # Mark the remote user's device list as stale so we know we need to retry
+            # it later.
+            await self.store.mark_remote_user_device_cache_as_stale(user_id)
+
+        return result
+
+    async def _user_device_resync_returning_failed(
+        self, user_id: str
+    ) -> Tuple[Optional[JsonDict], bool]:
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
             user_id: The user's id whose device_list will be updated.
-            mark_failed_as_stale: Whether to mark the user's device list as stale
-                if the attempt to resync failed.
         Returns:
-            A dict with device info as under the "devices" in the result of this
-            request:
-            https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+            - A dict with device info as under the "devices" in the result of this
+              request:
+              https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+            - True iff the resync failed and the device list should be marked as stale.
         """
         logger.debug("Attempting to resync the device list for %s", user_id)
         log_kv({"message": "Doing resync to update device list."})
@@ -1239,12 +1250,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         try:
             result = await self.federation.query_user_devices(origin, user_id)
         except NotRetryingDestination:
-            if mark_failed_as_stale:
-                # Mark the remote user's device list as stale so we know we need to retry
-                # it later.
-                await self.store.mark_remote_user_device_cache_as_stale(user_id)
-
-            return None
+            return None, True
         except (RequestSendFailed, HttpResponseException) as e:
             logger.warning(
                 "Failed to handle device list update for %s: %s",
@@ -1252,23 +1258,18 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
                 e,
             )
 
-            if mark_failed_as_stale:
-                # Mark the remote user's device list as stale so we know we need to retry
-                # it later.
-                await self.store.mark_remote_user_device_cache_as_stale(user_id)
-
             # We abort on exceptions rather than accepting the update
             # as otherwise synapse will 'forget' that its device list
             # is out of date. If we bail then we will retry the resync
             # next time we get a device list update for this user_id.
             # This makes it more likely that the device lists will
             # eventually become consistent.
-            return None
+            return None, True
         except FederationDeniedError as e:
             set_tag("error", True)
             log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
-            return None
+            return None, False
         except Exception as e:
             set_tag("error", True)
             log_kv(
@@ -1276,12 +1277,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
             )
             logger.exception("Failed to handle device list update for %s", user_id)
 
-            if mark_failed_as_stale:
-                # Mark the remote user's device list as stale so we know we need to retry
-                # it later.
-                await self.store.mark_remote_user_device_cache_as_stale(user_id)
-
-            return None
+            return None, True
         log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
@@ -1363,7 +1359,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         # point.
         self._seen_updates[user_id] = {stream_id}
 
-        return result
+        return result, False
 
     async def process_cross_signing_key_update(
         self,
