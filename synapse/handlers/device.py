@@ -947,9 +947,7 @@ class DeviceListWorkerUpdater:
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
-        # mark_failed_as_stale is not sent. Ensure this doesn't break expectations.
-        assert mark_failed_as_stale
-        return await self._user_device_resync_client(user_id=user_id)
+        return (await self.multi_user_device_resync([user_id]))[user_id]
 
 
 class DeviceListUpdater(DeviceListWorkerUpdater):
