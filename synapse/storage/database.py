@@ -1898,6 +1898,19 @@ class DatabasePool:
         updatevalues: Dict[str, Any],
         desc: str,
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+            desc: description of the transaction, for logging and metrics.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         return await self.runInteraction(
             desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
@@ -1909,6 +1922,19 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            txn: The database transaction object.
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         if keyvalues:
             where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
         else:
