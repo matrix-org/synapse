@@ -53,7 +53,7 @@ jobs:
       - run: scripts-dev/check_schema_delta.py --force-colors
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@1ee1eb9eb3e418f9631e52e8a7ab371ca26f163d"
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2"
     with:
       typechecking-extras: "all"
 
