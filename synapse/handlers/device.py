@@ -919,6 +919,11 @@ class DeviceListWorkerUpdater:
         """
         # mark_failed_as_stale is not sent. Ensure this doesn't break expectations.
         assert mark_failed_as_stale
+
+        if not user_ids:
+            # Shortcut empty requests
+            return {}
+
         try:
             return await self._multi_user_device_resync_client(user_ids=user_ids)
         except SynapseError as err:
