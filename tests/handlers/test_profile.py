@@ -332,7 +332,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {"server_name": "test:8888", "allowed_avatar_mimetypes": ["image/png"]}
     )
-    def test_avatar_constraint_on_local_server_with_port(self):
+    def test_avatar_constraint_on_local_server_with_port(self) -> None:
         """Test that avatar metadata is correctly fetched when the media is on a local
         server and the server has an explicit port.
 
@@ -376,7 +376,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.get_success(self.handler.check_avatar_size_and_mime_type(remote_mxc))
         )
 
-    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
+    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]) -> None:
         """Stores metadata about files in the database.
 
         Args:

@@ -15,14 +15,18 @@
 from copy import deepcopy
 from typing import List
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EduTypes, ReceiptTypes
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
 
 class ReceiptsTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_source = hs.get_event_sources().sources.receipt
 
     def test_filters_out_private_receipt(self) -> None:

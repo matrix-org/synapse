@@ -199,7 +199,7 @@ class CasHandlerTestCase(HomeserverTestCase):
         )
 
 
-def _mock_request():
+def _mock_request() -> Mock:
     """Returns a mock which will stand in as a SynapseRequest"""
     mock = Mock(
         spec=[

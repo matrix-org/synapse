@@ -18,7 +18,7 @@ from tests.utils import default_config
 
 
 class RatelimitConfigTestCase(TestCase):
-    def test_parse_rc_federation(self):
+    def test_parse_rc_federation(self) -> None:
         config_dict = default_config("test")
         config_dict["rc_federation"] = {
             "window_size": 20000,

@@ -31,7 +31,7 @@ from synapse.appservice import (
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.rest.client import login, receipts, register, room, sendtodevice
 from synapse.server import HomeServer
-from synapse.types import RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -44,7 +44,7 @@ from tests.utils import MockClock
 class AppServiceHandlerTestCase(unittest.TestCase):
     """Tests the ApplicationServicesHandler."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.mock_store = Mock()
         self.mock_as_api = Mock()
         self.mock_scheduler = Mock()
@@ -61,7 +61,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.handler = ApplicationServicesHandler(hs)
         self.event_source = hs.get_event_sources()
 
-    def test_notify_interested_services(self):
+    def test_notify_interested_services(self) -> None:
         interested_service = self._mkservice(is_interested_in_event=True)
         services = [
             self._mkservice(is_interested_in_event=False),
@@ -90,7 +90,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             interested_service, events=[event]
         )
 
-    def test_query_user_exists_unknown_user(self):
+    def test_query_user_exists_unknown_user(self) -> None:
         user_id = "@someone:anywhere"
         services = [self._mkservice(is_interested_in_event=True)]
         services[0].is_interested_in_user.return_value = True
@@ -107,7 +107,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
 
-    def test_query_user_exists_known_user(self):
+    def test_query_user_exists_known_user(self) -> None:
         user_id = "@someone:anywhere"
         services = [self._mkservice(is_interested_in_event=True)]
         services[0].is_interested_in_user.return_value = True
@@ -127,7 +127,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             "query_user called when it shouldn't have been.",
         )
 
-    def test_query_room_alias_exists(self):
+    def test_query_room_alias_exists(self) -> None:
         room_alias_str = "#foo:bar"
         room_alias = Mock()
         room_alias.to_string.return_value = room_alias_str
@@ -157,7 +157,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.assertEqual(result.room_id, room_id)
         self.assertEqual(result.servers, servers)
 
-    def test_get_3pe_protocols_no_appservices(self):
+    def test_get_3pe_protocols_no_appservices(self) -> None:
         self.mock_store.get_app_services.return_value = []
         response = self.successResultOf(
             defer.ensureDeferred(self.handler.get_3pe_protocols("my-protocol"))
@@ -165,7 +165,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_not_called()
         self.assertEqual(response, {})
 
-    def test_get_3pe_protocols_no_protocols(self):
+    def test_get_3pe_protocols_no_protocols(self) -> None:
         service = self._mkservice(False, [])
         self.mock_store.get_app_services.return_value = [service]
         response = self.successResultOf(
@@ -174,7 +174,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_not_called()
         self.assertEqual(response, {})
 
-    def test_get_3pe_protocols_protocol_no_response(self):
+    def test_get_3pe_protocols_protocol_no_response(self) -> None:
         service = self._mkservice(False, ["my-protocol"])
         self.mock_store.get_app_services.return_value = [service]
         self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(None)
@@ -186,7 +186,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.assertEqual(response, {})
 
-    def test_get_3pe_protocols_select_one_protocol(self):
+    def test_get_3pe_protocols_select_one_protocol(self) -> None:
         service = self._mkservice(False, ["my-protocol"])
         self.mock_store.get_app_services.return_value = [service]
         self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
@@ -202,7 +202,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
         )
 
-    def test_get_3pe_protocols_one_protocol(self):
+    def test_get_3pe_protocols_one_protocol(self) -> None:
         service = self._mkservice(False, ["my-protocol"])
         self.mock_store.get_app_services.return_value = [service]
         self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
@@ -218,7 +218,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
         )
 
-    def test_get_3pe_protocols_multiple_protocol(self):
+    def test_get_3pe_protocols_multiple_protocol(self) -> None:
         service_one = self._mkservice(False, ["my-protocol"])
         service_two = self._mkservice(False, ["other-protocol"])
         self.mock_store.get_app_services.return_value = [service_one, service_two]
@@ -237,11 +237,13 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             },
         )
 
-    def test_get_3pe_protocols_multiple_info(self):
+    def test_get_3pe_protocols_multiple_info(self) -> None:
         service_one = self._mkservice(False, ["my-protocol"])
         service_two = self._mkservice(False, ["my-protocol"])
 
-        async def get_3pe_protocol(service, unusedProtocol):
+        async def get_3pe_protocol(
+            service: ApplicationService, protocol: str
+        ) -> Optional[JsonDict]:
             if service == service_one:
                 return {
                     "x-protocol-data": 42,
@@ -276,7 +278,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             },
         )
 
-    def test_notify_interested_services_ephemeral(self):
+    def test_notify_interested_services_ephemeral(self) -> None:
         """
         Test sending ephemeral events to the appservice handler are scheduled
         to be pushed out to interested appservices, and that the stream ID is
@@ -306,7 +308,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             580,
         )
 
-    def test_notify_interested_services_ephemeral_out_of_order(self):
+    def test_notify_interested_services_ephemeral_out_of_order(self) -> None:
         """
         Test sending out of order ephemeral events to the appservice handler
         are ignored.
@@ -390,7 +392,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         receipts.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.hs = hs
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track any outgoing ephemeral events
@@ -417,7 +419,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             "exclusive_as_user", "password", self.exclusive_as_user_device_id
         )
 
-    def _notify_interested_services(self):
+    def _notify_interested_services(self) -> None:
         # This is normally set in `notify_interested_services` but we need to call the
         # internal async version so the reactor gets pushed to completion.
         self.hs.get_application_service_handler().current_max += 1
@@ -443,7 +445,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     )
     def test_match_interesting_room_members(
         self, interesting_user: str, should_notify: bool
-    ):
+    ) -> None:
         """
         Test to make sure that a interesting user (local or remote) in the room is
         notified as expected when someone else in the room sends a message.
@@ -512,7 +514,9 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         else:
             self.send_mock.assert_not_called()
 
-    def test_application_services_receive_events_sent_by_interesting_local_user(self):
+    def test_application_services_receive_events_sent_by_interesting_local_user(
+        self,
+    ) -> None:
         """
         Test to make sure that a messages sent from a local user can be interesting and
         picked up by the appservice.
@@ -568,7 +572,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(events[0]["type"], "m.room.message")
         self.assertEqual(events[0]["sender"], alice)
 
-    def test_sending_read_receipt_batches_to_application_services(self):
+    def test_sending_read_receipt_batches_to_application_services(self) -> None:
         """Tests that a large batch of read receipts are sent correctly to
         interested application services.
         """
@@ -644,7 +648,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
     )
-    def test_application_services_receive_local_to_device(self):
+    def test_application_services_receive_local_to_device(self) -> None:
         """
         Test that when a user sends a to-device message to another user
         that is an application service's user namespace, the
@@ -722,7 +726,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
     )
-    def test_application_services_receive_bursts_of_to_device(self):
+    def test_application_services_receive_bursts_of_to_device(self) -> None:
         """
         Test that when a user sends >100 to-device messages at once, any
         interested AS's will receive them in separate transactions.
@@ -913,7 +917,7 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
         experimental_feature_enabled: bool,
         as_supports_txn_extensions: bool,
         as_should_receive_device_list_updates: bool,
-    ):
+    ) -> None:
         """
         Tests that an application service receives notice of changed device
         lists for a user, when a user changes their device lists.
@@ -1070,7 +1074,7 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         and a room for the users to talk in.
         """
 
-        async def preparation():
+        async def preparation() -> None:
             await self._add_otks_for_device(self._sender_user, self._sender_device, 42)
             await self._add_fallback_key_for_device(
                 self._sender_user, self._sender_device, used=True

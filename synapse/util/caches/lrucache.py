@@ -788,26 +788,21 @@ class LruCache(Generic[KT, VT]):
     def __contains__(self, key: KT) -> bool:
         return self.contains(key)
 
-    def set_cache_factor(self, factor: float) -> bool:
+    def set_cache_factor(self, factor: float) -> None:
         """
         Set the cache factor for this individual cache.
 
         This will trigger a resize if it changes, which may require evicting
         items from the cache.
-
-        Returns:
-            Whether the cache changed size or not.
         """
         if not self.apply_cache_factor_from_config:
-            return False
+            return
 
         new_size = int(self._original_max_size * factor)
         if new_size != self.max_size:
             self.max_size = new_size
             if self._on_resize:
                 self._on_resize()
-            return True
-        return False
 
     def __del__(self) -> None:
         # We're about to be deleted, so we make sure to clear up all the nodes

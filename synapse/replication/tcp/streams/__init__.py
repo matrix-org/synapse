@@ -42,7 +42,10 @@ from synapse.replication.tcp.streams._base import (
 )
 from synapse.replication.tcp.streams.events import EventsStream
 from synapse.replication.tcp.streams.federation import FederationStream
-from synapse.replication.tcp.streams.partial_state import UnPartialStatedRoomStream
+from synapse.replication.tcp.streams.partial_state import (
+    UnPartialStatedEventStream,
+    UnPartialStatedRoomStream,
+)
 
 STREAMS_MAP = {
     stream.NAME: stream
@@ -63,6 +66,7 @@ STREAMS_MAP = {
         AccountDataStream,
         UserSignatureStream,
         UnPartialStatedRoomStream,
+        UnPartialStatedEventStream,
     )
 }
 
@@ -83,4 +87,5 @@ __all__ = [
     "AccountDataStream",
     "UserSignatureStream",
     "UnPartialStatedRoomStream",
+    "UnPartialStatedEventStream",
 ]
