@@ -135,7 +135,7 @@ class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(user_ids: List[str]) -> JsonDict:  # type: ignore[override]
-        return {"users": user_ids}
+        return {"user_ids": user_ids}
 
     async def _handle_request(  # type: ignore[override]
         self, request: Request
