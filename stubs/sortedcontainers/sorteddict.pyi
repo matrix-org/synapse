@@ -2,6 +2,8 @@
 # https://github.com/grantjenks/python-sortedcontainers/blob/eea42df1f7bad2792e8da77335ff888f04b9e5ae/sortedcontainers/sorteddict.pyi
 # (from https://github.com/grantjenks/python-sortedcontainers/pull/107)
 
+from __future__ import annotations
+
 from typing import (
     Any,
     Callable,

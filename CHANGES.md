@@ -1,3 +1,12 @@
+Synapse 1.74.0 (2022-12-20)
+===========================
+
+Improved Documentation
+----------------------
+
+- Add release note and update documentation regarding optional ICU support in user search. ([\#14712](https://github.com/matrix-org/synapse/issues/14712))
+
+
 Synapse 1.74.0rc1 (2022-12-13)
 ==============================
 
