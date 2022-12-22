@@ -796,12 +796,13 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             return None
 
         now = self._clock.time_msec()
-        logger.debug(
-            "Receipt %s for event %s in %s (%i ms old)",
+        logger.info(
+            "Receipt %s for event %s in %s (%i ms old) with stream_id %u",
             receipt_type,
             linearized_event_id,
             room_id,
             now - event_ts,
+            stream_id,
         )
 
         await self.db_pool.runInteraction(
