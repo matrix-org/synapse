@@ -37,6 +37,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.handlers.relations import BundledAggregations
+from synapse.logging import issue9533_logger
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -1623,13 +1624,18 @@ class SyncHandler:
                     }
                 )
 
-            logger.debug(
-                "Returning %d to-device messages between %d and %d (current token: %d)",
-                len(messages),
-                since_stream_id,
-                stream_id,
-                now_token.to_device_key,
-            )
+            if messages and issue9533_logger.isEnabledFor(logging.DEBUG):
+                issue9533_logger.debug(
+                    "Returning to-device messages with stream_ids (%d, %d]; now: %d;"
+                    " msgids: %s",
+                    since_stream_id,
+                    stream_id,
+                    now_token.to_device_key,
+                    [
+                        message["content"].get(EventContentFields.TO_DEVICE_MSGID)
+                        for message in messages
+                    ],
+                )
             sync_result_builder.now_token = now_token.copy_and_replace(
                 StreamKeyType.TO_DEVICE, stream_id
             )
