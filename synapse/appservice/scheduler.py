@@ -140,6 +140,9 @@ class ApplicationServiceScheduler:
                 longer track the device lists of.
         """
 
+        # XXX: Special patch just for Gitter which we should remove after the import,
+        # https://github.com/matrix-org/synapse/pull/14729
+        #
         # Ignore events that come from our own users. We probably already know about
         # them and sent them ourself.
         events = [event for event in events if not self._hs.is_mine_id(event.sender)]
