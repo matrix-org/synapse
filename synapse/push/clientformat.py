@@ -26,10 +26,7 @@ def format_push_rules_for_user(
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
-    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
-        "global": {},
-        "device": {},
-    }
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {"global": {}}
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
