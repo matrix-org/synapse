@@ -142,7 +142,7 @@ class ApplicationServiceScheduler:
 
         # Ignore events that come from our own users. We probably already know about
         # them and sent them ourself.
-        events = [event for event in events if self._hs.is_mine_id(event.sender)]
+        events = [event for event in events if not self._hs.is_mine_id(event.sender)]
 
         # We purposefully allow this method to run with empty events/ephemeral
         # collections, so that callers do not need to check iterable size themselves.
