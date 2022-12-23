@@ -139,14 +139,6 @@ class ApplicationServiceScheduler:
                 to refresh the device lists of, or those that the application service need no
                 longer track the device lists of.
         """
-
-        # XXX: Special patch just for Gitter which we should remove after the import,
-        # https://github.com/matrix-org/synapse/pull/14729
-        #
-        # Ignore events that come from our own users. We probably already know about
-        # them and sent them ourself.
-        events = [event for event in events if not self._hs.is_mine_id(event.sender)]
-
         # We purposefully allow this method to run with empty events/ephemeral
         # collections, so that callers do not need to check iterable size themselves.
         if (
@@ -156,6 +148,13 @@ class ApplicationServiceScheduler:
             and not device_list_summary
         ):
             return
+
+        # XXX: Special patch just for Gitter which we should remove after the import,
+        # https://github.com/matrix-org/synapse/pull/14729
+        #
+        # Ignore events that come from our own users. We probably already know about
+        # them and sent them ourself.
+        events = [event for event in events if not self._hs.is_mine_id(event.sender)]
 
         if events:
             self.queuer.queued_events.setdefault(appservice.id, []).extend(events)
