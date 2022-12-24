@@ -3,7 +3,7 @@ use std::hash::Hash;
 use anyhow::Error;
 use pyo3::{
     pyclass, pymethods,
-    types::{PyIterator, PyModule},
+    types::{PyModule, PyTuple},
     IntoPy, PyAny, PyObject, PyResult, Python, ToPyObject,
 };
 
@@ -25,6 +25,7 @@ pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+#[derive(Clone)]
 struct HashablePyObject {
     obj: PyObject,
     hash: isize,
@@ -41,8 +42,20 @@ impl HashablePyObject {
     }
 }
 
+impl IntoPy<PyObject> for HashablePyObject {
+    fn into_py(self, _: Python<'_>) -> PyObject {
+        self.obj.clone()
+    }
+}
+
 impl IntoPy<PyObject> for &HashablePyObject {
     fn into_py(self, _: Python<'_>) -> PyObject {
+        self.obj.clone()
+    }
+}
+
+impl ToPyObject for HashablePyObject {
+    fn to_object(&self, _py: Python<'_>) -> PyObject {
         self.obj.clone()
     }
 }
@@ -87,9 +100,31 @@ impl PythonTreeCache {
         Ok(())
     }
 
-    // pub fn get_node(&self, key: &PyAny) -> Result<Option<&TreeCacheNode<K, PyObject>>, Error> {
-    //     todo!()
-    // }
+    pub fn get_node<'a>(
+        &'a self,
+        py: Python<'a>,
+        key: &'a PyAny,
+    ) -> Result<Option<Vec<(&'a PyTuple, &'a PyObject)>>, Error> {
+        let v: Vec<HashablePyObject> = key
+            .iter()?
+            .map(|obj| HashablePyObject::new(obj?))
+            .collect::<Result<_, _>>()?;
+
+        let Some(node) = self.0.get_node(v.clone())? else {
+            return Ok(None)
+        };
+
+        let items = node
+            .items()
+            .map(|(k, value)| {
+                let vec = v.iter().chain(k.iter().map(|a| *a)).collect::<Vec<_>>();
+                let nk = PyTuple::new(py, vec);
+                (nk, value)
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Some(items))
+    }
 
     pub fn get(&self, key: &PyAny) -> Result<Option<&PyObject>, Error> {
         let v: Vec<HashablePyObject> = key
@@ -100,9 +135,31 @@ impl PythonTreeCache {
         Ok(self.0.get(&v)?)
     }
 
-    // pub fn pop_node(&mut self, key: &PyAny) -> Result<Option<TreeCacheNode<K, PyObject>>, Error> {
-    //     todo!()
-    // }
+    pub fn pop_node<'a>(
+        &'a mut self,
+        py: Python<'a>,
+        key: &'a PyAny,
+    ) -> Result<Option<Vec<(&'a PyTuple, PyObject)>>, Error> {
+        let v: Vec<HashablePyObject> = key
+            .iter()?
+            .map(|obj| HashablePyObject::new(obj?))
+            .collect::<Result<_, _>>()?;
+
+        let Some(node) = self.0.pop_node(v.clone())? else {
+            return Ok(None)
+        };
+
+        let items = node
+            .into_items()
+            .map(|(k, value)| {
+                let vec = v.iter().chain(k.iter()).collect::<Vec<_>>();
+                let nk = PyTuple::new(py, vec);
+                (nk, value)
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Some(items))
+    }
 
     pub fn pop(&mut self, key: &PyAny) -> Result<Option<PyObject>, Error> {
         let v: Vec<HashablePyObject> = key

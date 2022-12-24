@@ -3,3 +3,7 @@
 
 [workspace]
 members = ["rust"]
+
+[profile.dbgrelease]
+inherits = "release"
+debug = true

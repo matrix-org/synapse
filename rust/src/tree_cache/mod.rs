@@ -54,16 +54,20 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
         }
     }
 
-    pub fn pop(
+    pub fn pop<Q>(
         &mut self,
-        current_key: &K,
-        mut next_keys: impl Iterator<Item = &'a K>,
-    ) -> Result<Option<TreeCacheNode<K, V>>, Error> {
+        current_key: Q,
+        mut next_keys: impl Iterator<Item = Q>,
+    ) -> Result<Option<TreeCacheNode<K, V>>, Error>
+    where
+        Q: Borrow<K>,
+        Q: Hash + Eq + 'a,
+    {
         if let Some(next_key) = next_keys.next() {
             match self {
                 TreeCacheNode::Leaf(_) => bail!("Given key is too long"),
                 TreeCacheNode::Branch(size, map) => {
-                    let node = if let Some(node) = map.get_mut(current_key) {
+                    let node = if let Some(node) = map.get_mut(current_key.borrow()) {
                         node
                     } else {
                         return Ok(None);
@@ -82,7 +86,7 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
             match self {
                 TreeCacheNode::Leaf(_) => bail!("Given key is too long"),
                 TreeCacheNode::Branch(size, map) => {
-                    if let Some(node) = map.remove(current_key) {
+                    if let Some(node) = map.remove(current_key.borrow()) {
                         *size -= node.len();
 
                         Ok(Some(node))
@@ -94,8 +98,8 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
         }
     }
 
-    pub fn items(&self) -> impl Iterator<Item = (Vec<&K>, &V)> {
-        let mut stack = vec![(vec![], self)];
+    pub fn items(&'a self) -> impl Iterator<Item = (Vec<&K>, &V)> {
+        let mut stack = vec![(Vec::new(), self)];
 
         std::iter::from_fn(move || {
             while let Some((prefix, node)) = stack.pop() {
@@ -103,6 +107,29 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
                     TreeCacheNode::Leaf(value) => return Some((prefix, value)),
                     TreeCacheNode::Branch(_, map) => {
                         stack.extend(map.iter().map(|(k, v)| {
+                            let mut prefix = prefix.clone();
+                            prefix.push(k);
+                            (prefix, v)
+                        }));
+                    }
+                }
+            }
+
+            None
+        })
+    }
+}
+
+impl<'a, K: Clone + Eq + Hash + 'a, V> TreeCacheNode<K, V> {
+    pub fn into_items(self) -> impl Iterator<Item = (Vec<K>, V)> {
+        let mut stack = vec![(Vec::new(), self)];
+
+        std::iter::from_fn(move || {
+            while let Some((prefix, node)) = stack.pop() {
+                match node {
+                    TreeCacheNode::Leaf(value) => return Some((prefix, value)),
+                    TreeCacheNode::Branch(_, map) => {
+                        stack.extend(map.into_iter().map(|(k, v)| {
                             let mut prefix = prefix.clone();
                             prefix.push(k);
                             (prefix, v)
@@ -182,10 +209,14 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCache<K, V> {
         }
     }
 
-    pub fn pop_node(
+    pub fn pop_node<Q>(
         &mut self,
-        key: impl IntoIterator<Item = &'a K>,
-    ) -> Result<Option<TreeCacheNode<K, V>>, Error> {
+        key: impl IntoIterator<Item = Q>,
+    ) -> Result<Option<TreeCacheNode<K, V>>, Error>
+    where
+        Q: Borrow<K>,
+        Q: Hash + Eq + 'a,
+    {
         let mut key_iter = key.into_iter();
 
         let k = if let Some(k) = key_iter.next() {
