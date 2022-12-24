@@ -159,6 +159,7 @@ class ApplicationServiceScheduler:
                 event for event in events if not self._hs.is_mine_id(event.sender)
             ]
 
+        if events:
             self.queuer.queued_events.setdefault(appservice.id, []).extend(events)
         if ephemeral:
             self.queuer.queued_ephemeral.setdefault(appservice.id, []).extend(ephemeral)
