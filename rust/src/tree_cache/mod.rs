@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
 use anyhow::{bail, Error};
 
@@ -141,17 +141,21 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCache<K, V> {
         Ok(())
     }
 
-    pub fn get_node(
+    pub fn get_node<Q>(
         &self,
-        key: impl IntoIterator<Item = &'a K>,
-    ) -> Result<Option<&TreeCacheNode<K, V>>, Error> {
+        key: impl IntoIterator<Item = Q>,
+    ) -> Result<Option<&TreeCacheNode<K, V>>, Error>
+    where
+        Q: Borrow<K>,
+        Q: Hash + Eq + 'a,
+    {
         let mut node = &self.root;
 
         for k in key {
             match node {
                 TreeCacheNode::Leaf(_) => bail!("Given key is too long"),
                 TreeCacheNode::Branch(_, map) => {
-                    node = if let Some(node) = map.get(k) {
+                    node = if let Some(node) = map.get(k.borrow()) {
                         node
                     } else {
                         return Ok(None);
@@ -163,7 +167,11 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCache<K, V> {
         Ok(Some(node))
     }
 
-    pub fn get(&self, key: impl IntoIterator<Item = &'a K>) -> Result<Option<&V>, Error> {
+    pub fn get<Q>(&self, key: impl IntoIterator<Item = Q>) -> Result<Option<&V>, Error>
+    where
+        Q: Borrow<K>,
+        Q: Hash + Eq + 'a,
+    {
         if let Some(node) = self.get_node(key)? {
             match node {
                 TreeCacheNode::Leaf(value) => Ok(Some(value)),
