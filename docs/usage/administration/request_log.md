@@ -1,6 +1,6 @@
 # Request log format
 
-HTTP request logs are written by synapse (see [`site.py`](../synapse/http/site.py) for details).
+HTTP request logs are written by synapse (see [`synapse/http/site.py`](https://github.com/matrix-org/synapse/tree/develop/synapse/http/site.py) for details).
 
 See the following for how to decode the dense data available from the default logging configuration.
 

@@ -7,7 +7,7 @@ server admin. (Note that a server admin is distinct from a room admin.)
 
 An existing user can be marked as a server admin by updating the database directly.
 
-Check your [database settings](config_documentation.md#database) in the configuration file, connect to the correct database using either `psql [database name]` (if using PostgreSQL) or `sqlite3 path/to/your/database.db` (if using SQLite) and elevate the user `@foo:bar.com` to administrator.
+Check your [database settings](../../configuration/config_documentation.md#database) in the configuration file, connect to the correct database using either `psql [database name]` (if using PostgreSQL) or `sqlite3 path/to/your/database.db` (if using SQLite) and elevate the user `@foo:bar.com` to administrator.
 ```sql
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
@@ -32,10 +32,10 @@ curl --header "Authorization: Bearer <access_token>" <the_rest_of_your_API_reque
 ```
 
 For example, suppose we want to
-[query the account](user_admin_api.md#query-user-account) of the user
+[query the account](../../../admin_api/user_admin_api.md#query-user-account) of the user
 `@foo:bar.com`. We need an admin access token (e.g.
 `syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk`), and we need to know which port
-Synapse's [`client` listener](config_documentation.md#listeners) is listening
+Synapse's [`client` listener](../../configuration/config_documentation.md#listeners) is listening
 on (e.g. `8008`). Then we can use the following command to request the account
 information from the Admin API.
 

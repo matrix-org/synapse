@@ -3958,7 +3958,7 @@ worker_listeners:
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option
+If Synapse is being managed by [systemd](../../systemd-with-workers/), this option
 must be omitted or set to `false`.
 
 Defaults to `false`.

@@ -889,8 +889,8 @@ Any scripts still using the above APIs should be converted to use the
 ## User-interactive authentication fallback templates can now display errors
 
 This may affect you if you make use of custom HTML templates for the
-[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
-[terms](../synapse/res/templates/terms.html) fallback pages.
+[reCAPTCHA (`synapse/res/templates/recaptcha.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/recaptcha.html) or
+[terms (`synapse/res/templates/terms.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/terms.html) fallback pages.
 
 The template is now provided an `error` variable if the authentication
 process failed. See the default templates linked above for an example.
@@ -1488,7 +1488,7 @@ New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
 is configured to use SSO and a custom
 `sso_redirect_confirm_template_dir` configuration then these templates
 will need to be copied from
-[synapse/res/templates](synapse/res/templates) into that directory.
+[`synapse/res/templates`](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates) into that directory.
 
 ## Synapse SSO Plugins Method Deprecation
 

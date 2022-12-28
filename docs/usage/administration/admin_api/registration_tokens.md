@@ -6,7 +6,7 @@ registration requests, as proposed in
 and stabilised in version 1.2 of the Matrix specification.
 To use it, you will need to enable the `registration_requires_token` config
 option, and authenticate by providing an `access_token` for a server admin:
-see [Admin API](../admin_api).
+see [Admin API](../admin_api/).
 
 
 ## Registration token objects

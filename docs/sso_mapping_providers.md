@@ -120,7 +120,7 @@ specified in the config. It is located at
 ## SAML Mapping Providers
 
 The SAML mapping provider can be customized by editing the
-[`saml2_config.user_mapping_provider.module`](docs/usage/configuration/config_documentation.md#saml2_config)
+[`saml2_config.user_mapping_provider.module`](usage/configuration/config_documentation.md#saml2_config)
 config option.
 
 `saml2_config.user_mapping_provider.config` allows you to provide custom
