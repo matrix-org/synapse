@@ -1,0 +1,1 @@
+Avoid running CI steps when the files they check have not been changed.
