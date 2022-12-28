@@ -5,7 +5,7 @@ use it, you must enable the account validity feature (under
 `account_validity`) in Synapse's configuration.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## Renew account
 

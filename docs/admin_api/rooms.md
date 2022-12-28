@@ -5,7 +5,7 @@ server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 **Parameters**
 
@@ -400,7 +400,7 @@ sent to a room in a given timeframe. There are various parameters available
 that allow for filtering and ordering the returned list. This API supports pagination.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 This endpoint mirrors the [Matrix Spec defined Messages API](https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3roomsroomidmessages).
 
