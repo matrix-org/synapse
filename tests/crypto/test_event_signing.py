@@ -33,12 +33,12 @@ HOSTNAME = "domain"
 
 
 class EventSigningTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.signing_key: SigningKey = decode_signing_key_base64(
             KEY_ALG, KEY_VER, SIGNING_KEY_SEED
         )
 
-    def test_sign_minimal(self):
+    def test_sign_minimal(self) -> None:
         event_dict = {
             "event_id": "$0:domain",
             "origin": "domain",
@@ -69,7 +69,7 @@ class EventSigningTestCase(unittest.TestCase):
             "aIbygsSdLOFzvdDjww8zUVKCmI02eP9xtyJxc/cLiBA",
         )
 
-    def test_sign_message(self):
+    def test_sign_message(self) -> None:
         event_dict = {
             "content": {"body": "Here is the message content"},
             "event_id": "$0:domain",
