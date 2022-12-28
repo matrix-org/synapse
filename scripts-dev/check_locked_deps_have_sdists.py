@@ -24,9 +24,16 @@ def main() -> None:
     with open(lockfile_path, "rb") as lockfile:
         lockfile_content = tomli.load(lockfile)
 
-    packages_to_assets: Dict[str, List[Dict[str, str]]] = lockfile_content["metadata"][
-        "files"
-    ]
+    packages_to_assets: Dict[str, List[Dict[str, str]]]
+    # There seem to be two different formats for storing the list of files per package.
+    if lockfile_content.get("metadata", {}).get("files") is not None:
+        # either [metadata.files]
+        packages_to_assets = lockfile_content["metadata"]["files"]
+    else:
+        # or a `files` inline table in each [[package]]
+        packages_to_assets = {
+            package["name"]: package["files"] for package in lockfile_content["package"]
+        }
 
     success = True
 
@@ -45,6 +52,11 @@ def main() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+    print(
+        f"Poetry lockfile OK. {len(packages_to_assets)} locked packages checked.",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
