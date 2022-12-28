@@ -386,7 +386,7 @@ so. It will then pass those events over HTTP replication to any configured event
 persisters (or the main process if none are configured).
 
 Note that `event_creator`s and `event_persister`s are implemented using the same
-[`synapse.app.generic_worker`](#synapse.app.generic_worker).
+[`synapse.app.generic_worker`](#synapseappgeneric_worker).
 
 An example [`stream_writers`](usage/configuration/config_documentation.md#stream_writers)
 configuration with multiple writers:
