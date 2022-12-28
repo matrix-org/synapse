@@ -104,6 +104,7 @@ set -x
 isort "${files[@]}"
 python3 -m black "${files[@]}"
 ./scripts-dev/config-lint.sh
-ruff "${files[@]}"
+# --quiet suppresses the update check.
+ruff --quiet "${files[@]}"
 ./scripts-dev/check_pydantic_models.py lint
 mypy
