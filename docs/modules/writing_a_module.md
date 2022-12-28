@@ -59,8 +59,8 @@ namespace (such as anything under `/_matrix/client` for example). It is strongly
 recommended that modules register their web resources under the `/_synapse/client`
 namespace.
 
-The provided resource is a Python class that implements Twisted's [IResource](https://twistedmatrix.com/documents/current/api/twisted.web.resource.IResource.html)
-interface (such as [Resource](https://twistedmatrix.com/documents/current/api/twisted.web.resource.Resource.html)).
+The provided resource is a Python class that implements Twisted's [IResource](https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.IResource.html)
+interface (such as [Resource](https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.Resource.html)).
 
 Only one resource can be registered for a given path. If several modules attempt to
 register a resource for the same path, the module that appears first in Synapse's
