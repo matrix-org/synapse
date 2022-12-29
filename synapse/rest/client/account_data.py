@@ -108,7 +108,6 @@ class UnstableAccountDataServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
 
     async def on_DELETE(
@@ -240,7 +239,6 @@ class UnstableRoomAccountDataServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
 
     async def on_DELETE(
