@@ -209,6 +209,10 @@ if [[ -n "$WORKERS" ]]; then
   # Workers can only use Postgres as a database.
   export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
 
+  # Allow testing Faster Remote Room Joins despite the feature being incomplete.
+  # Do not use in production, not even temporarily! No support will be provided!
+  export PASS_SYNAPSE_DANGEROUS_EXPERIMENTAL_I_DO_NOT_CARE_ABOUT_THIS_SERVER_ENABLE_FRRJ_UNDER_WORKERS_ANYWAY=1
+
   # And provide some more configuration to complement.
 
   # It can take quite a while to spin up a worker-mode Synapse for the first

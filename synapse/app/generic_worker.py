@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
 import sys
 from typing import Dict, List
 
@@ -283,11 +284,28 @@ def start(config_options: List[str]) -> None:
     )
 
     if config.experimental.faster_joins_enabled:
-        raise ConfigError(
-            "You have enabled the experimental `faster_joins` config option, but it is "
-            "not compatible with worker deployments yet. Please disable `faster_joins` "
-            "or run Synapse as a single process deployment instead."
-        )
+        # Never enable this flag on a server that is not ephemeral, and especially
+        # not on a production server! Not even temporarily!
+        # THIS FLAG IS PROVIDED SOLELY FOR COMPLEMENT TEST COVERAGE TO PREVENT TEST
+        # REGRESSIONS WHILST FASTER JOINS ARE IN DEVELOPMENT.
+        # NO SUPPORT WILL BE PROVIDED ONCE THIS OPTION HAS BEEN ENABLED ON A SERVER.
+        if os.environb.get(
+            b"SYNAPSE_DANGEROUS_EXPERIMENTAL_I_DO_NOT_CARE_ABOUT_THIS_SERVER_ENABLE_FRRJ_UNDER_WORKERS_ANYWAY"
+        ):
+            logger.critical(
+                "You have enabled the experimental `faster_joins` config option. "
+                "It is not currently compatible with worker deployments. "
+                "You have chosen to enable it anyway. "
+                "Expect severe bugs, including irreversible database corruption "
+                "and permanent data loss. "
+                "No support will be offered for this installation of Synapse."
+            )
+        else:
+            raise ConfigError(
+                "You have enabled the experimental `faster_joins` config option, but "
+                "it is not compatible with worker deployments yet. Please disable "
+                "`faster_joins` or run Synapse as a single process deployment instead."
+            )
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
