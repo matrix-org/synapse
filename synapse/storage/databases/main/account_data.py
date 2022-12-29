@@ -139,42 +139,47 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         def get_account_data_for_user_txn(
             txn: LoggingTransaction,
         ) -> Tuple[Dict[str, JsonDict], Dict[str, Dict[str, JsonDict]]]:
-            rows = self.db_pool.simple_select_list_txn(
-                txn,
-                "account_data",
-                {"user_id": user_id},
-                ["account_data_type", "content"],
-            )
+            # The 'content != '{}' condition below prevents us from using
+            # `simple_select_list_txn` here, as it doesn't support conditions
+            # other than 'equals'.
+            sql = """
+                SELECT account_data_type, content FROM account_data
+                WHERE user_id = ?
+            """
 
             # If experimental MSC3391 support is enabled, then account data entries
             # with an empty content are considered "deleted". So skip adding them to
             # the results.
             if self.hs.config.experimental.msc3391_enabled:
-                rows = [row for row in rows if row["content"] != "{}"]
+                sql += " AND content != '{}'"
+
+            txn.execute(sql, (user_id,))
+            rows = self.db_pool.cursor_to_dict(txn)
 
             global_account_data = {
                 row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
-            rows = self.db_pool.simple_select_list_txn(
-                txn,
-                "room_account_data",
-                {"user_id": user_id},
-                ["room_id", "account_data_type", "content"],
-            )
+            # The 'content != '{}' condition below prevents us from using
+            # `simple_select_list_txn` here, as it doesn't support conditions
+            # other than 'equals'.
+            sql = """
+                SELECT room_id, account_data_type, content FROM room_account_data
+                WHERE user_id = ?
+            """
+
+            # If experimental MSC3391 support is enabled, then account data entries
+            # with an empty content are considered "deleted". So skip adding them to
+            # the results.
+            if self.hs.config.experimental.msc3391_enabled:
+                sql += " AND content != '{}'"
+
+            txn.execute(sql, (user_id,))
+            rows = self.db_pool.cursor_to_dict(txn)
 
             by_room: Dict[str, Dict[str, JsonDict]] = {}
             for row in rows:
                 room_data = by_room.setdefault(row["room_id"], {})
-
-                # If experimental MSC3391 support is enabled, then account data entries
-                # with an empty content are considered "deleted". So skip adding them to
-                # the results.
-                if (
-                    self.hs.config.experimental.msc3391_enabled
-                    and row["content"] == "{}"
-                ):
-                    continue
 
                 room_data[row["account_data_type"]] = db_to_json(row["content"])
 
