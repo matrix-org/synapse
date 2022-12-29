@@ -587,8 +587,6 @@ class FederationHandler:
 
         self._federation_event_handler.room_queues[room_id] = []
 
-        await self._clean_room_for_join(room_id)
-
         try:
             # Try the host we successfully got a response to /make_join/
             # request first.
@@ -615,6 +613,8 @@ class FederationHandler:
             logger.debug("do_invite_join state: %s", state)
 
             logger.debug("do_invite_join event: %s", event)
+
+            await self._clean_room_for_join(room_id)
 
             # if this is the first time we've joined this room, it's time to add
             # a row to `rooms` with the correct room version. If there's already a
