@@ -420,9 +420,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(code_verifier, "")
         self.assertEqual(redirect, "http://client/redirect")
 
-    @override_config(
-        {"oidc_config": {**DEFAULT_CONFIG, "code_challenge_method": "S256"}}
-    )
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "pkce_method": "always"}})
     def test_redirect_request_with_code_challenge(self) -> None:
         """The redirect request has the right arguments & generates a valid session cookie."""
         req = Mock(spec=["cookies"])

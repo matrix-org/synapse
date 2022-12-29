@@ -3053,9 +3053,10 @@ Options for each entry include:
    values are `client_secret_basic` (default), `client_secret_post` and
    `none`.
 
-* `code_challenge_method`: proof key for code exchange method used when requesting
-  and exchanging the token. Valid values are `null` (default, disables support),
-  `plain`, and `S256`.
+* `pkce_method`: Whether to use proof key for code exchange when requesting
+  and exchanging the token. Valid values are: `auto` or `always`. Defaults to
+  `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
+   to always enable PKCE.
 
 * `scopes`: list of scopes to request. This should normally include the "openid"
    scope. Defaults to `["openid"]`.

@@ -404,7 +404,6 @@ class OidcProvider:
             provider.client_auth_method,
         )
         self._client_auth_method = provider.client_auth_method
-        self._code_challenge_method = provider.code_challenge_method
 
         # cache of metadata for the identity provider (endpoint uris, mostly). This is
         # loaded on-demand from the discovery endpoint (if discovery is enabled), with
@@ -477,16 +476,12 @@ class OidcProvider:
                     )
                 )
 
-        # Validate code_challenge_methods_supported only if it is enabled.
-        if (
-            m.get("code_challenge_methods_supported") is not None
-            and self._code_challenge_method is not None
-        ):
+        # If PKCE support is advertised ensure the wanted method is available.
+        if m.get("code_challenge_methods_supported") is not None:
             m.validate_code_challenge_methods_supported()
-            if self._code_challenge_method not in m["code_challenge_methods_supported"]:
+            if "S256" not in m["code_challenge_methods_supported"]:
                 raise ValueError(
-                    '"{code_challenge_method}" not in "code_challenge_methods_supported" ({supported!r})'.format(
-                        code_challenge_method=self._code_challenge_method,
+                    '"S256" not in "code_challenge_methods_supported" ({supported!r})'.format(
                         supported=m["code_challenge_methods_supported"],
                     )
                 )
@@ -617,6 +612,9 @@ class OidcProvider:
 
         if self._config.jwks_uri:
             metadata["jwks_uri"] = self._config.jwks_uri
+
+        if self._config.pkce_method == "always":
+            metadata["code_challenge_methods_supported"] = ["S256"]
 
         self._validate_metadata(metadata)
 
@@ -959,24 +957,18 @@ class OidcProvider:
         if not client_redirect_url:
             client_redirect_url = b""
 
-        # If code challenge is supported and configured, use it.
+        metadata = await self.load_metadata()
+
+        # Automatically enable PKCE if it is supported. (Note we verified it contains S256 earlier.)
         extra_grant_values = {}
-        if self._code_challenge_method is not None:
+        if metadata.get("code_challenge_methods_supported"):
             code_verifier = generate_token(48)
 
             # Default to the values for plain.
-            extra_grant_values = {"code_challenge_method": self._code_challenge_method}
-
-            if self._code_challenge_method == "S256":
-                extra_grant_values["code_challenge"] = create_s256_code_challenge(
-                    code_verifier
-                )
-            elif self._code_challenge_method == "plain":
-                extra_grant_values["code_challenge"] = code_verifier
-            else:
-                raise RuntimeError(
-                    f"Unexpeced code challenege method: {self._code_challenge_method!r}"
-                )
+            extra_grant_values = {
+                "code_challenge_method": "S256",
+                "code_challenge": create_s256_code_challenge(code_verifier),
+            }
 
         cookie = self._macaroon_generaton.generate_oidc_session_token(
             state=state,
@@ -1006,7 +998,6 @@ class OidcProvider:
                 )
             )
 
-        metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
         return prepare_grant_uri(
             authorization_endpoint,
