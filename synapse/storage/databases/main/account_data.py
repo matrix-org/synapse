@@ -519,6 +519,8 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 otherwise False. This informs callers of whether there actually was an
                 existing room account data entry to delete, or if the call was a no-op.
             """
+            # We can't use `simple_update` as it doesn't have the ability to specify
+            # where clauses other than '=', which we need for `content != '{}'` below.
             sql = """
                 UPDATE room_account_data
                     SET stream_id = ?, content = '{}'
@@ -689,6 +691,8 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 False. This informs callers of whether there actually was an existing
                 account data entry to delete, or if the call was a no-op.
             """
+            # We can't use `simple_update` as it doesn't have the ability to specify
+            # where clauses other than '=', which we need for `content != '{}'` below.
             sql = """
                 UPDATE account_data
                     SET stream_id = ?, content = '{}'
