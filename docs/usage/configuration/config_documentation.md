@@ -3053,8 +3053,12 @@ Options for each entry include:
    values are `client_secret_basic` (default), `client_secret_post` and
    `none`.
 
+* `code_challenge_method`: proof key for code exchange method used when requesting
+  and exchanging the token. Valid values are `null` (default, disables support),
+  `plain`, and `S256`.
+
 * `scopes`: list of scopes to request. This should normally include the "openid"
-   scope. Defaults to ["openid"].
+   scope. Defaults to `["openid"]`.
 
 * `authorization_endpoint`: the oauth2 authorization endpoint. Required if
    provider discovery is disabled.

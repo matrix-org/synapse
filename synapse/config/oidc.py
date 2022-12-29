@@ -117,6 +117,18 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             # to avoid importing authlib here.
             "enum": ["client_secret_basic", "client_secret_post", "none"],
         },
+        "code_challenge_method": {
+            "oneOf": [
+                {
+                    "type": "string",
+                    # the following list is the same as the keys of
+                    # authlib.oauth2.auth.rfc7636.challenge.CodeChallenge.SUPPORTED_CODE_CHALLENGE_METHOD.
+                    # We inline it to avoid importing authlib here.
+                    "enum": ["plain", "S256"],
+                },
+                {"type": "null"},
+            ],
+        },
         "scopes": {"type": "array", "items": {"type": "string"}},
         "authorization_endpoint": {"type": "string"},
         "token_endpoint": {"type": "string"},
@@ -289,6 +301,7 @@ def _parse_oidc_config_dict(
         client_secret=oidc_config.get("client_secret"),
         client_secret_jwt_key=client_secret_jwt_key,
         client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
+        code_challenge_method=oidc_config.get("code_challenge_method"),
         scopes=oidc_config.get("scopes", ["openid"]),
         authorization_endpoint=oidc_config.get("authorization_endpoint"),
         token_endpoint=oidc_config.get("token_endpoint"),
@@ -356,6 +369,10 @@ class OidcProviderConfig:
     # Valid values are 'client_secret_basic', 'client_secret_post' and
     # 'none'.
     client_auth_method: str
+
+    # code challenge method to use when exchanging the authorization & token.
+    # Valid values are None (to disable use of code challenges), 'plain', and 'S256'.
+    code_challenge_method: Optional[str]
 
     # list of scopes to request
     scopes: Collection[str]

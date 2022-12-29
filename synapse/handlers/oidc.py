@@ -36,6 +36,7 @@ from authlib.jose import JsonWebToken, JWTClaims
 from authlib.jose.errors import InvalidClaimError, JoseError, MissingClaimError
 from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
+from authlib.oauth2.rfc7636.challenge import create_s256_code_challenge
 from authlib.oidc.core import CodeIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 from jinja2 import Environment, Template
@@ -403,6 +404,7 @@ class OidcProvider:
             provider.client_auth_method,
         )
         self._client_auth_method = provider.client_auth_method
+        self._code_challenge_method = provider.code_challenge_method
 
         # cache of metadata for the identity provider (endpoint uris, mostly). This is
         # loaded on-demand from the discovery endpoint (if discovery is enabled), with
@@ -472,6 +474,20 @@ class OidcProvider:
                     '"{auth_method}" not in "token_endpoint_auth_methods_supported" ({supported!r})'.format(
                         auth_method=self._client_auth_method,
                         supported=m["token_endpoint_auth_methods_supported"],
+                    )
+                )
+
+        # Validate code_challenge_methods_supported only if it is enabled.
+        if (
+            m.get("code_challenge_methods_supported") is not None
+            and self._code_challenge_method is not None
+        ):
+            m.validate_code_challenge_methods_supported()
+            if self._code_challenge_method not in m["code_challenge_methods_supported"]:
+                raise ValueError(
+                    '"{code_challenge_method}" not in "code_challenge_methods_supported" ({supported!r})'.format(
+                        code_challenge_method=self._code_challenge_method,
+                        supported=m["code_challenge_methods_supported"],
                     )
                 )
 
@@ -653,7 +669,7 @@ class OidcProvider:
 
         return jwk_set
 
-    async def _exchange_code(self, code: str) -> Token:
+    async def _exchange_code(self, code: str, code_verifier: str) -> Token:
         """Exchange an authorization code for a token.
 
         This calls the ``token_endpoint`` with the authorization code we
@@ -666,6 +682,7 @@ class OidcProvider:
 
         Args:
             code: The authorization code we got from the callback.
+            code_verifier: The code verifier to send, blank if unused.
 
         Returns:
             A dict containing various tokens.
@@ -696,6 +713,8 @@ class OidcProvider:
             "code": code,
             "redirect_uri": self._callback_url,
         }
+        if code_verifier:
+            args["code_verifier"] = code_verifier
         body = urlencode(args, True)
 
         # Fill the body/headers with credentials
@@ -935,9 +954,29 @@ class OidcProvider:
 
         state = generate_token()
         nonce = generate_token()
+        code_verifier = ""
 
         if not client_redirect_url:
             client_redirect_url = b""
+
+        # If code challenge is supported and configured, use it.
+        extra_grant_values = {}
+        if self._code_challenge_method is not None:
+            code_verifier = generate_token(48)
+
+            # Default to the values for plain.
+            extra_grant_values = {"code_challenge_method": self._code_challenge_method}
+
+            if self._code_challenge_method == "S256":
+                extra_grant_values["code_challenge"] = create_s256_code_challenge(
+                    code_verifier
+                )
+            elif self._code_challenge_method == "plain":
+                extra_grant_values["code_challenge"] = code_verifier
+            else:
+                raise RuntimeError(
+                    f"Unexpeced code challenege method: {self._code_challenge_method!r}"
+                )
 
         cookie = self._macaroon_generaton.generate_oidc_session_token(
             state=state,
@@ -946,6 +985,7 @@ class OidcProvider:
                 nonce=nonce,
                 client_redirect_url=client_redirect_url.decode(),
                 ui_auth_session_id=ui_auth_session_id or "",
+                code_verifier=code_verifier,
             ),
         )
 
@@ -976,6 +1016,7 @@ class OidcProvider:
             scope=self._scopes,
             state=state,
             nonce=nonce,
+            **extra_grant_values,
         )
 
     async def handle_oidc_callback(
@@ -1003,7 +1044,9 @@ class OidcProvider:
         # Exchange the code with the provider
         try:
             logger.debug("Exchanging OAuth2 code for a token")
-            token = await self._exchange_code(code)
+            token = await self._exchange_code(
+                code, code_verifier=session_data.code_verifier
+            )
         except OidcError as e:
             logger.warning("Could not exchange OAuth2 code: %s", e)
             self._sso_handler.render_error(request, e.error, e.error_description)
