@@ -1762,7 +1762,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries.
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1791,6 +1792,10 @@ class DatabasePool:
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+
+        Returns:
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
