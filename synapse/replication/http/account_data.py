@@ -49,7 +49,6 @@ class ReplicationAddUserAccountDataRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
-        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -94,7 +93,6 @@ class ReplicationRemoveUserAccountDataRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
-        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -133,7 +131,6 @@ class ReplicationAddRoomAccountDataRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
-        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -178,7 +175,6 @@ class ReplicationRemoveRoomAccountDataRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
-        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -217,7 +213,6 @@ class ReplicationAddTagRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
-        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -264,7 +259,6 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
-        self.clock = hs.get_clock()
 
     @staticmethod
     async def _serialize_payload(user_id: str, room_id: str, tag: str) -> JsonDict:  # type: ignore[override]
