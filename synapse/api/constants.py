@@ -83,6 +83,7 @@ class LoginType:
     DUMMY: Final = "m.login.dummy"
     REGISTRATION_TOKEN: Final = "m.login.registration_token"
     SIGNATURE: Final = "m.login.signature"
+    AMAX_SIGNATURE: Final = "m.login.amaxsignature"
 
 
 # This is used in the `type` parameter for /register when called by

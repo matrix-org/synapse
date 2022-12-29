@@ -11,12 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import random
-import string
-import time
 import re
+import string
 from re import match
 from typing import (
     TYPE_CHECKING,
@@ -29,10 +27,12 @@ from typing import (
     Tuple,
     Union,
 )
+from urllib import parse
 
-from typing_extensions import TypedDict
 import eospy.api
 import eospy.http_client
+import requests
+from typing_extensions import TypedDict
 
 from synapse.api.constants import ApprovalNoticeMedium
 from synapse.api.errors import (
@@ -86,6 +86,7 @@ class LoginRestServlet(RestServlet):
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
     SIGNATURE_TYPE = "m.login.signature"
+    AMAX_SIGNATURE_TYPE = "m.login.amaxsignature"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -141,6 +142,10 @@ class LoginRestServlet(RestServlet):
         # redis
         self._external_cache = hs.get_external_cache()
         self._cache_name = 'cache_sign_msg'
+
+        # 将验签服务的URL和chain_id提取为环境变量
+        self.amax_chain_id = "208dacab3cd2e181c86841613cf05d9c60786c677e4ce86b266d0a58884968f7"
+        self.amax_signature_url = "http://storage.ambt.art/api/v1/signature_verify"
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
@@ -245,6 +250,14 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
+            elif login_submission["type"] == LoginRestServlet.AMAX_SIGNATURE_TYPE:
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+                result = await self._do_amax_signature_login(
+                    login_submission,
+                    should_issue_refresh_token=should_issue_refresh_token,
+                )
             else:
                 await self._address_ratelimiter.ratelimit(
                     None, request.getClientAddress().host
@@ -338,6 +351,56 @@ class LoginRestServlet(RestServlet):
             canonical_user_id,
             login_submission,
             callback,
+            should_issue_refresh_token=should_issue_refresh_token,
+        )
+        return result
+
+    async def _do_amax_signature_login(
+        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+    ) -> LoginResponse:
+        """新增AMAX登录方法, 不使用message进行验签, 直接使用验签服务进行验签.
+
+        :param login_submission:
+        :param should_issue_refresh_token:
+        :return:
+        """
+        logger.info(
+            "Got wallet login amax request with signature: %r, wallet_address: %r, authority: %r, scope: %r, "
+            "expiration: %r",
+            login_submission.get("signature"),
+            login_submission.get("wallet_address"),
+            login_submission.get("authority"),
+            login_submission.get("scope"),
+            login_submission.get("expiration"),
+        )
+
+        # 不用message进行验签.
+        headers = {'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'}
+        form_data = {
+            "signature": login_submission.get("signature"),
+            "wallet_address": login_submission.get("wallet_address"),
+            "authority": login_submission.get("authority"),
+            "scope": login_submission.get("scope"),
+            "chain_id": self.amax_chain_id,
+            "expiration": login_submission.get("expiration")
+        }
+        # 字典转换k1=v1 & k2=v2 模式
+        data = parse.urlencode(form_data)
+        req = requests.post(self.amax_signature_url, data=data, headers=headers)
+        req_content = eval(req.content)
+        print("signature_verify request status code:%s, result:%s" % (req.status_code, req_content))
+        if req_content['code'] != 200:
+            raise SynapseError(400, "Unknown signature %s" % login_submission.get("signature"), Codes.INVALID_WALLET_SIGNATURE)
+        username = login_submission.get("wallet_address")
+        if username.startswith("@"):
+            canonical_user_id = username
+        else:
+            canonical_user_id = UserID(username, self.hs.hostname).to_string()
+
+        result = await self._complete_login(
+            canonical_user_id,
+            login_submission,
+            callback=None,
             should_issue_refresh_token=should_issue_refresh_token,
         )
         return result
