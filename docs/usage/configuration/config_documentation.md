@@ -476,6 +476,12 @@ Valid resource names are:
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
 
+* `health`: the [health check endpoint](../../reverse_proxy.md#health-check-endpoint). This endpoint
+  is by default active for all other resources and does not have to be activated separately.
+  This is only useful if you want to use the health endpoint explicitly on a dedicated port or
+  for [workers](../../workers.md) and containers without listener e.g.
+  [application services](../../workers.md#notifying-application-services).
+
 Example configuration #1:
 ```yaml
 listeners:
@@ -2514,18 +2520,18 @@ state events are shared with users:
 - `m.room.topic`
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: boolean. Set to `true` to disable the above 
+* `disable_default_event_types`: boolean. Set to `true` to disable the above
   defaults. If this is enabled, only the event types listed in
   `additional_event_types` are shared. Defaults to `false`.
-* `additional_event_types`: A list of additional state events to include in the 
-  events to be shared. By default, this list is empty (so only the default event 
+* `additional_event_types`: A list of additional state events to include in the
+  events to be shared. By default, this list is empty (so only the default event
   types are shared).
 
   Each entry in this list should be either a single string or a list of two
-  strings. 
+  strings.
   * A standalone string `t` represents all events with type `t` (i.e.
     with no restrictions on state keys).
-  * A pair of strings `[t, s]` represents a single event with type `t` and 
+  * A pair of strings `[t, s]` represents a single event with type `t` and
     state key `s`. The same type can appear in two entries with different state
     keys: in this situation, both state keys are included in prejoin state.
 
@@ -2996,7 +3002,7 @@ Options for each entry include:
        * `picture_claim`: name of the claim containing an url for the user's profile picture.
          Defaults to 'picture', which OpenID Connect compliant providers should provide
          and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
-         
+
          Currently only supported in monolithic (single-process) server configurations
          where the media repository runs within the Synapse process.
 

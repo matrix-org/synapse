@@ -96,6 +96,9 @@ class SynapseHomeServer(HomeServer):
                     # Skip loading openid resource if federation is defined
                     # since federation resource will include openid
                     continue
+                if name == "health":
+                    # Skip loading, health resource is always included
+                    continue
                 resources.update(self._configure_named_resource(name, res.compress))
 
         additional_resources = listener_config.http_options.additional_resources
