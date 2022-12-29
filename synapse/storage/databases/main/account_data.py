@@ -531,12 +531,8 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 sql,
                 (next_id, user_id, room_id, account_data_type),
             )
-            if txn.rowcount == 0:
-                # We didn't update any rows. This means that there was no matching room
-                # account data entry to delete in the first place.
-                return False
-
-            return True
+            # Return true if any rows were updated.
+            return txn.rowcount != 0
 
         async with self._account_data_id_gen.get_next() as next_id:
             row_updated = await self.db_pool.runInteraction(
