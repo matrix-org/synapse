@@ -1531,13 +1531,13 @@ class EventCreationHandler:
         external federation senders don't have to recalculate it themselves.
         """
 
+        if not self._external_cache.is_enabled():
+            return
+
+        # If external cache is enabled we should always have this.
+        assert self._external_cache_joined_hosts_updates is not None
+
         for event, event_context in events_and_context:
-            if not self._external_cache.is_enabled():
-                return
-
-            # If external cache is enabled we should always have this.
-            assert self._external_cache_joined_hosts_updates is not None
-
             if event_context.partial_state:
                 # We can't precalculate joined hosts for a partial-state event,
                 # (at least not without blocking until full state).
