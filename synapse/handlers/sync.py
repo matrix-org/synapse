@@ -844,13 +844,18 @@ class SyncHandler:
                     summary["m.heroes"],
                 )
                 summary["com.beeper.m.heroes"] = [
-                    {"mxid": mxid, "display_name": profile.display_name}
+                    {
+                        "mxid": mxid,
+                        "display_name": profile.display_name
+                        if profile is not None
+                        else None,
+                    }
                     for mxid, profile in profiles.items()
                     if not mxid.startswith("@_")  # filter out bot users
                 ]
-            except Exception:
+            except Exception as e:
                 logger.warning(
-                    f"Error generating heroes for room {room_id} profiles {profiles}"
+                    f"Error generating heroes for room {room_id} profiles {profiles} error {e}"
                 )
                 raise
 
