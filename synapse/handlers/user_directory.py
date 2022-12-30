@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
+from twisted.internet.interfaces import IDelayedCall
+
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
@@ -85,6 +87,8 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         # Guard to ensure we only have one process for refreshing remote profiles
         self._is_refreshing_remote_profiles = False
+        # Handle to cancel the `call_later` of `kick_off_remote_profile_refresh_process`
+        self._refresh_remote_profiles_call_later: Optional[IDelayedCall] = None
 
         # Guard to ensure we only have one process for refreshing remote profiles
         # for the given servers.
@@ -99,7 +103,9 @@ class UserDirectoryHandler(StateDeltasHandler):
             self.clock.call_later(0, self.notify_new_event)
 
             # Kick off the profile refresh process on startup
-            self.clock.call_later(10, self.kick_off_remote_profile_refresh_process)
+            self._refresh_remote_profiles_call_later = self.clock.call_later(
+                10, self.kick_off_remote_profile_refresh_process
+            )
 
     async def search_users(
         self, user_id: str, search_term: str, limit: int
@@ -533,6 +539,11 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self._is_refreshing_remote_profiles:
             return
 
+        if self._refresh_remote_profiles_call_later:
+            if self._refresh_remote_profiles_call_later.active():
+                self._refresh_remote_profiles_call_later.cancel()
+            self._refresh_remote_profiles_call_later = None
+
         async def process() -> None:
             try:
                 await self._unsafe_refresh_remote_profiles()
@@ -550,7 +561,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             # nothing to do: already refreshing the maximum number of servers
             # at once.
             # Come back later.
-            self.clock.call_later(
+            self._refresh_remote_profiles_call_later = self.clock.call_later(
                 INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES,
                 self.kick_off_remote_profile_refresh_process,
             )
@@ -572,7 +583,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 server_to_refresh
             )
 
-        self.clock.call_later(
+        self._refresh_remote_profiles_call_later = self.clock.call_later(
             INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES,
             self.kick_off_remote_profile_refresh_process,
         )
@@ -604,4 +615,4 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _unsafe_refresh_remote_profiles_for_remote_server(
         self, server_name: str
     ) -> None:
-        pass
+        logger.info("Refreshing profiles in user directory for %s", server_name)
