@@ -78,6 +78,11 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Guard to ensure we only have one process for refreshing remote profiles
         self._is_refreshing_remote_profiles = False
 
+        # Guard to ensure we only have one process for refreshing remote profiles
+        # for the given servers.
+        # Set of server names.
+        self._is_refreshing_remote_profiles_for_servers: Set[str] = set()
+
         if self.update_user_directory:
             self.notifier.add_replication_callback(self.notify_new_event)
 
@@ -530,4 +535,33 @@ class UserDirectoryHandler(StateDeltasHandler):
         run_as_background_process("user_directory.refresh_remote_profiles", process)
 
     async def _unsafe_refresh_remote_profiles(self) -> None:
+        pass
+
+    def kick_off_remote_profile_refresh_process_for_remote_server(
+        self, server_name: str
+    ) -> None:
+        """Called when there may be remote users with stale profiles to be refreshed
+        on the given server."""
+        if not self.update_user_directory:
+            return
+
+        if server_name in self._is_refreshing_remote_profiles_for_servers:
+            return
+
+        async def process() -> None:
+            try:
+                await self._unsafe_refresh_remote_profiles_for_remote_server(
+                    server_name
+                )
+            finally:
+                self._is_refreshing_remote_profiles_for_servers.remove(server_name)
+
+        self._is_refreshing_remote_profiles_for_servers.add(server_name)
+        run_as_background_process(
+            "user_directory.refresh_remote_profiles_for_remote_server", process
+        )
+
+    async def _unsafe_refresh_remote_profiles_for_remote_server(
+        self, server_name: str
+    ) -> None:
         pass
