@@ -467,6 +467,16 @@ class UserDirectoryHandler(StateDeltasHandler):
         if event.membership != Membership.JOIN:
             return
 
+        is_public = await self.store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+        if not is_public:
+            # Don't collect user profiles from private rooms as they are not guaranteed
+            # to be the same as the user's global profile.
+            # TODO For correctness, need to fetch the user's real profile and store that
+            #      to the directory.
+            return
+
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
         # If the new name is an unexpected form, do not update the directory.
