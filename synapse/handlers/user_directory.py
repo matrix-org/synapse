@@ -28,6 +28,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Don't refresh a stale user directory entry, using a Federation /profile request,
+# for 60 seconds. This gives time for other state events to arrive (which will
+# then be coalesced such that only one /profile request is made).
+USER_DIRECTORY_STALE_REFRESH_TIME_MS = 60 * 1000
+
 
 class UserDirectoryHandler(StateDeltasHandler):
     """Handles queries and updates for the user_directory.
@@ -473,8 +478,12 @@ class UserDirectoryHandler(StateDeltasHandler):
         if not is_public:
             # Don't collect user profiles from private rooms as they are not guaranteed
             # to be the same as the user's global profile.
-            # TODO For correctness, need to fetch the user's real profile and store that
-            #      to the directory.
+            now_ts = self.clock.time_msec()
+            await self.store.set_remote_user_profile_in_user_dir_stale(
+                user_id,
+                next_try_at_ms=now_ts + USER_DIRECTORY_STALE_REFRESH_TIME_MS,
+                retry_counter=0,
+            )
             return
 
         prev_name = prev_event.content.get("displayname")
