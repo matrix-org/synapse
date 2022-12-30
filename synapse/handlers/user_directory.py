@@ -75,12 +75,18 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
+        # Guard to ensure we only have one process for refreshing remote profiles
+        self._is_refreshing_remote_profiles = False
+
         if self.update_user_directory:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
+
+            # Kick off the profile refresh process on startup
+            self.clock.call_later(10, self.kick_off_remote_profile_refresh_process)
 
     async def search_users(
         self, user_id: str, search_term: str, limit: int
@@ -505,3 +511,23 @@ class UserDirectoryHandler(StateDeltasHandler):
             # Only update if something has changed, or we didn't have a previous event
             # in the first place.
             await self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)
+
+    def kick_off_remote_profile_refresh_process(self) -> None:
+        """Called when there may be remote users with stale profiles to be refreshed"""
+        if not self.update_user_directory:
+            return
+
+        if self._is_refreshing_remote_profiles:
+            return
+
+        async def process() -> None:
+            try:
+                await self._unsafe_refresh_remote_profiles()
+            finally:
+                self._is_refreshing_remote_profiles = False
+
+        self._is_refreshing_remote_profiles = True
+        run_as_background_process("user_directory.refresh_remote_profiles", process)
+
+    async def _unsafe_refresh_remote_profiles(self) -> None:
+        pass
