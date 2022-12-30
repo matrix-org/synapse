@@ -547,7 +547,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
     async def get_remote_users_to_refresh_on_server(
         self, server_name: str, now_ts: int, limit: int
-    ) -> List[Tuple[str, int]]:
+    ) -> List[Tuple[str, int, int]]:
         """
         Get a list of up to `limit` user IDs from the server `server_name`
         whose locally-cached profiles we believe to be stale
@@ -557,20 +557,21 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             tuple of:
                 - User ID
                 - Retry counter (number of failures so far)
+                - Time the retry is scheduled for, in milliseconds
         """
 
         def _get_remote_users_to_refresh_on_server_txn(
             txn: LoggingTransaction,
-        ) -> List[Tuple[str, int]]:
+        ) -> List[Tuple[str, int, int]]:
             sql = """
-                SELECT user_id, retry_counter
+                SELECT user_id, retry_counter, next_try_at_ts
                 FROM user_directory_stale_remote_users
                 WHERE user_server_name = ? AND next_try_at_ts < ?
                 ORDER BY next_try_at_ts
                 LIMIT ?
             """
             txn.execute(sql, (server_name, now_ts, limit))
-            return txn.fetchall()
+            return cast(List[Tuple[str, int, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_remote_users_to_refresh_on_server",

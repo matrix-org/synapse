@@ -591,8 +591,29 @@ class UserDirectoryHandler(StateDeltasHandler):
         )
 
         if not servers_to_refresh:
-            # TODO Do we have any backing-off servers that we should try again
-            #      for eventually?
+            # Do we have any backing-off servers that we should try again
+            # for eventually?
+            end_of_time = 1 << 62
+            backing_off_servers = (
+                await self.store.get_remote_servers_with_profiles_to_refresh(
+                    now_ts=end_of_time, limit=1
+                )
+            )
+            if backing_off_servers:
+                # Find out when the next user is refreshable and schedule a
+                # refresh then.
+                backing_off_server_name = backing_off_servers[0]
+                users = await self.store.get_remote_users_to_refresh_on_server(
+                    backing_off_server_name, now_ts=end_of_time, limit=1
+                )
+                if not users:
+                    return
+                _, _, next_try_at_ts = users[0]
+                self._refresh_remote_profiles_call_later = self.clock.call_later(
+                    ((next_try_at_ts - self.clock.time_msec()) // 1000) + 2,
+                    self.kick_off_remote_profile_refresh_process,
+                )
+
             return
 
         for server_to_refresh in servers_to_refresh:
@@ -643,7 +664,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 # Finished for now
                 return
 
-            for user_id, retry_counter in next_batch:
+            for user_id, retry_counter, _ in next_batch:
                 # Request the profile of the user.
                 try:
                     profile = await self._hs.get_profile_handler().get_profile(
