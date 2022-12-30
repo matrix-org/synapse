@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 # then be coalesced such that only one /profile request is made).
 USER_DIRECTORY_STALE_REFRESH_TIME_MS = 60 * 1000
 
+# Maximum number of remote servers that we will attempt to refresh profiles for
+# in one go.
+MAX_SERVERS_TO_REFRESH_PROFILES_FOR_IN_ONE_GO = 5
+
+# As long as we have servers to refresh (without backoff), keep adding more
+# every 15 seconds.
+INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES = 15
+
 
 class UserDirectoryHandler(StateDeltasHandler):
     """Handles queries and updates for the user_directory.
@@ -535,7 +543,39 @@ class UserDirectoryHandler(StateDeltasHandler):
         run_as_background_process("user_directory.refresh_remote_profiles", process)
 
     async def _unsafe_refresh_remote_profiles(self) -> None:
-        pass
+        limit = MAX_SERVERS_TO_REFRESH_PROFILES_FOR_IN_ONE_GO - len(
+            self._is_refreshing_remote_profiles_for_servers
+        )
+        if limit <= 0:
+            # nothing to do: already refreshing the maximum number of servers
+            # at once.
+            # Come back later.
+            self.clock.call_later(
+                INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES,
+                self.kick_off_remote_profile_refresh_process,
+            )
+            return
+
+        servers_to_refresh = (
+            await self.store.get_remote_servers_with_profiles_to_refresh(
+                now_ts=self.clock.time_msec(), limit=limit
+            )
+        )
+
+        if not servers_to_refresh:
+            # TODO Do we have any backing-off servers that we should try again
+            #      for eventually?
+            return
+
+        for server_to_refresh in servers_to_refresh:
+            self.kick_off_remote_profile_refresh_process_for_remote_server(
+                server_to_refresh
+            )
+
+        self.clock.call_later(
+            INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES,
+            self.kick_off_remote_profile_refresh_process,
+        )
 
     def kick_off_remote_profile_refresh_process_for_remote_server(
         self, server_name: str
