@@ -25,6 +25,7 @@ from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases.main.user_directory import SearchResult
 from synapse.storage.roommember import ProfileInfo
+from synapse.types import UserID
 from synapse.util.metrics import Measure
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import non_null_str_or_none
@@ -524,6 +525,20 @@ class UserDirectoryHandler(StateDeltasHandler):
                 user_id,
                 next_try_at_ms=now_ts + USER_DIRECTORY_STALE_REFRESH_TIME_MS,
                 retry_counter=0,
+            )
+            # Schedule a wake-up to refresh the user directory for this server.
+            # We intentionally wake up this server directly because we don't want
+            # other servers ahead of it in the queue to get in the way of updating
+            # the profile if the server only just sent us an event.
+            self.clock.call_later(
+                USER_DIRECTORY_STALE_REFRESH_TIME_MS // 1000 + 1,
+                self.kick_off_remote_profile_refresh_process_for_remote_server,
+                UserID.from_string(user_id).domain,
+            )
+            # Schedule a wake-up to handle any backoffs that may occur in the future.
+            self.clock.call_later(
+                2 * USER_DIRECTORY_STALE_REFRESH_TIME_MS // 1000 + 1,
+                self.kick_off_remote_profile_refresh_process,
             )
             return
 
