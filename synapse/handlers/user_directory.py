@@ -13,17 +13,21 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
+from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases.main.user_directory import SearchResult
 from synapse.storage.roommember import ProfileInfo
 from synapse.util.metrics import Measure
+from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import non_null_str_or_none
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -42,6 +46,17 @@ MAX_SERVERS_TO_REFRESH_PROFILES_FOR_IN_ONE_GO = 5
 # As long as we have servers to refresh (without backoff), keep adding more
 # every 15 seconds.
 INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES = 15
+
+
+def calculate_time_of_next_retry(now_ts: int, retry_count: int) -> int:
+    """
+    Calculates the time of a next retry given `now_ts` in ms and the number
+    of failures encountered thus far.
+
+    Currently the sequence goes:
+    1 min, 5 min, 25 min, 2 hour, 10 hour, 52 hour, 10 day, 7.75 week
+    """
+    return now_ts + 60_000 * (5 ** min(retry_count, 7))
 
 
 class UserDirectoryHandler(StateDeltasHandler):
@@ -79,6 +94,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.update_user_directory = hs.config.worker.should_update_user_directory
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
+        self._hs = hs
+
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
 
@@ -616,3 +633,78 @@ class UserDirectoryHandler(StateDeltasHandler):
         self, server_name: str
     ) -> None:
         logger.info("Refreshing profiles in user directory for %s", server_name)
+
+        while True:
+            # Get a handful of users to process.
+            next_batch = await self.store.get_remote_users_to_refresh_on_server(
+                server_name, now_ts=self.clock.time_msec(), limit=10
+            )
+            if not next_batch:
+                # Finished for now
+                return
+
+            for user_id, retry_counter in next_batch:
+                # Request the profile of the user.
+                try:
+                    profile = await self._hs.get_profile_handler().get_profile(
+                        user_id, ignore_backoff=False
+                    )
+                except NotRetryingDestination as e:
+                    logger.info(
+                        "Failed to refresh profile for %r because the destination is undergoing backoff",
+                        user_id,
+                    )
+                    # As a special-case, we back off until the destination is no longer
+                    # backed off from.
+                    await self.store.set_remote_user_profile_in_user_dir_stale(
+                        user_id,
+                        e.retry_last_ts + e.retry_interval,
+                        retry_counter=retry_counter + 1,
+                    )
+                    continue
+                except SynapseError as e:
+                    if e.code == HTTPStatus.NOT_FOUND and e.errcode == Codes.NOT_FOUND:
+                        # The profile doesn't exist.
+                        # TODO Does this mean we should clear it from our user
+                        #      directory?
+                        await self.store.clear_remote_user_profile_in_user_dir_stale(
+                            user_id
+                        )
+                        logger.warning(
+                            "Refresh of remote profile %r: not found (%r)",
+                            user_id,
+                            e.msg,
+                        )
+                        continue
+
+                    logger.warning(
+                        "Failed to refresh profile for %r because %r", user_id, e
+                    )
+                    await self.store.set_remote_user_profile_in_user_dir_stale(
+                        user_id,
+                        calculate_time_of_next_retry(
+                            self.clock.time_msec(), retry_counter + 1
+                        ),
+                        retry_counter=retry_counter + 1,
+                    )
+                    continue
+                except Exception:
+                    logger.error(
+                        "Failed to refresh profile for %r due to unhandled exception",
+                        user_id,
+                        exc_info=True,
+                    )
+                    await self.store.set_remote_user_profile_in_user_dir_stale(
+                        user_id,
+                        calculate_time_of_next_retry(
+                            self.clock.time_msec(), retry_counter + 1
+                        ),
+                        retry_counter=retry_counter + 1,
+                    )
+                    continue
+
+                await self.store.update_profile_in_user_dir(
+                    user_id,
+                    display_name=non_null_str_or_none(profile.get("displayname")),
+                    avatar_url=non_null_str_or_none(profile.get("avatar_url")),
+                )
