@@ -46,7 +46,7 @@ when using a containerized Synapse, as that will prevent it from responding
 to proxied traffic.)
 
 Optionally, you can also set
-[`request_id_header`](../usage/configuration/config_documentation.md#listeners)
+[`request_id_header`](./usage/configuration/config_documentation.md#listeners)
 so that the server extracts and re-uses the same request ID format that the
 reverse proxy is using.
 
