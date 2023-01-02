@@ -47,6 +47,7 @@ from synapse.api.errors import (
     FederationError,
     FederationPullAttemptBackoffError,
     HttpResponseException,
+    PartialStateConflictError,
     RequestSendFailed,
     SynapseError,
 )
@@ -74,7 +75,6 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.state import StateResolutionStore
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
     PersistedEventPosition,

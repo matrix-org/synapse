@@ -16,7 +16,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import PartialStateConflictError, SynapseError
 from synapse.handlers.room_member import NoKnownServersError, RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
@@ -25,7 +25,6 @@ from synapse.replication.http.membership import (
     ReplicationRemoteRescindKnockRestServlet as ReplRescindKnock,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
 )
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.types import JsonDict, Requester, UserID
 
 if TYPE_CHECKING:
