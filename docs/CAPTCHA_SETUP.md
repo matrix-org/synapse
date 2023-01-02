@@ -11,7 +11,8 @@ from Google.
 This is the only type of captcha that works with Synapse.
 1. Add the public hostname for your server, as set in `public_baseurl`
 in `homeserver.yaml`, to the list of authorized domains. If you have not set
-`public_baseurl`, use `server_name`.
+`public_baseurl`, then add domain of your third-party client ( ex - app.element.io for element) into
+list of authorized domains.
 1. Agree to the terms of service and submit.
 1. Copy your site key and secret key and add them to your `homeserver.yaml`
 configuration file
