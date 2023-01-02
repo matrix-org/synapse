@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.handlers.room_member import RoomMemberHandler
+from synapse.handlers.room_member import NoKnownServersError, RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
     ReplicationRemoteKnockRestServlet as ReplRemoteKnock,
@@ -24,6 +25,7 @@ from synapse.replication.http.membership import (
     ReplicationRemoteRescindKnockRestServlet as ReplRescindKnock,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
 )
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.types import JsonDict, Requester, UserID
 
 if TYPE_CHECKING:
@@ -52,15 +54,19 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
     ) -> Tuple[str, int]:
         """Implements RoomMemberHandler._remote_join"""
         if len(remote_room_hosts) == 0:
-            raise SynapseError(404, "No known servers")
+            raise NoKnownServersError()
 
-        ret = await self._remote_join_client(
-            requester=requester,
-            remote_room_hosts=remote_room_hosts,
-            room_id=room_id,
-            user_id=user.to_string(),
-            content=content,
-        )
+        try:
+            ret = await self._remote_join_client(
+                requester=requester,
+                remote_room_hosts=remote_room_hosts,
+                room_id=room_id,
+                user_id=user.to_string(),
+                content=content,
+            )
+        except SynapseError as e:
+            if e.code == HTTPStatus.CONFLICT:
+                raise PartialStateConflictError()
 
         return ret["event_id"], ret["stream_id"]
 

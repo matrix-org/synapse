@@ -56,6 +56,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class NoKnownServersError(SynapseError):
+    """No server already resident to the room was provided to the join/knock operation."""
+
+    def __init__(self, msg: str = "No known servers"):
+        super().__init__(404, msg)
+
+
 class RoomMemberHandler(metaclass=abc.ABCMeta):
     # TODO(paul): This handler currently contains a messy conflation of
     #   low-level API that works on UserID objects and so on, and REST-level
@@ -185,6 +192,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             room_id: Room that we are trying to join
             user: User who is trying to join
             content: A dict that should be used as the content of the join event.
+
+        Raises:
+            NoKnownServersError: if remote_room_hosts does not contain a server joined to
+                the room.
+            PartialStateConflictError: if the room was un-partial stated in the meantime,
+                a local room join should be done instead.
         """
         raise NotImplementedError()
 
@@ -972,11 +985,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if requester.is_guest:
                     content["kind"] = "guest"
 
-                remote_join_response = await self._remote_join(
-                    requester, remote_room_hosts, room_id, target, content
-                )
+                try:
+                    remote_join_response = await self._remote_join(
+                        requester, remote_room_hosts, room_id, target, content
+                    )
 
-                return remote_join_response
+                    return remote_join_response
+                except PartialStateConflictError:
+                    # Room has been un-partial stated in the meantime, let's continue
+                    # the code flow to trigger a local join through _local_membership_update.
+                    pass
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
@@ -1741,8 +1759,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         ]
 
         if len(remote_room_hosts) == 0:
-            raise SynapseError(
-                404,
+            raise NoKnownServersError(
                 "Can't join remote room because no servers "
                 "that are in the room have been provided.",
             )
@@ -1973,7 +1990,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         ]
 
         if len(remote_room_hosts) == 0:
-            raise SynapseError(404, "No known servers")
+            raise NoKnownServersError()
 
         return await self.federation_handler.do_knock(
             remote_room_hosts, room_id, user.to_string(), content=content

@@ -82,10 +82,14 @@ class PartialStateConflictError(SynapseError):
     It should not be exposed to clients.
     """
 
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
     def __init__(self) -> None:
         super().__init__(
             HTTPStatus.CONFLICT,
-            msg="Cannot persist partial state event in un-partial stated room",
+            msg=PartialStateConflictError.message(),
             errcode=Codes.UNKNOWN,
         )
 

@@ -562,6 +562,10 @@ class FederationHandler:
             joinee: The User ID of the joining user.
 
             content: The event content to use for the join event.
+
+        Raises:
+            PartialStateConflictError if homeserver was already in the room and it is
+                no longer partial stated.
         """
         # TODO: We should be able to call this on workers, but the upgrading of
         # room stuff after join currently doesn't work on workers.
@@ -655,15 +659,14 @@ class FederationHandler:
                 )
             except PartialStateConflictError as e:
                 # The homeserver was already in the room and it is no longer partial
-                # stated. We ought to be doing a local join instead. Turn the error into
-                # a 429, as a hint to the client to try again.
+                # stated. We ought to be doing a local join instead.
                 # TODO(faster_joins): `_should_perform_remote_join` suggests that we may
                 #   do a remote join for restricted rooms even if we have full state.
                 logger.error(
                     "Room %s was un-partial stated while processing remote join.",
                     room_id,
                 )
-                raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
+                raise e
             else:
                 # Record the join event id for future use (when we finish the full
                 # join). We have to do this after persisting the event to keep foreign
