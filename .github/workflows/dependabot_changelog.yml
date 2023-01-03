@@ -6,7 +6,7 @@ on:
       - reopened  # For debugging!
 
 permissions:
-  # Needed to be able to push the commit. See 
+  # Needed to be able to push the commit. See
   #     https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions#enable-auto-merge-on-a-pull-request
   # for a similar example
   contents: write
@@ -20,8 +20,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Write, commit and push changelog
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "${{ github.event.pull_request.title }}." > "changelog.d/${{ github.event.pull_request.number }}".misc
+          echo "${PR_TITLE}." > "changelog.d/${PR_NUMBER}".misc
           git add changelog.d
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
