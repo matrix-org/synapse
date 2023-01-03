@@ -680,7 +680,7 @@ class OidcProvider:
 
         Args:
             code: The authorization code we got from the callback.
-            code_verifier: The code verifier to send, blank if unused.
+            code_verifier: The PKCE code verifier to send, blank if unused.
 
         Returns:
             A dict containing various tokens.
@@ -931,6 +931,7 @@ class OidcProvider:
           - ``scope``: the list of scopes set in ``oidc_config.scopes``
           - ``state``: a random string
           - ``nonce``: a random string
+          - ``code_challenge``: a RFC7636 code challenge (if PKCE is supported)
 
         In addition to generating a redirect URL, we are setting a cookie with
         a signed macaroon token containing the state, the nonce, the
