@@ -99,7 +99,11 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
     }
 
     pub fn items(&'a self) -> impl Iterator<Item = (Vec<&K>, &V)> {
-        let mut stack = vec![(Vec::new(), self)];
+        // To avoid a lot of mallocs we guess the length of the key. Ideally
+        // we'd know this.
+        let capacity_guesstimate = 10;
+
+        let mut stack = vec![(Vec::with_capacity(capacity_guesstimate), self)];
 
         std::iter::from_fn(move || {
             while let Some((prefix, node)) = stack.pop() {
@@ -107,10 +111,28 @@ impl<'a, K: Eq + Hash + 'a, V> TreeCacheNode<K, V> {
                     TreeCacheNode::Leaf(value) => return Some((prefix, value)),
                     TreeCacheNode::Branch(_, map) => {
                         stack.extend(map.iter().map(|(k, v)| {
-                            let mut prefix = prefix.clone();
-                            prefix.push(k);
-                            (prefix, v)
+                            let mut new_prefix = Vec::with_capacity(capacity_guesstimate);
+                            new_prefix.extend_from_slice(&prefix);
+                            new_prefix.push(k);
+                            (new_prefix, v)
                         }));
+                    }
+                }
+            }
+
+            None
+        })
+    }
+
+    pub fn values(&'a self) -> impl Iterator<Item = &V> {
+        let mut stack = vec![self];
+
+        std::iter::from_fn(move || {
+            while let Some(node) = stack.pop() {
+                match node {
+                    TreeCacheNode::Leaf(value) => return Some(value),
+                    TreeCacheNode::Branch(_, map) => {
+                        stack.extend(map.iter().map(|(_k, v)| v));
                     }
                 }
             }

@@ -58,3 +58,20 @@ fn bench_tree_cache_length(b: &mut Bencher) {
 
     b.iter(|| cache.len());
 }
+
+#[bench]
+fn tree_cache_iterate(b: &mut Bencher) {
+    let mut cache: TreeCache<u32, u32> = TreeCache::new();
+
+    for c1 in 0..=10 {
+        for c2 in 0..=10 {
+            for c3 in 0..=10 {
+                for c4 in 0..=10 {
+                    cache.set([c1, c2, c3, c4], 1).unwrap()
+                }
+            }
+        }
+    }
+
+    b.iter(|| cache.items().count());
+}
