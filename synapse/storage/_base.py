@@ -58,7 +58,8 @@ class SQLBaseStore(metaclass=ABCMeta):
         rows: Iterable[Any],
     ) -> None:
         """
-        Used by storage classes to invalidate caches based on incoming replication data.
+        Used by storage classes to invalidate caches based on incoming replication data. These
+        must not update any ID generators, use `process_replication_position`.
         """
 
     def process_replication_position(  # noqa: B027 (no-op by design)
