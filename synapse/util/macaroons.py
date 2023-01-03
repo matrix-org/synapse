@@ -111,7 +111,7 @@ class OidcSessionData:
     """The session ID of the ongoing UI Auth ("" if this is a login)"""
 
     code_verifier: str
-    """The random string used in code challenges ("" if code challenges are not used)."""
+    """The random string used in the RFC7636 code challenge ("" if PKCE is not being used)."""
 
 
 class MacaroonGenerator:
