@@ -932,10 +932,12 @@ class OidcProvider:
           - ``state``: a random string
           - ``nonce``: a random string
 
-        In addition generating a redirect URL, we are setting a cookie with
-        a signed macaroon token containing the state, the nonce and the
-        client_redirect_url params. Those are then checked when the client
-        comes back from the provider.
+        In addition to generating a redirect URL, we are setting a cookie with
+        a signed macaroon token containing the state, the nonce, the
+        client_redirect_url, and (optionally) the code_verifier params. The state,
+        nonce, and client_redirect_url are then checked when the client comes back
+        from the provider. The code_verifier is passed back to the server during
+        the token exchange and compared to the code_challenge sent in this request.
 
         Args:
             request: the incoming request from the browser.
@@ -959,12 +961,13 @@ class OidcProvider:
 
         metadata = await self.load_metadata()
 
-        # Automatically enable PKCE if it is supported. (Note we verified it contains S256 earlier.)
+        # Automatically enable PKCE if it is supported.
         extra_grant_values = {}
         if metadata.get("code_challenge_methods_supported"):
             code_verifier = generate_token(48)
 
-            # Default to the values for plain.
+            # Note that we verified the server supports S256 earlier (in
+            # OidcProvider._validate_metadata).
             extra_grant_values = {
                 "code_challenge_method": "S256",
                 "code_challenge": create_s256_code_challenge(code_verifier),
