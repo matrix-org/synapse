@@ -1,1 +1,1 @@
-Make room version 10 default. Implements MSC3904. Contributed by @FSG-Cat.
+Update the default room version to [v10](https://spec.matrix.org/v1.4/rooms/v10/) ([MSC 3904](https://github.com/matrix-org/matrix-spec-proposals/pull/3904)). Contributed by @FSG-Cat.
