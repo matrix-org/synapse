@@ -3098,9 +3098,25 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
+       * `subject_template`: Jinja2 template for a unique identifier for the user.
+         Defaults to `{{ user.sub }}`, which OpenID Connect compliant providers should provide.
+
+         This replaces and overrides `subject_claim`.
+
        * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
+
+         *Deprecated in Synapse v1.75.0.*
+
+       * `picture_template`: Jinja2 template for an url for the user's profile picture.
+         Defaults to `{{ user.picture }}`, which OpenID Connect compliant providers should
+         provide and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+
+         This replaces and overrides `picture_claim`.
+
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
 
        * `picture_claim`: name of the claim containing an url for the user's profile picture.
          Defaults to 'picture', which OpenID Connect compliant providers should provide
@@ -3108,6 +3124,8 @@ Options for each entry include:
          
          Currently only supported in monolithic (single-process) server configurations
          where the media repository runs within the Synapse process.
+
+         *Deprecated in Synapse v1.75.0.*
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their

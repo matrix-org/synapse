@@ -1520,8 +1520,8 @@ env.filters.update(
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class JinjaOidcMappingConfig:
-    subject_claim: str
-    picture_claim: str
+    subject_template: Template
+    picture_template: Template
     localpart_template: Optional[Template]
     display_name_template: Optional[Template]
     email_template: Optional[Template]
@@ -1540,8 +1540,23 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
 
     @staticmethod
     def parse_config(config: dict) -> JinjaOidcMappingConfig:
-        subject_claim = config.get("subject_claim", "sub")
-        picture_claim = config.get("picture_claim", "picture")
+        def parse_template_config_with_claim(
+            option_name: str, default_claim: str
+        ) -> Template:
+            template_name = f"{option_name}_template"
+            template = config.get(template_name)
+            if not template:
+                # Convert the legacy subject_claim into a template.
+                claim = config.get(f"{option_name}_claim", default_claim)
+                template = "{{ user.%s }}" % (claim,)
+
+            try:
+                return env.from_string(template)
+            except Exception as e:
+                raise ConfigError("invalid jinja template", path=[template_name]) from e
+
+        subject_template = parse_template_config_with_claim("subject", "sub")
+        picture_template = parse_template_config_with_claim("picture", "picture")
 
         def parse_template_config(option_name: str) -> Optional[Template]:
             if option_name not in config:
@@ -1574,8 +1589,8 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             raise ConfigError("must be a bool", path=["confirm_localpart"])
 
         return JinjaOidcMappingConfig(
-            subject_claim=subject_claim,
-            picture_claim=picture_claim,
+            subject_template=subject_template,
+            picture_template=picture_template,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             email_template=email_template,
@@ -1584,7 +1599,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
-        return userinfo[self._config.subject_claim]
+        return self._config.subject_template.render(user=userinfo).strip()
 
     async def map_user_attributes(
         self, userinfo: UserInfo, token: Token, failures: int
@@ -1615,7 +1630,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if email:
             emails.append(email)
 
-        picture = userinfo.get(self._config.picture_claim)
+        picture = self._config.picture_template.render(user=userinfo).strip()
 
         return UserAttributeDict(
             localpart=localpart,
