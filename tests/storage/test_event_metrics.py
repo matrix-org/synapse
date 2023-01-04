@@ -13,14 +13,18 @@
 # limitations under the License.
 from prometheus_client import generate_latest
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.metrics import REGISTRY
+from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class ExtremStatisticsTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.clock._reactor.advance(1)  # type: ignore
 
     def test_exposed_to_prometheus(self) -> None:
