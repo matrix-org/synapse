@@ -3053,8 +3053,13 @@ Options for each entry include:
    values are `client_secret_basic` (default), `client_secret_post` and
    `none`.
 
+* `pkce_method`: Whether to use proof key for code exchange when requesting
+   and exchanging the token. Valid values are: `auto`, `always`, or `never`. Defaults
+   to `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
+   to force enable PKCE or `never` to force disable PKCE.
+
 * `scopes`: list of scopes to request. This should normally include the "openid"
-   scope. Defaults to ["openid"].
+   scope. Defaults to `["openid"]`.
 
 * `authorization_endpoint`: the oauth2 authorization endpoint. Required if
    provider discovery is disabled.
