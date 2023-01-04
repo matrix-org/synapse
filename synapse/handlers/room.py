@@ -340,6 +340,9 @@ class RoomCreationHandler:
             old_room_state,
         )
 
+        # Beeper: clear out any push actions and summaries for this room
+        await self.store.beeper_cleanup_tombstoned_room(old_room_id)
+
         return new_room_id
 
     async def _update_upgraded_room_pls(

@@ -68,3 +68,17 @@ class BeeperStore(SQLBaseStore):
             "beeper_preview_for_room_id_and_user_id",
             beeper_preview_txn,
         )
+
+    async def beeper_cleanup_tombstoned_room(self, room_id: str) -> None:
+        def beeper_cleanup_tombstoned_room_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_delete_txn(
+                txn, table="event_push_actions", keyvalues={"room_id": room_id}
+            )
+            self.db_pool.simple_delete_txn(
+                txn, table="event_push_summary", keyvalues={"room_id": room_id}
+            )
+
+        await self.db_pool.runInteraction(
+            "beeper_cleanup_tombstoned_room",
+            beeper_cleanup_tombstoned_room_txn,
+        )
