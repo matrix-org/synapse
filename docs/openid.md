@@ -612,6 +612,41 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
+### Twitter
+
+*Using Twitter as an identity provider requires using Synapse 1.75.0 or later.*
+
+1. Setup a developer account on [Twitter](https://developer.twitter.com/en/portal/dashboard)
+2. Create a project & app.
+3. Enable user authentication and under "Type of App" choose "Web App, Automated App or Bot".
+4. Under "App info" set the callback URL to `[synapse public baseurl]/_synapse/client/oidc/callback`.
+5. Obtain the OAuth 2.0 credentials under the "Keys and tokens" tab, copy the "OAuth 2.0 Client ID and Client Secret"
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: twitter
+    idp_name: Twitter
+    idp_brand: "twitter"  # optional: styling hint for clients
+    discover: false  # Twitter is not OpenID compliant.
+    issuer: "https://twitter.com/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    pkce_method: "always"
+    # offline.access providers refresh tokens, tweet.read and users.read needed for userinfo request.
+    scopes: ["offline.access", "tweet.read", "users.read"]
+    authorization_endpoint: https://twitter.com/i/oauth2/authorize
+    token_endpoint: https://api.twitter.com/2/oauth2/token
+    userinfo_endpoint: https://api.twitter.com/2/users/me?user.fields=profile_image_url
+    user_mapping_provider:
+      config:
+        subject_template: "{{ user.data.id }}"
+        localpart_template: "{{ user.data.username }}"
+        display_name_template: "{{ user.data.name }}"
+        picture_template: "{{ user.data.profile_image_url }}"
+```
+
 ### XWiki
 
 Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
