@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import NoReturn
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -23,14 +24,14 @@ from tests.unittest import TestCase
 
 
 class CachedCallTestCase(TestCase):
-    def test_get(self):
+    def test_get(self) -> None:
         """
         Happy-path test case: makes a couple of calls and makes sure they behave
         correctly
         """
-        d = Deferred()
+        d: "Deferred[int]" = Deferred()
 
-        async def f():
+        async def f() -> int:
             return await d
 
         slow_call = Mock(side_effect=f)
@@ -43,7 +44,7 @@ class CachedCallTestCase(TestCase):
         # now fire off a couple of calls
         completed_results = []
 
-        async def r():
+        async def r() -> None:
             res = await cached_call.get()
             completed_results.append(res)
 
@@ -69,12 +70,12 @@ class CachedCallTestCase(TestCase):
         self.assertEqual(r3, 123)
         slow_call.assert_not_called()
 
-    def test_fast_call(self):
+    def test_fast_call(self) -> None:
         """
         Test the behaviour when the underlying function completes immediately
         """
 
-        async def f():
+        async def f() -> int:
             return 12
 
         fast_call = Mock(side_effect=f)
@@ -92,12 +93,12 @@ class CachedCallTestCase(TestCase):
 
 
 class RetryOnExceptionCachedCallTestCase(TestCase):
-    def test_get(self):
+    def test_get(self) -> None:
         # set up the RetryOnExceptionCachedCall around a function which will fail
         # (after a while)
-        d = Deferred()
+        d: "Deferred[int]" = Deferred()
 
-        async def f1():
+        async def f1() -> NoReturn:
             await d
             raise ValueError("moo")
 
@@ -110,7 +111,7 @@ class RetryOnExceptionCachedCallTestCase(TestCase):
         # now fire off a couple of calls
         completed_results = []
 
-        async def r():
+        async def r() -> None:
             try:
                 await cached_call.get()
             except Exception as e1:
@@ -137,7 +138,7 @@ class RetryOnExceptionCachedCallTestCase(TestCase):
         # to the getter
         d = Deferred()
 
-        async def f2():
+        async def f2() -> int:
             return await d
 
         slow_call.reset_mock()

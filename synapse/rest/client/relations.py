@@ -13,12 +13,15 @@
 # limitations under the License.
 
 import logging
+import re
 from typing import TYPE_CHECKING, Optional, Tuple
 
+from synapse.handlers.relations import ThreadsListInclude
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
+from synapse.storage.databases.main.relations import ThreadsNextBatch
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict
 
@@ -78,5 +81,45 @@ class RelationPaginationServlet(RestServlet):
         return 200, result
 
 
+class ThreadsServlet(RestServlet):
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"),)
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
+        self._relations_handler = hs.get_relations_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+
+        limit = parse_integer(request, "limit", default=5)
+        from_token_str = parse_string(request, "from")
+        include = parse_string(
+            request,
+            "include",
+            default=ThreadsListInclude.all.value,
+            allowed_values=[v.value for v in ThreadsListInclude],
+        )
+
+        # Return the relations
+        from_token = None
+        if from_token_str:
+            from_token = ThreadsNextBatch.from_string(from_token_str)
+
+        result = await self._relations_handler.get_threads(
+            requester=requester,
+            room_id=room_id,
+            include=ThreadsListInclude(include),
+            limit=limit,
+            from_token=from_token,
+        )
+
+        return 200, result
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RelationPaginationServlet(hs).register(http_server)
+    ThreadsServlet(hs).register(http_server)

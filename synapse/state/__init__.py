@@ -44,8 +44,8 @@ from synapse.logging.context import ContextResourceUsage
 from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import StateMap
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
@@ -190,6 +190,7 @@ class StateHandler:
         room_id: str,
         event_ids: Collection[str],
         state_filter: Optional[StateFilter] = None,
+        await_full_state: bool = True,
     ) -> StateMap[str]:
         """Fetch the state after each of the given event IDs. Resolve them and return.
 
@@ -200,13 +201,24 @@ class StateHandler:
         Args:
             room_id: the room_id containing the given events.
             event_ids: the events whose state should be fetched and resolved.
+            await_full_state: if `True`, will block if we do not yet have complete state
+                at these events and `state_filter` is not satisfied by partial state.
+                Defaults to `True`.
 
         Returns:
             the state dict (a mapping from (event_type, state_key) -> event_id) which
             holds the resolution of the states after the given event IDs.
         """
         logger.debug("calling resolve_state_groups from compute_state_after_events")
-        ret = await self.resolve_state_groups_for_events(room_id, event_ids)
+        if (
+            await_full_state
+            and state_filter
+            and not state_filter.must_await_full_state(self.hs.is_mine_id)
+        ):
+            await_full_state = False
+        ret = await self.resolve_state_groups_for_events(
+            room_id, event_ids, await_full_state
+        )
         return await ret.get_state(self._state_storage_controller, state_filter)
 
     async def get_current_user_ids_in_room(

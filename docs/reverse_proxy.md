@@ -46,7 +46,7 @@ when using a containerized Synapse, as that will prevent it from responding
 to proxied traffic.)
 
 Optionally, you can also set
-[`request_id_header`](../usage/configuration/config_documentation.md#listeners)
+[`request_id_header`](./usage/configuration/config_documentation.md#listeners)
 so that the server extracts and re-uses the same request ID format that the
 reverse proxy is using.
 
@@ -79,6 +79,9 @@ server {
         # Nginx by default only allows file uploads up to 1M in size
         # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
         client_max_body_size 50M;
+	
+	# Synapse responses may be chunked, which is an HTTP/1.1 feature.
+	proxy_http_version 1.1;
     }
 }
 ```

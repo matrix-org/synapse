@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, Optional, Union
 
 import frozendict
 
@@ -39,10 +39,7 @@ from tests.test_utils.event_injection import create_event, inject_member_event
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
-        self,
-        content: JsonDict,
-        relations: Optional[Dict[str, Set[Tuple[str, str]]]] = None,
-        relations_match_enabled: bool = False,
+        self, content: JsonDict, related_events=None
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
@@ -63,8 +60,10 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             room_member_count,
             sender_power_level,
             power_levels.get("notifications", {}),
-            relations or {},
-            relations_match_enabled,
+            {} if related_events is None else related_events,
+            True,
+            event.room_version.msc3931_push_features,
+            True,
         )
 
     def test_display_name(self) -> None:
@@ -299,70 +298,214 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {"sound": "default", "highlight": True},
         )
 
-    def test_relation_match(self) -> None:
-        """Test the relation_match push rule kind."""
-
-        # Check if the experimental feature is disabled.
+    def test_related_event_match(self):
         evaluator = self._get_evaluator(
-            {}, {"m.annotation": {("@user:test", "m.reaction")}}
+            {
+                "m.relates_to": {
+                    "event_id": "$parent_event_id",
+                    "key": "😀",
+                    "rel_type": "m.annotation",
+                    "m.in_reply_to": {
+                        "event_id": "$parent_event_id",
+                    },
+                }
+            },
+            {
+                "m.in_reply_to": {
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                },
+                "m.annotation": {
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                },
+            },
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@user:test",
+                },
+                "@other_user:test",
+                "display_name",
+            )
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.annotation",
+                    "pattern": "@other_user:test",
+                },
+                "@other_user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "rel_type": "m.replace",
+                },
+                "@other_user:test",
+                "display_name",
+            )
         )
 
-        # A push rule evaluator with the experimental rule enabled.
+    def test_related_event_match_with_fallback(self):
         evaluator = self._get_evaluator(
-            {}, {"m.annotation": {("@user:test", "m.reaction")}}, True
+            {
+                "m.relates_to": {
+                    "event_id": "$parent_event_id",
+                    "key": "😀",
+                    "rel_type": "m.thread",
+                    "is_falling_back": True,
+                    "m.in_reply_to": {
+                        "event_id": "$parent_event_id",
+                    },
+                }
+            },
+            {
+                "m.in_reply_to": {
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                    "im.vector.is_falling_back": "",
+                },
+                "m.thread": {
+                    "event_id": "$parent_event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "room_id": "!room:test",
+                    "content.msgtype": "m.text",
+                    "content.body": "Original message",
+                },
+            },
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                    "include_fallbacks": True,
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                    "include_fallbacks": False,
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                },
+                "@user:test",
+                "display_name",
+            )
         )
 
-        # Check just relation type.
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "rel_type": "m.annotation",
-        }
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
-
-        # Check relation type and sender.
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "rel_type": "m.annotation",
-            "sender": "@user:test",
-        }
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "rel_type": "m.annotation",
-            "sender": "@other:test",
-        }
-        self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
-
-        # Check relation type and event type.
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "rel_type": "m.annotation",
-            "type": "m.reaction",
-        }
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
-
-        # Check just sender, this fails since rel_type is required.
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "sender": "@user:test",
-        }
-        self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
-
-        # Check sender glob.
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "rel_type": "m.annotation",
-            "sender": "@*:test",
-        }
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
-
-        # Check event type glob.
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "rel_type": "m.annotation",
-            "event_type": "*.reaction",
-        }
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+    def test_related_event_match_no_related_event(self):
+        evaluator = self._get_evaluator(
+            {"msgtype": "m.text", "body": "Message without related event"}
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                    "pattern": "@other_user:test",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
 
 
 class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):

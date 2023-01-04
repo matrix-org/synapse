@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.room_versions import RoomVersions
+from synapse.server import HomeServer
 from synapse.types import RoomAlias, RoomID, UserID
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class RoomStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
         self.store = hs.get_datastores().main
@@ -37,30 +41,34 @@ class RoomStoreTestCase(HomeserverTestCase):
             )
         )
 
-    def test_get_room(self):
+    def test_get_room(self) -> None:
+        res = self.get_success(self.store.get_room(self.room.to_string()))
+        assert res is not None
         self.assertDictContainsSubset(
             {
                 "room_id": self.room.to_string(),
                 "creator": self.u_creator.to_string(),
                 "is_public": True,
             },
-            (self.get_success(self.store.get_room(self.room.to_string()))),
+            res,
         )
 
-    def test_get_room_unknown_room(self):
+    def test_get_room_unknown_room(self) -> None:
         self.assertIsNone(self.get_success(self.store.get_room("!uknown:test")))
 
-    def test_get_room_with_stats(self):
+    def test_get_room_with_stats(self) -> None:
+        res = self.get_success(self.store.get_room_with_stats(self.room.to_string()))
+        assert res is not None
         self.assertDictContainsSubset(
             {
                 "room_id": self.room.to_string(),
                 "creator": self.u_creator.to_string(),
                 "public": True,
             },
-            (self.get_success(self.store.get_room_with_stats(self.room.to_string()))),
+            res,
         )
 
-    def test_get_room_with_stats_unknown_room(self):
+    def test_get_room_with_stats_unknown_room(self) -> None:
         self.assertIsNone(
-            (self.get_success(self.store.get_room_with_stats("!uknown:test"))),
+            self.get_success(self.store.get_room_with_stats("!uknown:test"))
         )

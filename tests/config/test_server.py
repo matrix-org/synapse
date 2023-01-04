@@ -21,7 +21,7 @@ from tests import unittest
 
 
 class ServerConfigTestCase(unittest.TestCase):
-    def test_is_threepid_reserved(self):
+    def test_is_threepid_reserved(self) -> None:
         user1 = {"medium": "email", "address": "user1@example.com"}
         user2 = {"medium": "email", "address": "user2@example.com"}
         user3 = {"medium": "email", "address": "user3@example.com"}
@@ -32,7 +32,7 @@ class ServerConfigTestCase(unittest.TestCase):
         self.assertFalse(is_threepid_reserved(config, user3))
         self.assertFalse(is_threepid_reserved(config, user1_msisdn))
 
-    def test_unsecure_listener_no_listeners_open_private_ports_false(self):
+    def test_unsecure_listener_no_listeners_open_private_ports_false(self) -> None:
         conf = yaml.safe_load(
             ServerConfig().generate_config_section(
                 "CONFDIR", "/data_dir_path", "che.org", False, None
@@ -52,7 +52,7 @@ class ServerConfigTestCase(unittest.TestCase):
 
         self.assertEqual(conf["listeners"], expected_listeners)
 
-    def test_unsecure_listener_no_listeners_open_private_ports_true(self):
+    def test_unsecure_listener_no_listeners_open_private_ports_true(self) -> None:
         conf = yaml.safe_load(
             ServerConfig().generate_config_section(
                 "CONFDIR", "/data_dir_path", "che.org", True, None
@@ -71,7 +71,7 @@ class ServerConfigTestCase(unittest.TestCase):
 
         self.assertEqual(conf["listeners"], expected_listeners)
 
-    def test_listeners_set_correctly_open_private_ports_false(self):
+    def test_listeners_set_correctly_open_private_ports_false(self) -> None:
         listeners = [
             {
                 "port": 8448,
@@ -95,7 +95,7 @@ class ServerConfigTestCase(unittest.TestCase):
 
         self.assertEqual(conf["listeners"], listeners)
 
-    def test_listeners_set_correctly_open_private_ports_true(self):
+    def test_listeners_set_correctly_open_private_ports_true(self) -> None:
         listeners = [
             {
                 "port": 8448,
@@ -131,14 +131,14 @@ class ServerConfigTestCase(unittest.TestCase):
 
 
 class GenerateIpSetTestCase(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         ip_set = generate_ip_set(())
         self.assertFalse(ip_set)
 
         ip_set = generate_ip_set((), ())
         self.assertFalse(ip_set)
 
-    def test_generate(self):
+    def test_generate(self) -> None:
         """Check adding IPv4 and IPv6 addresses."""
         # IPv4 address
         ip_set = generate_ip_set(("1.2.3.4",))
@@ -160,7 +160,7 @@ class GenerateIpSetTestCase(unittest.TestCase):
         ip_set = generate_ip_set(("1.2.3.4", "::1.2.3.4"))
         self.assertEqual(len(ip_set.iter_cidrs()), 4)
 
-    def test_extra(self):
+    def test_extra(self) -> None:
         """Extra IP addresses are treated the same."""
         ip_set = generate_ip_set((), ("1.2.3.4",))
         self.assertEqual(len(ip_set.iter_cidrs()), 4)
@@ -172,7 +172,7 @@ class GenerateIpSetTestCase(unittest.TestCase):
         ip_set = generate_ip_set(("1.2.3.4",), ("1.2.3.4",))
         self.assertEqual(len(ip_set.iter_cidrs()), 4)
 
-    def test_bad_value(self):
+    def test_bad_value(self) -> None:
         """An error should be raised if a bad value is passed in."""
         with self.assertRaises(ConfigError):
             generate_ip_set(("not-an-ip",))

@@ -23,7 +23,7 @@ from synapse.types import JsonDict, StateMap
 if TYPE_CHECKING:
     from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
-    from synapse.storage.state import StateFilter
+    from synapse.types.state import StateFilter
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -65,7 +65,8 @@ class EventContext:
             None does not necessarily mean that ``state_group`` does not have
             a prev_group!
 
-            If the event is a state event, this is normally the same as ``prev_group``.
+            If the event is a state event, this is normally the same as
+            ``state_group_before_event``.
 
             If ``state_group`` is None (ie, the event is an outlier), ``prev_group``
             will always also be ``None``.

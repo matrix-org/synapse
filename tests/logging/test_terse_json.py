@@ -153,6 +153,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         site.site_tag = "test-site"
         site.server_version_string = "Server v1"
         site.reactor = Mock()
+        site.experimental_cors_msc3886 = False
         request = SynapseRequest(FakeChannel(site, None), site)
         # Call requestReceived to finish instantiating the object.
         request.content = BytesIO()

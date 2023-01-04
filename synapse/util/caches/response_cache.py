@@ -167,12 +167,10 @@ class ResponseCache(Generic[KV]):
             # the should_cache bit, we leave it in the cache for now and schedule
             # its removal later.
             if self.timeout_sec and context.should_cache:
-                self.clock.call_later(
-                    self.timeout_sec, self._result_cache.pop, key, None
-                )
+                self.clock.call_later(self.timeout_sec, self.unset, key)
             else:
                 # otherwise, remove the result immediately.
-                self._result_cache.pop(key, None)
+                self.unset(key)
             return r
 
         # make sure we do this *after* adding the entry to result_cache,
@@ -180,6 +178,14 @@ class ResponseCache(Generic[KV]):
         # leave us with a stuck entry in the cache).
         result.addBoth(on_complete)
         return entry
+
+    def unset(self, key: KV) -> None:
+        """Remove the cached value for this key from the cache, if any.
+
+        Args:
+            key: key used to remove the cached value
+        """
+        self._result_cache.pop(key, None)
 
     async def wrap(
         self,

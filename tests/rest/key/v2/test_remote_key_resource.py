@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import urllib.parse
 from io import BytesIO, StringIO
 from typing import Any, Dict, Optional, Union
 from unittest.mock import Mock
@@ -26,7 +25,7 @@ from twisted.web.resource import NoResource, Resource
 
 from synapse.crypto.keyring import PerspectivesKeyFetcher
 from synapse.http.site import SynapseRequest
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict
@@ -46,7 +45,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
 
     def create_test_resource(self) -> Resource:
         return create_resource_tree(
-            {"/_matrix/key/v2": KeyApiV2Resource(self.hs)}, root_resource=NoResource()
+            {"/_matrix/key/v2": KeyResource(self.hs)}, root_resource=NoResource()
         )
 
     def expect_outgoing_key_request(
@@ -65,9 +64,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
             self.assertTrue(ignore_backoff)
             self.assertEqual(destination, server_name)
             key_id = "%s:%s" % (signing_key.alg, signing_key.version)
-            self.assertEqual(
-                path, "/_matrix/key/v2/server/%s" % (urllib.parse.quote(key_id),)
-            )
+            self.assertEqual(path, "/_matrix/key/v2/server")
 
             response = {
                 "server_name": server_name,
