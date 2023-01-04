@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 from typing import (
     TYPE_CHECKING,
     Collection,
@@ -63,6 +64,9 @@ logger = logging.getLogger(__name__)
 
 _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
 _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME = "current_state_events_membership"
+
+# Regex pattern for detecting a bridge bot (cached here for performance)
+BOT_PATTERN = re.compile(r"^@_.*_bot\:.*")
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
@@ -1549,15 +1553,26 @@ def extract_heroes_from_room_summary(
     """
     empty_ms = MemberSummary([], 0)
 
+    def mxid_filter(mxid: str) -> bool:
+        return mxid != me and not BOT_PATTERN.match(mxid)
+
     joined_user_ids = [
-        r[0] for r in details.get(Membership.JOIN, empty_ms).members if r[0] != me
+        r[0]
+        for r in details.get(Membership.JOIN, empty_ms).members
+        if mxid_filter(r[0])
     ]
     invited_user_ids = [
-        r[0] for r in details.get(Membership.INVITE, empty_ms).members if r[0] != me
+        r[0]
+        for r in details.get(Membership.INVITE, empty_ms).members
+        if mxid_filter(r[0])
     ]
     gone_user_ids = [
-        r[0] for r in details.get(Membership.LEAVE, empty_ms).members if r[0] != me
-    ] + [r[0] for r in details.get(Membership.BAN, empty_ms).members if r[0] != me]
+        r[0]
+        for r in details.get(Membership.LEAVE, empty_ms).members
+        if mxid_filter(r[0])
+    ] + [
+        r[0] for r in details.get(Membership.BAN, empty_ms).members if mxid_filter(r[0])
+    ]
 
     # FIXME: order by stream ordering rather than as returned by SQL
     if joined_user_ids or invited_user_ids:

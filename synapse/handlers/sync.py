@@ -843,28 +843,6 @@ class SyncHandler:
         me = sync_config.user.to_string()
         summary["m.heroes"] = extract_heroes_from_room_summary(details, me)
 
-        if sync_config.beeper_previews:
-            try:
-                profiles = await self.store.get_subset_users_in_room_with_profiles(
-                    room_id,
-                    summary["m.heroes"],
-                )
-                summary["com.beeper.m.heroes"] = [
-                    {
-                        "mxid": mxid,
-                        "display_name": profile.display_name
-                        if profile is not None
-                        else None,
-                    }
-                    for mxid, profile in profiles.items()
-                    if not mxid.startswith("@_")  # filter out bot users
-                ]
-            except Exception as e:
-                logger.warning(
-                    f"Error generating heroes for room {room_id} profiles {profiles} error {e}"
-                )
-                raise
-
         if not sync_config.filter_collection.lazy_load_members():
             return summary
 
