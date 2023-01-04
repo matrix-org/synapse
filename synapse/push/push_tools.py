@@ -32,12 +32,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
         if room_id not in joins:
             continue
 
-        # Beeper change: Only count a room as having unread messages if we
-        # have both unread events (MSC2654) *and* notifications (ie, not muted).
-        if notify_count == 0 or (
-            store.hs.config.experimental.msc2654_enabled
-            and notifs.main_timeline.unread_count == 0
-        ):
+        if notify_count == 0:
             continue
 
         if group_by_room:
