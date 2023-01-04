@@ -388,11 +388,7 @@ class EventsWorkerStore(SQLBaseStore):
         token: int,
         rows: Iterable[Any],
     ) -> None:
-        if stream_name == EventsStream.NAME:
-            self._stream_id_gen.advance(instance_name, token)
-        elif stream_name == BackfillStream.NAME:
-            self._backfill_id_gen.advance(instance_name, -token)
-        elif stream_name == UnPartialStatedEventStream.NAME:
+        if stream_name == UnPartialStatedEventStream.NAME:
             for row in rows:
                 assert isinstance(row, UnPartialStatedEventStreamRow)
 
@@ -404,6 +400,15 @@ class EventsWorkerStore(SQLBaseStore):
                     self._invalidate_local_get_event_cache(row.event_id)
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == EventsStream.NAME:
+            self._stream_id_gen.advance(instance_name, token)
+        elif stream_name == BackfillStream.NAME:
+            self._backfill_id_gen.advance(instance_name, -token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     async def have_censored_event(self, event_id: str) -> bool:
         """Check if an event has been censored, i.e. if the content of the event has been erased
