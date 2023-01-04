@@ -420,30 +420,23 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(code_verifier, "")
         self.assertEqual(redirect, "http://client/redirect")
 
-    @override_config({"oidc_config": {**DEFAULT_CONFIG, "pkce_method": "always"}})
+    @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_redirect_request_with_code_challenge(self) -> None:
         """The redirect request has the right arguments & generates a valid session cookie."""
         req = Mock(spec=["cookies"])
         req.cookies = []
 
-        url = urlparse(
-            self.get_success(
-                self.provider.handle_redirect_request(req, b"http://client/redirect")
+        with self.metadata_edit({"code_challenge_methods_supported": ["S256"]}):
+            url = urlparse(
+                self.get_success(
+                    self.provider.handle_redirect_request(
+                        req, b"http://client/redirect"
+                    )
+                )
             )
-        )
-        auth_endpoint = urlparse(self.fake_server.authorization_endpoint)
 
-        self.assertEqual(url.scheme, auth_endpoint.scheme)
-        self.assertEqual(url.netloc, auth_endpoint.netloc)
-        self.assertEqual(url.path, auth_endpoint.path)
-
+        # Ensure the code_challenge param is added to the redirect.
         params = parse_qs(url.query)
-        self.assertEqual(params["redirect_uri"], [CALLBACK_URL])
-        self.assertEqual(params["response_type"], ["code"])
-        self.assertEqual(params["scope"], [" ".join(SCOPES)])
-        self.assertEqual(params["client_id"], [CLIENT_ID])
-        self.assertEqual(len(params["state"]), 1)
-        self.assertEqual(len(params["nonce"]), 1)
         self.assertEqual(len(params["code_challenge"]), 1)
 
         # Check what is in the cookies
@@ -457,17 +450,78 @@ class OidcHandlerTestCase(HomeserverTestCase):
         name, cookie = parts[0].split(b"=")
         self.assertEqual(name, b"oidc_session")
 
+        # Ensure the code_verifier is set in the cookie.
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
-        state = get_value_from_macaroon(macaroon, "state")
-        nonce = get_value_from_macaroon(macaroon, "nonce")
         code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
-        redirect = get_value_from_macaroon(macaroon, "client_redirect_url")
-
-        self.assertEqual(params["state"], [state])
-        self.assertEqual(params["nonce"], [nonce])
-        # Ensure the code verifier is not blank.
         self.assertNotEqual(code_verifier, "")
-        self.assertEqual(redirect, "http://client/redirect")
+
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "pkce_method": "always"}})
+    def test_redirect_request_with_forced_code_challenge(self) -> None:
+        """The redirect request has the right arguments & generates a valid session cookie."""
+        req = Mock(spec=["cookies"])
+        req.cookies = []
+
+        url = urlparse(
+            self.get_success(
+                self.provider.handle_redirect_request(req, b"http://client/redirect")
+            )
+        )
+
+        # Ensure the code_challenge param is added to the redirect.
+        params = parse_qs(url.query)
+        self.assertEqual(len(params["code_challenge"]), 1)
+
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
+        cookie_header = req.cookies[0]
+
+        # The cookie name and path don't really matter, just that it has to be coherent
+        # between the callback & redirect handlers.
+        parts = [p.strip() for p in cookie_header.split(b";")]
+        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        name, cookie = parts[0].split(b"=")
+        self.assertEqual(name, b"oidc_session")
+
+        # Ensure the code_verifier is set in the cookie.
+        macaroon = pymacaroons.Macaroon.deserialize(cookie)
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
+        self.assertNotEqual(code_verifier, "")
+
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "pkce_method": "never"}})
+    def test_redirect_request_with_disabled_code_challenge(self) -> None:
+        """The redirect request has the right arguments & generates a valid session cookie."""
+        req = Mock(spec=["cookies"])
+        req.cookies = []
+
+        # The metadata should state that PKCE is enabled.
+        with self.metadata_edit({"code_challenge_methods_supported": ["S256"]}):
+            url = urlparse(
+                self.get_success(
+                    self.provider.handle_redirect_request(
+                        req, b"http://client/redirect"
+                    )
+                )
+            )
+
+        # Ensure the code_challenge param is added to the redirect.
+        params = parse_qs(url.query)
+        self.assertNotIn("code_challenge", params)
+
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
+        cookie_header = req.cookies[0]
+
+        # The cookie name and path don't really matter, just that it has to be coherent
+        # between the callback & redirect handlers.
+        parts = [p.strip() for p in cookie_header.split(b";")]
+        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        name, cookie = parts[0].split(b"=")
+        self.assertEqual(name, b"oidc_session")
+
+        # Ensure the code_verifier is blank in the cookie.
+        macaroon = pymacaroons.Macaroon.deserialize(cookie)
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
+        self.assertEqual(code_verifier, "")
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_callback_error(self) -> None:

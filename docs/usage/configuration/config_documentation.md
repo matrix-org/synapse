@@ -3054,9 +3054,9 @@ Options for each entry include:
    `none`.
 
 * `pkce_method`: Whether to use proof key for code exchange when requesting
-  and exchanging the token. Valid values are: `auto` or `always`. Defaults to
-  `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
-   to always enable PKCE.
+   and exchanging the token. Valid values are: `auto`, `always`, or `never`. Defaults
+   to `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
+   to force enable PKCE or `never` to force disable PKCE.
 
 * `scopes`: list of scopes to request. This should normally include the "openid"
    scope. Defaults to `["openid"]`.

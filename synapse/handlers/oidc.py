@@ -615,6 +615,8 @@ class OidcProvider:
 
         if self._config.pkce_method == "always":
             metadata["code_challenge_methods_supported"] = ["S256"]
+        elif self._config.pkce_method == "never":
+            metadata.pop("code_challenge_methods_supported", None)
 
         self._validate_metadata(metadata)
 

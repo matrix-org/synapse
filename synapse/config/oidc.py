@@ -117,7 +117,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             # to avoid importing authlib here.
             "enum": ["client_secret_basic", "client_secret_post", "none"],
         },
-        "pkce_method": {"type": "string", "enum": ["auto", "always"]},
+        "pkce_method": {"type": "string", "enum": ["auto", "always", "never"]},
         "scopes": {"type": "array", "items": {"type": "string"}},
         "authorization_endpoint": {"type": "string"},
         "token_endpoint": {"type": "string"},
@@ -360,7 +360,7 @@ class OidcProviderConfig:
     client_auth_method: str
 
     # Whether to enable PKCE when exchanging the authorization & token.
-    # Valid values are 'auto', and 'always'.
+    # Valid values are 'auto', 'always', and 'never'.
     pkce_method: str
 
     # list of scopes to request
