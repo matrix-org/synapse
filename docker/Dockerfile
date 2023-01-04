@@ -44,8 +44,16 @@ RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && apt-get install -yqq \
-      build-essential git libffi-dev libssl-dev \
+      build-essential git libffi-dev libssl-dev curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install rust and ensure its in the PATH
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+RUN mkdir /rust /cargo
+
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable --profile minimal
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
