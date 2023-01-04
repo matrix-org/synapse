@@ -23,7 +23,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.clock._reactor.advance(1)  # type: ignore
 
-    def test_exposed_to_prometheus(self):
+    def test_exposed_to_prometheus(self) -> None:
         """
         Forward extremity counts are exposed via Prometheus.
         """

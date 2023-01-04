@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -40,11 +40,6 @@ class HTTPPusherTests(HomeserverTestCase):
     ]
     user_id = True
     hijack_auth = False
-
-    def default_config(self) -> Dict[str, Any]:
-        config = super().default_config()
-        config["start_pushers"] = True
-        return config
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.push_attempts: List[Tuple[Deferred, str, dict]] = []

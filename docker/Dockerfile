@@ -44,7 +44,7 @@ RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && apt-get install -yqq \
-      build-essential cargo git libffi-dev libssl-dev \
+      build-essential git libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
@@ -99,6 +99,8 @@ RUN \
     zlib1g-dev \
     git \
     curl \
+    libicu-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Install rust and ensure its in the PATH
@@ -185,6 +187,7 @@ RUN \
     libwebp6 \
     xmlsec1 \
     libjemalloc2 \
+    libicu67 \
     libssl-dev \
     openssl \
     && rm -rf /var/lib/apt/lists/*

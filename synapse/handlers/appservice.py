@@ -578,9 +578,6 @@ class ApplicationServicesHandler:
             device_id,
         ), messages in recipient_device_to_messages.items():
             for message_json in messages:
-                # Remove 'message_id' from the to-device message, as it's an internal ID
-                message_json.pop("message_id", None)
-
                 message_payload.append(
                     {
                         "to_user_id": user_id,
@@ -615,8 +612,8 @@ class ApplicationServicesHandler:
         )
 
         # Fetch the users who have modified their device list since then.
-        users_with_changed_device_lists = (
-            await self.store.get_users_whose_devices_changed(from_key, to_key=new_key)
+        users_with_changed_device_lists = await self.store.get_all_devices_changed(
+            from_key, to_key=new_key
         )
 
         # Filter out any users the application service is not interested in
