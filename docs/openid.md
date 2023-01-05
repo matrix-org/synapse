@@ -463,7 +463,7 @@ oidc_providers:
 Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
 This can be optionally enabled by setting `backchannel_logout_enabled` to `true` in the Synapse configuration, and by setting the "Backchannel Logout URL" in Keycloak.
 
-Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
+Follow the [Getting Started Guide](https://www.keycloak.org/guides) to install Keycloak and set up a realm.
 
 1. Click `Clients` in the sidebar and click `Create`
 

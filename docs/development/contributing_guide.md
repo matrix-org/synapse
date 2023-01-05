@@ -106,8 +106,8 @@ regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
 Synapse's code style is documented [here](../code_style.md). Please follow
-it, including the conventions for the [sample configuration
-file](../code_style.md#configuration-file-format).
+it, including the conventions for [configuration
+options and documentation](../code_style.md#configuration-code-and-documentation-format).
 
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please
@@ -126,7 +126,7 @@ changes to the Rust code.
 
 
 # 8. Test, test, test!
-<a name="test-test-test"></a>
+<a name="test-test-test" id="test-test-test"></a>
 
 While you're developing and before submitting a patch, you'll
 want to test your code.
@@ -424,8 +424,7 @@ chicken-and-egg problem.
 There are two options for solving this:
 
 1. Open the PR without a changelog file, see what number you got, and *then*
-   add the changelog file to your branch (see [Updating your pull
-   request](#updating-your-pull-request)), or:
+   add the changelog file to your branch, or:
 
 1. Look at the [list of all
    issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the
