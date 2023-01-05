@@ -23,8 +23,8 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
-from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, StreamKeyType, UserID
+from synapse.types.state import StateFilter
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:

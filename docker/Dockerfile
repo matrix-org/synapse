@@ -97,6 +97,8 @@ RUN \
     zlib1g-dev \
     git \
     curl \
+    libicu-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -165,6 +167,7 @@ RUN \
     libwebp6 \
     xmlsec1 \
     libjemalloc2 \
+    libicu67 \
     libssl-dev \
     openssl \
     && rm -rf /var/lib/apt/lists/*

@@ -57,7 +57,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.73.0"
+version = "1.74.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -208,11 +208,7 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
-ecdsa = "^0.17.0"
-by = "^0.0.2"
-base58 = "^2.1.1"
-eospy = "^0.0.2"
-sha256 = "^0.3"
+pyicu = { version = ">=2.10.2", optional = true }
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
@@ -235,6 +231,10 @@ redis = ["txredisapi", "hiredis"]
 # Required to use experimental `caches.track_memory_usage` config option.
 cache-memory = ["pympler"]
 test = ["parameterized", "idna"]
+# Allows for better search for international characters in the user directory. This
+# requires libicu's development headers installed on the system (e.g. libicu-dev on
+# Debian-based distributions).
+user-search = ["pyicu"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
 # to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
@@ -266,6 +266,8 @@ all = [
     "txredisapi", "hiredis",
     # cache-memory
     "pympler",
+    # improved user search
+    "pyicu",
     # omitted:
     #   - test: it's useful to have this separate from dev deps in the olddeps job
     #   - systemd: this is a system-based requirement

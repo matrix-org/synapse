@@ -79,11 +79,7 @@ class Codes(str, Enum):
     PASSWORD_IN_DICTIONARY = "M_PASSWORD_IN_DICTIONARY"
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
-    INVALID_WALLET_SIGNATURE = "M_INVALID_WALLET_SIGNATURE"
-    INVALID_SIGNATUR_MESSAGE = "M_INVALID_SIGNATURE_MESSAGE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
-    INVALID_PARSED_PUBLICKKEY = "M_INVALID_PARSED_PUBLICKKEY"
-    GET_CHAIN_ACCOUNT_FAILED = "M_GET_CHAIN_ACCOUNT_FAILED"
 
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
@@ -428,8 +424,17 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, msg: str):
+    def __init__(self, msg: str, unpersistable: bool):
+        """
+        unpersistable:
+            if True, the PDU must not be persisted, not even as a rejected PDU
+            when received over federation.
+            This is notably true when the entire PDU exceeds the size limit for a PDU,
+            (as opposed to an individual key's size limit being exceeded).
+        """
+
         super().__init__(413, msg, Codes.TOO_LARGE)
+        self.unpersistable = unpersistable
 
 
 class LoginError(SynapseError):

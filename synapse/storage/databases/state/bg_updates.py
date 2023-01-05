@@ -22,8 +22,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.state import StateFilter
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
 from synapse.util.caches import intern_string
 
 if TYPE_CHECKING:

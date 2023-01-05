@@ -50,6 +50,7 @@ from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
+from synapse.events.utils import maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
 from synapse.logging import opentracing
@@ -59,7 +60,6 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
 from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     MutableStateMap,
     PersistedEventPosition,
@@ -70,6 +70,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -360,8 +361,6 @@ class MessageHandler:
             user_id: {
                 "avatar_url": profile.avatar_url,
                 "display_name": profile.display_name,
-                "avatar_nft": profile.avatar_nft,
-                "metadata": profile.metadata,
             }
             for user_id, profile in users_with_profile.items()
         }
@@ -1741,12 +1740,15 @@ class EventCreationHandler:
 
             if event.type == EventTypes.Member:
                 if event.content["membership"] == Membership.INVITE:
-                    event.unsigned[
-                        "invite_room_state"
-                    ] = await self.store.get_stripped_room_state_from_event_context(
-                        context,
-                        self.room_prejoin_state_types,
-                        membership_user_id=event.sender,
+                    maybe_upsert_event_field(
+                        event,
+                        event.unsigned,
+                        "invite_room_state",
+                        await self.store.get_stripped_room_state_from_event_context(
+                            context,
+                            self.room_prejoin_state_types,
+                            membership_user_id=event.sender,
+                        ),
                     )
 
                     invitee = UserID.from_string(event.state_key)
@@ -1764,11 +1766,14 @@ class EventCreationHandler:
                         event.signatures.update(returned_invite.signatures)
 
                 if event.content["membership"] == Membership.KNOCK:
-                    event.unsigned[
-                        "knock_room_state"
-                    ] = await self.store.get_stripped_room_state_from_event_context(
-                        context,
-                        self.room_prejoin_state_types,
+                    maybe_upsert_event_field(
+                        event,
+                        event.unsigned,
+                        "knock_room_state",
+                        await self.store.get_stripped_room_state_from_event_context(
+                            context,
+                            self.room_prejoin_state_types,
+                        ),
                     )
 
             if event.type == EventTypes.Redaction:
