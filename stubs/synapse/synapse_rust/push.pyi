@@ -29,6 +29,7 @@ class FilteredPushRules:
         self,
         push_rules: PushRules,
         enabled_map: Dict[str, bool],
+        msc3930_enabled: bool,
         msc3664_enabled: bool,
         msc1767_enabled: bool,
     ): ...

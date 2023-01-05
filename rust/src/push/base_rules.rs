@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022, 2023 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -201,6 +201,20 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
             Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
                 key: Cow::Borrowed("state_key"),
                 pattern: Some(Cow::Borrowed("")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3930.rule.poll_response"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.response")),
                 pattern_type: None,
             })),
         ]),
@@ -593,6 +607,68 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
             })),
         ]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3930.rule.poll_start_one_to_one"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.start")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3930.rule.poll_start"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.start")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3930.rule.poll_end_one_to_one"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.end")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3930.rule.poll_end"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.end")),
+                pattern_type: None,
+            })),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify]),
         default: true,
         default_enabled: true,
     },
