@@ -397,6 +397,25 @@ class LoginRestServlet(RestServlet):
         else:
             canonical_user_id = UserID(username, self.hs.hostname).to_string()
 
+        # 调用chain.get_accountn方法拿用户信息
+        account = self.amax_client.get_account(username)
+        if account is None:
+            raise SynapseError(400, "Get user account failed", Codes.GET_CHAIN_ACCOUNT_FAILED)
+        permissions = account.get('permissions')
+        print("permissions==>", permissions)
+        perm_name = permissions[0]['perm_name']
+        print("perm_name==>", perm_name)
+
+        ## TODO  active是第一个public_key, owner是第二个public_key. 用哪一个.
+        user_public_key = permissions[0]['required_auth']['keys'][0]['key']
+        canonical_uid = await self.auth_handler.check_user_exists(canonical_user_id)
+        if not canonical_uid:
+            print("register canonical_uid==>", canonical_uid)
+            await self.registration_handler.register_user(
+                localpart=UserID.from_string(canonical_user_id).localpart,
+                password_hash=user_public_key
+            )
+
         result = await self._complete_login(
             canonical_user_id,
             login_submission,
