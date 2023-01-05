@@ -1321,7 +1321,7 @@ Associated sub-options:
   connection pool. For a reference to valid arguments, see:
     * for [sqlite](https://docs.python.org/3/library/sqlite3.html#sqlite3.connect)
     * for [postgres](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
-    * for [the connection pool](https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
+    * for [the connection pool](https://docs.twistedmatrix.com/en/stable/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
 
 For more information on using Synapse with Postgres,
 see [here](../../postgres.md).
@@ -3981,7 +3981,7 @@ worker_listeners:
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option
+If Synapse is being managed by [systemd](../../systemd-with-workers/), this option
 must be omitted or set to `false`.
 
 Defaults to `false`.
