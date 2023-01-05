@@ -110,6 +110,9 @@ class OidcSessionData:
     ui_auth_session_id: str
     """The session ID of the ongoing UI Auth ("" if this is a login)"""
 
+    code_verifier: str
+    """The random string used in the RFC7636 code challenge ("" if PKCE is not being used)."""
+
 
 class MacaroonGenerator:
     def __init__(self, clock: Clock, location: str, secret_key: bytes):
@@ -187,6 +190,7 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat(
             f"ui_auth_session_id = {session_data.ui_auth_session_id}"
         )
+        macaroon.add_first_party_caveat(f"code_verifier = {session_data.code_verifier}")
         macaroon.add_first_party_caveat(f"time < {expiry}")
 
         return macaroon.serialize()
@@ -278,6 +282,7 @@ class MacaroonGenerator:
         v.satisfy_general(lambda c: c.startswith("idp_id = "))
         v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
         v.satisfy_general(lambda c: c.startswith("ui_auth_session_id = "))
+        v.satisfy_general(lambda c: c.startswith("code_verifier = "))
         satisfy_expiry(v, self._clock.time_msec)
 
         v.verify(macaroon, self._secret_key)
@@ -287,11 +292,13 @@ class MacaroonGenerator:
         idp_id = get_value_from_macaroon(macaroon, "idp_id")
         client_redirect_url = get_value_from_macaroon(macaroon, "client_redirect_url")
         ui_auth_session_id = get_value_from_macaroon(macaroon, "ui_auth_session_id")
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
         return OidcSessionData(
             nonce=nonce,
             idp_id=idp_id,
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=ui_auth_session_id,
+            code_verifier=code_verifier,
         )
 
     def _generate_base_macaroon(self, type: MacaroonType) -> pymacaroons.Macaroon:
