@@ -189,8 +189,8 @@ that Synapse does not allow registering resources for several sub-paths in the <
 namespace (such as anything under <code>/_matrix/client</code> for example). It is strongly
 recommended that modules register their web resources under the <code>/_synapse/client</code>
 namespace.</p>
-<p>The provided resource is a Python class that implements Twisted's <a href="https://twistedmatrix.com/documents/current/api/twisted.web.resource.IResource.html">IResource</a>
-interface (such as <a href="https://twistedmatrix.com/documents/current/api/twisted.web.resource.Resource.html">Resource</a>).</p>
+<p>The provided resource is a Python class that implements Twisted's <a href="https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.IResource.html">IResource</a>
+interface (such as <a href="https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.Resource.html">Resource</a>).</p>
 <p>Only one resource can be registered for a given path. If several modules attempt to
 register a resource for the same path, the module that appears first in Synapse's
 configuration file takes priority.</p>

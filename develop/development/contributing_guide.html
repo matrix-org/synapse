@@ -215,8 +215,8 @@ Synapse developers.
 regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.</p>
 <p>Synapse's code style is documented <a href="../code_style.html">here</a>. Please follow
-it, including the conventions for the <a href="../code_style.html#configuration-file-format">sample configuration
-file</a>.</p>
+it, including the conventions for <a href="../code_style.html#configuration-code-and-documentation-format">configuration
+options and documentation</a>.</p>
 <p>We welcome improvements and additions to our documentation itself! When
 writing new pages, please
 <a href="https://github.com/matrix-org/synapse/tree/develop/docs#adding-to-the-documentation">build <code>docs</code> to a book</a>
@@ -230,7 +230,7 @@ or <code>maturin develop</code> (if installed) to rebuild the Rust code. Using <
 is quicker than <code>poetry install</code>, so is recommended when making frequent
 changes to the Rust code.</p>
 <h1 id="8-test-test-test"><a class="header" href="#8-test-test-test">8. Test, test, test!</a></h1>
-<p><a name="test-test-test"></a></p>
+<p><a name="test-test-test" id="test-test-test"></a></p>
 <p>While you're developing and before submitting a patch, you'll
 want to test your code.</p>
 <h2 id="run-the-linters"><a class="header" href="#run-the-linters">Run the linters.</a></h2>
@@ -437,8 +437,7 @@ chicken-and-egg problem.</p>
 <ol>
 <li>
 <p>Open the PR without a changelog file, see what number you got, and <em>then</em>
-add the changelog file to your branch (see <a href="#updating-your-pull-request">Updating your pull
-request</a>), or:</p>
+add the changelog file to your branch, or:</p>
 </li>
 <li>
 <p>Look at the <a href="https://github.com/matrix-org/synapse/issues?q=">list of all

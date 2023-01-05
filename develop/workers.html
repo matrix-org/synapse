@@ -283,7 +283,7 @@ endpoints to the worker (<code>localhost:8083</code> in the above example).</p>
 <code>synctl</code> or your distribution's preferred service manager such as <code>systemd</code>. We
 recommend the use of <code>systemd</code> where available: for information on setting up
 <code>systemd</code> to start synapse workers, see
-<a href="systemd-with-workers">Systemd with Workers</a>. To use <code>synctl</code>, see
+<a href="systemd-with-workers/">Systemd with Workers</a>. To use <code>synctl</code>, see
 <a href="synctl_workers.html">Using synctl with Workers</a>.</p>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
@@ -504,7 +504,7 @@ An <code>event_creator</code> listens for requests from clients to create new ev
 so. It will then pass those events over HTTP replication to any configured event
 persisters (or the main process if none are configured).</p>
 <p>Note that <code>event_creator</code>s and <code>event_persister</code>s are implemented using the same
-<a href="#synapse.app.generic_worker"><code>synapse.app.generic_worker</code></a>.</p>
+<a href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a>.</p>
 <p>An example <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a>
 configuration with multiple writers:</p>
 <pre><code class="language-yaml">stream_writers:

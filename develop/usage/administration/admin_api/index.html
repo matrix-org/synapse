@@ -151,7 +151,7 @@
 <p>Many of the API calls in the admin api will require an <code>access_token</code> for a
 server admin. (Note that a server admin is distinct from a room admin.)</p>
 <p>An existing user can be marked as a server admin by updating the database directly.</p>
-<p>Check your <a href="config_documentation.html#database">database settings</a> in the configuration file, connect to the correct database using either <code>psql [database name]</code> (if using PostgreSQL) or <code>sqlite3 path/to/your/database.db</code> (if using SQLite) and elevate the user <code>@foo:bar.com</code> to administrator.</p>
+<p>Check your <a href="../../configuration/config_documentation.html#database">database settings</a> in the configuration file, connect to the correct database using either <code>psql [database name]</code> (if using PostgreSQL) or <code>sqlite3 path/to/your/database.db</code> (if using SQLite) and elevate the user <code>@foo:bar.com</code> to administrator.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <p>A new server admin user can also be created using the <code>register_new_matrix_user</code>
@@ -168,10 +168,10 @@ providing the token as either a query parameter or a request header. To add it a
 <pre><code class="language-sh">curl --header &quot;Authorization: Bearer &lt;access_token&gt;&quot; &lt;the_rest_of_your_API_request&gt;
 </code></pre>
 <p>For example, suppose we want to
-<a href="user_admin_api.html#query-user-account">query the account</a> of the user
+<a href="../../../admin_api/user_admin_api.html#query-user-account">query the account</a> of the user
 <code>@foo:bar.com</code>. We need an admin access token (e.g.
 <code>syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk</code>), and we need to know which port
-Synapse's <a href="config_documentation.html#listeners"><code>client</code> listener</a> is listening
+Synapse's <a href="../../configuration/config_documentation.html#listeners"><code>client</code> listener</a> is listening
 on (e.g. <code>8008</code>). Then we can use the following command to request the account
 information from the Admin API.</p>
 <pre><code class="language-sh">curl --header &quot;Authorization: Bearer syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk&quot; -X GET http://127.0.0.1:8008/_synapse/admin/v2/users/@foo:bar.com
