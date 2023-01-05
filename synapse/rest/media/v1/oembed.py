@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import html as html5
 import logging
 import urllib.parse
 from typing import TYPE_CHECKING, List, Optional
@@ -161,7 +162,7 @@ class OEmbedProvider:
 
         title = oembed.get("title")
         if title and isinstance(title, str):
-            open_graph_response["og:title"] = title
+            open_graph_response["og:title"] = html5.unescape(title)
 
         author_name = oembed.get("author_name")
         if not isinstance(author_name, str):
