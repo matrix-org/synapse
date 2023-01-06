@@ -127,6 +127,9 @@ class ExperimentalConfig(Config):
             "msc3886_endpoint", None
         )
 
+        # MSC3930: Push rules for MSC3391 polls
+        self.msc3930_enabled: bool = experimental.get("msc3930_enabled", False)
+
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
 
