@@ -13,11 +13,7 @@
 # limitations under the License.
 
 import logging
-import random
-import string
-import time
 import re
-from re import match
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,8 +27,6 @@ from typing import (
 )
 
 from typing_extensions import TypedDict
-import eospy.api
-import eospy.http_client
 
 from synapse.api.constants import ApprovalNoticeMedium
 from synapse.api.errors import (
@@ -45,7 +39,6 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
-from synapse.handlers.auth import convert_client_dict_legacy_fields_to_identifier
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
@@ -85,7 +78,6 @@ class LoginRestServlet(RestServlet):
     JWT_TYPE = "org.matrix.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
-    SIGNATURE_TYPE = "m.login.signature"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -134,13 +126,6 @@ class LoginRestServlet(RestServlet):
             rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
-
-        # self.client = eospy.api.ChainApi(['http://139.224.250.244:18888/'], 10)
-        self.amax_rpc = hs.config.server.amax_rpc_url
-        self.amax_client = eospy.api.ChainApi([self.amax_rpc], 10)
-        # redis
-        self._external_cache = hs.get_external_cache()
-        self._cache_name = 'cache_sign_msg'
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
@@ -237,14 +222,6 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
-            elif login_submission["type"] == LoginRestServlet.SIGNATURE_TYPE:
-                await self._address_ratelimiter.ratelimit(
-                    None, request.getClientAddress().host
-                )
-                result = await self._do_signature_login(
-                    login_submission,
-                    should_issue_refresh_token=should_issue_refresh_token,
-                )
             else:
                 await self._address_ratelimiter.ratelimit(
                     None, request.getClientAddress().host
@@ -334,105 +311,6 @@ class LoginRestServlet(RestServlet):
         canonical_user_id, callback = await self.auth_handler.validate_login(
             login_submission, ratelimit=True
         )
-        result = await self._complete_login(
-            canonical_user_id,
-            login_submission,
-            callback,
-            should_issue_refresh_token=should_issue_refresh_token,
-        )
-        return result
-
-    async def _do_signature_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
-    ) -> LoginResponse:
-        """Handle blockchain signature login
-
-        Args:
-            login_submission:
-            should_issue_refresh_token: True if this login should issue
-                a refresh token alongside the access token.
-
-        Returns:
-            HTTP response
-        """
-        # Log the request we got, but only certain fields to minimise the chance of
-        # logging someone's password (even if they accidentally put it in the wrong
-        # field)
-        logger.info(
-            "Got wallet login request with identifier: %r, medium: %r, address: %r, user: %r, message: %r, sinature: "
-            "%r, timestamp: %r",
-            login_submission.get("identifier"),
-            login_submission.get("medium"),
-            login_submission.get("address"),
-            login_submission.get("user"),
-            login_submission.get("message"),
-            login_submission.get("signature"),
-            login_submission.get("timestamp"),
-        )
-
-        # 先验证签名的message是否在redis中，是否过期
-        # message_ts = login_submission.get("timestamp")
-        req_message = login_submission.get("message")
-        if not isinstance(req_message, str):
-            raise SynapseError(400, "Bad parameter: message", Codes.INVALID_PARAM)
-
-        nonce_str = req_message.split(':')[1]
-        cache_message = await self._external_cache.get(self._cache_name, nonce_str)
-        if cache_message is None:
-            logger.error("redis cache mesage not found, cache_name: %r, key: %r", self._cache_name, nonce_str)
-            raise SynapseError(400, "Wallet sign message is invalid, Please login "
-                                    "again.", Codes.INVALID_SIGNATUR_MESSAGE)
-
-        if cache_message != req_message:
-            logger.warning("request message is invalid, Please logi, cache_message: "
-                           "%r, req_message: %r", cache_message, req_message)
-            raise SynapseError(400, "Wallet sign message is invalid, Please login "
-                                    "again.", Codes.INVALID_SIGNATUR_MESSAGE)
-
-        # 根据user查询账户信息
-        # map old-school login fields into new-school "identifier" fields.
-        identifier_dict = convert_client_dict_legacy_fields_to_identifier(
-            login_submission
-        )
-
-        username = identifier_dict.get("user")
-        if not username:
-            raise SynapseError(400, "User identifier is missing 'user' key", Codes.INVALID_PARAM)
-
-        # user是amax链账号，验证下
-
-        # 调chain.get_accountn方法拿用户信息
-        account = self.amax_client.get_account(username)
-        if account is None:
-            raise SynapseError(400, "Get user accoount failed", Codes.GET_CHAIN_ACCOUNT_FAILED)
-        permissions = account.get('permissions')
-        print("permissions==>", permissions)
-        perm_name = permissions[0]['perm_name']
-        print("perm_name==>", perm_name)
-
-        user_publickey = permissions[0]['required_auth']['keys'][0]['key']
-        print("user_publickey==>", user_publickey)
-        if not user_publickey:
-            raise SynapseError(400, "Get user_publickey failed", Codes.INVALID_PARSED_PUBLICKKEY)
-
-        # 验证是否是amax链的公钥
-        matched = match('AM', user_publickey)
-        if matched is None:
-            raise SynapseError(400, "Parsed user_publickey is invalid", Codes.INVALID_PARSED_PUBLICKKEY)
-
-        canonical_user_id, callback = await self.auth_handler.validate_signature_login(
-            login_submission, user_publickey, ratelimit=True
-        )
-
-        print("canonical_user_id===>", canonical_user_id)
-
-        canonical_uid = await self.auth_handler.check_user_exists(canonical_user_id)
-        if not canonical_uid:
-            await self.registration_handler.register_user(
-                localpart=UserID.from_string(canonical_user_id).localpart,
-                password_hash=user_publickey
-            )
-
         result = await self._complete_login(
             canonical_user_id,
             login_submission,
@@ -786,38 +664,6 @@ class CasTicketServlet(RestServlet):
         )
 
 
-class RandomStrServlet(RestServlet):
-    PATTERNS = client_patterns("/sign/get_random")
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__()
-        self.hs = hs
-
-        # redis
-        self._external_cache = hs.get_external_cache()
-        self._cache_name = 'cache_sign_msg'
-        self.wallet_sign_message = hs.config.server.wallet_sigin_message
-
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        rand_str = ''.join(random.sample(string.ascii_letters + string.digits, 32))
-
-        # message = "Welcome to amax-synapse! sign nonce:{s}".format(s=rand_str)
-        message = "{sign_ms} sign nonce:{s}".format(sign_ms=self.wallet_sign_message, s=rand_str)
-
-        # message to redis, expiry_ms: 60000
-        key = rand_str
-        # test
-        expiry_ms = 3000000
-        await self._external_cache.set(self._cache_name, key, message, expiry_ms)
-
-        response: Dict[str, Union[str, int]] = {
-            "message": message,
-            # "timestamp": key
-        }
-
-        return 200, response
-
-
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
     if hs.config.registration.refreshable_access_token_lifetime is not None:
@@ -825,7 +671,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
-    RandomStrServlet(hs).register(http_server)
 
 
 def _load_sso_handlers(hs: "HomeServer") -> None:

@@ -52,7 +52,6 @@ from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.cancellation import cancellable
-from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -422,9 +421,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         self._check_device_name_length(initial_device_display_name)
 
-        # Prune the user's device list if they already have a lot of devices.
-        await self._prune_too_many_devices(user_id)
-
         if device_id is not None:
             new_device = await self.store.store_device(
                 user_id=user_id,
@@ -456,33 +452,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    async def _prune_too_many_devices(self, user_id: str) -> None:
-        """Delete any excess old devices this user may have."""
-        device_ids = await self.store.check_too_many_devices_for_user(user_id, 100)
-        if not device_ids:
-            return
-
-        logger.info("Pruning %d old devices for user %s", len(device_ids), user_id)
-
-        # We don't want to block and try and delete tonnes of devices at once,
-        # so we cap the number of devices we delete synchronously.
-        first_batch, remaining_device_ids = device_ids[:10], device_ids[10:]
-        await self.delete_devices(user_id, first_batch)
-
-        if not remaining_device_ids:
-            return
-
-        # Now spawn a background loop that deletes the rest.
-        async def _prune_too_many_devices_loop() -> None:
-            for batch in batch_iter(remaining_device_ids, 10):
-                await self.delete_devices(user_id, batch)
-
-                await self.clock.sleep(1)
-
-        run_as_background_process(
-            "_prune_too_many_devices_loop", _prune_too_many_devices_loop
-        )
-
     async def _delete_stale_devices(self) -> None:
         """Background task that deletes devices which haven't been accessed for more than
         a configured time period.
@@ -512,7 +481,7 @@ class DeviceHandler(DeviceWorkerHandler):
             device_ids = [d for d in device_ids if d != except_device_id]
         await self.delete_devices(user_id, device_ids)
 
-    async def delete_devices(self, user_id: str, device_ids: Collection[str]) -> None:
+    async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
         """Delete several devices
 
         Args:

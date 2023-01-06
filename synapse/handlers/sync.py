@@ -49,7 +49,6 @@ from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.databases.main.event_push_actions import RoomNotifCounts
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
-from synapse.storage.state import StateFilter
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
@@ -61,6 +60,7 @@ from synapse.types import (
     StreamToken,
     UserID,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache

@@ -82,7 +82,6 @@ class LoginType:
     SSO: Final = "m.login.sso"
     DUMMY: Final = "m.login.dummy"
     REGISTRATION_TOKEN: Final = "m.login.registration_token"
-    SIGNATURE: Final = "m.login.signature"
 
 
 # This is used in the `type` parameter for /register when called by
@@ -153,6 +152,7 @@ class EduTypes:
 
 class RejectedReason:
     AUTH_ERROR: Final = "auth_error"
+    OVERSIZED_EVENT: Final = "oversized_event"
 
 
 class RoomCreationPreset:

@@ -88,6 +88,22 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.74.0
+
+## Unicode support in user search
+
+This version introduces optional support for an [improved user search dealing with Unicode characters](https://github.com/matrix-org/synapse/pull/14464).
+
+If you want to take advantage of this feature you need to install PyICU,
+the ICU native dependency and its development headers
+so that PyICU can build since no prebuilt wheels are available.
+
+You can follow [the PyICU documentation](https://pypi.org/project/PyICU/) to do so,
+and then do `pip install matrix-synapse[icu]` for a PyPI install.
+
+Docker images and Debian packages need nothing specific as they already
+include or specify ICU as an explicit dependency.
+
 # Upgrading to v1.73.0
 
 ## Legacy Prometheus metric names have now been removed

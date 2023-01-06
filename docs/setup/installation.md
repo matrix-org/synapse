@@ -278,7 +278,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```sh
 sudo apt install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev
 ```
 
 ##### ArchLinux
@@ -287,7 +287,7 @@ Installing prerequisites on ArchLinux:
 
 ```sh
 sudo pacman -S base-devel python python-pip \
-               python-setuptools python-virtualenv sqlite3
+               python-setuptools python-virtualenv sqlite3 icu
 ```
 
 ##### CentOS/Fedora
@@ -297,7 +297,8 @@ Installing prerequisites on CentOS or Fedora Linux:
 ```sh
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel libxml2-devel libxslt-devel libpq-devel \
-                 python3-virtualenv libffi-devel openssl-devel python3-devel
+                 python3-virtualenv libffi-devel openssl-devel python3-devel \
+                 libicu-devel
 sudo dnf groupinstall "Development Tools"
 ```
 
@@ -310,8 +311,12 @@ You may need to install the latest Xcode developer tools:
 xcode-select --install
 ```
 
-On ARM-based Macs you may need to install libjpeg and libpq. 
-You can use Homebrew (https://brew.sh):
+Some extra dependencies may be needed. You can use Homebrew (https://brew.sh) for them.
+
+You may need to install icu, and make the icu binaries and libraries accessible.
+Please follow [the official instructions of PyICU](https://pypi.org/project/PyICU/) to do so.
+
+On ARM-based Macs you may also need to install libjpeg and libpq:
 ```sh
  brew install jpeg libpq
  ```
@@ -332,7 +337,8 @@ Installing prerequisites on openSUSE:
 ```sh
 sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
-               python-devel libffi-devel libopenssl-devel libjpeg62-devel
+               python-devel libffi-devel libopenssl-devel libjpeg62-devel \
+               libicu-devel
 ```
 
 ##### OpenBSD
