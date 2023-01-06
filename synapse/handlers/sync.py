@@ -1403,11 +1403,14 @@ class SyncHandler:
 
         logger.debug("Fetching room data")
 
-        res = await self._generate_sync_entry_for_rooms(
+        (
+            newly_joined_rooms,
+            newly_joined_or_invited_or_knocked_users,
+            newly_left_rooms,
+            newly_left_users,
+        ) = await self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_or_invited_or_knocked_users, _, _ = res
-        _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
