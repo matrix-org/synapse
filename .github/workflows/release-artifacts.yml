@@ -139,6 +139,10 @@ jobs:
         if: matrix.arch == 'aarch64'
         run: echo 'CIBW_ARCHS_LINUX=aarch64' >> $GITHUB_ENV
 
+      - name: Only build a single wheel on PR
+        if: startsWith(github.ref, 'refs/pull/')
+        run: echo "CIBW_BUILD="cp37-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
+
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
