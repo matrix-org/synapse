@@ -565,7 +565,8 @@ worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
 <h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
 <p>You can designate one generic worker to update the user directory.</p>
-<p>Specify its name in the shared configuration as follows:</p>
+<p>Specify its name in the <a href="usage/configuration/config_documentation.html#update_user_directory_from_worker">shared configuration</a>
+as follows:</p>
 <pre><code class="language-yaml">update_user_directory_from_worker: worker_name
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
@@ -581,16 +582,36 @@ worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
 <p>You can designate one generic worker to send output traffic to Application Services.
 Doesn't handle any REST endpoints itself, but you should specify its name in the
-shared configuration as follows:</p>
+<a href="usage/configuration/config_documentation.html#notify_appservices_from_worker">shared configuration</a>
+as follows:</p>
 <pre><code class="language-yaml">notify_appservices_from_worker: worker_name
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
 after setting this option in the shared configuration!</p>
 <p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
 worker application type.</p>
+<h4 id="push-notifications"><a class="header" href="#push-notifications">Push Notifications</a></h4>
+<p>You can designate generic worker to sending push notifications to
+a <a href="https://spec.matrix.org/v1.5/push-gateway-api/">push gateway</a> such as
+<a href="https://github.com/matrix-org/sygnal">sygnal</a> and email.</p>
+<p>This will stop the main process sending push notifications.</p>
+<p>The workers responsible for sending push notifications can be defined using the
+<a href="usage/configuration/config_documentation.html#pusher_instances"><code>pusher_instances</code></a>
+option. For example:</p>
+<pre><code class="language-yaml">pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+</code></pre>
+<p>Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.</p>
+<p>These workers don't need to accept incoming HTTP requests to send push notifications,
+so no additional reverse proxy configuration is required for pusher workers.</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.pusher</code>
+worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>It is likely this option will be deprecated in the future and is not recommended for new
-installations. Instead, <a href="usage/configuration/config_documentation.html#pusher_instances">use <code>synapse.app.generic_worker</code> with the <code>pusher_instances</code></a>.</p>
+installations. Instead, <a href="#push-notifications">use <code>synapse.app.generic_worker</code> with the <code>pusher_instances</code></a>.</p>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
 <a href="usage/configuration/config_documentation.html#start_pushers"><code>start_pushers: false</code></a> in the
@@ -623,7 +644,7 @@ shared configuration file to stop the main synapse sending appservice notificati
 <p>Note this worker cannot be load-balanced: only one instance should be active.</p>
 <h3 id="synapseappfederation_sender"><a class="header" href="#synapseappfederation_sender"><code>synapse.app.federation_sender</code></a></h3>
 <p>It is likely this option will be deprecated in the future and not recommended for
-new installations. Instead, <a href="usage/configuration/config_documentation.html#federation_sender_instances">use <code>synapse.app.generic_worker</code> with the <code>federation_sender_instances</code></a>. </p>
+new installations. Instead, <a href="usage/configuration/config_documentation.html#federation_sender_instances">use <code>synapse.app.generic_worker</code> with the <code>federation_sender_instances</code></a>.</p>
 <p>Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
 <a href="usage/configuration/config_documentation.html#send_federation"><code>send_federation: false</code></a>
@@ -687,7 +708,9 @@ worker_listeners:
 worker_log_config: /etc/matrix-synapse/media-worker-log.yaml
 </code></pre>
 <p>Note that if running multiple media repositories they must be on the same server
-and you must configure a single instance to run the background tasks, e.g.:</p>
+and you must specify a single instance to run the background tasks in the
+<a href="usage/configuration/config_documentation.html#media_instance_running_background_jobs">shared configuration</a>,
+e.g.:</p>
 <pre><code class="language-yaml">media_instance_running_background_jobs: &quot;media-repository-1&quot;
 </code></pre>
 <p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
