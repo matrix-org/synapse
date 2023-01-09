@@ -382,7 +382,7 @@ To prepare a Pull Request, please:
 ## Changelog
 
 All changes, even minor ones, need a corresponding changelog / newsfragment
-entry. These are managed by [Towncrier](https://github.com/hawkowl/towncrier).
+entry. These are managed by [Towncrier](https://github.com/twisted/towncrier).
 
 To create a changelog entry, make a new file in the `changelog.d` directory named
 in the format of `PRnumber.type`. The type can be one of the following:
