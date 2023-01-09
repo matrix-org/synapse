@@ -422,6 +422,10 @@ Sub-options for each listener include:
 
 * `port`: the TCP port to bind to.
 
+* `tag`: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to `None`, is optional and only valid for listener with `type: http`.
+See the docs [request log format](../administration/request_log.md).
+
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
@@ -2623,18 +2627,18 @@ state events are shared with users:
 - `m.room.topic`
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: boolean. Set to `true` to disable the above 
+* `disable_default_event_types`: boolean. Set to `true` to disable the above
   defaults. If this is enabled, only the event types listed in
   `additional_event_types` are shared. Defaults to `false`.
-* `additional_event_types`: A list of additional state events to include in the 
-  events to be shared. By default, this list is empty (so only the default event 
+* `additional_event_types`: A list of additional state events to include in the
+  events to be shared. By default, this list is empty (so only the default event
   types are shared).
 
   Each entry in this list should be either a single string or a list of two
-  strings. 
+  strings.
   * A standalone string `t` represents all events with type `t` (i.e.
     with no restrictions on state keys).
-  * A pair of strings `[t, s]` represents a single event with type `t` and 
+  * A pair of strings `[t, s]` represents a single event with type `t` and
     state key `s`. The same type can appear in two entries with different state
     keys: in this situation, both state keys are included in prejoin state.
 
@@ -3126,7 +3130,7 @@ Options for each entry include:
        * `picture_claim`: name of the claim containing an url for the user's profile picture.
          Defaults to 'picture', which OpenID Connect compliant providers should provide
          and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
-         
+
          Currently only supported in monolithic (single-process) server configurations
          where the media repository runs within the Synapse process.
 
