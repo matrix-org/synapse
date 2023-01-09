@@ -3850,6 +3850,9 @@ Example configuration:
 ```yaml
 update_user_directory_from_worker: worker1
 ```
+
+_Added in Synapse 1.59.0._
+
 ---
 ### `notify_appservices_from_worker`
 
@@ -3861,6 +3864,9 @@ Example configuration:
 ```yaml
 notify_appservices_from_worker: worker1
 ```
+
+_Added in Synapse 1.59.0._
+
 ---
 ### `media_instance_running_background_jobs`
 
@@ -3873,6 +3879,9 @@ Example configuration:
 ```yaml
 media_instance_running_background_jobs: worker1
 ```
+
+_Added in Synapse 1.16.0._
+
 ---
 ### `redis`
 
