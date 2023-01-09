@@ -1,0 +1,1 @@
+Bump Ubuntu from 20.04 to 22.04 when building Synapse Python wheels in CI.
