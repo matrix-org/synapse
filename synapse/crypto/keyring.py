@@ -154,8 +154,11 @@ class Keyring:
 
         if key_fetchers is None:
             key_fetchers = (
+                # Fetch keys from the database.
                 StoreKeyFetcher(hs),
+                # Fetch keys from a configured Perspectives server.
                 PerspectivesKeyFetcher(hs),
+                # Fetch keys from the origin server directly.
                 ServerKeyFetcher(hs),
             )
         self._key_fetchers = key_fetchers
@@ -279,6 +282,11 @@ class Keyring:
 
         key_ids_to_find = set(verify_request.key_ids) - found_keys.keys()
         if key_ids_to_find:
+            # We're still missing some keys. Consult each of our `KeyFetcher` instances
+            # (stored in `self._key_fetchers`) to try and find them.
+            # Key fetch attempts are queued via `self._server_queue` below, and carried
+            # out in `self._inner_fetch_key_requests`.
+
             # Add the keys we need to verify to the queue for retrieval. We queue
             # up requests for the same server so we don't end up with many in flight
             # requests for the same keys.
@@ -420,25 +428,21 @@ class Keyring:
                 if not key:
                     continue
 
-                # If we already have a result for the given key ID we keep the
+                # If we already have a result for the given key ID, we keep the
                 # one with the highest `valid_until_ts`.
                 existing_key = found_keys.get(key_id)
-                if existing_key:
-                    if key.valid_until_ts <= existing_key.valid_until_ts:
-                        continue
-
-                # We always store the returned key even if it doesn't the
-                # `minimum_valid_until_ts` requirement, as some verification
-                # requests may still be able to be satisfied by it.
-                #
-                # We still keep looking for the key from other fetchers in that
-                # case though.
-                found_keys[key_id] = key
-
-                if key.valid_until_ts < verify_request.minimum_valid_until_ts:
+                if existing_key and existing_key.valid_until_ts > key.valid_until_ts:
                     continue
 
-                missing_key_ids.discard(key_id)
+                # Check if this key's expiry timestamp is valid for the verify request.
+                if key.valid_until_ts >= verify_request.minimum_valid_until_ts:
+                    # Stop looking for this key from subsequent fetchers.
+                    missing_key_ids.discard(key_id)
+
+                # We always store the returned key even if it doesn't meet the
+                # `minimum_valid_until_ts` requirement, as some verification
+                # requests may still be able to be satisfied by it.
+                found_keys[key_id] = key
 
         return found_keys
 
