@@ -506,12 +506,15 @@ worker application type.
 
 #### Push Notifications
 
-You can designate one generic worker to sending push notifications to
+You can designate generic worker to sending push notifications to
+a [push gateway](https://spec.matrix.org/v1.5/push-gateway-api/) such as
 [sygnal](https://github.com/matrix-org/sygnal) and email.
-This will stop the main synapse sending push notifications.
-Doesn't handle any REST endpoints itself, but you should specify its name in the
-[shared configuration](usage/configuration/config_documentation.md#pusher_instances)
-as follows:
+
+This will stop the main process sending push notifications.
+
+The workers responsible for sending push notifications can be defined using the
+[`pusher_instances`](usage/configuration/config_documentation.md#pusher_instances)
+option. For example:
 
 ```yaml
 pusher_instances:
@@ -522,6 +525,9 @@ pusher_instances:
 Multiple workers can be added to this map, in which case the work is balanced
 across them. Ensure the main process and all pusher workers are restarted after changing
 this option.
+
+This workers don't need to accept incoming HTTP requests to send push notifications,
+so no additional reverse proxy configuration is required for pusher workers.
 
 This style of configuration supersedes the legacy `synapse.app.pusher`
 worker application type.
