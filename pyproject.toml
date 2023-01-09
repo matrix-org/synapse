@@ -317,7 +317,7 @@ all = [
 # We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-ruff = "0.0.206"
+ruff = "0.0.215"
 
 # Typechecking
 mypy = "*"
