@@ -4,7 +4,7 @@ This is a work-in-progress set of notes with two goals:
 - act as a reference, explaining how Synapse implements faster joins; and
 - record the rationale behind our choices.
 
-See also [MSC3902](https:ithub.com/matrix-org/matrix-spec-proposals/pull/3902).
+See also [MSC3902](https://github.com/matrix-org/matrix-spec-proposals/pull/3902).
 
 ## Overview: processing events in a partially-joined room
 
