@@ -526,7 +526,7 @@ Multiple workers can be added to this map, in which case the work is balanced
 across them. Ensure the main process and all pusher workers are restarted after changing
 this option.
 
-This workers don't need to accept incoming HTTP requests to send push notifications,
+These workers don't need to accept incoming HTTP requests to send push notifications,
 so no additional reverse proxy configuration is required for pusher workers.
 
 This style of configuration supersedes the legacy `synapse.app.pusher`
