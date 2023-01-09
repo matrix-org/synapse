@@ -167,6 +167,7 @@ RUN \
     libwebp6 \
     xmlsec1 \
     libjemalloc2 \
+    libicu67 \
     libssl-dev \
     openssl \
     && rm -rf /var/lib/apt/lists/*

@@ -22,7 +22,7 @@ class BackgroundUpdateConfigTestCase(HomeserverTestCase):
     # Tests that the default values in the config are correctly loaded. Note that the default
     # values are loaded when the corresponding config options are commented out, which is why there isn't
     # a config specified here.
-    def test_default_configuration(self):
+    def test_default_configuration(self) -> None:
         background_updater = BackgroundUpdater(
             self.hs, self.hs.get_datastores().main.db_pool
         )
@@ -46,7 +46,7 @@ class BackgroundUpdateConfigTestCase(HomeserverTestCase):
             """
         )
     )
-    def test_custom_configuration(self):
+    def test_custom_configuration(self) -> None:
         background_updater = BackgroundUpdater(
             self.hs, self.hs.get_datastores().main.db_pool
         )

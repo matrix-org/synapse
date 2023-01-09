@@ -46,3 +46,31 @@ class UnPartialStatedRoomStream(Stream):
             current_token_without_instance(store.get_un_partial_stated_rooms_token),
             store.get_un_partial_stated_rooms_from_stream,
         )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class UnPartialStatedEventStreamRow:
+    # ID of the event that has been un-partial-stated.
+    event_id: str
+
+    # True iff the rejection status of the event changed as a result of being
+    # un-partial-stated.
+    rejection_status_changed: bool
+
+
+class UnPartialStatedEventStream(Stream):
+    """
+    Stream to notify about events becoming un-partial-stated.
+    """
+
+    NAME = "un_partial_stated_event"
+    ROW_TYPE = UnPartialStatedEventStreamRow
+
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
+        super().__init__(
+            hs.get_instance_name(),
+            # TODO(faster_joins, multiple writers): we need to account for instance names
+            current_token_without_instance(store.get_un_partial_stated_events_token),
+            store.get_un_partial_stated_events_from_stream,
+        )

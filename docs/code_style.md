@@ -10,7 +10,7 @@ The necessary tools are:
 
 - [black](https://black.readthedocs.io/en/stable/), a source code formatter;
 - [isort](https://pycqa.github.io/isort/), which organises each file's imports;
-- [flake8](https://flake8.pycqa.org/en/latest/), which can spot common errors; and
+- [ruff](https://github.com/charliermarsh/ruff), which can spot common errors; and
 - [mypy](https://mypy.readthedocs.io/en/stable/), a type checker.
 
 Install them with:
@@ -28,7 +28,7 @@ scripts-dev/lint.sh
 It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
 functionality is supported in your editor for a more convenient
-development workflow. It is not, however, recommended to run `flake8` or `mypy`
+development workflow. It is not, however, recommended to run `mypy`
 on save as they take a while and can be very resource intensive.
 
 ## General rules

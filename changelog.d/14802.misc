@@ -1,0 +1,1 @@
+Skip testing built wheels for PyPy 3.7 on Linux x86_64 as we lack new required dependencies in the build environment.

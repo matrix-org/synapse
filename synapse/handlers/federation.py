@@ -1349,40 +1349,55 @@ class FederationHandler:
             )
 
             EventValidator().validate_builder(builder)
-            (
-                event,
-                unpersisted_context,
-            ) = await self.event_creation_handler.create_new_client_event(
-                builder=builder
-            )
 
-            (
-                event,
-                unpersisted_context,
-            ) = await self.add_display_name_to_third_party_invite(
-                room_version_obj, event_dict, event, unpersisted_context
-            )
+            # Try several times, it could fail with PartialStateConflictError
+            # in send_membership_event, cf comment in except block.
+            max_retries = 5
+            for i in range(max_retries):
+                try:
+                    (
+                        event,
+                        unpersisted_context,
+                    ) = await self.event_creation_handler.create_new_client_event(
+                        builder=builder
+                    )
 
-            context = await unpersisted_context.persist(event)
+                    event, unpersisted_context = await self.add_display_name_to_third_party_invite(
+                        room_version_obj, event_dict, event, unpersisted_context
+                    )
 
-            EventValidator().validate_new(event, self.config)
+                    context = await unpersisted_context.persist(event)
 
-            # We need to tell the transaction queue to send this out, even
-            # though the sender isn't a local user.
-            event.internal_metadata.send_on_behalf_of = self.hs.hostname
+                    EventValidator().validate_new(event, self.config)
 
-            try:
-                validate_event_for_room_version(event)
-                await self._event_auth_handler.check_auth_rules_from_context(event)
-            except AuthError as e:
-                logger.warning("Denying new third party invite %r because %s", event, e)
-                raise e
+                    # We need to tell the transaction queue to send this out, even
+                    # though the sender isn't a local user.
+                    event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
-            await self._check_signature(event, context)
+                    try:
+                        validate_event_for_room_version(event)
+                        await self._event_auth_handler.check_auth_rules_from_context(
+                            event
+                        )
+                    except AuthError as e:
+                        logger.warning(
+                            "Denying new third party invite %r because %s", event, e
+                        )
+                        raise e
 
-            # We retrieve the room member handler here as to not cause a cyclic dependency
-            member_handler = self.hs.get_room_member_handler()
-            await member_handler.send_membership_event(None, event, context)
+                    await self._check_signature(event, context)
+
+                    # We retrieve the room member handler here as to not cause a cyclic dependency
+                    member_handler = self.hs.get_room_member_handler()
+                    await member_handler.send_membership_event(None, event, context)
+
+                    break
+                except PartialStateConflictError as e:
+                    # Persisting couldn't happen because the room got un-partial stated
+                    # in the meantime and context needs to be recomputed, so let's do so.
+                    if i == max_retries - 1:
+                        raise e
+                    pass
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
 
@@ -1414,32 +1429,49 @@ class FederationHandler:
             room_version_obj, event_dict
         )
 
-        (
-            event,
-            unpersisted_context,
-        ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
-        event, unpersisted_context = await self.add_display_name_to_third_party_invite(
-            room_version_obj, event_dict, event, unpersisted_context
-        )
+        # Try several times, it could fail with PartialStateConflictError
+        # in send_membership_event, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                (
+                    event,
+                    unpersisted_context,
+                ) = await self.event_creation_handler.create_new_client_event(
+                    builder=builder
+                )
+                event, context = await self.add_display_name_to_third_party_invite(
+                    room_version_obj, event_dict, event, unpersisted_context
+                )
 
-        context = await unpersisted_context.persist(event)
+                context = await unpersisted_context.persist(event)
 
-        try:
-            validate_event_for_room_version(event)
-            await self._event_auth_handler.check_auth_rules_from_context(event)
-        except AuthError as e:
-            logger.warning("Denying third party invite %r because %s", event, e)
-            raise e
-        await self._check_signature(event, context)
+                try:
+                    validate_event_for_room_version(event)
+                    await self._event_auth_handler.check_auth_rules_from_context(event)
+                except AuthError as e:
+                    logger.warning("Denying third party invite %r because %s", event, e)
+                    raise e
+                await self._check_signature(event, context)
 
-        # We need to tell the transaction queue to send this out, even
-        # though the sender isn't a local user.
-        event.internal_metadata.send_on_behalf_of = get_domain_from_id(event.sender)
+                # We need to tell the transaction queue to send this out, even
+                # though the sender isn't a local user.
+                event.internal_metadata.send_on_behalf_of = get_domain_from_id(
+                    event.sender
+                )
 
-        # We retrieve the room member handler here as to not cause a cyclic dependency
-        member_handler = self.hs.get_room_member_handler()
-        await member_handler.send_membership_event(None, event, context)
+                # We retrieve the room member handler here as to not cause a cyclic dependency
+                member_handler = self.hs.get_room_member_handler()
+                await member_handler.send_membership_event(None, event, context)
+
+                break
+            except PartialStateConflictError as e:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
 
     async def add_display_name_to_third_party_invite(
         self,

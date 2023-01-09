@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
 # Runs linting scripts over the local Synapse checkout
-# isort - sorts import statements
 # black - opinionated code formatter
-# flake8 - lints and finds mistakes
+# ruff - lints and finds mistakes
 
 set -e
 
@@ -105,6 +104,7 @@ set -x
 isort "${files[@]}"
 python3 -m black "${files[@]}"
 ./scripts-dev/config-lint.sh
-flake8 "${files[@]}"
+# --quiet suppresses the update check.
+ruff --quiet "${files[@]}"
 ./scripts-dev/check_pydantic_models.py lint
 mypy

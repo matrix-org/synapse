@@ -62,6 +62,7 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -207,46 +208,64 @@ class RoomCreationHandler:
 
         new_room_id = self._generate_room_id()
 
-        # Check whether the user has the power level to carry out the upgrade.
-        # `check_auth_rules_from_context` will check that they are in the room and have
-        # the required power level to send the tombstone event.
-        (
-            tombstone_event,
-            tombstone_context,
-        ) = await self.event_creation_handler.create_event(
-            requester,
-            {
-                "type": EventTypes.Tombstone,
-                "state_key": "",
-                "room_id": old_room_id,
-                "sender": user_id,
-                "content": {
-                    "body": "This room has been replaced",
-                    "replacement_room": new_room_id,
-                },
-            },
-        )
-        validate_event_for_room_version(tombstone_event)
-        await self._event_auth_handler.check_auth_rules_from_context(tombstone_event)
+        # Try several times, it could fail with PartialStateConflictError
+        # in _upgrade_room, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                # Check whether the user has the power level to carry out the upgrade.
+                # `check_auth_rules_from_context` will check that they are in the room and have
+                # the required power level to send the tombstone event.
+                (
+                    tombstone_event,
+                    tombstone_context,
+                ) = await self.event_creation_handler.create_event(
+                    requester,
+                    {
+                        "type": EventTypes.Tombstone,
+                        "state_key": "",
+                        "room_id": old_room_id,
+                        "sender": user_id,
+                        "content": {
+                            "body": "This room has been replaced",
+                            "replacement_room": new_room_id,
+                        },
+                    },
+                )
+                validate_event_for_room_version(tombstone_event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    tombstone_event
+                )
 
-        # Upgrade the room
-        #
-        # If this user has sent multiple upgrade requests for the same room
-        # and one of them is not complete yet, cache the response and
-        # return it to all subsequent requests
-        ret = await self._upgrade_response_cache.wrap(
-            (old_room_id, user_id),
-            self._upgrade_room,
-            requester,
-            old_room_id,
-            old_room,  # args for _upgrade_room
-            new_room_id,
-            new_version,
-            tombstone_event,
-            tombstone_context,
-        )
+                # Upgrade the room
+                #
+                # If this user has sent multiple upgrade requests for the same room
+                # and one of them is not complete yet, cache the response and
+                # return it to all subsequent requests
+                ret = await self._upgrade_response_cache.wrap(
+                    (old_room_id, user_id),
+                    self._upgrade_room,
+                    requester,
+                    old_room_id,
+                    old_room,  # args for _upgrade_room
+                    new_room_id,
+                    new_version,
+                    tombstone_event,
+                    tombstone_context,
+                )
 
-        return ret
+                return ret
+            except PartialStateConflictError as e:
+                # Clean up the cache so we can retry properly
+                self._upgrade_response_cache.unset((old_room_id, user_id))
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
+
+        # This is to satisfy mypy and should never happen
+        raise PartialStateConflictError()
 
     async def _upgrade_room(
         self,

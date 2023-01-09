@@ -375,6 +375,8 @@ class RoomBatchHandler:
         # Events are sorted by (topological_ordering, stream_ordering)
         # where topological_ordering is just depth.
         for (event, context) in reversed(events_to_persist):
+            # This call can't raise `PartialStateConflictError` since we forbid
+            # use of the historical batch API during partial state
             await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
                     event.sender, app_service_requester.app_service

@@ -14,7 +14,7 @@ class EncryptedByDefaultTestCase(unittest.HomeserverTestCase):
     ]
 
     @override_config({"encryption_enabled_by_default_for_room_type": "all"})
-    def test_encrypted_by_default_config_option_all(self):
+    def test_encrypted_by_default_config_option_all(self) -> None:
         """Tests that invite-only and non-invite-only rooms have encryption enabled by
         default when the config option encryption_enabled_by_default_for_room_type is "all".
         """
@@ -45,7 +45,7 @@ class EncryptedByDefaultTestCase(unittest.HomeserverTestCase):
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
     @override_config({"encryption_enabled_by_default_for_room_type": "invite"})
-    def test_encrypted_by_default_config_option_invite(self):
+    def test_encrypted_by_default_config_option_invite(self) -> None:
         """Tests that only new, invite-only rooms have encryption enabled by default when
         the config option encryption_enabled_by_default_for_room_type is "invite".
         """
@@ -76,7 +76,7 @@ class EncryptedByDefaultTestCase(unittest.HomeserverTestCase):
         )
 
     @override_config({"encryption_enabled_by_default_for_room_type": "off"})
-    def test_encrypted_by_default_config_option_off(self):
+    def test_encrypted_by_default_config_option_off(self) -> None:
         """Tests that neither new invite-only nor non-invite-only rooms have encryption
         enabled by default when the config option
         encryption_enabled_by_default_for_room_type is "off".

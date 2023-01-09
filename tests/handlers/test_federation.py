@@ -439,7 +439,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        def create_invite():
+        def create_invite() -> EventBase:
             room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
             room_version = self.get_success(self.store.get_room_version(room_id))
             return event_from_pdu_json(
