@@ -1,1 +1,1 @@
-Remove undocumented device from /pushrules.
+Remove the unspecced `device` field from `/pushrules` responses.
