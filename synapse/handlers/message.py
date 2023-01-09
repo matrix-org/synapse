@@ -49,7 +49,7 @@ from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
-from synapse.events.snapshot import EventContext, UnpersistedEventContext
+from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.events.utils import maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
@@ -1073,7 +1073,7 @@ class EventCreationHandler:
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
         current_state_group: Optional[int] = None,
-    ) -> Tuple[EventBase, UnpersistedEventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         """Create a new event for a local client. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
         the event using the parameters state_map and current_state_group, thus these parameters
@@ -1184,13 +1184,15 @@ class EventCreationHandler:
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
 
-            context = UnpersistedEventContext(
-                self._storage_controllers,
-                state_map=state_map,
-                state_handler=self.state,
-                state_group_before_event=current_state_group,
-                for_batch=True,
+            context: UnpersistedEventContextBase = (
+                await self.state.calculate_context_info(
+                    event,
+                    state_ids_before_event=state_map,
+                    partial_state=False,
+                    current_state_group=current_state_group,
+                )
             )
+
         else:
             event = await builder.build(
                 prev_event_ids=prev_event_ids,
@@ -1202,7 +1204,7 @@ class EventCreationHandler:
             # after it is created
             if builder.internal_metadata.outlier:
                 event.internal_metadata.outlier = True
-                context = UnpersistedEventContext.for_outlier(self._storage_controllers)
+                context = EventContext.for_outlier(self._storage_controllers)
             elif (
                 event.type == EventTypes.MSC2716_INSERTION
                 and state_event_ids
@@ -1240,11 +1242,12 @@ class EventCreationHandler:
 
                     state_map_for_event[(data.event_type, data.state_key)] = state_id
 
-                context = UnpersistedEventContext(
-                    self._storage_controllers,
-                    state_map=state_map_for_event,
-                    state_handler=self.state,
+                context = await self.state.calculate_context_info(
+                    event,
+                    state_ids_before_event=state_map_for_event,
+                    partial_state=False,
                 )
+
             else:
                 entry = (
                     await self.hs.get_state_handler().resolve_state_groups_for_events(
@@ -1254,23 +1257,26 @@ class EventCreationHandler:
                     )
                 )
 
-                if not entry.state_group:
+                if entry.state_group is None:
                     state_before_event = await entry.get_state(
                         self.state._state_storage_controller, StateFilter.all()
                     )
 
-                    context = UnpersistedEventContext(
-                        self._storage_controllers,
-                        state_map=state_before_event,
-                        state_handler=self.state,
-                        state_entry=entry,
-                    )
+                    if state_before_event:
+                        context = await self.state.calculate_context_info(
+                            event,
+                            state_ids_before_event=state_before_event,
+                            entry=entry,
+                            partial_state=False,
+                        )
+                    else:
+                        context = await self.state.calculate_context_info(
+                            event, entry=entry
+                        )
+
                 else:
-                    context = UnpersistedEventContext(
-                        self._storage_controllers,
-                        state_group_before_event=entry.state_group,
-                        state_handler=self.state,
-                        state_entry=entry,
+                    context = await self.state.calculate_context_info(
+                        event, entry=entry, current_state_group=entry.state_group
                     )
 
         if requester:
@@ -1290,7 +1296,7 @@ class EventCreationHandler:
         elif new_content is not None:
             # the third-party rules want to replace the event. We'll need to build a new
             # event.
-            event = await self._rebuild_event_after_third_party_rules(
+            event, context = await self._rebuild_event_after_third_party_rules(
                 new_content, event
             )
 
@@ -2085,7 +2091,7 @@ class EventCreationHandler:
 
     async def _rebuild_event_after_third_party_rules(
         self, third_party_result: dict, original_event: EventBase
-    ) -> EventBase:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         # the third_party_event_rules want to replace the event.
         # we do some basic checks, and then return the replacement event.
 
@@ -2139,4 +2145,6 @@ class EventCreationHandler:
             auth_event_ids=None,
         )
 
-        return event
+        context = await self.state.calculate_context_info(event)
+
+        return event, context
