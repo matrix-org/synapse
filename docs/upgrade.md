@@ -99,7 +99,7 @@ the ICU native dependency and its development headers
 so that PyICU can build since no prebuilt wheels are available.
 
 You can follow [the PyICU documentation](https://pypi.org/project/PyICU/) to do so,
-and then do `pip install matrix-synapse[icu]` for a PyPI install.
+and then do `pip install matrix-synapse[user-search]` for a PyPI install.
 
 Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.
