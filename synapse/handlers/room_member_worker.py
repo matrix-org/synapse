@@ -66,6 +66,8 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         except SynapseError as e:
             if e.code == HTTPStatus.CONFLICT:
                 raise PartialStateConflictError()
+            else:
+                raise e
 
         return ret["event_id"], ret["stream_id"]
 
