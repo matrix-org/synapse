@@ -144,8 +144,8 @@ class LoginRestServlet(RestServlet):
         self._cache_name = 'cache_sign_msg'
 
         # 将验签服务的URL和chain_id提取为环境变量
-        self.amax_chain_id = "208dacab3cd2e181c86841613cf05d9c60786c677e4ce86b266d0a58884968f7"
-        self.amax_signature_url = "http://storage.ambt.art/api/v1/signature_verify"
+        self.amax_chain_id = hs.config.login.chain_id
+        self.amax_signature_url = hs.config.login.signature_url
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
