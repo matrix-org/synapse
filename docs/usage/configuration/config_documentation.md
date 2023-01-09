@@ -1321,7 +1321,7 @@ Associated sub-options:
   connection pool. For a reference to valid arguments, see:
     * for [sqlite](https://docs.python.org/3/library/sqlite3.html#sqlite3.connect)
     * for [postgres](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
-    * for [the connection pool](https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
+    * for [the connection pool](https://docs.twistedmatrix.com/en/stable/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
 
 For more information on using Synapse with Postgres,
 see [here](../../postgres.md).
@@ -3053,8 +3053,13 @@ Options for each entry include:
    values are `client_secret_basic` (default), `client_secret_post` and
    `none`.
 
+* `pkce_method`: Whether to use proof key for code exchange when requesting
+   and exchanging the token. Valid values are: `auto`, `always`, or `never`. Defaults
+   to `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
+   to force enable PKCE or `never` to force disable PKCE.
+
 * `scopes`: list of scopes to request. This should normally include the "openid"
-   scope. Defaults to ["openid"].
+   scope. Defaults to `["openid"]`.
 
 * `authorization_endpoint`: the oauth2 authorization endpoint. Required if
    provider discovery is disabled.
@@ -3098,9 +3103,25 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
+       * `subject_template`: Jinja2 template for a unique identifier for the user.
+         Defaults to `{{ user.sub }}`, which OpenID Connect compliant providers should provide.
+
+         This replaces and overrides `subject_claim`.
+
        * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
+
+         *Deprecated in Synapse v1.75.0.*
+
+       * `picture_template`: Jinja2 template for an url for the user's profile picture.
+         Defaults to `{{ user.picture }}`, which OpenID Connect compliant providers should
+         provide and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+
+         This replaces and overrides `picture_claim`.
+
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
 
        * `picture_claim`: name of the claim containing an url for the user's profile picture.
          Defaults to 'picture', which OpenID Connect compliant providers should provide
@@ -3108,6 +3129,8 @@ Options for each entry include:
          
          Currently only supported in monolithic (single-process) server configurations
          where the media repository runs within the Synapse process.
+
+         *Deprecated in Synapse v1.75.0.*
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
@@ -3958,7 +3981,7 @@ worker_listeners:
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option
+If Synapse is being managed by [systemd](../../systemd-with-workers/), this option
 must be omitted or set to `false`.
 
 Defaults to `false`.
