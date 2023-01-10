@@ -1,1 +1,0 @@
-Fix Synapse 1.74 upgrade notes to correctly explain how to install pyICU when installing Synapse from PyPI.
