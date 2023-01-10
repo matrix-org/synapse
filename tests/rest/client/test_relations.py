@@ -492,7 +492,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
     @override_config({"experimental_features": {"msc3925_inhibit_edit": True}})
-    def test_edit_inhibit_replace(self):
+    def test_edit_inhibit_replace(self) -> None:
         """
         If msc3925_inhibit_edit is enabled, then the original event should not be
         replaced.
