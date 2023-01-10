@@ -71,6 +71,6 @@ class UnPartialStatedEventStream(Stream):
         super().__init__(
             hs.get_instance_name(),
             # TODO(faster_joins, multiple writers): we need to account for instance names
-            current_token_without_instance(store.get_un_partial_stated_events_token),
+            store.get_un_partial_stated_events_token,
             store.get_un_partial_stated_events_from_stream,
         )
