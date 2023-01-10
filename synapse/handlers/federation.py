@@ -1443,7 +1443,10 @@ class FederationHandler:
                 ) = await self.event_creation_handler.create_new_client_event(
                     builder=builder
                 )
-                event, unpersisted_context = await self.add_display_name_to_third_party_invite(
+                (
+                    event,
+                    unpersisted_context,
+                ) = await self.add_display_name_to_third_party_invite(
                     room_version_obj, event_dict, event, unpersisted_context
                 )
 
