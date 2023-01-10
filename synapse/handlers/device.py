@@ -919,6 +919,11 @@ class DeviceListWorkerUpdater:
         """
         # mark_failed_as_stale is not sent. Ensure this doesn't break expectations.
         assert mark_failed_as_stale
+
+        if not user_ids:
+            # Shortcut empty requests
+            return {}
+
         try:
             return await self._multi_user_device_resync_client(user_ids=user_ids)
         except SynapseError as err:
@@ -946,6 +951,8 @@ class DeviceListWorkerUpdater:
             A dict with device info as under the "devices" in the result of this
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+            None when we weren't able to fetch the device info for some reason,
+            e.g. due to a connection problem.
         """
         return (await self.multi_user_device_resync([user_id]))[user_id]
 
@@ -1250,6 +1257,8 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
             - A dict with device info as under the "devices" in the result of this
               request:
               https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+              None when we weren't able to fetch the device info for some reason,
+              e.g. due to a connection problem.
             - True iff the resync failed and the device list should be marked as stale.
         """
         logger.debug("Attempting to resync the device list for %s", user_id)

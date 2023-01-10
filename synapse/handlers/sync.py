@@ -37,6 +37,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.handlers.relations import BundledAggregations
+from synapse.logging import issue9533_logger
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -1402,11 +1403,14 @@ class SyncHandler:
 
         logger.debug("Fetching room data")
 
-        res = await self._generate_sync_entry_for_rooms(
+        (
+            newly_joined_rooms,
+            newly_joined_or_invited_or_knocked_users,
+            newly_left_rooms,
+            newly_left_users,
+        ) = await self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_or_invited_or_knocked_users, _, _ = res
-        _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
@@ -1623,13 +1627,18 @@ class SyncHandler:
                     }
                 )
 
-            logger.debug(
-                "Returning %d to-device messages between %d and %d (current token: %d)",
-                len(messages),
-                since_stream_id,
-                stream_id,
-                now_token.to_device_key,
-            )
+            if messages and issue9533_logger.isEnabledFor(logging.DEBUG):
+                issue9533_logger.debug(
+                    "Returning to-device messages with stream_ids (%d, %d]; now: %d;"
+                    " msgids: %s",
+                    since_stream_id,
+                    stream_id,
+                    now_token.to_device_key,
+                    [
+                        message["content"].get(EventContentFields.TO_DEVICE_MSGID)
+                        for message in messages
+                    ],
+                )
             sync_result_builder.now_token = now_token.copy_and_replace(
                 StreamKeyType.TO_DEVICE, stream_id
             )
@@ -1783,6 +1792,11 @@ class SyncHandler:
             - newly_left_rooms
             - newly_left_users
         """
+
+        # If the request doesn't care about rooms then nothing to do!
+        if sync_result_builder.sync_config.filter_collection.blocks_all_rooms():
+            return set(), set(), set(), set()
+
         since_token = sync_result_builder.since_token
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).

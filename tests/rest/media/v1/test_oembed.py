@@ -150,3 +150,13 @@ class OEmbedTests(HomeserverTestCase):
         result = self.parse_response({"type": "link"})
         self.assertIn("og:type", result.open_graph_result)
         self.assertEqual(result.open_graph_result["og:type"], "website")
+
+    def test_title_html_entities(self) -> None:
+        """Test HTML entities in title"""
+        result = self.parse_response(
+            {"title": "Why JSON isn&#8217;t a Good Configuration Language"}
+        )
+        self.assertEqual(
+            result.open_graph_result["og:title"],
+            "Why JSON isn’t a Good Configuration Language",
+        )
