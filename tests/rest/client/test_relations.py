@@ -30,6 +30,7 @@ from tests import unittest
 from tests.server import FakeChannel
 from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_event
+from tests.unittest import override_config
 
 
 class BaseRelationsTestCase(unittest.HomeserverTestCase):
@@ -488,6 +489,40 @@ class RelationsTestCase(BaseRelationsTestCase):
             self._find_event_in_chunk(chunk),
             edit_event_id,
             edit_event_content,
+        )
+
+    @override_config({"experimental_features": {"msc3925_inhibit_edit": True}})
+    def test_edit_inhibit_replace(self):
+        """
+        If msc3925_inhibit_edit is enabled, then the original event should not be
+        replaced.
+        """
+
+        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        edit_event_content = {
+            "msgtype": "m.text",
+            "body": "foo",
+            "m.new_content": new_body,
+        }
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            content=edit_event_content,
+        )
+        edit_event_id = channel.json_body["event_id"]
+
+        # /context should return the *original* event.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/context/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertEqual(
+            channel.json_body["event"]["content"], {"body": "Hi!", "msgtype": "m.text"}
+        )
+        self._assert_edit_bundle(
+            channel.json_body["event"], edit_event_id, edit_event_content
         )
 
     def test_multi_edit(self) -> None:
