@@ -74,6 +74,21 @@ redis:
 
 This assumes that your Redis service is called `redis` in your Docker Compose file.
 
+When using [Redis Sentinel](https://redis.io/docs/management/sentinel/) the following configuration can be used instead:
+
+```yaml
+redis:
+  enabled: true
+  sentinel: true
+  dbid: service_name
+  sentinels:
+    - host: sentinel1
+      port: 6379
+    - host: sentinel2
+      port: 6379
+  # password: <secret_password>  
+```
+
 ### Add a replication Listener
 
 Locate the `listeners` section of your `homeserver.yaml` and add the following replication listener:

@@ -330,7 +330,7 @@ class ReplicationCommandHandler:
 
     def start_replication(self, hs: "HomeServer") -> None:
         """Helper method to start replication."""
-        from synapse.replication.tcp.redis import RedisDirectTcpReplicationClientFactory
+        from synapse.replication.tcp.redis.factory import get_replication_factory
 
         # First let's ensure that we have a ReplicationStreamer started.
         hs.get_replication_streamer()
@@ -343,17 +343,8 @@ class ReplicationCommandHandler:
         outbound_redis_connection = hs.get_outbound_redis_connection()
 
         # Now create the factory/connection for the subscription stream.
-        self._factory = RedisDirectTcpReplicationClientFactory(
-            hs,
-            outbound_redis_connection,
-            channel_names=self._channels_to_subscribe_to,
-        )
-        hs.get_reactor().connectTCP(
-            hs.config.redis.redis_host,
-            hs.config.redis.redis_port,
-            self._factory,
-            timeout=30,
-            bindAddress=None,
+        self._factory = get_replication_factory(
+            hs, outbound_redis_connection, channel_names=self._channels_to_subscribe_to
         )
 
     def get_streams(self) -> Dict[str, Stream]:

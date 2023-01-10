@@ -113,6 +113,7 @@ from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
+from synapse.replication.tcp.redis.connection import IRedisConnection
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
 from synapse.rest.media.v1.media_repository import (
@@ -138,8 +139,6 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from txredisapi import ConnectionHandler
-
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
 
@@ -804,7 +803,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PushRulesHandler(self)
 
     @cache_in_self
-    def get_outbound_redis_connection(self) -> "ConnectionHandler":
+    def get_outbound_redis_connection(self) -> "IRedisConnection":
         """
         The Redis connection used for replication.
 
@@ -813,9 +812,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         assert self.config.redis.redis_enabled
 
-        # We only want to import redis module if we're using it, as we have
-        # `txredisapi` as an optional dependency.
-        from synapse.replication.tcp.redis import lazyConnection
+        from synapse.replication.tcp.redis.factory import get_redis_connection
 
         logger.info(
             "Connecting to redis (host=%r port=%r) for external cache",
@@ -823,14 +820,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.redis.redis_port,
         )
 
-        return lazyConnection(
-            hs=self,
-            host=self.config.redis.redis_host,
-            port=self.config.redis.redis_port,
-            dbid=self.config.redis.redis_dbid,
-            password=self.config.redis.redis_password,
-            reconnect=True,
-        )
+        return get_redis_connection(hs=self, config=self.config.redis)
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
