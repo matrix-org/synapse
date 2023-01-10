@@ -58,6 +58,7 @@ class FederationRateLimiterTestCase(TestCase):
 
             # ... until we complete an earlier request
             cm2.__exit__(None, None, None)
+            reactor.advance(0.0)
             self.successResultOf(d3)
 
     def test_sleep_limit(self) -> None:
@@ -116,6 +117,7 @@ class FederationRateLimiterTestCase(TestCase):
             # If a stack overflow occurs, the final task will not complete.
 
         # Wait for all the things to complete.
+        reactor.advance(0.0)
         self.successResultOf(last_task)
 
 
