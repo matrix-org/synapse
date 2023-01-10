@@ -459,6 +459,47 @@ class JsonResource(DirectServeJsonResource):
                 callback, servlet_classname
             )
 
+    def check_paths(self):
+        import re
+
+        with open('conflicts.txt', "a") as f:
+
+            for path_pattern in self._routes.keys():
+                # Push rules have weird routing.
+                if "pushrules/" in path_pattern.pattern:
+                    continue
+
+                # Try to find conflicts.
+                needle = path_pattern.pattern.lstrip("^").rstrip("$")
+                for group_name in path_pattern.groupindex.keys():
+                    value = group_name
+                    if group_name == "membership_action":
+                        value = "join"
+                    needle = re.sub(fr"\(\?P<{group_name}>[^)]+\)", value, needle)
+                    needle = needle.replace("\\", "")
+
+                # There should only be a single group left to match the version.
+                def get_ver(m):
+                    return m.group().lstrip("(").rstrip(")").split("|")[0]
+                needle = re.sub(r"\([^)]+?\)", get_ver, needle)
+
+                # The needle must match itself.
+                assert path_pattern.match(needle) is not None, f"{needle} does not match {path_pattern.pattern}"
+
+                # See if the new fake-ish path matches any previous registered paths.
+                matches = []
+                for p in self._routes.keys():
+                    # Skip yourself.
+                    if p is path_pattern:
+                        continue
+
+                    m = p.match(needle)
+                    if m:
+                        matches.append(p.pattern)
+
+                if matches:
+                    f.write(f"Conflicting paths: {path_pattern.pattern}: {matches}\n")
+
     def _get_handler_for_request(
         self, request: SynapseRequest
     ) -> Tuple[ServletCallback, str, Dict[str, str]]:

@@ -151,3 +151,5 @@ class ClientRestResource(JsonResource):
             mutual_rooms.register_servlets(hs, client_resource)
             login_token_request.register_servlets(hs, client_resource)
             rendezvous.register_servlets(hs, client_resource)
+
+        client_resource.check_paths()
