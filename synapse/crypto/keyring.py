@@ -168,6 +168,7 @@ class Keyring:
         ] = BatchingQueue(
             "keyring_server",
             clock=hs.get_clock(),
+            # The method called to fetch each key
             process_batch_callback=self._inner_fetch_key_requests,
         )
 
@@ -282,11 +283,6 @@ class Keyring:
 
         key_ids_to_find = set(verify_request.key_ids) - found_keys.keys()
         if key_ids_to_find:
-            # We're still missing some keys. Consult each of our `KeyFetcher` instances
-            # (stored in `self._key_fetchers`) to try and find them.
-            # Key fetch attempts are queued via `self._fetch_keys_queue` below, and carried
-            # out in `self._inner_fetch_key_requests`.
-
             # Add the keys we need to verify to the queue for retrieval. We queue
             # up requests for the same server so we don't end up with many in flight
             # requests for the same keys.
@@ -360,7 +356,17 @@ class Keyring:
     async def _inner_fetch_key_requests(
         self, requests: List[_FetchKeyRequest]
     ) -> Dict[str, Dict[str, FetchKeyResult]]:
-        """Processing function for the queue of `_FetchKeyRequest`."""
+        """Processing function for the queue of `_FetchKeyRequest`.
+
+        Takes a list of key fetch requests, de-duplicates them and then carries out
+        each request by invoking self._inner_fetch_key_request.
+
+        Args:
+            requests: A list of requests for homeserver verify keys.
+
+        Returns:
+            {server name: {key id: fetch key result}}
+        """
 
         logger.debug("Starting fetch for %s", requests)
 
@@ -405,8 +411,23 @@ class Keyring:
     async def _inner_fetch_key_request(
         self, verify_request: _FetchKeyRequest
     ) -> Dict[str, FetchKeyResult]:
-        """Attempt to fetch the given key by calling each key fetcher one by
-        one.
+        """Attempt to fetch the given key by calling each key fetcher one by one.
+
+        If a key is found, check whether its `valid_until_ts` attribute satisfies the
+        `minimum_valid_until_ts` attribute of the `verify_request`. If it does, we
+        refrain from asking subsequent fetchers for that key.
+
+        Even if the above check fails, we still return the found key - the caller may
+        still find the invalid key result useful. In this case, we continue to ask
+        subsequent fetchers for the invalid key, in case they return a valid result
+        for it. This can happen when fetching a stale key result from the database,
+        before querying the origin server for an up-to-date result.
+
+        Args:
+            verify_request: The request for a verify key. Can include multiple key IDs.
+
+        Returns:
+            A map of {key_id: the key fetch result}.
         """
         logger.debug("Starting fetch for %s", verify_request)
 
