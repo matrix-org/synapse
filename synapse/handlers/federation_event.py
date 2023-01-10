@@ -1423,7 +1423,7 @@ class FederationEventHandler:
         """
 
         try:
-            await self._store.mark_remote_user_device_cache_as_stale(sender)
+            await self._store.mark_remote_users_device_caches_as_stale((sender,))
 
             # Immediately attempt a resync in the background
             if self._config.worker.worker_app:

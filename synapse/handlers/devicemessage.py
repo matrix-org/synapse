@@ -195,7 +195,7 @@ class DeviceMessageHandler:
                 sender_user_id,
                 unknown_devices,
             )
-            await self.store.mark_remote_user_device_cache_as_stale(sender_user_id)
+            await self.store.mark_remote_users_device_caches_as_stale((sender_user_id,))
 
             # Immediately attempt a resync in the background
             run_in_background(self._user_device_resync, user_id=sender_user_id)
