@@ -163,7 +163,7 @@ class Keyring:
             )
         self._key_fetchers = key_fetchers
 
-        self._server_queue: BatchingQueue[
+        self._fetch_keys_queue: BatchingQueue[
             _FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]
         ] = BatchingQueue(
             "keyring_server",
@@ -284,7 +284,7 @@ class Keyring:
         if key_ids_to_find:
             # We're still missing some keys. Consult each of our `KeyFetcher` instances
             # (stored in `self._key_fetchers`) to try and find them.
-            # Key fetch attempts are queued via `self._server_queue` below, and carried
+            # Key fetch attempts are queued via `self._fetch_keys_queue` below, and carried
             # out in `self._inner_fetch_key_requests`.
 
             # Add the keys we need to verify to the queue for retrieval. We queue
@@ -295,7 +295,7 @@ class Keyring:
                 minimum_valid_until_ts=verify_request.minimum_valid_until_ts,
                 key_ids=list(key_ids_to_find),
             )
-            found_keys_by_server = await self._server_queue.add_to_queue(
+            found_keys_by_server = await self._fetch_keys_queue.add_to_queue(
                 key_request, key=verify_request.server_name
             )
 
