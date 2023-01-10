@@ -39,7 +39,7 @@ from tests.test_utils.event_injection import create_event, inject_member_event
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
-        self, content: JsonMapping, related_events=None
+        self, content: JsonMapping, related_events: Optional[JsonDict] = None
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
@@ -296,7 +296,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {"sound": "default", "highlight": True},
         )
 
-    def test_related_event_match(self):
+    def test_related_event_match(self) -> None:
         evaluator = self._get_evaluator(
             {
                 "m.relates_to": {
@@ -395,7 +395,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             )
         )
 
-    def test_related_event_match_with_fallback(self):
+    def test_related_event_match_with_fallback(self) -> None:
         evaluator = self._get_evaluator(
             {
                 "m.relates_to": {
@@ -467,7 +467,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             )
         )
 
-    def test_related_event_match_no_related_event(self):
+    def test_related_event_match_no_related_event(self) -> None:
         evaluator = self._get_evaluator(
             {"msgtype": "m.text", "body": "Message without related event"}
         )
@@ -516,7 +516,9 @@ class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         # Define an application service so that we can register appservice users
         self._service_token = "some_token"
         self._service = ApplicationService(
