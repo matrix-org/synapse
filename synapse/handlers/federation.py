@@ -1362,7 +1362,10 @@ class FederationHandler:
                         builder=builder
                     )
 
-                    event, unpersisted_context = await self.add_display_name_to_third_party_invite(
+                    (
+                        event,
+                        unpersisted_context,
+                    ) = await self.add_display_name_to_third_party_invite(
                         room_version_obj, event_dict, event, unpersisted_context
                     )
 
@@ -1429,7 +1432,6 @@ class FederationHandler:
             room_version_obj, event_dict
         )
 
-
         # Try several times, it could fail with PartialStateConflictError
         # in send_membership_event, cf comment in except block.
         max_retries = 5
@@ -1441,7 +1443,7 @@ class FederationHandler:
                 ) = await self.event_creation_handler.create_new_client_event(
                     builder=builder
                 )
-                event, context = await self.add_display_name_to_third_party_invite(
+                event, unpersisted_context = await self.add_display_name_to_third_party_invite(
                     room_version_obj, event_dict, event, unpersisted_context
                 )
 
