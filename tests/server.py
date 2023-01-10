@@ -49,6 +49,7 @@ from twisted.internet.interfaces import (
     IProtocol,
     IPullProducer,
     IPushProducer,
+    IReactorFromThreads,
     IReactorPluggableNameResolver,
     IReactorTime,
     IResolverSimple,
@@ -401,7 +402,7 @@ def make_request(
     return channel
 
 
-@implementer(IReactorPluggableNameResolver)
+@implementer(IReactorPluggableNameResolver, IReactorFromThreads)
 class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.

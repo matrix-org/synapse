@@ -30,7 +30,7 @@ class FederationRateLimiterTestCase(TestCase):
         """A simple test with the default values"""
         reactor, clock = get_clock()
         rc_config = build_rc_config()
-        ratelimiter = FederationRateLimiter(clock, rc_config)
+        ratelimiter = FederationRateLimiter(reactor, clock, rc_config)
 
         with ratelimiter.ratelimit("testhost") as d1:
             # shouldn't block
@@ -40,7 +40,7 @@ class FederationRateLimiterTestCase(TestCase):
         """Test what happens when we hit the concurrent limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config({"rc_federation": {"concurrent": 2}})
-        ratelimiter = FederationRateLimiter(clock, rc_config)
+        ratelimiter = FederationRateLimiter(reactor, clock, rc_config)
 
         with ratelimiter.ratelimit("testhost") as d1:
             # shouldn't block
@@ -66,7 +66,7 @@ class FederationRateLimiterTestCase(TestCase):
         rc_config = build_rc_config(
             {"rc_federation": {"sleep_limit": 2, "sleep_delay": 500}}
         )
-        ratelimiter = FederationRateLimiter(clock, rc_config)
+        ratelimiter = FederationRateLimiter(reactor, clock, rc_config)
 
         with ratelimiter.ratelimit("testhost") as d1:
             # shouldn't block
@@ -97,7 +97,7 @@ class FederationRateLimiterTestCase(TestCase):
                 }
             }
         )
-        ratelimiter = FederationRateLimiter(clock, rc_config)
+        ratelimiter = FederationRateLimiter(reactor, clock, rc_config)
 
         with ratelimiter.ratelimit("testhost") as d:
             # shouldn't block
