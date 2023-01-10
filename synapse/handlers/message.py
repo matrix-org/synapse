@@ -1539,9 +1539,14 @@ class EventCreationHandler:
 
         for event, event_context in events_and_context:
             if event_context.partial_state:
-                # We can't precalculate joined hosts for a partial-state event,
-                # (at least not without blocking until full state).
-                # So skip this calculation entirely.
+                # To populate the cache for a partial-state event, we either have to
+                # block until full state, which the code below does, or change the
+                # meaning of cache values to be the list of hosts to which we plan to
+                # send events and calculate that instead.
+                #
+                # The federation senders don't use the external cache when sending
+                # events in partial-state rooms anyway, so let's not bother populating
+                # the cache.
                 continue
 
             # We actually store two mappings, event ID -> prev state group,
