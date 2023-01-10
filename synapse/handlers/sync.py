@@ -1793,10 +1793,6 @@ class SyncHandler:
             - newly_left_users
         """
 
-        # If the request doesn't care about rooms then nothing to do!
-        if sync_result_builder.sync_config.filter_collection.blocks_all_rooms():
-            return set(), set(), set(), set()
-
         since_token = sync_result_builder.since_token
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
