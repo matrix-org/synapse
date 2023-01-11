@@ -110,6 +110,24 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
+    def test_can_set_displayname(self):
+        localpart = "alice_wants_a_new_displayname"
+        user_id = self.register_user(
+            localpart, "1234", displayname="Alice", admin=False
+        )
+        found_userinfo = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+
+        self.get_success(
+            self.module_api.set_displayname(
+                found_userinfo.user_id, "Bob", deactivation=False
+            )
+        )
+        found_profile = self.get_success(
+            self.module_api.get_profile_for_user(localpart)
+        )
+
+        self.assertEqual(found_profile.display_name, "Bob")
+
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
