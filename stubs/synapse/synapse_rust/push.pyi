@@ -1,4 +1,4 @@
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
 
 from synapse.types import JsonDict
 
@@ -54,3 +54,6 @@ class PushRuleEvaluator:
         user_id: Optional[str],
         display_name: Optional[str],
     ) -> Collection[Union[Mapping, str]]: ...
+    def matches(
+        self, condition: JsonDict, user_id: Optional[str], display_name: Optional[str]
+    ) -> bool: ...
