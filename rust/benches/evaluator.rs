@@ -151,7 +151,7 @@ fn bench_eval_message(b: &mut Bencher) {
     .unwrap();
 
     let rules =
-        FilteredPushRules::py_new(PushRules::new(Vec::new()), Default::default(), false, false);
+        FilteredPushRules::py_new(PushRules::new(Vec::new()), Default::default(), false, false, false);
 
     b.iter(|| eval.run(&rules, Some("bob"), Some("person")));
 }
