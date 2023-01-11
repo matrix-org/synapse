@@ -101,10 +101,21 @@ echo
 # Print out the commands being run
 set -x
 
+# Ensure the sort order of imports.
 isort "${files[@]}"
+
+# Ensure Python code conforms to an opinionated style.
 python3 -m black "${files[@]}"
+
+# Ensure the sample configuration file conforms to style checks.
 ./scripts-dev/config-lint.sh
+
+# Catch any common programming mistakes in Python code.
 # --quiet suppresses the update check.
 ruff --quiet "${files[@]}"
+
+# Ensure all Pydantic models use strict types.
 ./scripts-dev/check_pydantic_models.py lint
+
+# Ensure type hints are correct.
 mypy
