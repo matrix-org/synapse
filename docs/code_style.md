@@ -20,7 +20,7 @@ It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
 functionality is supported in your editor for a more convenient
 development workflow. It is not, however, recommended to run `mypy`
-on save as it take a while and can be very resource intensive.
+on save as it takes a while and can be very resource intensive.
 
 ## General rules
 
