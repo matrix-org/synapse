@@ -452,7 +452,7 @@ class Keyring:
                 # If we already have a result for the given key ID, we keep the
                 # one with the highest `valid_until_ts`.
                 existing_key = found_keys.get(key_id)
-                if existing_key and existing_key.valid_until_ts >= key.valid_until_ts:
+                if existing_key and existing_key.valid_until_ts > key.valid_until_ts:
                     continue
 
                 # Check if this key's expiry timestamp is valid for the verify request.
