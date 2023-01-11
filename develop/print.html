@@ -15585,17 +15585,13 @@ errors in code.</p>
 <li><a href="https://github.com/charliermarsh/ruff">ruff</a>, which can spot common errors; and</li>
 <li><a href="https://mypy.readthedocs.io/en/stable/">mypy</a>, a type checker.</li>
 </ul>
-<p>Install them with:</p>
-<pre><code class="language-sh">pip install -e &quot;.[lint,mypy]&quot;
-</code></pre>
-<p>The easiest way to run the lints is to invoke the linter script as follows.</p>
-<pre><code class="language-sh">scripts-dev/lint.sh
-</code></pre>
+<p>See <a href="development/contributing_guide.html#run-the-linters">the contributing guide</a> for instructions
+on how to install the above tools and run the linters.</p>
 <p>It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
 functionality is supported in your editor for a more convenient
 development workflow. It is not, however, recommended to run <code>mypy</code>
-on save as they take a while and can be very resource intensive.</p>
+on save as it takes a while and can be very resource intensive.</p>
 <h2 id="general-rules"><a class="header" href="#general-rules">General rules</a></h2>
 <ul>
 <li><strong>Naming</strong>:
