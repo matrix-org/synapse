@@ -411,9 +411,9 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
-    msc3930_enabled: bool,
-    msc3664_enabled: bool,
     msc1767_enabled: bool,
+    msc3664_enabled: bool,
+    msc3930_enabled: bool,
 }
 
 #[pymethods]
@@ -422,16 +422,16 @@ impl FilteredPushRules {
     pub fn py_new(
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
-        msc3930_enabled: bool,
-        msc3664_enabled: bool,
         msc1767_enabled: bool,
+        msc3664_enabled: bool,
+        msc3930_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3930_enabled,
-            msc3664_enabled,
             msc1767_enabled,
+            msc3664_enabled,
+            msc3930_enabled,
         }
     }
 
@@ -450,13 +450,8 @@ impl FilteredPushRules {
             .iter()
             .filter(|rule| {
                 // Ignore disabled experimental push rules
-                if !self.msc3930_enabled
-                    && (rule.rule_id == "global/override/.org.matrix.msc3930.rule.poll_response"
-                        || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start_one_to_one"
-                        || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start"
-                        || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_end_one_to_one"
-                        || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_end")
-                {
+
+                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
                     return false;
                 }
 
@@ -466,7 +461,13 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                if !self.msc3930_enabled
+                    && (rule.rule_id == "global/override/.org.matrix.msc3930.rule.poll_response"
+                    || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start_one_to_one"
+                    || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start"
+                    || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_end_one_to_one"
+                    || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_end")
+                {
                     return false;
                 }
 
