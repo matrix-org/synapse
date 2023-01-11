@@ -13,7 +13,7 @@ The necessary tools are:
 - [ruff](https://github.com/charliermarsh/ruff), which can spot common errors; and
 - [mypy](https://mypy.readthedocs.io/en/stable/), a type checker.
 
-See [the contributing guide](../contributing_guide.md#run-the-linters) for instructions
+See [the contributing guide](development/contributing_guide.md#run-the-linters) for instructions
 on how to install the above tools and run the linters.
 
 It's worth noting that modern IDEs and text editors can run these tools
