@@ -10,10 +10,10 @@ See the following for how to decode the dense data available from the default lo
 ```
 
 
-| Part  | Explanation | 
+| Part  | Explanation |
 | ----- | ------------ |
 | AAAA  | Timestamp request was logged (not received) |
-| BBBB  | Logger name (`synapse.access.(http\|https).<tag>`, where 'tag' is defined in the `listeners` config section, normally the port) |
+| BBBB  | Logger name (`synapse.access.(http\|https).<tag>`, where 'tag' is defined in the [`listeners`](../configuration/config_documentation.md#listeners) config section, normally the port) |
 | CCCC  | Line number in code |
 | DDDD  | Log Level |
 | EEEE  | Request Identifier (This identifier is shared by related log lines)|

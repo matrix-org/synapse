@@ -422,6 +422,10 @@ Sub-options for each listener include:
 
 * `port`: the TCP port to bind to.
 
+* `tag`: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to `None`, is optional and only valid for listener with `type: http`.
+See the docs [request log format](../administration/request_log.md).
+
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
