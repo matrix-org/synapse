@@ -127,8 +127,12 @@ class ExperimentalConfig(Config):
             "msc3886_endpoint", None
         )
 
-        # MSC3930: Push rules for MSC3391 polls
-        self.msc3930_enabled: bool = experimental.get("msc3930_enabled", False)
+        # MSC3381: Polls.
+        # In practice, supporting polls in Synapse only requires an implementation of
+        # MSC3930: Push rules for MSC3391 polls; which is what this option enables.
+        self.msc3381_polls_enabled: bool = experimental.get(
+            "msc3381_polls_enabled", False
+        )
 
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)

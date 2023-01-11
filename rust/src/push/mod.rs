@@ -412,8 +412,8 @@ pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
     msc1767_enabled: bool,
+    msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
-    msc3930_enabled: bool,
 }
 
 #[pymethods]
@@ -423,15 +423,15 @@ impl FilteredPushRules {
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
         msc1767_enabled: bool,
+        msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3930_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
             enabled_map,
             msc1767_enabled,
+            msc3381_polls_enabled,
             msc3664_enabled,
-            msc3930_enabled,
         }
     }
 
@@ -461,7 +461,7 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc3930_enabled
+                if !self.msc3381_polls_enabled
                     && (rule.rule_id == "global/override/.org.matrix.msc3930.rule.poll_response"
                     || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start_one_to_one"
                     || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start"
