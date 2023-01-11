@@ -3888,6 +3888,13 @@ additional endpoints which should be loaded via dynamic modules.</p>
 <li>
 <p><code>static</code>: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)</p>
 </li>
+<li>
+<p><code>health</code>: the <a href="usage/configuration/../../reverse_proxy.html#health-check-endpoint">health check endpoint</a>. This endpoint
+is by default active for all other resources and does not have to be activated separately.
+This is only useful if you want to use the health endpoint explicitly on a dedicated port or
+for <a href="usage/configuration/../../workers.html">workers</a> and containers without listener e.g.
+<a href="usage/configuration/../../workers.html#notifying-application-services">application services</a>.</p>
+</li>
 </ul>
 <p>Example configuration #1:</p>
 <pre><code class="language-yaml">listeners:
