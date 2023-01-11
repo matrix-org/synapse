@@ -114,6 +114,27 @@ python3 -m black "${files[@]}"
 # --quiet suppresses the update check.
 ruff --quiet "${files[@]}"
 
+# Catch any common programming mistakes in Rust code.
+#
+# --bins, --examples, --lib, --tests combined explicitly disable checking
+# the benchmarks, which can fail on the stable rust toolchain.
+#
+# --allow-staged and --allow-dirty suppress clippy raising errors
+# for uncommitted files. Only needed when using --fix.
+#
+# -D warnings disables the "warnings" lint.
+#
+# Using --fix has a tendency to cause subsequent runs of clippy to recompile
+# rust code, which can slow down this script. Thus we run clippy without --fix
+# first which is quick, and then re-run it with --fix if an error was found.
+if ! cargo-clippy --bins --examples --lib --tests -- -D warnings > /dev/null 2>&1; then
+  cargo-clippy \
+    --bins --examples --lib --tests --allow-staged --allow-dirty --fix -- -D warnings
+fi
+
+# Ensure the formatting of Rust code.
+cargo-fmt
+
 # Ensure all Pydantic models use strict types.
 ./scripts-dev/check_pydantic_models.py lint
 
