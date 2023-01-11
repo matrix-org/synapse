@@ -480,6 +480,12 @@ Valid resource names are:
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
 
+* `health`: the [health check endpoint](../../reverse_proxy.md#health-check-endpoint). This endpoint
+  is by default active for all other resources and does not have to be activated separately.
+  This is only useful if you want to use the health endpoint explicitly on a dedicated port or
+  for [workers](../../workers.md) and containers without listener e.g.
+  [application services](../../workers.md#notifying-application-services).
+
 Example configuration #1:
 ```yaml
 listeners:
