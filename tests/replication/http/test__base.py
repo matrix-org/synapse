@@ -54,6 +54,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
     NAME = "uncancellable_sleep"
     PATH_ARGS = ()
     CACHE = False
+    WAIT_FOR_STREAMS = False
 
     def __init__(self, hs: HomeServer):
         super().__init__(hs)

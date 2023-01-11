@@ -98,6 +98,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             a connection error is received.
         RETRY_ON_CONNECT_ERROR_ATTEMPTS (int): Number of attempts to retry when
             receiving connection errors, each will backoff exponentially longer.
+        WAIT_FOR_STREAMS (bool): Whether to wait for replication streams to
+            catch up before processing the request and/or response. Defaults to
+            True.
     """
 
     NAME: str = abc.abstractproperty()  # type: ignore
@@ -107,6 +110,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     RETRY_ON_TIMEOUT = True
     RETRY_ON_CONNECT_ERROR = True
     RETRY_ON_CONNECT_ERROR_ATTEMPTS = 5  # =63s (2^6-1)
+
+    WAIT_FOR_STREAMS = True
 
     def __init__(self, hs: "HomeServer"):
         if self.CACHE:
@@ -231,7 +236,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
                 data = await cls._serialize_payload(**kwargs)
 
-                if cls.METHOD != "GET":
+                if cls.METHOD != "GET" and cls.WAIT_FOR_STREAMS:
                     # Include the current stream positions that we write to. We
                     # don't do this for GETs as they don't have a body, and we
                     # generally assume that a GET won't rely on data we have
@@ -436,9 +441,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if _STREAM_POSITION_KEY in response:
             raise Exception("data to send contains %r key", _STREAM_POSITION_KEY)
 
-        response[_STREAM_POSITION_KEY] = {
-            stream.NAME: stream.current_token(self._instance_name)
-            for stream in self._streams
-        }
+        if self.WAIT_FOR_STREAMS:
+            response[_STREAM_POSITION_KEY] = {
+                stream.NAME: stream.current_token(self._instance_name)
+                for stream in self._streams
+            }
 
         return code, response

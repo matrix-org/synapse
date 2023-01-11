@@ -54,6 +54,10 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
     PATH_ARGS = ("stream_name",)
     METHOD = "GET"
 
+    # We don't want to wait for replication streams to catch up, as this gets
+    # called in the process of catching replication streams up.
+    WAIT_FOR_STREAMS = False
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
