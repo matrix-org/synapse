@@ -469,6 +469,11 @@ configuration.</p>
 <p><code>port</code>: the TCP port to bind to.</p>
 </li>
 <li>
+<p><code>tag</code>: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to <code>None</code>, is optional and only valid for listener with <code>type: http</code>.
+See the docs <a href="../administration/request_log.html">request log format</a>.</p>
+</li>
+<li>
 <p><code>bind_addresses</code>: a list of local addresses to listen on. The default is
 'all local interfaces'.</p>
 </li>

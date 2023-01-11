@@ -3806,6 +3806,11 @@ configuration.</p>
 <p><code>port</code>: the TCP port to bind to.</p>
 </li>
 <li>
+<p><code>tag</code>: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to <code>None</code>, is optional and only valid for listener with <code>type: http</code>.
+See the docs <a href="usage/configuration/../administration/request_log.html">request log format</a>.</p>
+</li>
+<li>
 <p><code>bind_addresses</code>: a list of local addresses to listen on. The default is
 'all local interfaces'.</p>
 </li>
@@ -14985,7 +14990,7 @@ WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h l
 </code></pre>
 <table><thead><tr><th>Part</th><th>Explanation</th></tr></thead><tbody>
 <tr><td>AAAA</td><td>Timestamp request was logged (not received)</td></tr>
-<tr><td>BBBB</td><td>Logger name (<code>synapse.access.(http\|https).&lt;tag&gt;</code>, where 'tag' is defined in the <code>listeners</code> config section, normally the port)</td></tr>
+<tr><td>BBBB</td><td>Logger name (<code>synapse.access.(http\|https).&lt;tag&gt;</code>, where 'tag' is defined in the <a href="usage/administration/../configuration/config_documentation.html#listeners"><code>listeners</code></a> config section, normally the port)</td></tr>
 <tr><td>CCCC</td><td>Line number in code</td></tr>
 <tr><td>DDDD</td><td>Log Level</td></tr>
 <tr><td>EEEE</td><td>Request Identifier (This identifier is shared by related log lines)</td></tr>
