@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, Set, Union, cast
 
 import frozendict
 
@@ -39,7 +39,11 @@ from tests.test_utils.event_injection import create_event, inject_member_event
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
-        self, content: JsonMapping, related_events: Optional[JsonDict] = None
+        self,
+        content: JsonMapping,
+        *,
+        mentions: Optional[Set[str]] = None,
+        related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
@@ -57,13 +61,14 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
+            mentions or set(),
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
             {} if related_events is None else related_events,
-            True,
-            event.room_version.msc3931_push_features,
-            True,
+            related_event_match_enabled=True,
+            room_version_feature_flags=event.room_version.msc3931_push_features,
+            msc3931_enabled=True,
         )
 
     def test_display_name(self) -> None:
@@ -89,6 +94,50 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # A display name with spaces should work fine.
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
+
+    def test_user_mentions(self) -> None:
+        """Check for user mentions."""
+        condition = {"kind": "org.matrix.msc3952.is_user_mention"}
+
+        # No mentions shouldn't match.
+        evaluator = self._get_evaluator({})
+        self.assertFalse(evaluator.matches(condition, "@user:test", None))
+
+        # An empty set shouldn't match
+        evaluator = self._get_evaluator({}, mentions=set())
+        self.assertFalse(evaluator.matches(condition, "@user:test", None))
+
+        # The Matrix ID appearing anywhere in the mentions list should match
+        evaluator = self._get_evaluator({}, mentions={"@user:test"})
+        self.assertTrue(evaluator.matches(condition, "@user:test", None))
+
+        evaluator = self._get_evaluator({}, mentions={"@another:test", "@user:test"})
+        self.assertTrue(evaluator.matches(condition, "@user:test", None))
+
+        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
+        # since the BulkPushRuleEvaluator is what handles data sanitisation.
+
+    def test_room_mentions(self) -> None:
+        """Check for room mentions."""
+        condition = {"kind": "org.matrix.msc3952.is_room_mention"}
+
+        # No mentions shouldn't match.
+        evaluator = self._get_evaluator({})
+        self.assertFalse(evaluator.matches(condition, None, None))
+
+        # An empty set shouldn't match
+        evaluator = self._get_evaluator({}, mentions=set())
+        self.assertFalse(evaluator.matches(condition, None, None))
+
+        # The @room appearing anywhere in the mentions list should match
+        evaluator = self._get_evaluator({}, mentions={"@room"})
+        self.assertTrue(evaluator.matches(condition, None, None))
+
+        evaluator = self._get_evaluator({}, mentions={"@another:test", "@room"})
+        self.assertTrue(evaluator.matches(condition, None, None))
+
+        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
+        # since the BulkPushRuleEvaluator is what handles data sanitisation.
 
     def _assert_matches(
         self, condition: JsonDict, content: JsonMapping, msg: Optional[str] = None
@@ -308,7 +357,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                     },
                 }
             },
-            {
+            related_events={
                 "m.in_reply_to": {
                     "event_id": "$parent_event_id",
                     "type": "m.room.message",
@@ -408,7 +457,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                     },
                 }
             },
-            {
+            related_events={
                 "m.in_reply_to": {
                     "event_id": "$parent_event_id",
                     "type": "m.room.message",

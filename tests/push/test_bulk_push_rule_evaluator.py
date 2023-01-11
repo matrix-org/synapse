@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
 from unittest.mock import patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.rest import admin
@@ -126,3 +128,62 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Ensure no actions are generated!
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
         bulk_evaluator._action_for_event_by_user.assert_not_called()
+
+    def test_mentions(self) -> None:
+        """Test the behavior of an event which includes invalid mentions."""
+        bulk_evaluator = BulkPushRuleEvaluator(self.hs)
+
+        sentinel = object()
+
+        def create_and_process(mentions: Any = sentinel) -> bool:
+            content = {}
+            if mentions is not sentinel:
+                content[EventContentFields.MSC3952_MENTIONS] = mentions
+
+            # Create a new message event which should cause a notification.
+            event, context = self.get_success(
+                self.event_creation_handler.create_event(
+                    self.requester,
+                    {
+                        "type": "test",
+                        "room_id": self.room_id,
+                        "content": content,
+                        "sender": f"@bob:{self.hs.hostname}",
+                    },
+                )
+            )
+
+            # Ensure no actions are generated!
+            self.get_success(
+                bulk_evaluator.action_for_events_by_user([(event, context)])
+            )
+
+            # If any actions are generated for this event, return true.
+            result = self.get_success(
+                self.hs.get_datastores().main.db_pool.simple_select_list(
+                    table="event_push_actions_staging",
+                    keyvalues={"event_id": event.event_id},
+                    retcols=("*",),
+                    desc="get_event_push_actions_staging",
+                )
+            )
+            return len(result) > 0
+
+        # Not including the mentions field should result in no notifications.
+        self.assertFalse(create_and_process())
+
+        # Invalid data should be ignored.
+        mentions: Any
+        for mentions in (None, True, False, "foo", {}):
+            self.assertFalse(create_and_process(mentions))
+
+        # The Matrix ID appearing anywhere in the mentions list should match
+        self.assertTrue(create_and_process([self.alice]))
+        self.assertTrue(create_and_process(["@another:test", self.alice]))
+
+        # The Matrix ID appearing > 10 entries into the list should be ignored.
+        self.assertFalse(create_and_process(["@another:test"] * 10 + [self.alice]))
+
+        # Invalid entries in the list are ignored, but count towards the limit.
+        self.assertTrue(create_and_process([None, True, False, {}, [], self.alice]))
+        self.assertFalse(create_and_process([None] * 10 + [self.alice]))

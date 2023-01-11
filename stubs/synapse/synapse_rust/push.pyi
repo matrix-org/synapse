@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
 
 from synapse.types import JsonDict
 
@@ -55,6 +55,7 @@ class PushRuleEvaluator:
     def __init__(
         self,
         flattened_keys: Mapping[str, str],
+        mentions: Set[str],
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
