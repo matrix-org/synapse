@@ -85,7 +85,7 @@ class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     def test_cancellable_disconnect(self) -> None:
         """Test that handlers with the `@cancellable` flag can be cancelled."""
         path = f"{REPLICATION_PREFIX}/{CancellableReplicationEndpoint.NAME}/"
-        channel = self.make_request("POST", path, await_result=False)
+        channel = self.make_request("POST", path, await_result=False, content={})
         test_disconnect(
             self.reactor,
             channel,
@@ -96,7 +96,7 @@ class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     def test_uncancellable_disconnect(self) -> None:
         """Test that handlers without the `@cancellable` flag cannot be cancelled."""
         path = f"{REPLICATION_PREFIX}/{UncancellableReplicationEndpoint.NAME}/"
-        channel = self.make_request("POST", path, await_result=False)
+        channel = self.make_request("POST", path, await_result=False, content={})
         test_disconnect(
             self.reactor,
             channel,
