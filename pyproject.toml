@@ -48,7 +48,7 @@ line-length = 88
 #  E731: do not assign a lambda expression, use a def
 #  E501: Line too long (black enforces this for us)
 #
-# See https://github.com/charliermarsh/ruff/#pyflakes
+# See https://github.com/charliermarsh/ruff/#pyflakes-f
 #  F401: unused import
 #  F811: Redefinition of unused
 #  F821: Undefined name
@@ -64,9 +64,6 @@ ignore = [
     "B024",
     "E501",
     "E731",
-    "F401",
-    "F811",
-    "F821",
 ]
 select = [
     # pycodestyle checks.
