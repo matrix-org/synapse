@@ -67,7 +67,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         return {"from_token": from_token, "upto_token": upto_token}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, stream_name: str
+        self, request: Request, content: JsonDict, stream_name: str
     ) -> Tuple[int, JsonDict]:
         stream = self.streams.get(stream_name)
         if stream is None:

@@ -27,6 +27,7 @@ from twisted.web.server import Request
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
 from synapse.http.server import HttpServer
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing
 from synapse.logging.opentracing import trace_with_opname
@@ -160,7 +161,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def _handle_request(
-        self, request: Request, **kwargs: Any
+        self, request: Request, content: JsonDict, **kwargs: Any
     ) -> Tuple[int, JsonDict]:
         """Handle incoming request.
 
@@ -353,6 +354,12 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self._replication_secret:
             self._check_auth(request)
 
+        if self.METHOD == "GET":
+            # GET APIs always have an empty body.
+            content = {}
+        else:
+            content = parse_json_object_from_request(request)
+
         if self.CACHE:
             txn_id = kwargs.pop("txn_id")
 
@@ -362,7 +369,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             # context lifetimes.
 
             return await self.response_cache.wrap(
-                txn_id, self._handle_request, request, **kwargs
+                txn_id, self._handle_request, request, content, **kwargs
             )
 
         # The `@cancellable` decorator may be applied to `_handle_request`. But we
@@ -370,4 +377,4 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         # so we have to set up the cancellable flag ourselves.
         request.is_render_cancellable = is_function_cancellable(self._handle_request)
 
-        return await self._handle_request(request, **kwargs)
+        return await self._handle_request(request, content, **kwargs)
