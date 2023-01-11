@@ -211,13 +211,13 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed("global/override/.org.matrix.msc3930.rule.poll_response"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
+            EventMatchCondition {
                 key: Cow::Borrowed("type"),
                 pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.response")),
                 pattern_type: None,
-            })),
-        ]),
+            },
+        ))]),
         actions: Cow::Borrowed(&[]),
         default: true,
         default_enabled: true,
@@ -630,13 +630,13 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3930.rule.poll_start"),
         priority_class: 1,
-        conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
+            EventMatchCondition {
                 key: Cow::Borrowed("type"),
                 pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.start")),
                 pattern_type: None,
-            })),
-        ]),
+            },
+        ))]),
         actions: Cow::Borrowed(&[Action::Notify]),
         default: true,
         default_enabled: true,
@@ -661,13 +661,13 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed("global/underride/.org.matrix.msc3930.rule.poll_end"),
         priority_class: 1,
-        conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
+            EventMatchCondition {
                 key: Cow::Borrowed("type"),
                 pattern: Some(Cow::Borrowed("org.matrix.msc3381.poll.end")),
                 pattern_type: None,
-            })),
-        ]),
+            },
+        ))]),
         actions: Cow::Borrowed(&[Action::Notify]),
         default: true,
         default_enabled: true,
