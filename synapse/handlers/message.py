@@ -1254,6 +1254,9 @@ class EventCreationHandler:
 
                     state_map_for_event[(data.event_type, data.state_key)] = state_id
 
+                # TODO(faster_joins): check how MSC2716 works and whether we can have
+                #   partial state here
+                #   https://github.com/matrix-org/synapse/issues/13003
                 context = await self.state.calculate_context_info(
                     event,
                     state_ids_before_event=state_map_for_event,
@@ -1261,35 +1264,7 @@ class EventCreationHandler:
                 )
 
             else:
-                entry = (
-                    await self.hs.get_state_handler().resolve_state_groups_for_events(
-                        event.room_id,
-                        event.prev_event_ids(),
-                        await_full_state=False,
-                    )
-                )
-
-                if entry.state_group is None:
-                    state_before_event = await entry.get_state(
-                        self.state._state_storage_controller, StateFilter.all()
-                    )
-
-                    if state_before_event:
-                        context = await self.state.calculate_context_info(
-                            event,
-                            state_ids_before_event=state_before_event,
-                            entry=entry,
-                            partial_state=False,
-                        )
-                    else:
-                        context = await self.state.calculate_context_info(
-                            event, entry=entry
-                        )
-
-                else:
-                    context = await self.state.calculate_context_info(
-                        event, entry=entry, current_state_group=entry.state_group
-                    )
+                context = await self.state.calculate_context_info(event)
 
         if requester:
             context.app_service = requester.app_service
@@ -2159,6 +2134,8 @@ class EventCreationHandler:
             auth_event_ids=None,
         )
 
+        # we rebuild the event context, to be on the safe side. If nothing else,
+        # delta_ids might need an update.
         context = await self.state.calculate_context_info(event)
 
         return event, context

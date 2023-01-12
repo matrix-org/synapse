@@ -427,7 +427,7 @@ class FederationEventHandler:
 
     async def check_join_restrictions(
         self,
-        context: Union[EventContext, UnpersistedEventContextBase],
+        context: UnpersistedEventContextBase,
         event: EventBase,
     ) -> None:
         """Check that restrictions in restricted join rules are matched

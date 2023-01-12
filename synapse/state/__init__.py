@@ -43,7 +43,6 @@ from synapse.events.snapshot import (
     EventContext,
     UnpersistedEventContext,
     UnpersistedEventContextBase,
-    UnpersistedEventContextForBatched,
 )
 from synapse.logging.context import ContextResourceUsage
 from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
@@ -272,33 +271,32 @@ class StateHandler:
         event: EventBase,
         state_ids_before_event: Optional[StateMap[str]] = None,
         partial_state: Optional[bool] = None,
-        entry: Optional[_StateCacheEntry] = None,
         current_state_group: Optional[int] = None,
     ) -> UnpersistedEventContextBase:
         """
         Calulates the contents of an unpersisted event context, other than the current
         state group (which is either provided or calculated when the event context is persisted)
 
-        state_ids_before_event: The event ids of the full state before the event if
-                    it can't be calculated from existing events. This is normally
-                    only specified when receiving an event from federation where we
-                    don't have the prev events, e.g. when backfilling or when the event
-                    is being created for batch persisting.
-                partial_state:
-                    `True` if `state_ids_before_event` is partial and omits non-critical
-                    membership events.
-                    `False` if `state_ids_before_event` is the full state.
-                    `None` when `state_ids_before_event` is not provided. In this case, the
-                    flag will be calculated based on `event`'s prev events.
-                entry:
-                    A state cache entry for the resolved state across the prev events. We may
-                    have already calculated this, so if it's available pass it in
-            Returns:
-                The event context.
+        state_ids_before_event:
+            The event ids of the full state before the event if
+            it can't be calculated from existing events. This is normally
+            only specified when receiving an event from federation where we
+            don't have the prev events, e.g. when backfilling or when the event
+            is being created for batch persisting.
+        partial_state:
+            `True` if `state_ids_before_event` is partial and omits non-critical
+            membership events.
+            `False` if `state_ids_before_event` is the full state.
+            `None` when `state_ids_before_event` is not provided. In this case, the
+            flag will be calculated based on `event`'s prev events.
+        current_state_group:
+            the current state group at the time of event, if known
+        Returns:
+            The event context.
 
-            Raises:
-                RuntimeError if `state_ids_before_event` is not provided and one or more
-                    prev events are missing or outliers.
+        Raises:
+            RuntimeError if `state_ids_before_event` is not provided and one or more
+                prev events are missing or outliers.
         """
         assert not event.internal_metadata.is_outlier()
 
@@ -313,15 +311,7 @@ class StateHandler:
 
             # .. though we need to get a state group for it if we don't have it
             if not current_state_group:
-                state_group_before_event = (
-                    await self._state_storage_controller.store_state_group(
-                        event.event_id,
-                        event.room_id,
-                        prev_group=None,
-                        delta_ids=None,
-                        current_state_ids=state_ids_before_event,
-                    )
-                )
+                state_group_before_event = None
             else:
                 state_group_before_event = current_state_group
 
@@ -354,12 +344,11 @@ class StateHandler:
             # we've already taken into account partial state, so no need to wait for
             # complete state here.
 
-            if not entry:
-                entry = await self.resolve_state_groups_for_events(
-                    event.room_id,
-                    event.prev_event_ids(),
-                    await_full_state=False,
-                )
+            entry = await self.resolve_state_groups_for_events(
+                event.room_id,
+                event.prev_event_ids(),
+                await_full_state=False,
+            )
 
             state_group_before_event_prev_group = entry.prev_group
             deltas_to_state_group_before_event = entry.delta_ids
@@ -393,28 +382,16 @@ class StateHandler:
         #
 
         if not event.is_state():
-            if state_ids_before_event:
-                return UnpersistedEventContextForBatched(
-                    storage_controller=self._storage_controllers,
-                    state_group_before_event=state_group_before_event,
-                    state_group=state_group_before_event,
-                    state_delta_due_to_event={},
-                    prev_group=state_group_before_event_prev_group,
-                    delta_ids=deltas_to_state_group_before_event,
-                    partial_state=partial_state,
-                    state_map=state_ids_before_event,
-                )
-
-            else:
-                return UnpersistedEventContext(
-                    storage_controller=self._storage_controllers,
-                    state_group_before_event=state_group_before_event,
-                    state_group=state_group_before_event,
-                    state_delta_due_to_event={},
-                    prev_group=state_group_before_event_prev_group,
-                    delta_ids=deltas_to_state_group_before_event,
-                    partial_state=partial_state,
-                )
+            return UnpersistedEventContext(
+                storage=self._storage_controllers,
+                state_group_before_event=state_group_before_event,
+                state_group=state_group_before_event,
+                state_delta_due_to_event={},
+                prev_group=state_group_before_event_prev_group,
+                delta_ids=deltas_to_state_group_before_event,
+                partial_state=partial_state,
+                state_map=state_ids_before_event,
+            )
 
         #
         # otherwise, we'll need to create a new state group for after the event
@@ -425,7 +402,6 @@ class StateHandler:
         if state_ids_before_event is not None:
             replaces = state_ids_before_event.get(key)
         else:
-            assert entry is not None
             replaces_state_map = await entry.get_state(
                 self._state_storage_controller, StateFilter.from_types([key])
             )
@@ -436,36 +412,22 @@ class StateHandler:
 
         delta_ids = {key: event.event_id}
 
-        if state_ids_before_event:
-            return UnpersistedEventContextForBatched(
-                storage_controller=self._storage_controllers,
-                state_group_before_event=state_group_before_event,
-                state_group=None,
-                state_delta_due_to_event=delta_ids,
-                prev_group=state_group_before_event,
-                delta_ids=delta_ids,
-                partial_state=partial_state,
-                state_map=state_ids_before_event,
-            )
-
-        else:
-            return UnpersistedEventContext(
-                storage_controller=self._storage_controllers,
-                state_group_before_event=state_group_before_event,
-                state_group=None,
-                state_delta_due_to_event=delta_ids,
-                prev_group=state_group_before_event,
-                delta_ids=delta_ids,
-                partial_state=partial_state,
-            )
+        return UnpersistedEventContext(
+            storage=self._storage_controllers,
+            state_group_before_event=state_group_before_event,
+            state_group=None,
+            state_delta_due_to_event=delta_ids,
+            prev_group=state_group_before_event,
+            delta_ids=delta_ids,
+            partial_state=partial_state,
+            state_map=state_ids_before_event,
+        )
 
     async def compute_event_context(
         self,
         event: EventBase,
         state_ids_before_event: Optional[StateMap[str]] = None,
         partial_state: Optional[bool] = None,
-        entry: Optional[_StateCacheEntry] = None,
-        current_state_group: Optional[int] = None,
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event.
 
@@ -501,8 +463,6 @@ class StateHandler:
             event=event,
             state_ids_before_event=state_ids_before_event,
             partial_state=partial_state,
-            entry=entry,
-            current_state_group=current_state_group,
         )
 
         return await unpersisted_context.persist(event)
