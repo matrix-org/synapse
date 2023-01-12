@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Setup mdbook
-        uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
+        uses: peaceiris/actions-mdbook@adeb05db28a0c0004681db83893d56c0388ea9ea # v1.2.0
         with:
           mdbook-version: '0.4.17'
 
@@ -54,11 +54,11 @@ jobs:
           esac
 
           # finally, set the 'branch-version' var.
-          echo "::set-output name=branch-version::$branch"
+          echo "branch-version=$branch" >> "$GITHUB_OUTPUT"
           
       # Deploy to the target directory.
       - name: Deploy to gh pages
-        uses: peaceiris/actions-gh-pages@068dc23d9710f1ba62e86896f84735d869951305 # v3.8.0
+        uses: peaceiris/actions-gh-pages@de7ea6f8efb354206b205ef54722213d99067935 # v3.9.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./book

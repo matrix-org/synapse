@@ -33,10 +33,12 @@ fn bench_match_exact(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         10,
-        0,
+        Some(0),
         Default::default(),
         Default::default(),
         true,
+        vec![],
+        false,
     )
     .unwrap();
 
@@ -67,10 +69,12 @@ fn bench_match_word(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         10,
-        0,
+        Some(0),
         Default::default(),
         Default::default(),
         true,
+        vec![],
+        false,
     )
     .unwrap();
 
@@ -101,10 +105,12 @@ fn bench_match_word_miss(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         10,
-        0,
+        Some(0),
         Default::default(),
         Default::default(),
         true,
+        vec![],
+        false,
     )
     .unwrap();
 
@@ -135,10 +141,12 @@ fn bench_eval_message(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         10,
-        0,
+        Some(0),
         Default::default(),
         Default::default(),
         true,
+        vec![],
+        false,
     )
     .unwrap();
 

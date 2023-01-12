@@ -84,6 +84,8 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-venv \
         sqlite3 \
         libpq-dev \
+        libicu-dev \
+        pkg-config \
         xmlsec1
 
 # Install rust and ensure it's in the PATH

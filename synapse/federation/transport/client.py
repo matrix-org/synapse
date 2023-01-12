@@ -185,9 +185,8 @@ class TransportLayerClient:
         Raises:
             Various exceptions when the request fails
         """
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX,
-            "/org.matrix.msc3030/timestamp_to_event/%s",
+        path = _create_v1_path(
+            "/timestamp_to_event/%s",
             room_id,
         )
 
@@ -280,12 +279,11 @@ class TransportLayerClient:
         Note that this does not append any events to any graphs.
 
         Args:
-            destination (str): address of remote homeserver
-            room_id (str): room to join/leave
-            user_id (str): user to be joined/left
-            membership (str): one of join/leave
-            params (dict[str, str|Iterable[str]]): Query parameters to include in the
-                request.
+            destination: address of remote homeserver
+            room_id: room to join/leave
+            user_id: user to be joined/left
+            membership: one of join/leave
+            params: Query parameters to include in the request.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The result

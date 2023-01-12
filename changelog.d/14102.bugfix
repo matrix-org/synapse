@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.37.0 in which an incorrect key name was used for sending and receiving room metadata when knocking on a room.
