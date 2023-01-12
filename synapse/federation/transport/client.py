@@ -357,6 +357,7 @@ class TransportLayerClient:
         if self._faster_joins_enabled:
             # lazy-load state on join
             query_params["org.matrix.msc3706.partial_state"] = "true"
+            query_params["omit_members"] = "true"
 
         return await self.client.put_json(
             destination=destination,
