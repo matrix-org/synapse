@@ -117,6 +117,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             # to avoid importing authlib here.
             "enum": ["client_secret_basic", "client_secret_post", "none"],
         },
+        "pkce_method": {"type": "string", "enum": ["auto", "always", "never"]},
         "scopes": {"type": "array", "items": {"type": "string"}},
         "authorization_endpoint": {"type": "string"},
         "token_endpoint": {"type": "string"},
@@ -289,6 +290,7 @@ def _parse_oidc_config_dict(
         client_secret=oidc_config.get("client_secret"),
         client_secret_jwt_key=client_secret_jwt_key,
         client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
+        pkce_method=oidc_config.get("pkce_method", "auto"),
         scopes=oidc_config.get("scopes", ["openid"]),
         authorization_endpoint=oidc_config.get("authorization_endpoint"),
         token_endpoint=oidc_config.get("token_endpoint"),
@@ -356,6 +358,10 @@ class OidcProviderConfig:
     # Valid values are 'client_secret_basic', 'client_secret_post' and
     # 'none'.
     client_auth_method: str
+
+    # Whether to enable PKCE when exchanging the authorization & token.
+    # Valid values are 'auto', 'always', and 'never'.
+    pkce_method: str
 
     # list of scopes to request
     scopes: Collection[str]
