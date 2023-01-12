@@ -298,6 +298,7 @@ class EventContext(UnpersistedEventContextBase):
             self.state_group_before_event, state_filter
         )
 
+
 @attr.s(slots=True, auto_attribs=True)
 class UnpersistedEventContext(UnpersistedEventContextBase):
     """
