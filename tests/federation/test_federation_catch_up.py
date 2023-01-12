@@ -7,13 +7,21 @@ from synapse.federation.sender import PerDestinationQueue, TransactionManager
 from synapse.federation.units import Edu
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.types import JsonDict
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable
-from tests.unittest import FederatingHomeserverTestCase, override_config
+from tests.unittest import FederatingHomeserverTestCase
 
 
 class FederationCatchUpTestCases(FederatingHomeserverTestCase):
+    """
+    Tests cases of catching up over federation.
+
+    By default for test cases federation sending is disabled. This Test class has it
+    re-enabled for the main process.
+    """
+
     servlets = [
         admin.register_servlets,
         room.register_servlets,
@@ -41,6 +49,11 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.hs.get_federation_transport_client().send_transaction.side_effect = (
             self.record_transaction
         )
+
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["federation_sender_instances"] = None
+        return config
 
     async def record_transaction(self, txn, json_cb):
         if self.is_online:
@@ -79,7 +92,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         )[0]
         return {"event_id": event_id, "stream_ordering": stream_ordering}
 
-    @override_config({"send_federation": True})
     def test_catch_up_destination_rooms_tracking(self):
         """
         Tests that we populate the `destination_rooms` table as needed.
@@ -105,7 +117,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.assertEqual(row_2["event_id"], event_id_2)
         self.assertEqual(row_1["stream_ordering"], row_2["stream_ordering"] - 1)
 
-    @override_config({"send_federation": True})
     def test_catch_up_last_successful_stream_ordering_tracking(self):
         """
         Tests that we populate the `destination_rooms` table as needed.
@@ -163,7 +174,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             "Send succeeded but not marked as last_successful_stream_ordering",
         )
 
-    @override_config({"send_federation": True})  # critical to federate
     def test_catch_up_from_blank_state(self):
         """
         Runs an overall test of federation catch-up from scratch.
@@ -260,7 +270,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         return per_dest_queue, results_list
 
-    @override_config({"send_federation": True})
     def test_catch_up_loop(self):
         """
         Tests the behaviour of _catch_up_transmission_loop.
@@ -325,7 +334,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             event_5.internal_metadata.stream_ordering,
         )
 
-    @override_config({"send_federation": True})
     def test_catch_up_on_synapse_startup(self):
         """
         Tests the behaviour of get_catch_up_outstanding_destinations and
@@ -424,7 +432,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # - all destinations are woken exactly once; they appear once in woken.
         self.assertCountEqual(woken, server_names[:-1])
 
-    @override_config({"send_federation": True})
     def test_not_latest_event(self):
         """Test that we send the latest event in the room even if its not ours."""
 

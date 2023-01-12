@@ -15,8 +15,9 @@ import logging
 import os
 from typing import Optional, Tuple
 
+from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
 from twisted.internet.protocol import Factory
-from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 from twisted.web.server import Request
 
@@ -102,7 +103,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         # fish the test server back out of the server-side TLS protocol.
-        http_server = server_tls_protocol.wrappedProtocol
+        http_server: HTTPChannel = server_tls_protocol.wrappedProtocol  # type: ignore[assignment]
 
         # give the reactor a pump to get the TLS juices flowing.
         self.reactor.pump((0.1,))
@@ -238,16 +239,15 @@ def get_connection_factory():
     return test_server_connection_factory
 
 
-def _build_test_server(connection_creator):
+def _build_test_server(
+    connection_creator: IOpenSSLServerConnectionCreator,
+) -> TLSMemoryBIOProtocol:
     """Construct a test server
 
     This builds an HTTP channel, wrapped with a TLSMemoryBIOProtocol
 
     Args:
-        connection_creator (IOpenSSLServerConnectionCreator): thing to build
-            SSL connections
-        sanlist (list[bytes]): list of the SAN entries for the cert returned
-            by the server
+        connection_creator: thing to build SSL connections
 
     Returns:
         TLSMemoryBIOProtocol

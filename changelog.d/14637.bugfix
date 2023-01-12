@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.67.0 where not specifying a config file or a server URL would lead to the `register_new_matrix_user` script failing.

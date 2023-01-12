@@ -34,9 +34,9 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
-from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, RoomID, UserID, create_requester
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
