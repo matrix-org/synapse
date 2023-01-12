@@ -62,7 +62,6 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
-from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -77,6 +76,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import stringutils
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -1080,6 +1080,19 @@ class RoomCreationHandler:
             for_batch: bool,
             **kwargs: Any,
         ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+            """
+            Creates an event and associated event context.
+            Args:
+                etype: the type of event to be created
+                content: content of the event
+                for_batch: whether the event is being created for batch persisting. If
+                bool for_batch is true, this will create an event using the prev_event_ids,
+                and will create an event context for the event using the parameters state_map
+                and current_state_group, thus these parameters must be provided in this
+                case if for_batch is True. The subsequently created event and context
+                are suitable for being batched up and bulk persisted to the database
+                with other similarly created events.
+            """
             nonlocal depth
             nonlocal prev_event
 
@@ -1139,13 +1152,21 @@ class RoomCreationHandler:
         depth += 1
         state_map[(EventTypes.Member, creator.user.to_string())] = member_event_id
 
+        # we need the state group of the membership event as it is the current state group
+        event_to_state = (
+            await self._storage_controllers.state.get_state_group_for_events(
+                [member_event_id]
+            )
+        )
+        current_state_group = event_to_state[member_event_id]
+
         events_to_send = []
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
             power_event, power_context = await create_event(
-                EventTypes.PowerLevels, pl_content, False
+                EventTypes.PowerLevels, pl_content, True
             )
             current_state_group = power_context._state_group
             events_to_send.append((power_event, power_context))
@@ -1194,7 +1215,7 @@ class RoomCreationHandler:
             pl_event, pl_context = await create_event(
                 EventTypes.PowerLevels,
                 power_level_content,
-                False,
+                True,
             )
             current_state_group = pl_context._state_group
             events_to_send.append((pl_event, pl_context))
@@ -1430,7 +1451,7 @@ class RoomContextHandler:
             events_before=events_before,
             event=event,
             events_after=events_after,
-            state=await filter_evts(state_events),
+            state=state_events,
             aggregations=aggregations,
             start=await token.copy_and_replace(
                 StreamKeyType.ROOM, results.start

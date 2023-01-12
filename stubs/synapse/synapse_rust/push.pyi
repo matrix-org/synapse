@@ -1,4 +1,4 @@
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from synapse.types import JsonDict
 
@@ -26,7 +26,11 @@ class PushRules:
 
 class FilteredPushRules:
     def __init__(
-        self, push_rules: PushRules, enabled_map: Dict[str, bool], msc3664_enabled: bool
+        self,
+        push_rules: PushRules,
+        enabled_map: Dict[str, bool],
+        msc3664_enabled: bool,
+        msc1767_enabled: bool,
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
@@ -41,10 +45,12 @@ class PushRuleEvaluator:
         notification_power_levels: Mapping[str, int],
         related_events_flattened: Mapping[str, Mapping[str, str]],
         related_event_match_enabled: bool,
+        room_version_feature_flags: Tuple[str, ...],
+        msc3931_enabled: bool,
     ): ...
     def run(
         self,
         push_rules: FilteredPushRules,
         user_id: Optional[str],
         display_name: Optional[str],
-    ) -> Collection[dict]: ...
+    ) -> Collection[Union[Mapping, str]]: ...

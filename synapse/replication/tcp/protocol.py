@@ -245,7 +245,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self._parse_and_dispatch_line(line)
 
     def _parse_and_dispatch_line(self, line: bytes) -> None:
-        if line.strip() == "":
+        if line.strip() == b"":
             # Ignore blank lines
             return
 

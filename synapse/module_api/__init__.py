@@ -86,6 +86,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.device import DeviceHandler
 from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
@@ -110,7 +111,6 @@ from synapse.storage.background_updates import (
 )
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
@@ -123,6 +123,7 @@ from synapse.types import (
     UserProfile,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import CachedFunction, cached
@@ -207,6 +208,7 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
@@ -784,10 +786,12 @@ class ModuleApi:
     ) -> Generator["defer.Deferred[Any]", Any, None]:
         """Invalidate an access token for a user
 
+        Can only be called from the main process.
+
         Added in Synapse v0.25.0.
 
         Args:
-            access_token(str): access token
+            access_token: access token
 
         Returns:
             twisted.internet.defer.Deferred - resolves once the access token
@@ -796,6 +800,10 @@ class ModuleApi:
         Raises:
             synapse.api.errors.AuthError: the access token is invalid
         """
+        assert isinstance(
+            self._device_handler, DeviceHandler
+        ), "invalidate_access_token can only be called on the main process"
+
         # see if the access token corresponds to a device
         user_info = yield defer.ensureDeferred(
             self._auth.get_user_by_access_token(access_token)
@@ -805,7 +813,7 @@ class ModuleApi:
         if device_id:
             # delete the device, which will also delete its access tokens
             yield defer.ensureDeferred(
-                self._hs.get_device_handler().delete_devices(user_id, [device_id])
+                self._device_handler.delete_devices(user_id, [device_id])
             )
         else:
             # no associated device. Just delete the access token.
@@ -832,7 +840,7 @@ class ModuleApi:
             **kwargs: named args to be passed to func
 
         Returns:
-            Deferred[object]: result of func
+            Result of func
         """
         # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
@@ -924,8 +932,7 @@ class ModuleApi:
                 to represent 'any') of the room state to acquire.
 
         Returns:
-            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
-                The filtered state events in the room.
+            The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
             self._storage_controllers.state.get_current_state_ids(

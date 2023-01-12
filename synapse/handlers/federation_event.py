@@ -43,6 +43,7 @@ from synapse.api.constants import (
 from synapse.api.errors import (
     AuthError,
     Codes,
+    EventSizeError,
     FederationError,
     FederationPullAttemptBackoffError,
     HttpResponseException,
@@ -75,7 +76,6 @@ from synapse.replication.http.federation import (
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
@@ -83,6 +83,7 @@ from synapse.types import (
     UserID,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
@@ -1065,10 +1066,9 @@ class FederationEventHandler:
                 state_res_store=StateResolutionStore(self._store),
             )
 
-        except Exception:
+        except Exception as e:
             logger.warning(
-                "Error attempting to resolve state at missing prev_events",
-                exc_info=True,
+                "Error attempting to resolve state at missing prev_events: %s", e
             )
             raise FederationError(
                 "ERROR",
@@ -1737,6 +1737,15 @@ class FederationEventHandler:
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
+                except EventSizeError as e:
+                    if e.unpersistable:
+                        # This event is completely unpersistable.
+                        raise e
+                    # Otherwise, we are somewhat lenient and just persist the event
+                    # as rejected, for moderate compatibility with older Synapse
+                    # versions.
+                    logger.warning("While validating received event %r: %s", event, e)
+                    context.rejected = RejectedReason.OVERSIZED_EVENT
 
             events_and_contexts_to_persist.append((event, context))
 
@@ -1781,6 +1790,16 @@ class FederationEventHandler:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
             context.rejected = RejectedReason.AUTH_ERROR
+            return
+        except EventSizeError as e:
+            if e.unpersistable:
+                # This event is completely unpersistable.
+                raise e
+            # Otherwise, we are somewhat lenient and just persist the event
+            # as rejected, for moderate compatibility with older Synapse
+            # versions.
+            logger.warning("While validating received event %r: %s", event, e)
+            context.rejected = RejectedReason.OVERSIZED_EVENT
             return
 
         # next, check that we have all of the event's auth events.

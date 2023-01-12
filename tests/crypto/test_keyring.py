@@ -433,7 +433,7 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         async def get_json(destination, path, **kwargs):
             self.assertEqual(destination, SERVER_NAME)
-            self.assertEqual(path, "/_matrix/key/v2/server/key1")
+            self.assertEqual(path, "/_matrix/key/v2/server")
             return response
 
         self.http_client.get_json.side_effect = get_json

@@ -140,71 +140,6 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return 200, {}
 
 
-class ProfileInfoRestServlet(RestServlet):
-    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/info", v1=True)
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__()
-        self.hs = hs
-        self.profile_handler = hs.get_profile_handler()
-        self.auth = hs.get_auth()
-
-    async def on_GET(
-        self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester_user = None
-
-        if self.hs.config.server.require_auth_for_profile_requests:
-            requester = await self.auth.get_user_by_req(request)
-            requester_user = requester.user
-
-        if not UserID.is_valid(user_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Invalid user id", Codes.INVALID_PARAM
-            )
-
-        user = UserID.from_string(user_id)
-        await self.profile_handler.check_profile_query_allowed(user, requester_user)
-
-        profileInfo = await self.profile_handler.get_profile(user.to_string())
-
-        avatarNft = profileInfo.get("avatar_nft")
-        metadata = profileInfo.get("metadata")
-
-        ret = {}
-        if avatarNft is not None:
-            ret["avatar_nft"] = avatarNft
-
-        if metadata is not None:
-            ret["metadata"] = metadata
-
-        return 200, ret
-
-    async def on_PUT(
-        self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        user = UserID.from_string(user_id)
-        is_admin = await self.auth.is_server_admin(requester)
-
-        content = parse_json_object_from_request(request)
-
-        try:
-            new_avatar_nft = content["avatar_nft"]
-            new_metadata = content["metadata"]
-        except Exception:
-            raise SynapseError(
-                code=400,
-                msg="Unable to parse name",
-                errcode=Codes.BAD_JSON,
-            )
-
-        await self.profile_handler.set_profile_info(user, requester, new_avatar_nft,
-                                                    new_metadata, is_admin)
-
-        return 200, {}
-
-
 class ProfileRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
 
@@ -231,16 +166,8 @@ class ProfileRestServlet(RestServlet):
         user = UserID.from_string(user_id)
         await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        # displayname = await self.profile_handler.get_displayname(user)
-        # avatar_url = await self.profile_handler.get_avatar_url(user)
-
-        profileInfo = await self.profile_handler.get_profile(user.to_string())
-
-        displayname = profileInfo.get("displayname")
-        avatar_url = profileInfo.get("avatar_url")
-
-        avatarNft = profileInfo.get("avatar_nft")
-        metadata = profileInfo.get("metadata")
+        displayname = await self.profile_handler.get_displayname(user)
+        avatar_url = await self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if displayname is not None:
@@ -248,16 +175,10 @@ class ProfileRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        if avatarNft is not None:
-            ret["avatar_nft"] = avatarNft
-        if metadata is not None:
-            ret["metadata"] = metadata
-
         return 200, ret
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ProfileDisplaynameRestServlet(hs).register(http_server)
     ProfileAvatarURLRestServlet(hs).register(http_server)
-    ProfileInfoRestServlet(hs).register(http_server)
     ProfileRestServlet(hs).register(http_server)
