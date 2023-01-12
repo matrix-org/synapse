@@ -633,6 +633,13 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             allow_none=True,
         )
 
+        if res is None:
+            logger.warning(
+                "Sending receipt for unknown event, roomID=%s, eventID=%s",
+                room_id,
+                event_id,
+            )
+
         stream_ordering = int(res["stream_ordering"]) if res else None
         rx_ts = res["received_ts"] if res else 0
 
