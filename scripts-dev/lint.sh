@@ -117,7 +117,8 @@ ruff --quiet "${files[@]}"
 # Catch any common programming mistakes in Rust code.
 #
 # --bins, --examples, --lib, --tests combined explicitly disable checking
-# the benchmarks, which can fail on the stable rust toolchain.
+# the benchmarks, which can fail due to `#![feature]` macros not being
+# allowed on the stable rust toolchain (rustc error E0554).
 #
 # --allow-staged and --allow-dirty suppress clippy raising errors
 # for uncommitted files. Only needed when using --fix.
