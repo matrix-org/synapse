@@ -69,7 +69,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
             events=events,
             ephemeral=[],
             to_device_messages=[],  # txn made and saved
-            one_time_key_counts={},
+            one_time_keys_count={},
             unused_fallback_keys={},
             device_list_summary=DeviceListUpdates(),
         )
@@ -96,7 +96,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
             events=events,
             ephemeral=[],
             to_device_messages=[],  # txn made and saved
-            one_time_key_counts={},
+            one_time_keys_count={},
             unused_fallback_keys={},
             device_list_summary=DeviceListUpdates(),
         )
@@ -125,7 +125,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
             events=events,
             ephemeral=[],
             to_device_messages=[],
-            one_time_key_counts={},
+            one_time_keys_count={},
             unused_fallback_keys={},
             device_list_summary=DeviceListUpdates(),
         )

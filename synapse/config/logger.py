@@ -53,7 +53,7 @@ DEFAULT_LOG_CONFIG = Template(
 # Synapse also supports structured logging for machine readable logs which can
 # be ingested by ELK stacks. See [2] for details.
 #
-# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [1]: https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema
 # [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
@@ -317,10 +317,9 @@ def setup_logging(
     Set up the logging subsystem.
 
     Args:
-        config (LoggingConfig | synapse.config.worker.WorkerConfig):
-            configuration data
+        config: configuration data
 
-        use_worker_options (bool): True to use the 'worker_log_config' option
+        use_worker_options: True to use the 'worker_log_config' option
             instead of 'log_config'.
 
         logBeginner: The Twisted logBeginner to use.

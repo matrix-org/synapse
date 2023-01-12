@@ -66,7 +66,6 @@ class EmailPusherTests(HomeserverTestCase):
             "riot_base_url": None,
         }
         config["public_baseurl"] = "http://aaa"
-        config["start_pushers"] = True
 
         hs = self.setup_test_homeserver(config=config)
 

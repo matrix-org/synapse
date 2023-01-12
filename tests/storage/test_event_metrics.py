@@ -11,15 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from prometheus_client import generate_latest
 
-from synapse.metrics import REGISTRY, generate_latest
+from synapse.metrics import REGISTRY
 from synapse.types import UserID, create_requester
 
 from tests.unittest import HomeserverTestCase
 
 
 class ExtremStatisticsTestCase(HomeserverTestCase):
-    def test_exposed_to_prometheus(self):
+    def test_exposed_to_prometheus(self) -> None:
         """
         Forward extremity counts are exposed via Prometheus.
         """
@@ -53,8 +54,8 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
 
         items = list(
             filter(
-                lambda x: b"synapse_forward_extremities_" in x,
-                generate_latest(REGISTRY, emit_help=False).split(b"\n"),
+                lambda x: b"synapse_forward_extremities_" in x and b"# HELP" not in x,
+                generate_latest(REGISTRY).split(b"\n"),
             )
         )
 

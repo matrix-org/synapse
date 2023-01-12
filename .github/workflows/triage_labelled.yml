@@ -11,34 +11,34 @@ jobs:
     if: >
       contains(github.event.issue.labels.*.name, 'X-Needs-Info')
     steps:
-      - uses: octokit/graphql-action@v2.x
-        id: add_to_project
+      - uses: actions/add-to-project@main
+        id: add_project
         with:
-          headers: '{"GraphQL-Features": "projects_next_graphql"}'
-          query: |
-            mutation {
-              updateProjectV2ItemFieldValue(
-                input: {
-                  projectId: $projectid
-                  itemId: $contentid
-                  fieldId: $fieldid
-                  value: {
-                    singleSelectOptionId: "Todo"
+          project-url: "https://github.com/orgs/matrix-org/projects/67"
+          github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+      - name: Set status
+        env:
+          GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
+        run: |
+          gh api graphql -f query='
+          mutation(
+              $project: ID!
+              $item: ID!
+              $fieldid: ID!
+              $columnid: String!
+            )  {
+            updateProjectV2ItemFieldValue(
+              input: {
+               projectId: $project
+                itemId: $item
+                fieldId: $fieldid
+                value: { 
+                  singleSelectOptionId: $columnid
                   }
-                }
-              ) {
-                projectV2Item {
-                  id
-                }
+              }
+            ) {
+              projectV2Item {
+                id
               }
             }
-
-          projectid: ${{ env.PROJECT_ID }}
-          contentid: ${{ github.event.issue.node_id }}
-          fieldid: ${{ env.FIELD_ID }}
-          optionid: ${{ env.OPTION_ID }}
-        env:
-          PROJECT_ID: "PVT_kwDOAIB0Bs4AFDdZ"
-          GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
-          FIELD_ID: "PVTSSF_lADOAIB0Bs4AFDdZzgC6ZA4"
-          OPTION_ID: "ba22e43c"
+          }' -f project="PVT_kwDOAIB0Bs4AFDdZ" -f item=${{ steps.add_project.outputs.itemId }} -f fieldid="PVTSSF_lADOAIB0Bs4AFDdZzgC6ZA4" -f columnid=ba22e43c --silent

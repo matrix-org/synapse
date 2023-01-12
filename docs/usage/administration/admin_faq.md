@@ -79,7 +79,7 @@ Here we can see that the request has been tagged with `GET-37`. (The tag depends
 grep 'GET-37' homeserver.log
 ```
 
-If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code).
+If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see [quoting code](https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code)).
 
 
 What do all those fields in the 'Processed' line mean?

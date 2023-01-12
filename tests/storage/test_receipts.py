@@ -14,8 +14,12 @@
 
 from typing import Collection, Optional
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import ReceiptTypes
+from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 
 from tests.test_utils.event_injection import create_event
 from tests.unittest import HomeserverTestCase
@@ -25,7 +29,9 @@ OUR_USER_ID = "@our:test"
 
 
 class ReceiptTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver) -> None:
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         super().prepare(reactor, clock, homeserver)
 
         self.store = homeserver.get_datastores().main
@@ -135,11 +141,11 @@ class ReceiptTestCase(HomeserverTestCase):
         )
         self.assertEqual(res, {})
 
-        res = self.get_last_unthreaded_receipt(
+        res2 = self.get_last_unthreaded_receipt(
             [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
         )
 
-        self.assertEqual(res, None)
+        self.assertIsNone(res2)
 
     def test_get_receipts_for_user(self) -> None:
         # Send some events into the first room

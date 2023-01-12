@@ -92,7 +92,6 @@ class ReceiptsHandler:
                         continue
 
                     # Check if these receipts apply to a thread.
-                    thread_id = None
                     data = user_values.get("data", {})
                     thread_id = data.get("thread_id")
                     # If the thread ID is invalid, consider it missing.
