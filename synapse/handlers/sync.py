@@ -1817,11 +1817,34 @@ class SyncHandler:
             )
             sync_result_builder.now_token = now_token
 
+        # Retrieve rooms that got un partial stated in the meantime, only useful in case
+        # of a non lazy-loading-members sync.
+        un_partial_stated_rooms = set()
+        if not sync_result_builder.sync_config.filter_collection.lazy_load_members():
+            un_partial_state_rooms_since = 0
+            if sync_result_builder.since_token is not None:
+                un_partial_state_rooms_since = int(
+                    sync_result_builder.since_token.un_partial_state_rooms_key
+                )
+
+            un_partial_state_rooms_now = int(
+                sync_result_builder.now_token.un_partial_state_rooms_key
+            )
+            if un_partial_state_rooms_since != un_partial_state_rooms_now:
+                un_partial_stated_rooms = (
+                    await self.store.get_un_partial_stated_rooms_between(
+                        un_partial_state_rooms_since,
+                        un_partial_state_rooms_now,
+                    )
+                )
+
         # 2. We check up front if anything has changed, if it hasn't then there is
         # no point in going further.
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
-                have_changed = await self._have_rooms_changed(sync_result_builder)
+                have_changed = await self._have_rooms_changed(
+                    sync_result_builder, un_partial_stated_rooms
+                )
                 log_kv({"rooms_have_changed": have_changed})
                 if not have_changed:
                     tags_by_room = await self.store.get_updated_tags(
@@ -1835,7 +1858,7 @@ class SyncHandler:
         ignored_users = await self.store.ignored_users(user_id)
         if since_token:
             room_changes = await self._get_rooms_changed(
-                sync_result_builder, ignored_users
+                sync_result_builder, ignored_users, un_partial_stated_rooms
             )
             tags_by_room = await self.store.get_updated_tags(
                 user_id, since_token.account_data_key
@@ -1888,7 +1911,9 @@ class SyncHandler:
         )
 
     async def _have_rooms_changed(
-        self, sync_result_builder: "SyncResultBuilder"
+        self,
+        sync_result_builder: "SyncResultBuilder",
+        un_partial_stated_rooms: Set[str],
     ) -> bool:
         """Returns whether there may be any new events that should be sent down
         the sync. Returns True if there are.
@@ -1905,6 +1930,11 @@ class SyncHandler:
 
         stream_id = since_token.room_key.stream
         for room_id in sync_result_builder.joined_room_ids:
+            # If a room has been un partial stated in the meantime,
+            # let's consider it has changes and deal with it accordingly
+            # in _get_rooms_changed.
+            if room_id in un_partial_stated_rooms:
+                return True
             if self.store.has_room_changed_since(room_id, stream_id):
                 return True
         return False
@@ -1913,6 +1943,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         ignored_users: FrozenSet[str],
+        un_partial_stated_rooms: Set[str],
     ) -> _RoomChanges:
         """Determine the changes in rooms to report to the user.
 
@@ -2116,7 +2147,24 @@ class SyncHandler:
             room_entry = room_to_events.get(room_id, None)
 
             newly_joined = room_id in newly_joined_rooms
-            if room_entry:
+
+            # In case of a non lazy-loading-members sync we want to include
+            # rooms that got un partial stated in the meantime, and we need
+            # to include the full state of them.
+            if (
+                not sync_config.filter_collection.lazy_load_members()
+                and room_id in un_partial_stated_rooms
+            ):
+                entry = RoomSyncResultBuilder(
+                    room_id=room_id,
+                    rtype="joined",
+                    events=None,
+                    newly_joined=True,
+                    full_state=True,
+                    since_token=None,
+                    upto_token=now_token,
+                )
+            elif room_entry:
                 events, start_key = room_entry
 
                 prev_batch_token = now_token.copy_and_replace(
@@ -2186,6 +2234,13 @@ class SyncHandler:
         knocked = []
 
         for event in room_list:
+            # Do not include rooms that we don't have the full state yet
+            # in case of non lazy-loading-members sync.
+            if (
+                not sync_config.filter_collection.lazy_load_members()
+            ) and await self.store.is_partial_state_room(event.room_id):
+                continue
+
             if event.room_version_id not in KNOWN_ROOM_VERSIONS:
                 continue
 
