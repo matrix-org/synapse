@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
+import random
 import re
+import string
+from re import match
+
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,6 +28,11 @@ from typing import (
     Tuple,
     Union,
 )
+from urllib import parse
+
+import eospy.api
+import eospy.http_client
+import requests
 
 from typing_extensions import TypedDict
 
@@ -78,6 +86,8 @@ class LoginRestServlet(RestServlet):
     JWT_TYPE = "org.matrix.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
+    SIGNATURE_TYPE = "m.login.signature"
+    AMAX_SIGNATURE_TYPE = "m.login.amaxsignature"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -126,6 +136,17 @@ class LoginRestServlet(RestServlet):
             rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
+
+        # self.client = eospy.api.ChainApi(['http://139.224.250.244:18888/'], 10)
+        self.amax_rpc = hs.config.server.amax_rpc_url
+        self.amax_client = eospy.api.ChainApi([self.amax_rpc], 10)
+        # redis
+        self._external_cache = hs.get_external_cache()
+        self._cache_name = 'cache_sign_msg'
+
+        # 将验签服务的URL和chain_id提取为环境变量
+        self.amax_chain_id = hs.config.login.chain_id
+        self.amax_signature_url = hs.config.login.signature_url
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
@@ -222,6 +243,23 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
+
+            elif login_submission["type"] == LoginRestServlet.SIGNATURE_TYPE:
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+                result = await self._do_signature_login(
+                    login_submission,
+                    should_issue_refresh_token=should_issue_refresh_token,
+                )
+            elif login_submission["type"] == LoginRestServlet.AMAX_SIGNATURE_TYPE:
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+                result = await self._do_amax_signature_login(
+                    login_submission,
+                    should_issue_refresh_token=should_issue_refresh_token,
+                )
             else:
                 await self._address_ratelimiter.ratelimit(
                     None, request.getClientAddress().host
@@ -311,6 +349,174 @@ class LoginRestServlet(RestServlet):
         canonical_user_id, callback = await self.auth_handler.validate_login(
             login_submission, ratelimit=True
         )
+        result = await self._complete_login(
+            canonical_user_id,
+            login_submission,
+            callback,
+            should_issue_refresh_token=should_issue_refresh_token,
+        )
+        return result
+
+    async def _do_amax_signature_login(
+        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+    ) -> LoginResponse:
+        """新增AMAX登录方法, 不使用message进行验签, 直接使用验签服务进行验签.
+
+        :param login_submission:
+        :param should_issue_refresh_token:
+        :return:
+        """
+        logger.info(
+            "Got wallet login amax request with signature: %r, wallet_address: %r, authority: %r, scope: %r, "
+            "expiration: %r",
+            login_submission.get("signature"),
+            login_submission.get("wallet_address"),
+            login_submission.get("authority"),
+            login_submission.get("scope"),
+            login_submission.get("expiration"),
+        )
+
+        # 不用message进行验签.
+        headers = {'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'}
+        form_data = {
+            "signature": login_submission.get("signature"),
+            "wallet_address": login_submission.get("wallet_address"),
+            "authority": login_submission.get("authority"),
+            "scope": login_submission.get("scope"),
+            "chain_id": self.amax_chain_id,
+            "expiration": login_submission.get("expiration")
+        }
+        # 字典转换k1=v1 & k2=v2 模式
+        data = parse.urlencode(form_data)
+        req = requests.post(self.amax_signature_url, data=data, headers=headers)
+        req_content = eval(req.content)
+        print("signature_verify request status code:%s, result:%s" % (req.status_code, req_content))
+        if req_content['code'] != 200:
+            raise SynapseError(400, "Unknown signature %s" % login_submission.get("signature"), Codes.INVALID_WALLET_SIGNATURE)
+        username = login_submission.get("wallet_address")
+        if username.startswith("@"):
+            canonical_user_id = username
+        else:
+            canonical_user_id = UserID(username, self.hs.hostname).to_string()
+
+        # 调用chain.get_accountn方法拿用户信息
+        account = self.amax_client.get_account(username)
+        if account is None:
+            raise SynapseError(400, "Get user account failed", Codes.GET_CHAIN_ACCOUNT_FAILED)
+        permissions = account.get('permissions')
+        print("permissions==>", permissions)
+        perm_name = permissions[0]['perm_name']
+        print("perm_name==>", perm_name)
+
+        ## TODO  active是第一个public_key, owner是第二个public_key. 用哪一个.
+        user_public_key = permissions[0]['required_auth']['keys'][0]['key']
+        canonical_uid = await self.auth_handler.check_user_exists(canonical_user_id)
+        if not canonical_uid:
+            print("register canonical_uid==>", canonical_uid)
+            await self.registration_handler.register_user(
+                localpart=UserID.from_string(canonical_user_id).localpart,
+                password_hash=user_public_key
+            )
+
+        result = await self._complete_login(
+            canonical_user_id,
+            login_submission,
+            callback=None,
+            should_issue_refresh_token=should_issue_refresh_token,
+        )
+        return result
+
+    async def _do_signature_login(
+        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+    ) -> LoginResponse:
+        """Handle blockchain signature login
+
+        Args:
+            login_submission:
+            should_issue_refresh_token: True if this login should issue
+                a refresh token alongside the access token.
+
+        Returns:
+            HTTP response
+        """
+        # Log the request we got, but only certain fields to minimise the chance of
+        # logging someone's password (even if they accidentally put it in the wrong
+        # field)
+        logger.info(
+            "Got wallet login request with identifier: %r, medium: %r, address: %r, user: %r, message: %r, sinature: "
+            "%r, timestamp: %r",
+            login_submission.get("identifier"),
+            login_submission.get("medium"),
+            login_submission.get("address"),
+            login_submission.get("user"),
+            login_submission.get("message"),
+            login_submission.get("signature"),
+            login_submission.get("timestamp"),
+        )
+
+        # 先验证签名的message是否在redis中，是否过期
+        # message_ts = login_submission.get("timestamp")
+        req_message = login_submission.get("message")
+        if not isinstance(req_message, str):
+            raise SynapseError(400, "Bad parameter: message", Codes.INVALID_PARAM)
+
+        nonce_str = req_message.split(':')[1]
+        cache_message = await self._external_cache.get(self._cache_name, nonce_str)
+        if cache_message is None:
+            logger.error("redis cache mesage not found, cache_name: %r, key: %r", self._cache_name, nonce_str)
+            raise SynapseError(400, "Wallet sign message is invalid, Please login "
+                                    "again.", Codes.INVALID_SIGNATUR_MESSAGE)
+
+        if cache_message != req_message:
+            logger.warning("request message is invalid, Please logi, cache_message: "
+                           "%r, req_message: %r", cache_message, req_message)
+            raise SynapseError(400, "Wallet sign message is invalid, Please login "
+                                    "again.", Codes.INVALID_SIGNATUR_MESSAGE)
+
+        # 根据user查询账户信息
+        # map old-school login fields into new-school "identifier" fields.
+        identifier_dict = convert_client_dict_legacy_fields_to_identifier(
+            login_submission
+        )
+
+        username = identifier_dict.get("user")
+        if not username:
+            raise SynapseError(400, "User identifier is missing 'user' key", Codes.INVALID_PARAM)
+
+        # user是amax链账号，验证下
+
+        # 调chain.get_accountn方法拿用户信息
+        account = self.amax_client.get_account(username)
+        if account is None:
+            raise SynapseError(400, "Get user accoount failed", Codes.GET_CHAIN_ACCOUNT_FAILED)
+        permissions = account.get('permissions')
+        print("permissions==>", permissions)
+        perm_name = permissions[0]['perm_name']
+        print("perm_name==>", perm_name)
+
+        user_publickey = permissions[0]['required_auth']['keys'][0]['key']
+        print("user_publickey==>", user_publickey)
+        if not user_publickey:
+            raise SynapseError(400, "Get user_publickey failed", Codes.INVALID_PARSED_PUBLICKKEY)
+
+        # 验证是否是amax链的公钥
+        matched = match('AM', user_publickey)
+        if matched is None:
+            raise SynapseError(400, "Parsed user_publickey is invalid", Codes.INVALID_PARSED_PUBLICKKEY)
+
+        canonical_user_id, callback = await self.auth_handler.validate_signature_login(
+            login_submission, user_publickey, ratelimit=True
+        )
+
+        print("canonical_user_id===>", canonical_user_id)
+
+        canonical_uid = await self.auth_handler.check_user_exists(canonical_user_id)
+        if not canonical_uid:
+            await self.registration_handler.register_user(
+                localpart=UserID.from_string(canonical_user_id).localpart,
+                password_hash=user_publickey
+            )
+
         result = await self._complete_login(
             canonical_user_id,
             login_submission,
