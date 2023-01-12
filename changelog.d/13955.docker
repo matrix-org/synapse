@@ -1,1 +1,0 @@
-Update the version of frozendict in Docker images and Debian packages from 2.3.3 to 2.3.4, which may fix memory leak problems.

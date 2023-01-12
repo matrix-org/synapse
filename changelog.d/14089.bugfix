@@ -1,1 +1,0 @@
-Fix a bug where invalid oEmbed fields would cause the entire response to be discarded. Introduced in Synapse 1.18.0.

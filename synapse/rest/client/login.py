@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import random
-import string
-import time
 import re
+import string
 from re import match
+
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -29,10 +28,13 @@ from typing import (
     Tuple,
     Union,
 )
+from urllib import parse
 
-from typing_extensions import TypedDict
 import eospy.api
 import eospy.http_client
+import requests
+
+from typing_extensions import TypedDict
 
 from synapse.api.constants import ApprovalNoticeMedium
 from synapse.api.errors import (
@@ -45,7 +47,6 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
-from synapse.handlers.auth import convert_client_dict_legacy_fields_to_identifier
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
@@ -86,6 +87,7 @@ class LoginRestServlet(RestServlet):
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
     SIGNATURE_TYPE = "m.login.signature"
+    AMAX_SIGNATURE_TYPE = "m.login.amaxsignature"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -141,6 +143,10 @@ class LoginRestServlet(RestServlet):
         # redis
         self._external_cache = hs.get_external_cache()
         self._cache_name = 'cache_sign_msg'
+
+        # 将验签服务的URL和chain_id提取为环境变量
+        self.amax_chain_id = hs.config.login.chain_id
+        self.amax_signature_url = hs.config.login.signature_url
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
@@ -237,11 +243,20 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
+
             elif login_submission["type"] == LoginRestServlet.SIGNATURE_TYPE:
                 await self._address_ratelimiter.ratelimit(
                     None, request.getClientAddress().host
                 )
                 result = await self._do_signature_login(
+                    login_submission,
+                    should_issue_refresh_token=should_issue_refresh_token,
+                )
+            elif login_submission["type"] == LoginRestServlet.AMAX_SIGNATURE_TYPE:
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+                result = await self._do_amax_signature_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
@@ -338,6 +353,75 @@ class LoginRestServlet(RestServlet):
             canonical_user_id,
             login_submission,
             callback,
+            should_issue_refresh_token=should_issue_refresh_token,
+        )
+        return result
+
+    async def _do_amax_signature_login(
+        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+    ) -> LoginResponse:
+        """新增AMAX登录方法, 不使用message进行验签, 直接使用验签服务进行验签.
+
+        :param login_submission:
+        :param should_issue_refresh_token:
+        :return:
+        """
+        logger.info(
+            "Got wallet login amax request with signature: %r, wallet_address: %r, authority: %r, scope: %r, "
+            "expiration: %r",
+            login_submission.get("signature"),
+            login_submission.get("wallet_address"),
+            login_submission.get("authority"),
+            login_submission.get("scope"),
+            login_submission.get("expiration"),
+        )
+
+        # 不用message进行验签.
+        headers = {'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'}
+        form_data = {
+            "signature": login_submission.get("signature"),
+            "wallet_address": login_submission.get("wallet_address"),
+            "authority": login_submission.get("authority"),
+            "scope": login_submission.get("scope"),
+            "chain_id": self.amax_chain_id,
+            "expiration": login_submission.get("expiration")
+        }
+        # 字典转换k1=v1 & k2=v2 模式
+        data = parse.urlencode(form_data)
+        req = requests.post(self.amax_signature_url, data=data, headers=headers)
+        req_content = eval(req.content)
+        print("signature_verify request status code:%s, result:%s" % (req.status_code, req_content))
+        if req_content['code'] != 200:
+            raise SynapseError(400, "Unknown signature %s" % login_submission.get("signature"), Codes.INVALID_WALLET_SIGNATURE)
+        username = login_submission.get("wallet_address")
+        if username.startswith("@"):
+            canonical_user_id = username
+        else:
+            canonical_user_id = UserID(username, self.hs.hostname).to_string()
+
+        # 调用chain.get_accountn方法拿用户信息
+        account = self.amax_client.get_account(username)
+        if account is None:
+            raise SynapseError(400, "Get user account failed", Codes.GET_CHAIN_ACCOUNT_FAILED)
+        permissions = account.get('permissions')
+        print("permissions==>", permissions)
+        perm_name = permissions[0]['perm_name']
+        print("perm_name==>", perm_name)
+
+        ## TODO  active是第一个public_key, owner是第二个public_key. 用哪一个.
+        user_public_key = permissions[0]['required_auth']['keys'][0]['key']
+        canonical_uid = await self.auth_handler.check_user_exists(canonical_user_id)
+        if not canonical_uid:
+            print("register canonical_uid==>", canonical_uid)
+            await self.registration_handler.register_user(
+                localpart=UserID.from_string(canonical_user_id).localpart,
+                password_hash=user_public_key
+            )
+
+        result = await self._complete_login(
+            canonical_user_id,
+            login_submission,
+            callback=None,
             should_issue_refresh_token=should_issue_refresh_token,
         )
         return result
@@ -472,7 +556,7 @@ class LoginRestServlet(RestServlet):
             auth_provider_session_id: The session ID got during login from the SSO IdP.
 
         Returns:
-            result: Dictionary of account information after successful login.
+            Dictionary of account information after successful login.
         """
 
         # Before we actually log them in we check if they've already logged in
@@ -558,8 +642,7 @@ class LoginRestServlet(RestServlet):
             The body of the JSON response.
         """
         token = login_submission["token"]
-        auth_handler = self.auth_handler
-        res = await auth_handler.validate_short_term_login_token(token)
+        res = await self.auth_handler.consume_login_token(token)
 
         return await self._complete_login(
             res.user_id,
@@ -659,7 +742,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 
 class RefreshTokenServlet(RestServlet):
-    PATTERNS = (re.compile("^/_matrix/client/v1/refresh$"),)
+    PATTERNS = client_patterns("/refresh$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
@@ -787,38 +870,6 @@ class CasTicketServlet(RestServlet):
         )
 
 
-class RandomStrServlet(RestServlet):
-    PATTERNS = client_patterns("/sign/get_random")
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__()
-        self.hs = hs
-
-        # redis
-        self._external_cache = hs.get_external_cache()
-        self._cache_name = 'cache_sign_msg'
-        self.wallet_sign_message = hs.config.server.wallet_sigin_message
-
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        rand_str = ''.join(random.sample(string.ascii_letters + string.digits, 32))
-
-        # message = "Welcome to amax-synapse! sign nonce:{s}".format(s=rand_str)
-        message = "{sign_ms} sign nonce:{s}".format(sign_ms=self.wallet_sign_message, s=rand_str)
-
-        # message to redis, expiry_ms: 60000
-        key = rand_str
-        # test
-        expiry_ms = 3000000
-        await self._external_cache.set(self._cache_name, key, message, expiry_ms)
-
-        response: Dict[str, Union[str, int]] = {
-            "message": message,
-            # "timestamp": key
-        }
-
-        return 200, response
-
-
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
     if hs.config.registration.refreshable_access_token_lifetime is not None:
@@ -826,7 +877,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
-    RandomStrServlet(hs).register(http_server)
 
 
 def _load_sso_handlers(hs: "HomeServer") -> None:

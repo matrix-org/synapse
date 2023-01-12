@@ -9,6 +9,8 @@
   - [Configuring a Reverse Proxy](reverse_proxy.md)
   - [Configuring a Forward/Outbound Proxy](setup/forward_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
+    - [coturn TURN server](setup/turn/coturn.md)
+    - [eturnal TURN server](setup/turn/eturnal.md)
   - [Delegation](delegate.md)
 
 # Upgrading

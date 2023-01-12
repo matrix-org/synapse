@@ -1,1 +1,0 @@
-Don't repeatedly wake up the same users for batched events.
