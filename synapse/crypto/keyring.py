@@ -14,7 +14,6 @@
 
 import abc
 import logging
-import urllib
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple
 
 import attr
@@ -213,7 +212,7 @@ class Keyring:
 
     def verify_json_objects_for_server(
         self, server_and_json: Iterable[Tuple[str, dict, int]]
-    ) -> List[defer.Deferred]:
+    ) -> List["defer.Deferred[None]"]:
         """Bulk verifies signatures of json objects, bulk fetching keys as
         necessary.
 
@@ -226,10 +225,9 @@ class Keyring:
                 valid.
 
         Returns:
-            List<Deferred[None]>: for each input triplet, a deferred indicating success
-                or failure to verify each json object's signature for the given
-                server_name. The deferreds run their callbacks in the sentinel
-                logcontext.
+            For each input triplet, a deferred indicating success or failure to
+            verify each json object's signature for the given server_name. The
+            deferreds run their callbacks in the sentinel logcontext.
         """
         return [
             run_in_background(
@@ -814,31 +812,27 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
 
         results = {}
 
-        async def get_key(key_to_fetch_item: _FetchKeyRequest) -> None:
+        async def get_keys(key_to_fetch_item: _FetchKeyRequest) -> None:
             server_name = key_to_fetch_item.server_name
-            key_ids = key_to_fetch_item.key_ids
 
             try:
-                keys = await self.get_server_verify_key_v2_direct(server_name, key_ids)
+                keys = await self.get_server_verify_keys_v2_direct(server_name)
                 results[server_name] = keys
             except KeyLookupError as e:
-                logger.warning(
-                    "Error looking up keys %s from %s: %s", key_ids, server_name, e
-                )
+                logger.warning("Error looking up keys from %s: %s", server_name, e)
             except Exception:
-                logger.exception("Error getting keys %s from %s", key_ids, server_name)
+                logger.exception("Error getting keys from %s", server_name)
 
-        await yieldable_gather_results(get_key, keys_to_fetch)
+        await yieldable_gather_results(get_keys, keys_to_fetch)
         return results
 
-    async def get_server_verify_key_v2_direct(
-        self, server_name: str, key_ids: Iterable[str]
+    async def get_server_verify_keys_v2_direct(
+        self, server_name: str
     ) -> Dict[str, FetchKeyResult]:
         """
 
         Args:
-            server_name:
-            key_ids:
+            server_name: Server to request keys from
 
         Returns:
             Map from key ID to lookup result
@@ -846,57 +840,41 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         Raises:
             KeyLookupError if there was a problem making the lookup
         """
-        keys: Dict[str, FetchKeyResult] = {}
-
-        for requested_key_id in key_ids:
-            # we may have found this key as a side-effect of asking for another.
-            if requested_key_id in keys:
-                continue
-
-            time_now_ms = self.clock.time_msec()
-            try:
-                response = await self.client.get_json(
-                    destination=server_name,
-                    path="/_matrix/key/v2/server/"
-                    + urllib.parse.quote(requested_key_id),
-                    ignore_backoff=True,
-                    # we only give the remote server 10s to respond. It should be an
-                    # easy request to handle, so if it doesn't reply within 10s, it's
-                    # probably not going to.
-                    #
-                    # Furthermore, when we are acting as a notary server, we cannot
-                    # wait all day for all of the origin servers, as the requesting
-                    # server will otherwise time out before we can respond.
-                    #
-                    # (Note that get_json may make 4 attempts, so this can still take
-                    # almost 45 seconds to fetch the headers, plus up to another 60s to
-                    # read the response).
-                    timeout=10000,
-                )
-            except (NotRetryingDestination, RequestSendFailed) as e:
-                # these both have str() representations which we can't really improve
-                # upon
-                raise KeyLookupError(str(e))
-            except HttpResponseException as e:
-                raise KeyLookupError("Remote server returned an error: %s" % (e,))
-
-            assert isinstance(response, dict)
-            if response["server_name"] != server_name:
-                raise KeyLookupError(
-                    "Expected a response for server %r not %r"
-                    % (server_name, response["server_name"])
-                )
-
-            response_keys = await self.process_v2_response(
-                from_server=server_name,
-                response_json=response,
-                time_added_ms=time_now_ms,
+        time_now_ms = self.clock.time_msec()
+        try:
+            response = await self.client.get_json(
+                destination=server_name,
+                path="/_matrix/key/v2/server",
+                ignore_backoff=True,
+                # we only give the remote server 10s to respond. It should be an
+                # easy request to handle, so if it doesn't reply within 10s, it's
+                # probably not going to.
+                #
+                # Furthermore, when we are acting as a notary server, we cannot
+                # wait all day for all of the origin servers, as the requesting
+                # server will otherwise time out before we can respond.
+                #
+                # (Note that get_json may make 4 attempts, so this can still take
+                # almost 45 seconds to fetch the headers, plus up to another 60s to
+                # read the response).
+                timeout=10000,
             )
-            await self.store.store_server_verify_keys(
-                server_name,
-                time_now_ms,
-                ((server_name, key_id, key) for key_id, key in response_keys.items()),
-            )
-            keys.update(response_keys)
+        except (NotRetryingDestination, RequestSendFailed) as e:
+            # these both have str() representations which we can't really improve
+            # upon
+            raise KeyLookupError(str(e))
+        except HttpResponseException as e:
+            raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
-        return keys
+        assert isinstance(response, dict)
+        if response["server_name"] != server_name:
+            raise KeyLookupError(
+                "Expected a response for server %r not %r"
+                % (server_name, response["server_name"])
+            )
+
+        return await self.process_v2_response(
+            from_server=server_name,
+            response_json=response,
+            time_added_ms=time_now_ms,
+        )

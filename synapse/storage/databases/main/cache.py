@@ -259,6 +259,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
+            self._attempt_to_invalidate_cache("get_references_for_event", (relates_to,))
             self._attempt_to_invalidate_cache(
                 "get_aggregation_groups_for_event", (relates_to,)
             )

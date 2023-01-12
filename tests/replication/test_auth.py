@@ -38,7 +38,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
 
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
-        config["worker_app"] = "synapse.app.client_reader"
+        config["worker_app"] = "synapse.app.generic_worker"
         config["worker_replication_host"] = "testserv"
         config["worker_replication_http_port"] = "8765"
 
@@ -53,7 +53,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         4. Return the final request.
 
         """
-        worker_hs = self.make_worker_hs("synapse.app.client_reader")
+        worker_hs = self.make_worker_hs("synapse.app.generic_worker")
         site = self._hs_to_site[worker_hs]
 
         channel_1 = make_request(

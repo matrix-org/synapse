@@ -953,7 +953,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         """Returns user id from threepid
 
         Args:
-            txn (cursor):
+            txn:
             medium: threepid medium e.g. email
             address: threepid address e.g. me@example.com
 
@@ -1283,8 +1283,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         """Sets an expiration date to the account with the given user ID.
 
         Args:
-             user_id (str): User ID to set an expiration date for.
-             use_delta (bool): If set to False, the expiration date for the user will be
+             user_id: User ID to set an expiration date for.
+             use_delta: If set to False, the expiration date for the user will be
                 now + validity period. If set to True, this expiration date will be a
                 random value in the [now + period - d ; now + period] range, d being a
                 delta equal to 10% of the validity period.

@@ -26,8 +26,8 @@ from synapse.events.utils import prune_event
 from synapse.logging.opentracing import trace
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
-from synapse.storage.state import StateFilter
 from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
@@ -563,7 +563,8 @@ def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
 
 async def filter_events_for_server(
     storage: StorageControllers,
-    server_name: str,
+    target_server_name: str,
+    local_server_name: str,
     events: List[EventBase],
     redact: bool = True,
     check_history_visibility_only: bool = False,
@@ -603,7 +604,7 @@ async def filter_events_for_server(
         # if the server is either in the room or has been invited
         # into the room.
         for ev in memberships.values():
-            assert get_domain_from_id(ev.state_key) == server_name
+            assert get_domain_from_id(ev.state_key) == target_server_name
 
             memtype = ev.membership
             if memtype == Membership.JOIN:
@@ -622,6 +623,24 @@ async def filter_events_for_server(
         # to no users having been erased.
         erased_senders = {}
 
+    # Filter out non-local events when we are in the middle of a partial join, since our servers
+    # list can be out of date and we could leak events to servers not in the room anymore.
+    # This can also be true for local events but we consider it to be an acceptable risk.
+
+    # We do this check as a first step and before retrieving membership events because
+    # otherwise a room could be fully joined after we retrieve those, which would then bypass
+    # this check but would base the filtering on an outdated view of the membership events.
+
+    partial_state_invisible_events = set()
+    if not check_history_visibility_only:
+        for e in events:
+            sender_domain = get_domain_from_id(e.sender)
+            if (
+                sender_domain != local_server_name
+                and await storage.main.is_partial_state_room(e.room_id)
+            ):
+                partial_state_invisible_events.add(e)
+
     # Let's check to see if all the events have a history visibility
     # of "shared" or "world_readable". If that's the case then we don't
     # need to check membership (as we know the server is in the room).
@@ -636,7 +655,7 @@ async def filter_events_for_server(
             if event_to_history_vis[e.event_id]
             not in (HistoryVisibility.SHARED, HistoryVisibility.WORLD_READABLE)
         ],
-        server_name,
+        target_server_name,
     )
 
     to_return = []
@@ -645,6 +664,10 @@ async def filter_events_for_server(
         visible = check_event_is_visible(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
         )
+
+        if e in partial_state_invisible_events:
+            visible = False
+
         if visible and not erased:
             to_return.append(e)
         elif redact:

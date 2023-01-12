@@ -858,7 +858,7 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default. Please be advised 
+The message retention policies feature is disabled by default. Please be advised
 that enabling this feature carries some risk. There are known bugs with the implementation
 which can cause database corruption. Setting retention to delete older history
 is less risky than deleting newer history but in general caution is advised when enabling this
@@ -2437,31 +2437,6 @@ Example configuration:
 enable_metrics: true
 ```
 ---
-### `enable_legacy_metrics`
-
-Set to `true` to publish both legacy and non-legacy Prometheus metric names,
-or to `false` to only publish non-legacy Prometheus metric names.
-Defaults to `false`. Has no effect if `enable_metrics` is `false`.
-**In Synapse v1.67.0 up to and including Synapse v1.70.1, this defaulted to `true`.**
-
-Legacy metric names include:
-- metrics containing colons in the name, such as `synapse_util_caches_response_cache:hits`, because colons are supposed to be reserved for user-defined recording rules;
-- counters that don't end with the `_total` suffix, such as `synapse_federation_client_sent_edus`, therefore not adhering to the OpenMetrics standard.
-
-These legacy metric names are unconventional and not compliant with OpenMetrics standards.
-They are included for backwards compatibility.
-
-Example configuration:
-```yaml
-enable_legacy_metrics: false
-```
-
-See https://github.com/matrix-org/synapse/issues/11106 for context.
-
-*Since v1.67.0.*
-
-**Will be removed in v1.73.0.**
----
 ### `sentry`
 
 Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
@@ -2526,32 +2501,53 @@ Config settings related to the client/server API
 ---
 ### `room_prejoin_state`
 
-Controls for the state that is shared with users who receive an invite
-to a room. By default, the following state event types are shared with users who
-receive invites to the room:
-- m.room.join_rules
-- m.room.canonical_alias
-- m.room.avatar
-- m.room.encryption
-- m.room.name
-- m.room.create
-- m.room.topic
+This setting controls the state that is shared with users upon receiving an
+invite to a room, or in reply to a knock on a room. By default, the following
+state events are shared with users:
+
+- `m.room.join_rules`
+- `m.room.canonical_alias`
+- `m.room.avatar`
+- `m.room.encryption`
+- `m.room.name`
+- `m.room.create`
+- `m.room.topic`
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: set to true to disable the above defaults. If this
-   is enabled, only the event types listed in `additional_event_types` are shared.
-   Defaults to false.
-* `additional_event_types`: Additional state event types to share with users when they are invited
-   to a room. By default, this list is empty (so only the default event types are shared).
+* `disable_default_event_types`: boolean. Set to `true` to disable the above 
+  defaults. If this is enabled, only the event types listed in
+  `additional_event_types` are shared. Defaults to `false`.
+* `additional_event_types`: A list of additional state events to include in the 
+  events to be shared. By default, this list is empty (so only the default event 
+  types are shared).
+
+  Each entry in this list should be either a single string or a list of two
+  strings. 
+  * A standalone string `t` represents all events with type `t` (i.e.
+    with no restrictions on state keys).
+  * A pair of strings `[t, s]` represents a single event with type `t` and 
+    state key `s`. The same type can appear in two entries with different state
+    keys: in this situation, both state keys are included in prejoin state.
 
 Example configuration:
 ```yaml
 room_prejoin_state:
-   disable_default_event_types: true
+   disable_default_event_types: false
    additional_event_types:
-     - org.example.custom.event.type
-     - m.room.join_rules
+     # Share all events of type `org.example.custom.event.typeA`
+     - org.example.custom.event.typeA
+     # Share only events of type `org.example.custom.event.typeB` whose
+     # state_key is "foo"
+     - ["org.example.custom.event.typeB", "foo"]
+     # Share only events of type `org.example.custom.event.typeC` whose
+     # state_key is "bar" or "baz"
+     - ["org.example.custom.event.typeC", "bar"]
+     - ["org.example.custom.event.typeC", "baz"]
 ```
+
+*Changed in Synapse 1.74:* admins can filter the events in prejoin state based
+on their state key.
+
 ---
 ### `track_puppeted_user_ips`
 
@@ -2993,9 +2989,16 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
-       * subject_claim: name of the claim containing a unique identifier
+       * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
+
+       * `picture_claim`: name of the claim containing an url for the user's profile picture.
+         Defaults to 'picture', which OpenID Connect compliant providers should provide
+         and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+         
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
@@ -3021,7 +3024,7 @@ Options for each entry include:
      which is set to the claims returned by the UserInfo Endpoint and/or
      in the ID Token.
 
-* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications. 
+* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications.
   Those notifications are expected to be received on `/_synapse/client/oidc/backchannel_logout`.
   Defaults to `false`.
 
@@ -3373,6 +3376,10 @@ Configuration settings related to push notifications
 This setting defines options for push notifications.
 
 This option has a number of sub-options. They are as follows:
+* `enabled`: Enables or disables push notification calculation. Note, disabling this will also
+   stop unread counts being calculated for rooms. This mode of operation is intended
+   for homeservers which may only have bots or appservice users connected, or are otherwise
+   not interested in push/unread counters. This is enabled by default.
 * `include_content`: Clients requesting push notifications can either have the body of
    the message sent in the notification poke along with other details
    like the sender, or just the event ID and room ID (`event_id_only`).
@@ -3393,6 +3400,7 @@ This option has a number of sub-options. They are as follows:
 Example configuration:
 ```yaml
 push:
+  enabled: true
   include_content: false
   group_unread_count_by_room: false
 ```
@@ -3438,7 +3446,7 @@ This option has the following sub-options:
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
-    
+
     These indexes are built the first time Synapse starts; admins can
     manually trigger a rebuild via the API following the instructions
     [for running background updates](../administration/admin_api/background_updates.md#run),
@@ -3697,7 +3705,7 @@ As a result, the worker configuration is divided into two parts.
 
 1. The first part (in this section of the manual) defines which shardable tasks
    are delegated to privileged workers. This allows unprivileged workers to make
-   request a privileged worker to act on their behalf.
+   requests to a privileged worker to act on their behalf.
 1. [The second part](#individual-worker-configuration)
    controls the behaviour of individual workers in isolation.
 
@@ -3709,7 +3717,7 @@ For guidance on setting up workers, see the [worker documentation](../../workers
 A shared secret used by the replication APIs on the main process to authenticate
 HTTP requests from workers.
 
-The default, this value is omitted (equivalently `null`), which means that 
+The default, this value is omitted (equivalently `null`), which means that
 traffic between the workers and the main process is not authenticated.
 
 Example configuration:
@@ -3718,6 +3726,8 @@ worker_replication_secret: "secret_secret"
 ```
 ---
 ### `start_pushers`
+
+Unnecessary to set if using [`pusher_instances`](#pusher_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
 
 Controls sending of push notifications on the main process. Set to `false`
 if using a [pusher worker](../../workers.md#synapseapppusher). Defaults to `true`.
@@ -3729,24 +3739,29 @@ start_pushers: false
 ---
 ### `pusher_instances`
 
-It is possible to run multiple [pusher workers](../../workers.md#synapseapppusher),
-in which case the work is balanced across them. Use this setting to list the pushers by
-[`worker_name`](#worker_name). Ensure the main process and all pusher workers are
-restarted after changing this option.
+It is possible to scale the processes that handle sending push notifications to [sygnal](https://github.com/matrix-org/sygnal)
+and email by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+a `pusher_instances` map. Doing so will remove handling of this function from the main
+process. Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.
 
-If no or only one pusher worker is configured, this setting is not necessary.
-The main process will send out push notifications by default if you do not disable
-it by setting [`start_pushers: false`](#start_pushers).
-
-Example configuration:
+Example configuration for a single worker:
 ```yaml
-start_pushers: false
+pusher_instances:
+  - pusher_worker1
+```
+And for multiple workers:
+```yaml
 pusher_instances:
   - pusher_worker1
   - pusher_worker2
 ```
+
 ---
 ### `send_federation`
+
+Unnecessary to set if using [`federation_sender_instances`](#federation_sender_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
 
 Controls sending of outbound federation transactions on the main process.
 Set to `false` if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
@@ -3759,29 +3774,36 @@ send_federation: false
 ---
 ### `federation_sender_instances`
 
-It is possible to run multiple
-[federation sender worker](../../workers.md#synapseappfederation_sender), in which
-case the work is balanced across them. Use this setting to list the senders.
+It is possible to scale the processes that handle sending outbound federation requests
+by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+a `federation_sender_instances` map. Doing so will remove handling of this function from
+the main process. Multiple workers can be added to this map, in which case the work is
+balanced across them.
 
-This configuration setting must be shared between all federation sender workers, and if
-changed all federation sender workers must be stopped at the same time and then
-started, to ensure that all instances are running with the same config (otherwise
+This configuration setting must be shared between all workers handling federation
+sending, and if changed all federation sender workers must be stopped at the same time
+and then started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).
 
-Example configuration:
+Example configuration for a single worker:
 ```yaml
-send_federation: false
 federation_sender_instances:
   - federation_sender1
+```
+And for multiple workers:
+```yaml
+federation_sender_instances:
+  - federation_sender1
+  - federation_sender2
 ```
 ---
 ### `instance_map`
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
 HTTP replication listener of the worker, if configured.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs 
+Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
 a HTTP replication listener, and that listener should be included in the `instance_map`.
-(The main process also needs an HTTP replication listener, but it should not be 
+(The main process also needs an HTTP replication listener, but it should not be
 listed in the `instance_map`.)
 
 Example configuration:
@@ -3893,10 +3915,30 @@ Example configuration:
 worker_replication_http_port: 9093
 ```
 ---
+### `worker_replication_http_tls`
+
+Whether TLS should be used for talking to the HTTP replication port on the main
+Synapse process.
+The main Synapse process defines this with the `tls` option on its [listener](#listeners) that
+has the `replication` resource enabled.
+
+**Please note:** by default, it is not safe to expose replication ports to the
+public Internet, even with TLS enabled.
+See [`worker_replication_secret`](#worker_replication_secret).
+
+Defaults to `false`.
+
+*Added in Synapse 1.72.0.*
+
+Example configuration:
+```yaml
+worker_replication_http_tls: true
+```
+---
 ### `worker_listeners`
 
-A worker can handle HTTP requests. To do so, a `worker_listeners` option 
-must be declared, in the same way as the [`listeners` option](#listeners) 
+A worker can handle HTTP requests. To do so, a `worker_listeners` option
+must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
 Workers declared in [`stream_writers`](#stream_writers) will need to include a
@@ -3915,7 +3957,7 @@ worker_listeners:
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option 
+If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option
 must be omitted or set to `false`.
 
 Defaults to `false`.
@@ -3927,11 +3969,11 @@ worker_daemonize: true
 ---
 ### `worker_pid_file`
 
-When running a worker as a daemon, we need a place to store the 
+When running a worker as a daemon, we need a place to store the
 [PID](https://en.wikipedia.org/wiki/Process_identifier) of the worker.
 This option defines the location of that "pid file".
 
-This option is required if `worker_daemonize` is `true` and ignored 
+This option is required if `worker_daemonize` is `true` and ignored
 otherwise. It has no default.
 
 See also the [`pid_file` option](#pid_file) option for the main Synapse process.
@@ -3981,4 +4023,3 @@ background_updates:
     min_batch_size: 10
     default_batch_size: 50
 ```
-

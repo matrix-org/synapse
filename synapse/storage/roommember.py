@@ -43,8 +43,7 @@ class GetRoomsForUserWithStreamOrdering:
 class ProfileInfo:
     avatar_url: Optional[str]
     display_name: Optional[str]
-    avatar_nft: Optional[str]
-    metadata: Optional[str]
+
 
 @attr.s(slots=True, frozen=True, weakref_slot=False, auto_attribs=True)
 class MemberSummary:

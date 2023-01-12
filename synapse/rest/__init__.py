@@ -29,7 +29,7 @@ from synapse.rest.client import (
     initial_sync,
     keys,
     knock,
-    login as v1_login,
+    login,
     login_token_request,
     logout,
     mutual_rooms,
@@ -82,6 +82,10 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource: HttpServer, hs: "HomeServer") -> None:
+        # Some servlets are only registered on the main process (and not worker
+        # processes).
+        is_main_process = hs.config.worker.worker_app is None
+
         versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
@@ -92,45 +96,58 @@ class ClientRestResource(JsonResource):
         events.register_servlets(hs, client_resource)
 
         room.register_servlets(hs, client_resource)
-        v1_login.register_servlets(hs, client_resource)
+        login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
-        directory.register_servlets(hs, client_resource)
+        if is_main_process:
+            directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
-        pusher.register_servlets(hs, client_resource)
+        if is_main_process:
+            pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
-        logout.register_servlets(hs, client_resource)
+        if is_main_process:
+            logout.register_servlets(hs, client_resource)
         sync.register_servlets(hs, client_resource)
-        filter.register_servlets(hs, client_resource)
+        if is_main_process:
+            filter.register_servlets(hs, client_resource)
         account.register_servlets(hs, client_resource)
         register.register_servlets(hs, client_resource)
-        auth.register_servlets(hs, client_resource)
+        if is_main_process:
+            auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
         room_keys.register_servlets(hs, client_resource)
         keys.register_servlets(hs, client_resource)
-        tokenrefresh.register_servlets(hs, client_resource)
+        if is_main_process:
+            tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
         account_data.register_servlets(hs, client_resource)
-        report_event.register_servlets(hs, client_resource)
-        openid.register_servlets(hs, client_resource)
-        notifications.register_servlets(hs, client_resource)
+        if is_main_process:
+            report_event.register_servlets(hs, client_resource)
+            openid.register_servlets(hs, client_resource)
+            notifications.register_servlets(hs, client_resource)
         devices.register_servlets(hs, client_resource)
-        thirdparty.register_servlets(hs, client_resource)
+        if is_main_process:
+            thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
-        room_upgrade_rest_servlet.register_servlets(hs, client_resource)
+        if is_main_process:
+            room_upgrade_rest_servlet.register_servlets(hs, client_resource)
         room_batch.register_servlets(hs, client_resource)
-        capabilities.register_servlets(hs, client_resource)
-        account_validity.register_servlets(hs, client_resource)
+        if is_main_process:
+            capabilities.register_servlets(hs, client_resource)
+            account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
-        password_policy.register_servlets(hs, client_resource)
-        knock.register_servlets(hs, client_resource)
+        if is_main_process:
+            password_policy.register_servlets(hs, client_resource)
+            knock.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
-        admin.register_servlets_for_client_rest_resource(hs, client_resource)
+        if is_main_process:
+            admin.register_servlets_for_client_rest_resource(hs, client_resource)
 
         # unstable
-        mutual_rooms.register_servlets(hs, client_resource)
-        login_token_request.register_servlets(hs, client_resource)
-        rendezvous.register_servlets(hs, client_resource)
+        if is_main_process:
+            mutual_rooms.register_servlets(hs, client_resource)
+            login_token_request.register_servlets(hs, client_resource)
+            rendezvous.register_servlets(hs, client_resource)

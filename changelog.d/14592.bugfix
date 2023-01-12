@@ -1,0 +1,1 @@
+Fix a long-standing bug where a device list update might not be sent to clients in certain circumstances.

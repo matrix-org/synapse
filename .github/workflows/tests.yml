@@ -27,6 +27,7 @@ jobs:
           rust:
             - 'rust/**'
             - 'Cargo.toml'
+            - 'Cargo.lock'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
@@ -102,13 +103,35 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
             toolchain: 1.58.1
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo clippy
+      - run: cargo clippy -- -D warnings
+
+  # We also lint against a nightly rustc so that we can lint the benchmark
+  # suite, which requires a nightly compiler.
+  lint-clippy-nightly:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
+        with:
+            toolchain: nightly-2022-12-01
+            components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo clippy --all-features -- -D warnings
 
   lint-rustfmt:
     runs-on: ubuntu-latest
@@ -122,7 +145,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
           toolchain: 1.58.1
           components: rustfmt
@@ -174,8 +197,12 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
+        # 1. Mount postgres data files onto a tmpfs in-memory filesystem to reduce overhead of docker's overlayfs layer.
+        # 2. Expose the unix socket for postgres. This removes latency of using docker-proxy for connections.
         run: |
           docker run -d -p 5432:5432 \
+            --tmpfs /var/lib/postgres:rw,size=6144m \
+            --mount 'type=bind,src=/var/run/postgresql,dst=/var/run/postgresql' \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.job.postgres-version }}
@@ -184,7 +211,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -197,10 +224,10 @@ jobs:
         if: ${{ matrix.job.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: poetry run trial --jobs=2 tests
+      - run: poetry run trial --jobs=6 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.job.database == 'postgres' || '' }}
-          SYNAPSE_POSTGRES_HOST: localhost
+          SYNAPSE_POSTGRES_HOST: /var/run/postgresql
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
@@ -228,7 +255,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -269,7 +296,7 @@ jobs:
           python-version: '3.7'
           extras: "all test"
 
-      - run: poetry run trial -j2 tests
+      - run: poetry run trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -346,7 +373,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -409,10 +436,10 @@ jobs:
       matrix:
         include:
           - python-version: "3.7"
-            postgres-version: "10"
+            postgres-version: "11"
 
           - python-version: "3.11"
-            postgres-version: "14"
+            postgres-version: "15"
 
     services:
       postgres:
@@ -430,6 +457,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Add PostgreSQL apt repository
+        # We need a version of pg_dump that can handle the version of
+        # PostgreSQL being tested against. The Ubuntu package repository lags
+        # behind new releases, so we have to use the PostreSQL apt repository.
+        # Steps taken from https://www.postgresql.org/download/linux/ubuntu/
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -480,7 +516,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -508,7 +544,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2

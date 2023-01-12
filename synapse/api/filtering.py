@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "limit": {"type": "number"},
@@ -63,7 +63,7 @@ FILTER_SCHEMA = {
 }
 
 ROOM_FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "not_rooms": {"$ref": "#/definitions/room_id_array"},
@@ -77,7 +77,7 @@ ROOM_FILTER_SCHEMA = {
 }
 
 ROOM_EVENT_FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "limit": {"type": "number"},
@@ -143,7 +143,7 @@ USER_FILTER_SCHEMA = {
             },
         },
     },
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
 }
 
 

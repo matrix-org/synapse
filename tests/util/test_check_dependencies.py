@@ -1,5 +1,20 @@
+# Copyright 2022 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from contextlib import contextmanager
-from typing import Generator, Optional
+from os import PathLike
+from typing import Generator, Optional, Union
 from unittest.mock import patch
 
 from synapse.util.check_dependencies import (
@@ -12,17 +27,17 @@ from tests.unittest import TestCase
 
 
 class DummyDistribution(metadata.Distribution):
-    def __init__(self, version: object):
+    def __init__(self, version: str):
         self._version = version
 
     @property
-    def version(self):
+    def version(self) -> str:
         return self._version
 
-    def locate_file(self, path):
+    def locate_file(self, path: Union[str, PathLike]) -> PathLike:
         raise NotImplementedError()
 
-    def read_text(self, filename):
+    def read_text(self, filename: str) -> None:
         raise NotImplementedError()
 
 
@@ -30,7 +45,7 @@ old = DummyDistribution("0.1.2")
 old_release_candidate = DummyDistribution("0.1.2rc3")
 new = DummyDistribution("1.2.3")
 new_release_candidate = DummyDistribution("1.2.3rc4")
-distribution_with_no_version = DummyDistribution(None)
+distribution_with_no_version = DummyDistribution(None)  # type: ignore[arg-type]
 
 # could probably use stdlib TestCase --- no need for twisted here
 
@@ -45,7 +60,7 @@ class TestDependencyChecker(TestCase):
         If `distribution = None`, we pretend that the package is not installed.
         """
 
-        def mock_distribution(name: str):
+        def mock_distribution(name: str) -> DummyDistribution:
             if distribution is None:
                 raise metadata.PackageNotFoundError
             else:

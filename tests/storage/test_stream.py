@@ -14,11 +14,15 @@
 
 from typing import List
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.filtering import Filter
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -37,12 +41,14 @@ class PaginationTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         config["experimental_features"] = {"msc3874_enabled": True}
         return config
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.user_id = self.register_user("test", "test")
         self.tok = self.login("test", "test")
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
@@ -130,7 +136,7 @@ class PaginationTestCase(HomeserverTestCase):
 
         return [ev.event_id for ev in events]
 
-    def test_filter_relation_senders(self):
+    def test_filter_relation_senders(self) -> None:
         # Messages which second user reacted to.
         filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
@@ -146,7 +152,7 @@ class PaginationTestCase(HomeserverTestCase):
         chunk = self._filter_messages(filter)
         self.assertCountEqual(chunk, [self.event_id_1, self.event_id_2])
 
-    def test_filter_relation_type(self):
+    def test_filter_relation_type(self) -> None:
         # Messages which have annotations.
         filter = {"related_by_rel_types": [RelationTypes.ANNOTATION]}
         chunk = self._filter_messages(filter)
@@ -167,7 +173,7 @@ class PaginationTestCase(HomeserverTestCase):
         chunk = self._filter_messages(filter)
         self.assertCountEqual(chunk, [self.event_id_1, self.event_id_2])
 
-    def test_filter_relation_senders_and_type(self):
+    def test_filter_relation_senders_and_type(self) -> None:
         # Messages which second user reacted to.
         filter = {
             "related_by_senders": [self.second_user_id],
@@ -176,7 +182,7 @@ class PaginationTestCase(HomeserverTestCase):
         chunk = self._filter_messages(filter)
         self.assertEqual(chunk, [self.event_id_1])
 
-    def test_duplicate_relation(self):
+    def test_duplicate_relation(self) -> None:
         """An event should only be returned once if there are multiple relations to it."""
         self.helper.send_event(
             room_id=self.room_id,

@@ -307,7 +307,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         stream to the master HS.
 
         Args:
-            worker_app: Type of worker, e.g. `synapse.app.federation_sender`.
+            worker_app: Type of worker, e.g. `synapse.app.generic_worker`.
             extra_config: Any extra config to use for this instances.
             **kwargs: Options that get passed to `self.setup_test_homeserver`,
                 useful to e.g. pass some mocks for things like `federation_http_client`
@@ -542,8 +542,13 @@ class FakeRedisPubSubProtocol(Protocol):
             self.send("OK")
         elif command == b"GET":
             self.send(None)
+
+        # Connection keep-alives.
+        elif command == b"PING":
+            self.send("PONG")
+
         else:
-            raise Exception("Unknown command")
+            raise Exception(f"Unknown command: {command}")
 
     def send(self, msg):
         """Send a message back to the client."""

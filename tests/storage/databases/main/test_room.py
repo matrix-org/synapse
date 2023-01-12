@@ -14,10 +14,14 @@
 
 import json
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import RoomTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage.databases.main.room import _BackgroundUpdates
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -30,7 +34,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
@@ -40,7 +44,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         return room_id
 
-    def test_background_populate_rooms_creator_column(self):
+    def test_background_populate_rooms_creator_column(self) -> None:
         """Test that the background update to populate the rooms creator column
         works properly.
         """
@@ -95,7 +99,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
         self.assertEqual(room_creator_after, self.user_id)
 
-    def test_background_add_room_type_column(self):
+    def test_background_add_room_type_column(self) -> None:
         """Test that the background update to populate the `room_type` column in
         `room_stats_state` works properly.
         """

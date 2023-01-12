@@ -1197,3 +1197,42 @@ Returns a `404` HTTP status code if no user was found, with a response body like
 ```
 
 _Added in Synapse 1.68.0._
+
+
+### Find a user based on their Third Party ID (ThreePID or 3PID)
+
+The API is:
+
+```
+GET /_synapse/admin/v1/threepid/$medium/users/$address
+```
+
+When a user matched the given address for the given medium, an HTTP code `200` with a response body like the following is returned:
+
+```json
+{
+    "user_id": "@hello:example.org"
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `medium` - Kind of third-party ID, either `email` or `msisdn`.
+- `address` - Value of the third-party ID.
+
+The `address` may have characters that are not URL-safe, so it is advised to URL-encode those parameters.
+
+**Errors**
+
+Returns a `404` HTTP status code if no user was found, with a response body like this:
+
+```json
+{
+    "errcode":"M_NOT_FOUND",
+    "error":"User not found"
+}
+```
+
+_Added in Synapse 1.72.0._
