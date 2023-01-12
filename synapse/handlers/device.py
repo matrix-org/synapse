@@ -499,7 +499,7 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
-        # Delete data specific to this device. Not optimised as it is not
+        # Delete data specific to each device. Not optimised as it is not
         # considered as part of a critical path.
         for device_id in device_ids:
             await self._auth_handler.delete_access_tokens_for_user(
