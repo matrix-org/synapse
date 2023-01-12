@@ -335,6 +335,7 @@ name = "serde_derive"
 version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42a3df25b0713732468deadad63ab9da1f1fd75a48a15024b50363f128db627e"
+
 dependencies = [
  "proc-macro2",
  "quote",
