@@ -357,6 +357,24 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
         )
         args.extend(event_filter.related_by_rel_types)
 
+    if event_filter.rel_types:
+        clauses.append(
+            "(%s)"
+            % " OR ".join(
+                "event_relation.relation_type = ?" for _ in event_filter.rel_types
+            )
+        )
+        args.extend(event_filter.rel_types)
+
+    if event_filter.not_rel_types:
+        clauses.append(
+            "((%s) OR event_relation.relation_type IS NULL)"
+            % " AND ".join(
+                "event_relation.relation_type != ?" for _ in event_filter.not_rel_types
+            )
+        )
+        args.extend(event_filter.not_rel_types)
+
     return " AND ".join(clauses), args
 
 
@@ -397,6 +415,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
+        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
     def get_room_max_stream_ordering(self) -> int:
         """Get the stream_ordering of regular events that we have committed up to
@@ -1278,8 +1297,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # Multiple labels could cause the same event to appear multiple times.
                 needs_distinct = True
 
-        # If there is a filter on relation_senders and relation_types join to the
-        # relations table.
+        # If there is a relation_senders and relation_types filter join to the
+        # relations table to get events related to the current event.
         if event_filter and (
             event_filter.related_by_senders or event_filter.related_by_rel_types
         ):
@@ -1293,6 +1312,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 join_clause += """
                     LEFT JOIN events AS related_event ON (relation.event_id = related_event.event_id)
                 """
+
+        # If there is a not_rel_types filter join to the relations table to get
+        # the event's relation information.
+        if event_filter and (event_filter.rel_types or event_filter.not_rel_types):
+            join_clause += """
+                LEFT JOIN event_relations AS event_relation USING (event_id)
+            """
 
         if needs_distinct:
             select_keywords += " DISTINCT"

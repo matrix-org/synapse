@@ -33,8 +33,8 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, JsonMapping, StateMap
+from synapse.types.state import StateFilter
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.cancellation import cancellable

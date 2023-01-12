@@ -218,14 +218,13 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
     `dir` can be `f` or `b` to indicate forwards and backwards in time from the
     given timestamp.
 
-    GET /_matrix/federation/unstable/org.matrix.msc3030/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
+    GET /_matrix/federation/v1/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
     {
         "event_id": ...
     }
     """
 
     PATH = "/timestamp_to_event/(?P<room_id>[^/]*)/?"
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3030"
 
     async def on_GET(
         self,
@@ -499,6 +498,11 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
         result = await self.handler.on_invite_request(
             origin, event, room_version_id=room_version
         )
+
+        # We only store invite_room_state for internal use, so remove it before
+        # returning the event to the remote homeserver.
+        result["event"].get("unsigned", {}).pop("invite_room_state", None)
+
         return 200, result
 
 

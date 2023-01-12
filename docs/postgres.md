@@ -1,6 +1,7 @@
 # Using Postgres
 
-Synapse supports PostgreSQL versions 10 or later.
+The minimum supported version of PostgreSQL is determined by the [Dependency
+Deprecation Policy](deprecation_policy.md).
 
 ## Install postgres client libraries
 

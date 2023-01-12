@@ -25,10 +25,17 @@ from synapse.rest.client import login
 from synapse.types import JsonDict, ReadReceipt
 
 from tests.test_utils import make_awaitable
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import HomeserverTestCase
 
 
 class FederationSenderReceiptsTestCases(HomeserverTestCase):
+    """
+    Test federation sending to update receipts.
+
+    By default for test cases federation sending is disabled. This Test class has it
+    re-enabled for the main process.
+    """
+
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
@@ -38,9 +45,17 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             return_value=make_awaitable({"test", "host2"})
         )
 
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
+            hs.get_storage_controllers().state.get_current_hosts_in_room
+        )
+
         return hs
 
-    @override_config({"send_federation": True})
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["federation_sender_instances"] = None
+        return config
+
     def test_send_receipts(self):
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
@@ -83,7 +98,82 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             ],
         )
 
-    @override_config({"send_federation": True})
+    def test_send_receipts_thread(self):
+        mock_send_transaction = (
+            self.hs.get_federation_transport_client().send_transaction
+        )
+        mock_send_transaction.return_value = make_awaitable({})
+
+        # Create receipts for:
+        #
+        # * The same room / user on multiple threads.
+        # * A different user in the same room.
+        sender = self.hs.get_federation_sender()
+        for user, thread in (
+            ("alice", None),
+            ("alice", "thread"),
+            ("bob", None),
+            ("bob", "diff-thread"),
+        ):
+            receipt = ReadReceipt(
+                "room_id",
+                "m.read",
+                user,
+                ["event_id"],
+                thread_id=thread,
+                data={"ts": 1234},
+            )
+            self.successResultOf(
+                defer.ensureDeferred(sender.send_read_receipt(receipt))
+            )
+
+        self.pump()
+
+        # expect a call to send_transaction with two EDUs to separate threads.
+        mock_send_transaction.assert_called_once()
+        json_cb = mock_send_transaction.call_args[0][1]
+        data = json_cb()
+        # Note that the ordering of the EDUs doesn't matter.
+        self.assertCountEqual(
+            data["edus"],
+            [
+                {
+                    "edu_type": EduTypes.RECEIPT,
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "alice": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234, "thread_id": "thread"},
+                                },
+                                "bob": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234, "thread_id": "diff-thread"},
+                                },
+                            }
+                        }
+                    },
+                },
+                {
+                    "edu_type": EduTypes.RECEIPT,
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "alice": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
+                                },
+                                "bob": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
+                                },
+                            }
+                        }
+                    },
+                },
+            ],
+        )
+
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""
@@ -170,6 +260,13 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
 
 class FederationSenderDevicesTestCases(HomeserverTestCase):
+    """
+    Test federation sending to update devices.
+
+    By default for test cases federation sending is disabled. This Test class has it
+    re-enabled for the main process.
+    """
+
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -184,7 +281,8 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def default_config(self):
         c = super().default_config()
-        c["send_federation"] = True
+        # Enable federation sending on the main process.
+        c["federation_sender_instances"] = None
         return c
 
     def prepare(self, reactor, clock, hs):

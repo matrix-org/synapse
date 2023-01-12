@@ -1,0 +1,42 @@
+llversion: '2'
+services:
+  db:
+    restart: always
+    image: postgres:12.5-alpine
+    shm_size: 1024mb
+    networks:
+      - internal_network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+
+  redis:          
+    restart: always
+    image: redis:6.0-alpine
+    networks:
+      - internal_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+    volumes:
+      - ./redis:/data
+  
+  synapse:
+    build: .
+    image: matrixdotorg/synapse
+    restart: always
+    ports:
+      - "8008:8008"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - external_network
+      - internal_network
+    volumes:
+      - ./data:/data
+      
+networks:
+  external_network:
+  internal_network:
+    internal: true

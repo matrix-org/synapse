@@ -43,7 +43,7 @@ RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && apt-get install -yqq \
-      build-essential cargo git libffi-dev libssl-dev \
+      build-essential git libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
@@ -97,6 +97,8 @@ RUN \
     zlib1g-dev \
     git \
     curl \
+    libicu-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -135,7 +137,9 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 # Install the synapse package itself.
 # If we have populated requirements.txt, we don't install any dependencies
 # as we should already have those from the previous `pip install` step.
-RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+RUN --mount=type=cache,target=/synapse/target,sharing=locked \
+  --mount=type=cache,target=${CARGO_HOME}/registry,sharing=locked \
+  if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
     pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
   else \
     pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
@@ -163,6 +167,7 @@ RUN \
     libwebp6 \
     xmlsec1 \
     libjemalloc2 \
+    libicu67 \
     libssl-dev \
     openssl \
     && rm -rf /var/lib/apt/lists/*

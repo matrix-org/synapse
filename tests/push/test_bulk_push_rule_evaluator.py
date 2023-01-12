@@ -6,10 +6,11 @@ from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.types import create_requester
 
-from tests import unittest
+from tests.test_utils import simple_async_mock
+from tests.unittest import HomeserverTestCase, override_config
 
 
-class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
+class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -71,4 +72,44 @@ class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # should not raise
-        self.get_success(bulk_evaluator.action_for_event_by_user(event, context))
+        self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
+
+    @override_config({"push": {"enabled": False}})
+    def test_action_for_event_by_user_disabled_by_config(self) -> None:
+        """Ensure that push rules are not calculated when disabled in the config"""
+        # Create a new user and room.
+        alice = self.register_user("alice", "pass")
+        token = self.login(alice, "pass")
+
+        room_id = self.helper.create_room_as(
+            alice, room_version=RoomVersions.V9.identifier, tok=token
+        )
+
+        # Alter the power levels in that room to include stringy and floaty levels.
+        # We need to suppress the validation logic or else it will reject these dodgy
+        # values. (Presumably this validation was not always present.)
+        event_creation_handler = self.hs.get_event_creation_handler()
+        requester = create_requester(alice)
+
+        # Create a new message event, and try to evaluate it under the dodgy
+        # power level event.
+        event, context = self.get_success(
+            event_creation_handler.create_event(
+                requester,
+                {
+                    "type": "m.room.message",
+                    "room_id": room_id,
+                    "content": {
+                        "msgtype": "m.text",
+                        "body": "helo",
+                    },
+                    "sender": alice,
+                },
+            )
+        )
+
+        bulk_evaluator = BulkPushRuleEvaluator(self.hs)
+        bulk_evaluator._action_for_event_by_user = simple_async_mock()  # type: ignore[assignment]
+        # should not raise
+        self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
+        bulk_evaluator._action_for_event_by_user.assert_not_called()
