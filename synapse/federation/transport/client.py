@@ -910,11 +910,28 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
                     use_float="True",
                 )
             )
+            # The stable field name comes last, so it "wins" if the fields disagree
+            self._coros.append(
+                ijson.items_coro(
+                    _partial_state_parser(self._response),
+                    "members_omitted",
+                    use_float="True",
+                )
+            )
 
             self._coros.append(
                 ijson.items_coro(
                     _servers_in_room_parser(self._response),
                     "org.matrix.msc3706.servers_in_room",
+                    use_float="True",
+                )
+            )
+
+            # Again, stable field name comes last
+            self._coros.append(
+                ijson.items_coro(
+                    _servers_in_room_parser(self._response),
+                    "servers_in_room",
                     use_float="True",
                 )
             )
