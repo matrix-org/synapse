@@ -1,0 +1,1 @@
+Fix html templates to load images only on HTTPS. Contributed by @ashfame.

@@ -949,9 +949,10 @@ def _calculate_registration_flows(
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    EmailRegisterRequestTokenRestServlet(hs).register(http_server)
-    MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
-    UsernameAvailabilityRestServlet(hs).register(http_server)
-    RegistrationSubmitTokenServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        EmailRegisterRequestTokenRestServlet(hs).register(http_server)
+        MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
+        UsernameAvailabilityRestServlet(hs).register(http_server)
+        RegistrationSubmitTokenServlet(hs).register(http_server)
     RegistrationTokenValidityRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

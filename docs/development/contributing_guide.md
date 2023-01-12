@@ -24,6 +24,8 @@ The code of Synapse is written in Python 3. To do pretty much anything, you'll n
 
 Synapse can connect to PostgreSQL via the [psycopg2](https://pypi.org/project/psycopg2/) Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with `sudo apt install libpq-dev`.
 
+Synapse has an optional, improved user search with better Unicode support. For that you need the development package of `libicu`. On Debian or Ubuntu Linux, this can be installed with `sudo apt install libicu-dev`.
+
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
@@ -324,6 +326,12 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 
 - Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+  - If setting `WORKERS=1`, optionally set `WORKER_TYPES=` to declare which worker
+    types you wish to test. A simple comma-delimited string containing the worker types
+    defined from the `WORKERS_CONFIG` template in
+    [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
+    A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
+    See the [worker documentation](../workers.md) for additional information on workers.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh

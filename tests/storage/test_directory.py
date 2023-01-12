@@ -12,19 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
 from synapse.types import RoomAlias, RoomID
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class DirectoryStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
         self.room = RoomID.from_string("!abcde:test")
         self.alias = RoomAlias.from_string("#my-room:test")
 
-    def test_room_to_alias(self):
+    def test_room_to_alias(self) -> None:
         self.get_success(
             self.store.create_room_alias_association(
                 room_alias=self.alias, room_id=self.room.to_string(), servers=["test"]
@@ -36,7 +40,7 @@ class DirectoryStoreTestCase(HomeserverTestCase):
             (self.get_success(self.store.get_aliases_for_room(self.room.to_string()))),
         )
 
-    def test_alias_to_room(self):
+    def test_alias_to_room(self) -> None:
         self.get_success(
             self.store.create_room_alias_association(
                 room_alias=self.alias, room_id=self.room.to_string(), servers=["test"]
@@ -48,7 +52,7 @@ class DirectoryStoreTestCase(HomeserverTestCase):
             (self.get_success(self.store.get_association_from_room_alias(self.alias))),
         )
 
-    def test_delete_alias(self):
+    def test_delete_alias(self) -> None:
         self.get_success(
             self.store.create_room_alias_association(
                 room_alias=self.alias, room_id=self.room.to_string(), servers=["test"]

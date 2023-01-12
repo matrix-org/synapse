@@ -1435,16 +1435,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 ),
             )
 
-            endpoint = None
             row = txn.fetchone()
             if row:
                 endpoint = row[0]
+            else:
+                # if the query didn't return a row, we must be almost done. We just
+                # need to go up to the recorded max_stream_ordering.
+                endpoint = max_stream_ordering_inclusive
 
-            where_clause = "stream_ordering > ?"
-            args = [min_stream_ordering_exclusive]
-            if endpoint:
-                where_clause += " AND stream_ordering <= ?"
-                args.append(endpoint)
+            where_clause = "stream_ordering > ? AND stream_ordering <= ?"
+            args = [min_stream_ordering_exclusive, endpoint]
 
             # now do the updates.
             txn.execute(
@@ -1458,13 +1458,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
             logger.info(
-                "populated new `events` columns up to %s/%i: updated %i rows",
+                "populated new `events` columns up to %i/%i: updated %i rows",
                 endpoint,
                 max_stream_ordering_inclusive,
                 txn.rowcount,
             )
 
-            if endpoint is None:
+            if endpoint >= max_stream_ordering_inclusive:
                 # we're done
                 return True
 

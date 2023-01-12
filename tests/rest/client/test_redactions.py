@@ -11,17 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Optional
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 class RedactionsTestCase(HomeserverTestCase):
@@ -67,7 +68,12 @@ class RedactionsTestCase(HomeserverTestCase):
         )
 
     def _redact_event(
-        self, access_token: str, room_id: str, event_id: str, expect_code: int = 200
+        self,
+        access_token: str,
+        room_id: str,
+        event_id: str,
+        expect_code: int = 200,
+        with_relations: Optional[List[str]] = None,
     ) -> JsonDict:
         """Helper function to send a redaction event.
 
@@ -75,7 +81,13 @@ class RedactionsTestCase(HomeserverTestCase):
         """
         path = "/_matrix/client/r0/rooms/%s/redact/%s" % (room_id, event_id)
 
-        channel = self.make_request("POST", path, content={}, access_token=access_token)
+        request_content = {}
+        if with_relations:
+            request_content["org.matrix.msc3912.with_relations"] = with_relations
+
+        channel = self.make_request(
+            "POST", path, request_content, access_token=access_token
+        )
         self.assertEqual(channel.code, expect_code)
         return channel.json_body
 
@@ -201,3 +213,256 @@ class RedactionsTestCase(HomeserverTestCase):
             # These should all succeed, even though this would be denied by
             # the standard message ratelimiter
             self._redact_event(self.mod_access_token, self.room_id, msg_id)
+
+    @override_config({"experimental_features": {"msc3912_enabled": True}})
+    def test_redact_relations(self) -> None:
+        """Tests that we can redact the relations of an event at the same time as the
+        event itself.
+        """
+        # Send a root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "hello"},
+            tok=self.mod_access_token,
+        )
+        root_event_id = res["event_id"]
+
+        # Send an edit to this root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "body": " * hello world",
+                "m.new_content": {
+                    "body": "hello world",
+                    "msgtype": "m.text",
+                },
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.REPLACE,
+                },
+                "msgtype": "m.text",
+            },
+            tok=self.mod_access_token,
+        )
+        edit_event_id = res["event_id"]
+
+        # Also send a threaded message whose root is the same as the edit's.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "message 1",
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.THREAD,
+                },
+            },
+            tok=self.mod_access_token,
+        )
+        threaded_event_id = res["event_id"]
+
+        # Also send a reaction, again with the same root.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Reaction,
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": root_event_id,
+                    "key": "👍",
+                }
+            },
+            tok=self.mod_access_token,
+        )
+        reaction_event_id = res["event_id"]
+
+        # Redact the root event, specifying that we also want to delete events that
+        # relate to it with m.replace.
+        self._redact_event(
+            self.mod_access_token,
+            self.room_id,
+            root_event_id,
+            with_relations=[
+                RelationTypes.REPLACE,
+                RelationTypes.THREAD,
+            ],
+        )
+
+        # Check that the root event got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, root_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the edit got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, edit_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the threaded message got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, threaded_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the reaction did not get redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, reaction_event_id, self.mod_access_token
+        )
+        self.assertNotIn("redacted_because", event_dict, event_dict)
+
+    @override_config({"experimental_features": {"msc3912_enabled": True}})
+    def test_redact_relations_no_perms(self) -> None:
+        """Tests that, when redacting a message along with its relations, if not all
+        the related messages can be redacted because of insufficient permissions, the
+        server still redacts all the ones that can be.
+        """
+        # Send a root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "root",
+            },
+            tok=self.other_access_token,
+        )
+        root_event_id = res["event_id"]
+
+        # Send a first threaded message, this one from the moderator. We do this for the
+        # first message with the m.thread relation (and not the last one) to ensure
+        # that, when the server fails to redact it, it doesn't stop there, and it
+        # instead goes on to redact the other one.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "message 1",
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.THREAD,
+                },
+            },
+            tok=self.mod_access_token,
+        )
+        first_threaded_event_id = res["event_id"]
+
+        # Send a second threaded message, this time from the user who'll perform the
+        # redaction.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "message 2",
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.THREAD,
+                },
+            },
+            tok=self.other_access_token,
+        )
+        second_threaded_event_id = res["event_id"]
+
+        # Redact the thread's root, and request that all threaded messages are also
+        # redacted. Send that request from the non-mod user, so that the first threaded
+        # event cannot be redacted.
+        self._redact_event(
+            self.other_access_token,
+            self.room_id,
+            root_event_id,
+            with_relations=[RelationTypes.THREAD],
+        )
+
+        # Check that the thread root got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, root_event_id, self.other_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the last message in the thread got redacted, despite failing to
+        # redact the one before it.
+        event_dict = self.helper.get_event(
+            self.room_id, second_threaded_event_id, self.other_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the message that was sent into the tread by the mod user is not
+        # redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, first_threaded_event_id, self.other_access_token
+        )
+        self.assertIn("body", event_dict["content"], event_dict)
+        self.assertEqual("message 1", event_dict["content"]["body"])
+
+    @override_config({"experimental_features": {"msc3912_enabled": True}})
+    def test_redact_relations_txn_id_reuse(self) -> None:
+        """Tests that redacting a message using a transaction ID, then reusing the same
+        transaction ID but providing an additional list of relations to redact, is
+        effectively a no-op.
+        """
+        # Send a root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "root",
+            },
+            tok=self.mod_access_token,
+        )
+        root_event_id = res["event_id"]
+
+        # Send a first threaded message.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "I'm in a thread!",
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.THREAD,
+                },
+            },
+            tok=self.mod_access_token,
+        )
+        threaded_event_id = res["event_id"]
+
+        # Send a first redaction request which redacts only the root event.
+        channel = self.make_request(
+            method="PUT",
+            path=f"/rooms/{self.room_id}/redact/{root_event_id}/foo",
+            content={},
+            access_token=self.mod_access_token,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Send a second redaction request which redacts the root event as well as
+        # threaded messages.
+        channel = self.make_request(
+            method="PUT",
+            path=f"/rooms/{self.room_id}/redact/{root_event_id}/foo",
+            content={"org.matrix.msc3912.with_relations": [RelationTypes.THREAD]},
+            access_token=self.mod_access_token,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Check that the root event got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, root_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict)
+
+        # Check that the threaded message didn't get redacted (since that wasn't part of
+        # the original redaction).
+        event_dict = self.helper.get_event(
+            self.room_id, threaded_event_id, self.mod_access_token
+        )
+        self.assertIn("body", event_dict["content"], event_dict)
+        self.assertEqual("I'm in a thread!", event_dict["content"]["body"])
