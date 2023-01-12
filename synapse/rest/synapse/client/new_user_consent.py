@@ -20,6 +20,7 @@ from synapse.api.errors import SynapseError
 from synapse.handlers.sso import get_username_mapping_session_cookie_from_request
 from synapse.http.server import DirectServeHtmlResource, respond_with_html
 from synapse.http.servlet import parse_string
+from synapse.http.site import SynapseRequest
 from synapse.types import UserID
 from synapse.util.templates import build_jinja_env
 
@@ -88,7 +89,7 @@ class NewUserConsentResource(DirectServeHtmlResource):
         html = template.render(template_params)
         respond_with_html(request, 200, html)
 
-    async def _async_render_POST(self, request: Request) -> None:
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         try:
             session_id = get_username_mapping_session_cookie_from_request(request)
         except SynapseError as e:

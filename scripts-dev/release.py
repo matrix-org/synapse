@@ -27,7 +27,7 @@ import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional
 
 import attr
 import click
@@ -174,9 +174,7 @@ def _prepare() -> None:
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    # Cast safety: parse() won't return a version.LegacyVersion from our
-    # version string format.
-    parsed_new_version = cast(version.Version, version.parse(new_version))
+    parsed_new_version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
@@ -219,9 +217,7 @@ def _prepare() -> None:
                 update_branch(repo)
 
             # Create the new release branch
-            # Type ignore will no longer be needed after GitPython 3.1.28.
-            # See https://github.com/gitpython-developers/GitPython/pull/1419
-            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            repo.create_head(release_branch_name, commit=base_branch)
 
         # Special-case SyTest: we don't actually prepare any files so we may
         # as well push it now (and only when we create a release branch;

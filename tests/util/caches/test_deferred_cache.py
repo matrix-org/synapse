@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from functools import partial
+from typing import List, Tuple
 
 from twisted.internet import defer
 
@@ -22,20 +23,20 @@ from tests.unittest import TestCase
 
 
 class DeferredCacheTestCase(TestCase):
-    def test_empty(self):
-        cache = DeferredCache("test")
+    def test_empty(self) -> None:
+        cache: DeferredCache[str, int] = DeferredCache("test")
         with self.assertRaises(KeyError):
             cache.get("foo")
 
-    def test_hit(self):
-        cache = DeferredCache("test")
+    def test_hit(self) -> None:
+        cache: DeferredCache[str, int] = DeferredCache("test")
         cache.prefill("foo", 123)
 
         self.assertEqual(self.successResultOf(cache.get("foo")), 123)
 
-    def test_hit_deferred(self):
-        cache = DeferredCache("test")
-        origin_d = defer.Deferred()
+    def test_hit_deferred(self) -> None:
+        cache: DeferredCache[str, int] = DeferredCache("test")
+        origin_d: "defer.Deferred[int]" = defer.Deferred()
         set_d = cache.set("k1", origin_d)
 
         # get should return an incomplete deferred
@@ -43,7 +44,7 @@ class DeferredCacheTestCase(TestCase):
         self.assertFalse(get_d.called)
 
         # add a callback that will make sure that the set_d gets called before the get_d
-        def check1(r):
+        def check1(r: str) -> str:
             self.assertTrue(set_d.called)
             return r
 
@@ -55,16 +56,16 @@ class DeferredCacheTestCase(TestCase):
         self.assertEqual(self.successResultOf(set_d), 99)
         self.assertEqual(self.successResultOf(get_d), 99)
 
-    def test_callbacks(self):
+    def test_callbacks(self) -> None:
         """Invalidation callbacks are called at the right time"""
-        cache = DeferredCache("test")
+        cache: DeferredCache[str, int] = DeferredCache("test")
         callbacks = set()
 
         # start with an entry, with a callback
         cache.prefill("k1", 10, callback=lambda: callbacks.add("prefill"))
 
         # now replace that entry with a pending result
-        origin_d = defer.Deferred()
+        origin_d: "defer.Deferred[int]" = defer.Deferred()
         set_d = cache.set("k1", origin_d, callback=lambda: callbacks.add("set"))
 
         # ... and also make a get request
@@ -89,15 +90,15 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill("k1", 30)
         self.assertEqual(callbacks, {"set", "get"})
 
-    def test_set_fail(self):
-        cache = DeferredCache("test")
+    def test_set_fail(self) -> None:
+        cache: DeferredCache[str, int] = DeferredCache("test")
         callbacks = set()
 
         # start with an entry, with a callback
         cache.prefill("k1", 10, callback=lambda: callbacks.add("prefill"))
 
         # now replace that entry with a pending result
-        origin_d = defer.Deferred()
+        origin_d: defer.Deferred = defer.Deferred()
         set_d = cache.set("k1", origin_d, callback=lambda: callbacks.add("set"))
 
         # ... and also make a get request
@@ -126,9 +127,9 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill("k1", 30)
         self.assertEqual(callbacks, {"prefill", "get2"})
 
-    def test_get_immediate(self):
-        cache = DeferredCache("test")
-        d1 = defer.Deferred()
+    def test_get_immediate(self) -> None:
+        cache: DeferredCache[str, int] = DeferredCache("test")
+        d1: "defer.Deferred[int]" = defer.Deferred()
         cache.set("key1", d1)
 
         # get_immediate should return default
@@ -142,27 +143,27 @@ class DeferredCacheTestCase(TestCase):
         v = cache.get_immediate("key1", 1)
         self.assertEqual(v, 2)
 
-    def test_invalidate(self):
-        cache = DeferredCache("test")
+    def test_invalidate(self) -> None:
+        cache: DeferredCache[Tuple[str], int] = DeferredCache("test")
         cache.prefill(("foo",), 123)
         cache.invalidate(("foo",))
 
         with self.assertRaises(KeyError):
             cache.get(("foo",))
 
-    def test_invalidate_all(self):
-        cache = DeferredCache("testcache")
+    def test_invalidate_all(self) -> None:
+        cache: DeferredCache[str, str] = DeferredCache("testcache")
 
         callback_record = [False, False]
 
-        def record_callback(idx):
+        def record_callback(idx: int) -> None:
             callback_record[idx] = True
 
         # add a couple of pending entries
-        d1 = defer.Deferred()
+        d1: "defer.Deferred[str]" = defer.Deferred()
         cache.set("key1", d1, partial(record_callback, 0))
 
-        d2 = defer.Deferred()
+        d2: "defer.Deferred[str]" = defer.Deferred()
         cache.set("key2", d2, partial(record_callback, 1))
 
         # lookup should return pending deferreds
@@ -193,8 +194,8 @@ class DeferredCacheTestCase(TestCase):
         with self.assertRaises(KeyError):
             cache.get("key1", None)
 
-    def test_eviction(self):
-        cache = DeferredCache(
+    def test_eviction(self) -> None:
+        cache: DeferredCache[int, str] = DeferredCache(
             "test", max_entries=2, apply_cache_factor_from_config=False
         )
 
@@ -208,8 +209,8 @@ class DeferredCacheTestCase(TestCase):
         cache.get(2)
         cache.get(3)
 
-    def test_eviction_lru(self):
-        cache = DeferredCache(
+    def test_eviction_lru(self) -> None:
+        cache: DeferredCache[int, str] = DeferredCache(
             "test", max_entries=2, apply_cache_factor_from_config=False
         )
 
@@ -227,8 +228,8 @@ class DeferredCacheTestCase(TestCase):
         cache.get(1)
         cache.get(3)
 
-    def test_eviction_iterable(self):
-        cache = DeferredCache(
+    def test_eviction_iterable(self) -> None:
+        cache: DeferredCache[int, List[str]] = DeferredCache(
             "test",
             max_entries=3,
             apply_cache_factor_from_config=False,

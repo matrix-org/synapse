@@ -27,9 +27,9 @@ from synapse.handlers.room import ShutdownRoomResponse
 from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.admin._base import assert_user_is_admin
-from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, Requester, StreamKeyType
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -448,6 +448,12 @@ class PaginationHandler:
 
         if pagin_config.from_token:
             from_token = pagin_config.from_token
+        elif pagin_config.direction == "f":
+            from_token = (
+                await self.hs.get_event_sources().get_start_token_for_pagination(
+                    room_id
+                )
+            )
         else:
             from_token = (
                 await self.hs.get_event_sources().get_current_token_for_pagination(

@@ -88,6 +88,98 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.74.0
+
+## Unicode support in user search
+
+This version introduces optional support for an [improved user search dealing with Unicode characters](https://github.com/matrix-org/synapse/pull/14464).
+
+If you want to take advantage of this feature you need to install PyICU,
+the ICU native dependency and its development headers
+so that PyICU can build since no prebuilt wheels are available.
+
+You can follow [the PyICU documentation](https://pypi.org/project/PyICU/) to do so,
+and then do `pip install matrix-synapse[icu]` for a PyPI install.
+
+Docker images and Debian packages need nothing specific as they already
+include or specify ICU as an explicit dependency.
+
+# Upgrading to v1.73.0
+
+## Legacy Prometheus metric names have now been removed
+
+Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.
+
+This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the `enable_legacy_metrics` configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.
+
+If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names)
+for more context.
+
+
+# Upgrading to v1.72.0
+
+## Dropping support for PostgreSQL 10
+
+In line with our [deprecation policy](deprecation_policy.md), we've dropped
+support for PostgreSQL 10, as it is no longer supported upstream.
+
+This release of Synapse requires PostgreSQL 11+.
+
+
+# Upgrading to v1.71.0
+
+## Removal of the `generate_short_term_login_token` module API method
+
+As announced with the release of [Synapse 1.69.0](#deprecation-of-the-generate_short_term_login_token-module-api-method), the deprecated `generate_short_term_login_token` module method has been removed.
+
+Modules relying on it can instead use the `create_login_token` method.
+
+
+## Changes to the events received by application services (interest)
+
+To align with spec (changed in
+[MSC3905](https://github.com/matrix-org/matrix-spec-proposals/pull/3905)), Synapse now
+only considers local users to be interesting. In other words, the `users` namespace
+regex is only be applied against local users of the homeserver.
+
+Please note, this probably doesn't affect the expected behavior of your application
+service, since an interesting local user in a room still means all messages in the room
+(from local or remote users) will still be considered interesting. And matching a room
+with the `rooms` or `aliases` namespace regex will still consider all events sent in the
+room to be interesting to the application service.
+
+If one of your application service's `users` regex was intending to match a remote user,
+this will no longer match as you expect. The behavioral mismatch between matching all
+local users and some remote users is why the spec was changed/clarified and this
+caveat is no longer supported.
+
+
+## Legacy Prometheus metric names are now disabled by default
+
+Synapse v1.71.0 disables legacy Prometheus metric names by default.
+For administrators that still rely on them and have not yet had chance to update their
+uses of the metrics, it's still possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and at that point,
+it will no longer be possible to re-enable them.
+
+If you do not use metrics or you have already updated your Grafana dashboard(s),
+Prometheus console(s) and alerting rule(s), there is no action needed.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names).
+
+
 # Upgrading to v1.69.0
 
 ## Changes to the receipts replication streams

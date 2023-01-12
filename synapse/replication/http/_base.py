@@ -153,7 +153,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         argument list.
 
         Returns:
-            dict: If POST/PUT request then dictionary must be JSON serialisable,
+            If POST/PUT request then dictionary must be JSON serialisable,
             otherwise must be appropriate for adding as query args.
         """
         return {}
@@ -184,8 +184,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         client = hs.get_simple_http_client()
         local_instance_name = hs.get_instance_name()
 
+        # The value of these option should match the replication listener settings
         master_host = hs.config.worker.worker_replication_host
         master_port = hs.config.worker.worker_replication_http_port
+        master_tls = hs.config.worker.worker_replication_http_tls
 
         instance_map = hs.config.worker.instance_map
 
@@ -205,9 +207,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 if instance_name == "master":
                     host = master_host
                     port = master_port
+                    tls = master_tls
                 elif instance_name in instance_map:
                     host = instance_map[instance_name].host
                     port = instance_map[instance_name].port
+                    tls = instance_map[instance_name].tls
                 else:
                     raise Exception(
                         "Instance %r not in 'instance_map' config" % (instance_name,)
@@ -238,7 +242,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
                     )
 
-                uri = "http://%s:%s/_synapse/replication/%s/%s" % (
+                # Here the protocol is hard coded to be http by default or https in case the replication
+                # port is set to have tls true.
+                scheme = "https" if tls else "http"
+                uri = "%s://%s:%s/_synapse/replication/%s/%s" % (
+                    scheme,
                     host,
                     port,
                     cls.NAME,
