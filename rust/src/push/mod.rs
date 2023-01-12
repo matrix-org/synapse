@@ -461,15 +461,7 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc3381_polls_enabled
-                    && (rule.rule_id == "global/override/.org.matrix.msc3930.rule.poll_response"
-                        || rule.rule_id
-                            == "global/underride/.org.matrix.msc3930.rule.poll_start_one_to_one"
-                        || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_start"
-                        || rule.rule_id
-                            == "global/underride/.org.matrix.msc3930.rule.poll_end_one_to_one"
-                        || rule.rule_id == "global/underride/.org.matrix.msc3930.rule.poll_end")
-                {
+                if !self.msc3381_polls_enabled && rule.rule_id.contains("org.matrix.msc3930") {
                     return false;
                 }
 
