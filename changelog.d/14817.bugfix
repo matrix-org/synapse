@@ -1,1 +1,0 @@
-Fix race where calling `/members` or `/state` with an `at` parameter could fail for newly created rooms, when using multiple workers.
