@@ -34,7 +34,7 @@ from prometheus_client.core import Counter
 from typing_extensions import ContextManager
 
 from twisted.internet import defer
-from twisted.internet.interfaces import IReactorFromThreads
+from twisted.internet.interfaces import IReactorTime
 
 from synapse.api.errors import LimitExceededError
 from synapse.config.ratelimiting import FederationRatelimitSettings
@@ -147,7 +147,7 @@ class FederationRateLimiter:
 
     def __init__(
         self,
-        reactor: IReactorFromThreads,
+        reactor: IReactorTime,
         clock: Clock,
         config: FederationRatelimitSettings,
         metrics_name: Optional[str] = None,
@@ -197,7 +197,7 @@ class FederationRateLimiter:
 class _PerHostRatelimiter:
     def __init__(
         self,
-        reactor: IReactorFromThreads,
+        reactor: IReactorTime,
         clock: Clock,
         config: FederationRatelimitSettings,
         metrics_name: Optional[str] = None,
@@ -388,4 +388,4 @@ class _PerHostRatelimiter:
             except KeyError:
                 pass
 
-        self.reactor.callFromThread(start_next_request)
+        self.reactor.callLater(0.0, start_next_request)
