@@ -4030,6 +4030,27 @@ worker_listeners:
       - names: [client, federation]
 ```
 ---
+### `worker_manhole`
+
+A worker may have a listener for [`manhole`](../../manhole.md).
+It allows server administrators to access a Python shell on the worker.
+
+Example configuration:
+```yaml
+worker_manhole: 9000
+```
+
+This is a short form for:
+```yaml
+worker_listeners:
+  - port: 9000
+    bind_addresses: ['127.0.0.1']
+    type: manhole
+```
+
+It needs also an additional [`manhole_settings`](#manhole_settings) configuration.
+
+---
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
