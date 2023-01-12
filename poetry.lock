@@ -1647,7 +1647,6 @@ lock-version = "1.1"
 python-versions = "^3.7.1"
 content-hash = "7f5a030863ac1c29aa6ebe369dc70c1bdfee742b935899c2555df26c94876b2c"
 
-
 [metadata.files]
 attrs = [
     {file = "attrs-22.1.0-py2.py3-none-any.whl", hash = "sha256:86efa402f67bf2df34f51a335487cf46b1ec130d02b8d39fd248abfd30da551c"},
