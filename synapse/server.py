@@ -221,8 +221,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    tls_server_context_factory: Optional[IOpenSSLContextFactory]
-
     def __init__(
         self,
         hostname: str,
@@ -257,6 +255,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
+
+        # This attribute is set by the free function `refresh_certificate`.
+        self.tls_server_context_factory: Optional[IOpenSSLContextFactory] = None
 
     def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
@@ -315,7 +316,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
-    def start_listening(self) -> None:
+    def start_listening(self) -> None:  # noqa: B027 (no-op by design)
         """Start the HTTP, manhole, metrics, etc listeners
 
         Does nothing in this base class; overridden in derived classes to start the
@@ -509,7 +510,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_device_handler(self):
+    def get_device_handler(self) -> DeviceWorkerHandler:
         if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:

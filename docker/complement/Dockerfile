@@ -7,8 +7,9 @@
 # https://github.com/matrix-org/synapse/blob/develop/docker/README-testing.md#testing-with-postgresql-and-single-or-multi-process-synapse
 
 ARG SYNAPSE_VERSION=latest
+ARG FROM=matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
-FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
+FROM $FROM
     # First of all, we copy postgres server from the official postgres image,
     # since for repeated rebuilds, this is much faster than apt installing
     # postgres each time.

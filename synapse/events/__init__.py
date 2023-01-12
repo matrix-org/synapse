@@ -597,8 +597,7 @@ def _event_type_from_format_version(
         format_version: The event format version
 
     Returns:
-        type: A type that can be initialized as per the initializer of
-        `FrozenEvent`
+        A type that can be initialized as per the initializer of `FrozenEvent`
     """
 
     if format_version == EventFormatVersions.ROOM_V1_V2:

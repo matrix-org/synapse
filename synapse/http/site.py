@@ -82,6 +82,7 @@ class SynapseRequest(Request):
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
+        self.experimental_cors_msc3886 = site.experimental_cors_msc3886
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
@@ -399,7 +400,7 @@ class SynapseRequest(Request):
         be sure to call finished_processing.
 
         Args:
-            servlet_name (str): the name of the servlet which will be
+            servlet_name: the name of the servlet which will be
                 processing this request. This is used in the metrics.
 
                 It is possible to update this afterwards by updating
@@ -621,6 +622,8 @@ class SynapseSite(Site):
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
         request_id_header = config.http_options.request_id_header
+
+        self.experimental_cors_msc3886 = config.http_options.experimental_cors_msc3886
 
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(

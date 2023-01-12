@@ -1,0 +1,1 @@
+Fix a long-standing bug where the user directory and room/user stats might be out of sync.

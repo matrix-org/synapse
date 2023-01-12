@@ -13,16 +13,19 @@
 # limitations under the License.
 from typing import Optional
 
+from twisted.internet.defer import Deferred
+
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import get_clock
+from tests.server import ThreadedMemoryReactorClock, get_clock
 from tests.unittest import TestCase
 from tests.utils import default_config
 
 
 class FederationRateLimiterTestCase(TestCase):
-    def test_ratelimit(self):
+    def test_ratelimit(self) -> None:
         """A simple test with the default values"""
         reactor, clock = get_clock()
         rc_config = build_rc_config()
@@ -32,7 +35,7 @@ class FederationRateLimiterTestCase(TestCase):
             # shouldn't block
             self.successResultOf(d1)
 
-    def test_concurrent_limit(self):
+    def test_concurrent_limit(self) -> None:
         """Test what happens when we hit the concurrent limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config({"rc_federation": {"concurrent": 2}})
@@ -56,7 +59,7 @@ class FederationRateLimiterTestCase(TestCase):
             cm2.__exit__(None, None, None)
             self.successResultOf(d3)
 
-    def test_sleep_limit(self):
+    def test_sleep_limit(self) -> None:
         """Test what happens when we hit the sleep limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config(
@@ -79,7 +82,7 @@ class FederationRateLimiterTestCase(TestCase):
             self.assertAlmostEqual(sleep_time, 500, places=3)
 
 
-def _await_resolution(reactor, d):
+def _await_resolution(reactor: ThreadedMemoryReactorClock, d: Deferred) -> float:
     """advance the clock until the deferred completes.
 
     Returns the number of milliseconds it took to complete.
@@ -90,7 +93,7 @@ def _await_resolution(reactor, d):
     return (reactor.seconds() - start_time) * 1000
 
 
-def build_rc_config(settings: Optional[dict] = None):
+def build_rc_config(settings: Optional[dict] = None) -> FederationRatelimitSettings:
     config_dict = default_config("test")
     config_dict.update(settings or {})
     config = HomeServerConfig()

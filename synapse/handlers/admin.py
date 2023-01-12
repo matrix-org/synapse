@@ -100,6 +100,7 @@ class AdminHandler:
         user_info_dict["avatar_url"] = profile.avatar_url
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
+        user_info_dict["erased"] = await self.store.is_user_erased(user.to_string())
 
         return user_info_dict
 

@@ -74,6 +74,36 @@ body:
         - Debian packages from packages.matrix.org
         - pip (from PyPI)
         - Other (please mention below)
+        - I don't know
+    validations:
+      required: true
+  - type: input
+    id: database
+    attributes:
+      label: Database
+      description: |
+        Are you using SQLite or PostgreSQL? What's the version of your database?
+
+        If PostgreSQL, please also answer the following:
+         - are you using a single PostgreSQL server
+        or [separate servers for `main` and `state`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#databases)?
+         - have you previously ported from SQLite using the Synapse "portdb" script?
+         - have you previously restored from a backup?
+    validations:
+      required: true
+  - type: dropdown
+    id: workers
+    attributes:
+      label: Workers
+      description: |
+        Are you running a single Synapse process, or are you running
+        [2 or more workers](https://matrix-org.github.io/synapse/latest/workers.html)?
+      options:
+        - Single process
+        - Multiple workers
+        - I don't know
+    validations:
+      required: true
   - type: textarea
     id: platform
     attributes:
@@ -84,16 +114,27 @@ body:
     validations:
       required: true
   - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: |
+        Do you have any unusual config options turned on? If so, please provide details.
+
+        - Experimental or undocumented features
+        - [Presence](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#presence)
+        - [Message retention](https://matrix-org.github.io/synapse/latest/message_retention_policies.html)
+        - [Synapse modules](https://matrix-org.github.io/synapse/latest/modules/index.html)
+  - type: textarea
     id: logs
     attributes:
       label: Relevant log output
       description: |
         Please copy and paste any relevant log output, ideally at INFO or DEBUG log level.
-        This will be automatically formatted into code, so there is no need for backticks.
+        This will be automatically formatted into code, so there is no need for backticks (`\``).
 
         Please be careful to remove any personal or private data.
 
-        **Bug reports are usually very difficult to diagnose without logging.**
+        **Bug reports are usually impossible to diagnose without logging.**
       render: shell
     validations:
       required: true

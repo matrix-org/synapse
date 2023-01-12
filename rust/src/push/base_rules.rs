@@ -25,6 +25,7 @@ use crate::push::Action;
 use crate::push::Condition;
 use crate::push::EventMatchCondition;
 use crate::push::PushRule;
+use crate::push::RelatedEventMatchCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 
@@ -111,6 +112,22 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
             },
         ))]),
         actions: Cow::Borrowed(&[Action::DontNotify]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.im.nheko.msc3664.reply"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatch(
+            RelatedEventMatchCondition {
+                key: Some(Cow::Borrowed("sender")),
+                pattern: None,
+                pattern_type: Some(Cow::Borrowed("user_id")),
+                rel_type: Cow::Borrowed("m.in_reply_to"),
+                include_fallbacks: None,
+            },
+        ))]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
         default: true,
         default_enabled: true,
     },
@@ -258,6 +275,156 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
+        rule_id: Cow::Borrowed(
+            "global/underride/.org.matrix.msc3933.rule.extensible.encrypted_room_one_to_one",
+        ),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("org.matrix.msc1767.encrypted")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed(
+            "global/underride/.org.matrix.msc3933.rule.extensible.message.room_one_to_one",
+        ),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("org.matrix.msc1767.message")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed(
+            "global/underride/.org.matrix.msc3933.rule.extensible.file.room_one_to_one",
+        ),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("org.matrix.msc1767.file")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed(
+            "global/underride/.org.matrix.msc3933.rule.extensible.image.room_one_to_one",
+        ),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("org.matrix.msc1767.image")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed(
+            "global/underride/.org.matrix.msc3933.rule.extensible.video.room_one_to_one",
+        ),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("org.matrix.msc1767.video")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed(
+            "global/underride/.org.matrix.msc3933.rule.extensible.audio.room_one_to_one",
+        ),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("org.matrix.msc1767.audio")),
+                pattern_type: None,
+            })),
+            Condition::Known(KnownCondition::RoomMemberCount {
+                is: Some(Cow::Borrowed("2")),
+            }),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, SOUND_ACTION, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
         rule_id: Cow::Borrowed("global/underride/.m.rule.message"),
         priority_class: 1,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
@@ -281,6 +448,126 @@ pub const BASE_APPEND_UNDERRIDE_RULES: &[PushRule] = &[
                 pattern_type: None,
             },
         ))]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc1767.rule.extensible.encrypted"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("m.encrypted")),
+                pattern_type: None,
+            })),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc1767.rule.extensible.message"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("m.message")),
+                pattern_type: None,
+            })),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc1767.rule.extensible.file"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("m.file")),
+                pattern_type: None,
+            })),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc1767.rule.extensible.image"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("m.image")),
+                pattern_type: None,
+            })),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc1767.rule.extensible.video"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("m.video")),
+                pattern_type: None,
+            })),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed("global/underride/.org.matrix.msc1767.rule.extensible.audio"),
+        priority_class: 1,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
+                key: Cow::Borrowed("type"),
+                // MSC3933: Type changed from template rule - see MSC.
+                pattern: Some(Cow::Borrowed("m.audio")),
+                pattern_type: None,
+            })),
+            // MSC3933: Add condition on top of template rule - see MSC.
+            Condition::Known(KnownCondition::RoomVersionSupports {
+                // RoomVersionFeatures::ExtensibleEvents.as_str(), ideally
+                feature: Cow::Borrowed("org.matrix.msc3932.extensible_events"),
+            }),
+        ]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION]),
         default: true,
         default_enabled: true,

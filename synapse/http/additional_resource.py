@@ -45,8 +45,7 @@ class AdditionalResource(DirectServeJsonResource):
 
         Args:
             hs: homeserver
-            handler ((twisted.web.server.Request) -> twisted.internet.defer.Deferred):
-                function to be called to handle the request.
+            handler: function to be called to handle the request.
         """
         super().__init__()
         self._handler = handler

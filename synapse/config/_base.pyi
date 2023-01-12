@@ -33,6 +33,7 @@ from synapse.config import (
     experimental,
     federation,
     jwt,
+    login,
     key,
     logger,
     metrics,
@@ -99,6 +100,7 @@ class RootConfig:
     sso: sso.SSOConfig
     oidc: oidc.OIDCConfig
     jwt: jwt.JWTConfig
+    login: login.LoginConfig
     auth: auth.AuthConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig

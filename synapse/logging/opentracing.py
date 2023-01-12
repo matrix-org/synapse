@@ -292,8 +292,15 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseTags:
-    # The message ID of any to_device message processed
-    TO_DEVICE_MESSAGE_ID = "to_device.message_id"
+    # The message ID of any to_device EDU processed
+    TO_DEVICE_EDU_ID = "to_device.edu_id"
+
+    # Details about to-device messages
+    TO_DEVICE_TYPE = "to_device.type"
+    TO_DEVICE_SENDER = "to_device.sender"
+    TO_DEVICE_RECIPIENT = "to_device.recipient"
+    TO_DEVICE_RECIPIENT_DEVICE = "to_device.recipient_device"
+    TO_DEVICE_MSGID = "to_device.msgid"  # client-generated ID
 
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
@@ -721,7 +728,7 @@ def inject_header_dict(
         destination: address of entity receiving the span context. Must be given unless
             check_destination is False. The context will only be injected if the
             destination matches the opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
+        check_destination: If false, destination will be ignored and the context
             will always be injected.
 
     Note:
@@ -780,7 +787,7 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
         destination: the name of the remote server.
 
     Returns:
-        dict: the active span's context if opentracing is enabled, otherwise empty.
+        the active span's context if opentracing is enabled, otherwise empty.
     """
 
     if destination and not whitelisted_homeserver(destination):
