@@ -29,6 +29,18 @@ if TYPE_CHECKING:
 
 
 class UnpersistedEventContextBase(ABC):
+    """
+    This is a base class for EventContext and UnpersistedEventContext, objects which
+    hold information relevant to storing an associated event. Note that an
+    UnpersistedEventContexts must be converted into an EventContext before it is
+    suitable to send to the db with its associated event.
+
+    Attributes:
+        _storage: storage controllers for interfacing with the database
+        app_service: If the associated event is being sent by a (local) application service, that
+            app service.
+    """
+
     def __init__(self, storage_controller: "StorageControllers"):
         self._storage: "StorageControllers" = storage_controller
         self.app_service: Optional[ApplicationService] = None
@@ -38,12 +50,24 @@ class UnpersistedEventContextBase(ABC):
         self,
         event: EventBase,
     ) -> "EventContext":
+        """
+        A method to convert an UnpersistedEventContext to an EventContext, suitable for
+        sending to the database with the associated event.
+        """
         pass
 
     @abstractmethod
     async def get_prev_state_ids(
         self, state_filter: Optional["StateFilter"] = None
     ) -> StateMap[str]:
+        """
+        Gets the room state at the event (ie not including the event if the event is a
+        state event).
+
+        Args:
+            state_filter: specifies the type of state event to fetch from DB, example:
+            EventTypes.JoinRules
+        """
         pass
 
 
@@ -97,9 +121,6 @@ class EventContext(UnpersistedEventContextBase):
 
         delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
             and ``state_group``.
-
-        app_service: If this event is being sent by a (local) application service, that
-            app service.
 
         partial_state: if True, we may be storing this event with a temporary,
             incomplete state.
@@ -277,116 +298,7 @@ class EventContext(UnpersistedEventContextBase):
             self.state_group_before_event, state_filter
         )
 
-
-class UnpersistedEventContextForBatched(UnpersistedEventContextBase):
-    """
-    This is a version of an EventContext before the new state group (if any) has been
-    computed and stored. It contains information about the state before the event (which
-    also may be the information after the event, if the event is not a state event). The
-    UnpersistedEventContext must be converted into an EventContext by calling the method
-    'persist' on it before it is suitable to be sent to the DB for processing.
-
-        state_group_before_event:
-            the state group at/before the event. This is required if `for_batch` is True.
-
-        state_group:
-             this will always be None until it is persisted
-
-        state_group_before_event: The ID of the state group representing the state
-         of the room before this event.
-
-        state_delta_due_to_event: If the event is a state event, then this is the
-         delta of the state between `state_group` and `state_group_before_event`
-
-        prev_group: If it is known, ``state_group``'s prev_group.
-
-             If the event is a state event, this is normally the same as
-             ``state_group_before_event``.
-
-         delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
-             and ``state_group``.
-
-         state_map: A map of the current state of the room
-    """
-
-    def __init__(
-        self,
-        storage_controller: "StorageControllers",
-        state_group: Optional[int],
-        state_delta_due_to_event: dict,
-        prev_group: Optional[int],
-        delta_ids: Optional[StateMap[str]],
-        partial_state: bool,
-        state_map: StateMap[str],
-        state_group_before_event: int,
-    ) -> None:
-        super().__init__(storage_controller)
-        self.state_group = state_group
-        self.state_delta_due_to_event = state_delta_due_to_event
-        self.prev_group = prev_group
-        self.delta_ids = delta_ids
-        self.partial_state = partial_state
-        self.state_map = state_map
-        self.state_group_before_event = state_group_before_event
-
-    async def get_prev_state_ids(
-        self, state_filter: Optional["StateFilter"] = None
-    ) -> StateMap[str]:
-        """
-        Gets the room state map, excluding this event.
-
-        Args:
-            state_filter: specifies the type of state event to fetch from DB, example: EventTypes.JoinRules
-
-        Returns:
-            Maps a (type, state_key) to the event ID of the state event matching
-            this tuple.
-        """
-        return self.state_map
-
-    async def persist(self, event: EventBase) -> EventContext:
-        """
-        If the event is a state event, calculates the current state group for the context,
-        stores it, and returns a EventContext. If the event is not state, returns
-        an EventContext.
-
-        Args:
-             event: event that the EventContext is associated with.
-
-        Returns: An EventContext suitable for sending to the database with the event
-        for persisting
-        """
-        assert self.partial_state is not None
-        if not event.is_state():
-            return EventContext.with_state(
-                storage=self._storage,
-                state_group=self.state_group_before_event,
-                state_group_before_event=self.state_group_before_event,
-                state_delta_due_to_event=self.state_delta_due_to_event,
-                partial_state=self.partial_state,
-                prev_group=self.prev_group,
-                delta_ids=self.delta_ids,
-            )
-        else:
-            state_group_after_event = await self._storage.state.store_state_group(
-                event.event_id,
-                event.room_id,
-                prev_group=self.prev_group,
-                delta_ids=self.delta_ids,
-                current_state_ids=None,
-            )
-
-            return EventContext.with_state(
-                storage=self._storage,
-                state_group=state_group_after_event,
-                state_group_before_event=self.state_group_before_event,
-                state_delta_due_to_event=self.state_delta_due_to_event,
-                partial_state=self.partial_state,
-                prev_group=self.prev_group,
-                delta_ids=self.delta_ids,
-            )
-
-
+@attr.s(slots=True, auto_attribs=True)
 class UnpersistedEventContext(UnpersistedEventContextBase):
     """
     This is a version of an EventContext before the new state group (if any) has been
@@ -415,25 +327,18 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
              and ``state_group``.
 
          partial_state: Whether the event has partial state.
+
+        state_map: A map of the state before the event, i.e. the state at `state_group_before_event`
     """
 
-    def __init__(
-        self,
-        storage_controller: "StorageControllers",
-        state_group_before_event: Optional[int],
-        state_group: Optional[int],
-        state_delta_due_to_event: Optional[dict],
-        prev_group: Optional[int],
-        delta_ids: Optional[StateMap[str]],
-        partial_state: Optional[bool],
-    ):
-        super().__init__(storage_controller)
-        self.state_group_before_event = state_group_before_event
-        self.state_group = state_group
-        self.state_delta_due_to_event = state_delta_due_to_event
-        self.prev_group = prev_group
-        self.delta_ids = delta_ids
-        self.partial_state = partial_state
+    _storage: "StorageControllers"
+    state_group_before_event: Optional[int]
+    state_group: Optional[int]
+    state_delta_due_to_event: Optional[dict]
+    prev_group: Optional[int]
+    delta_ids: Optional[StateMap[str]]
+    partial_state: Optional[bool]
+    state_map: Optional[StateMap[str]] = None
 
     async def get_prev_state_ids(
         self, state_filter: Optional["StateFilter"] = None
@@ -442,12 +347,14 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         Gets the room state map, excluding this event.
 
         Args:
-            state_filter: specifies the type of state event to fetch from DB, example: EventTypes.JoinRules
+            state_filter: specifies the type of state event to fetch from DB
 
         Returns:
             Maps a (type, state_key) to the event ID of the state event matching
             this tuple.
         """
+        if self.state_map:
+            return self.state_map
 
         assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
@@ -456,9 +363,8 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
     async def persist(self, event: EventBase) -> EventContext:
         """
-        If the event is a state event, calculates the current state group for the context,
-        stores it, and returns a EventContext. If the event is not state, returns
-        an EventContext.
+        Creates a full `EventContext` for the event, persisting any referenced state that
+        has not yet been persisted.
 
         Args:
              event: event that the EventContext is associated with.
@@ -467,6 +373,19 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         for persisting
         """
         assert self.partial_state is not None
+        # If we have a full set of state for at/before the event but don't have a state
+        # group for that state, we need to get one
+        if self.state_map:
+            if self.state_group_before_event is None:
+                state_group_before_event = await self._storage.state.store_state_group(
+                    event.event_id,
+                    event.room_id,
+                    prev_group=None,
+                    delta_ids=None,
+                    current_state_ids=self.state_map,
+                )
+                self.state_group_before_event = state_group_before_event
+                self.prev_group = state_group_before_event
         if not event.is_state():
             return EventContext.with_state(
                 storage=self._storage,
@@ -478,13 +397,24 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                 delta_ids=self.delta_ids,
             )
         else:
-            state_group_after_event = await self._storage.state.store_state_group(
-                event.event_id,
-                event.room_id,
-                prev_group=self.prev_group,
-                delta_ids=self.delta_ids,
-                current_state_ids=None,
-            )
+            if not self.prev_group and not self.delta_ids:
+                # if we don't have a prev_group and the delta from the prev_group we need
+                # to store the state group with the full state
+                state_group_after_event = await self._storage.state.store_state_group(
+                    event.event_id,
+                    event.room_id,
+                    prev_group=self.prev_group,
+                    delta_ids=self.delta_ids,
+                    current_state_ids=self.state_map,
+                )
+            else:
+                state_group_after_event = await self._storage.state.store_state_group(
+                    event.event_id,
+                    event.room_id,
+                    prev_group=self.prev_group,
+                    delta_ids=self.delta_ids,
+                    current_state_ids=None,
+                )
 
             return EventContext.with_state(
                 storage=self._storage,
