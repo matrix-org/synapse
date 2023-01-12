@@ -207,6 +207,9 @@ class HttpListenerConfig:
     additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
     request_id_header: Optional[str] = None
+    # If true, the listener will return CORS response headers compatible with MSC3886:
+    # https://github.com/matrix-org/matrix-spec-proposals/pull/3886
+    experimental_cors_msc3886: bool = False
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -254,8 +257,6 @@ class ServerConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
-        self.amax_rpc_url = config["amax_rpc_url"]
-        self.wallet_sigin_message = config["wallet_sigin_message"]
 
         try:
             parse_and_validate_server_name(self.server_name)
@@ -798,13 +799,6 @@ class ServerConfig(Config):
         return (
             """\
         server_name: "%(server_name)s"
-        
-        amax_rpc_url: https://testnode.amaxscan.io/
-        
-        wallet_sigin_message: "Welcome to amax-synapse!"
-
-        # When running as a daemon, the file to store the pid in
-        #
         pid_file: %(pid_file)s
         listeners:
           %(secure_http_bindings)s
@@ -944,6 +938,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
             request_id_header=listener.get("request_id_header"),
+            experimental_cors_msc3886=listener.get("experimental_cors_msc3886", False),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)

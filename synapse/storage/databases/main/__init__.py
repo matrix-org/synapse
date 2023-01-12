@@ -26,9 +26,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
-from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -138,40 +136,7 @@ class DataStore(
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        self._device_list_id_gen = StreamIdGenerator(
-            db_conn,
-            "device_lists_stream",
-            "stream_id",
-            extra_tables=[
-                ("user_signature_stream", "stream_id"),
-                ("device_lists_outbound_pokes", "stream_id"),
-                ("device_lists_changes_in_room", "stream_id"),
-            ],
-        )
-
         super().__init__(database, db_conn, hs)
-
-        events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "current_state_delta_stream",
-            entity_column="room_id",
-            stream_column="stream_id",
-            max_value=events_max,  # As we share the stream id with events token
-            limit=1000,
-        )
-        self._curr_state_delta_stream_cache = StreamChangeCache(
-            "_curr_state_delta_stream_cache",
-            min_curr_state_delta_id,
-            prefilled_cache=curr_state_delta_prefill,
-        )
-
-        self._stream_order_on_start = self.get_room_max_stream_ordering()
-        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
-
-    def get_device_stream_token(self) -> int:
-        # TODO: shouldn't this be moved to `DeviceWorkerStore`?
-        return self._device_list_id_gen.get_current_token()
 
     async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
@@ -201,7 +166,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-        order_by: str = UserSortOrder.USER_ID.value,
+        order_by: str = UserSortOrder.NAME.value,
         direction: str = "f",
         approved: bool = True,
     ) -> Tuple[List[JsonDict], int]:
@@ -261,6 +226,7 @@ class DataStore(
             sql_base = f"""
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                LEFT JOIN erased_users AS eu ON u.name = eu.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -269,7 +235,8 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
+                eu.user_id is not null as erased
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
@@ -277,6 +244,13 @@ class DataStore(
             args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)
+
+            # some of those boolean values are returned as integers when we're on SQLite
+            columns_to_boolify = ["erased"]
+            for user in users:
+                for column in columns_to_boolify:
+                    user[column] = bool(user[column])
+
             return users, count
 
         return await self.db_pool.runInteraction(

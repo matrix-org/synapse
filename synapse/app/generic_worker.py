@@ -14,21 +14,19 @@
 # limitations under the License.
 import logging
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
-from twisted.internet import address
 from twisted.web.resource import Resource
 
 import synapse
 import synapse.events
-from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
     MEDIA_V3_PREFIX,
-    SERVER_KEY_V2_PREFIX,
+    SERVER_KEY_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
@@ -43,53 +41,13 @@ from synapse.config.logger import setup_logging
 from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.slave.storage.devices import SlavedDeviceStore
-from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.replication.slave.storage.filtering import SlavedFilteringStore
-from synapse.replication.slave.storage.keys import SlavedKeyStore
-from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
-from synapse.replication.slave.storage.pushers import SlavedPusherStore
+from synapse.rest import ClientRestResource
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client import (
-    account_data,
-    events,
-    initial_sync,
-    login,
-    presence,
-    profile,
-    push_rule,
-    read_marker,
-    receipts,
-    relations,
-    room,
-    room_batch,
-    room_keys,
-    sendtodevice,
-    sync,
-    tags,
-    user_directory,
-    versions,
-    voip,
-)
-from synapse.rest.client._base import client_patterns
-from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
-from synapse.rest.client.devices import DevicesRestServlet
-from synapse.rest.client.keys import (
-    KeyChangesServlet,
-    KeyQueryServlet,
-    OneTimeKeyServlet,
-)
-from synapse.rest.client.register import (
-    RegisterRestServlet,
-    RegistrationTokenValidityRestServlet,
-)
 from synapse.rest.health import HealthResource
-from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
@@ -101,8 +59,16 @@ from synapse.storage.databases.main.appservice import (
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
+from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.directory import DirectoryWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
+from synapse.storage.databases.main.event_push_actions import (
+    EventPushActionsWorkerStore,
+)
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.keys import KeyStore
 from synapse.storage.databases.main.lock import LockStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
@@ -111,116 +77,29 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
+from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.room_batch import RoomBatchStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
+from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
-from synapse.types import JsonDict
+from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.httpresourcetree import create_resource_tree
 
 logger = logging.getLogger("synapse.app.generic_worker")
-
-
-class KeyUploadServlet(RestServlet):
-    """An implementation of the `KeyUploadServlet` that responds to read only
-    requests, but otherwise proxies through to the master instance.
-    """
-
-    PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
-
-    def __init__(self, hs: HomeServer):
-        """
-        Args:
-            hs: server
-        """
-        super().__init__()
-        self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
-        self.http_client = hs.get_simple_http_client()
-        self.main_uri = hs.config.worker.worker_main_http_uri
-
-    async def on_POST(
-        self, request: SynapseRequest, device_id: Optional[str]
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        user_id = requester.user.to_string()
-        body = parse_json_object_from_request(request)
-
-        if device_id is not None:
-            # passing the device_id here is deprecated; however, we allow it
-            # for now for compatibility with older clients.
-            if requester.device_id is not None and device_id != requester.device_id:
-                logger.warning(
-                    "Client uploading keys for a different device "
-                    "(logged in as %s, uploading for %s)",
-                    requester.device_id,
-                    device_id,
-                )
-        else:
-            device_id = requester.device_id
-
-        if device_id is None:
-            raise SynapseError(
-                400, "To upload keys, you must pass device_id when authenticating"
-            )
-
-        if body:
-            # They're actually trying to upload something, proxy to main synapse.
-
-            # Proxy headers from the original request, such as the auth headers
-            # (in case the access token is there) and the original IP /
-            # User-Agent of the request.
-            headers = {
-                header: request.requestHeaders.getRawHeaders(header, [])
-                for header in (b"Authorization", b"User-Agent")
-            }
-            # Add the previous hop to the X-Forwarded-For header.
-            x_forwarded_for = request.requestHeaders.getRawHeaders(
-                b"X-Forwarded-For", []
-            )
-            # we use request.client here, since we want the previous hop, not the
-            # original client (as returned by request.getClientAddress()).
-            if isinstance(request.client, (address.IPv4Address, address.IPv6Address)):
-                previous_host = request.client.host.encode("ascii")
-                # If the header exists, add to the comma-separated list of the first
-                # instance of the header. Otherwise, generate a new header.
-                if x_forwarded_for:
-                    x_forwarded_for = [x_forwarded_for[0] + b", " + previous_host]
-                    x_forwarded_for.extend(x_forwarded_for[1:])
-                else:
-                    x_forwarded_for = [previous_host]
-            headers[b"X-Forwarded-For"] = x_forwarded_for
-
-            # Replicate the original X-Forwarded-Proto header. Note that
-            # XForwardedForRequest overrides isSecure() to give us the original protocol
-            # used by the client, as opposed to the protocol used by our upstream proxy
-            # - which is what we want here.
-            headers[b"X-Forwarded-Proto"] = [
-                b"https" if request.isSecure() else b"http"
-            ]
-
-            try:
-                result = await self.http_client.post_json_get_json(
-                    self.main_uri + request.uri.decode("ascii"), body, headers=headers
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error() from e
-            except RequestSendFailed as e:
-                raise SynapseError(502, "Failed to talk to master") from e
-
-            return 200, result
-        else:
-            # Just interested in counts.
-            result = await self.store.count_e2e_one_time_keys(user_id, device_id)
-            return 200, {"one_time_key_counts": result}
 
 
 class GenericWorkerSlavedStore(
@@ -232,26 +111,36 @@ class GenericWorkerSlavedStore(
     EndToEndRoomKeyStore,
     PresenceStore,
     DeviceInboxWorkerStore,
-    SlavedDeviceStore,
-    SlavedPushRuleStore,
+    DeviceWorkerStore,
     TagsWorkerStore,
     AccountDataWorkerStore,
-    SlavedPusherStore,
     CensorEventsStore,
     ClientIpWorkerStore,
-    SlavedEventStore,
-    SlavedKeyStore,
+    # KeyStore isn't really safe to use from a worker, but for now we do so and hope that
+    # the races it creates aren't too bad.
+    KeyStore,
     RoomWorkerStore,
     RoomBatchStore,
     DirectoryWorkerStore,
+    PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
     ProfileWorkerStore,
-    SlavedFilteringStore,
+    FilteringWorkerStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
     ServerMetricsStore,
+    PusherWorkerStore,
+    RoomMemberWorkerStore,
+    RelationsWorkerStore,
+    EventFederationWorkerStore,
+    EventPushActionsWorkerStore,
+    StateGroupWorkerStore,
+    SignatureWorkerStore,
+    UserErasureWorkerStore,
     ReceiptsWorkerStore,
+    StreamWorkerStore,
+    EventsWorkerStore,
     RegistrationWorkerStore,
     SearchStore,
     TransactionWorkerStore,
@@ -268,14 +157,8 @@ class GenericWorkerServer(HomeServer):
     DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
 
     def _listen_http(self, listener_config: ListenerConfig) -> None:
-        port = listener_config.port
-        bind_addresses = listener_config.bind_addresses
 
         assert listener_config.http_options is not None
-
-        site_tag = listener_config.http_options.tag
-        if site_tag is None:
-            site_tag = str(port)
 
         # We always include a health resource.
         resources: Dict[str, Resource] = {"/health": HealthResource()}
@@ -285,53 +168,15 @@ class GenericWorkerServer(HomeServer):
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "client":
-                    resource = JsonResource(self, canonical_json=False)
+                    resource: Resource = ClientRestResource(self)
 
-                    RegisterRestServlet(self).register(resource)
-                    RegistrationTokenValidityRestServlet(self).register(resource)
-                    login.register_servlets(self, resource)
-                    ThreepidRestServlet(self).register(resource)
-                    WhoamiRestServlet(self).register(resource)
-                    DevicesRestServlet(self).register(resource)
-
-                    # Read-only
-                    KeyUploadServlet(self).register(resource)
-                    KeyQueryServlet(self).register(resource)
-                    KeyChangesServlet(self).register(resource)
-                    OneTimeKeyServlet(self).register(resource)
-
-                    voip.register_servlets(self, resource)
-                    push_rule.register_servlets(self, resource)
-                    versions.register_servlets(self, resource)
-
-                    profile.register_servlets(self, resource)
-
-                    sync.register_servlets(self, resource)
-                    events.register_servlets(self, resource)
-                    room.register_servlets(self, resource, is_worker=True)
-                    relations.register_servlets(self, resource)
-                    room.register_deprecated_servlets(self, resource)
-                    initial_sync.register_servlets(self, resource)
-                    room_batch.register_servlets(self, resource)
-                    room_keys.register_servlets(self, resource)
-                    tags.register_servlets(self, resource)
-                    account_data.register_servlets(self, resource)
-                    receipts.register_servlets(self, resource)
-                    read_marker.register_servlets(self, resource)
-
-                    sendtodevice.register_servlets(self, resource)
-
-                    user_directory.register_servlets(self, resource)
-
-                    presence.register_servlets(self, resource)
-
-                    resources.update({CLIENT_API_PREFIX: resource})
+                    resources[CLIENT_API_PREFIX] = resource
 
                     resources.update(build_synapse_client_resource_tree(self))
-                    resources.update({"/.well-known": well_known_resource(self)})
+                    resources["/.well-known"] = well_known_resource(self)
 
                 elif name == "federation":
-                    resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(self)
                 elif name == "media":
                     if self.config.media.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
@@ -359,16 +204,12 @@ class GenericWorkerServer(HomeServer):
                     # Only load the openid resource separately if federation resource
                     # is not specified since federation resource includes openid
                     # resource.
-                    resources.update(
-                        {
-                            FEDERATION_PREFIX: TransportLayerServer(
-                                self, servlet_groups=["openid"]
-                            )
-                        }
+                    resources[FEDERATION_PREFIX] = TransportLayerServer(
+                        self, servlet_groups=["openid"]
                     )
 
                 if name in ["keys", "federation"]:
-                    resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
+                    resources[SERVER_KEY_PREFIX] = KeyResource(self)
 
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
@@ -379,22 +220,14 @@ class GenericWorkerServer(HomeServer):
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
-        _base.listen_tcp(
-            bind_addresses,
-            port,
-            SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
-                site_tag,
-                listener_config,
-                root_resource,
-                self.version_string,
-                max_request_body_size=max_request_body_size(self.config),
-                reactor=self.get_reactor(),
-            ),
+        _base.listen_http(
+            listener_config,
+            root_resource,
+            self.version_string,
+            max_request_body_size(self.config),
+            self.tls_server_context_factory,
             reactor=self.get_reactor(),
         )
-
-        logger.info("Synapse worker now listening on port %d", port)
 
     def start_listening(self) -> None:
         for listener in self.config.worker.worker_listeners:
@@ -417,7 +250,6 @@ class GenericWorkerServer(HomeServer):
                     _base.listen_metrics(
                         listener.bind_addresses,
                         listener.port,
-                        enable_legacy_metric_names=self.config.metrics.enable_legacy_metrics,
                     )
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)

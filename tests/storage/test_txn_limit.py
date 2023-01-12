@@ -12,21 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
+from synapse.storage.types import Cursor
+from synapse.util import Clock
+
 from tests import unittest
 
 
 class SQLTransactionLimitTestCase(unittest.HomeserverTestCase):
     """Test SQL transaction limit doesn't break transactions."""
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(db_txn_limit=1000)
 
-    def test_config(self):
+    def test_config(self) -> None:
         db_config = self.hs.config.database.get_single_database()
         self.assertEqual(db_config.config["txn_limit"], 1000)
 
-    def test_select(self):
-        def do_select(txn):
+    def test_select(self) -> None:
+        def do_select(txn: Cursor) -> None:
             txn.execute("SELECT 1")
 
         db_pool = self.hs.get_datastores().databases[0]

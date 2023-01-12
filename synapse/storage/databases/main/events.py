@@ -355,9 +355,9 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         *,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
-        inhibit_local_membership_updates: bool = False,
-        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
-        new_forward_extremities: Optional[Dict[str, Set[str]]] = None,
+        inhibit_local_membership_updates: bool,
+        state_delta_for_room: Dict[str, DeltaState],
+        new_forward_extremities: Dict[str, Set[str]],
     ) -> None:
         """Insert some number of room events into the necessary database tables.
 
@@ -384,9 +384,6 @@ class PersistEventsStore:
             PartialStateConflictError: if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
-        state_delta_for_room = state_delta_for_room or {}
-        new_forward_extremities = new_forward_extremities or {}
-
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
@@ -1282,9 +1279,10 @@ class PersistEventsStore:
         Pick the earliest non-outlier if there is one, else the earliest one.
 
         Args:
-            events_and_contexts (list[(EventBase, EventContext)]):
+            events_and_contexts:
+
         Returns:
-            list[(EventBase, EventContext)]: filtered list
+            filtered list
         """
         new_events_and_contexts: OrderedDict[
             str, Tuple[EventBase, EventContext]
@@ -1310,9 +1308,8 @@ class PersistEventsStore:
         """Update min_depth for each room
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
+            txn: db connection
+            events_and_contexts: events we are persisting
         """
         depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
@@ -1583,13 +1580,11 @@ class PersistEventsStore:
         """Update all the miscellaneous tables for new events
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
-            all_events_and_contexts (list[(EventBase, EventContext)]): all
-                events that we were going to persist. This includes events
-                we've already persisted, etc, that wouldn't appear in
-                events_and_context.
+            txn: db connection
+            events_and_contexts: events we are persisting
+            all_events_and_contexts: all events that we were going to persist.
+                This includes events we've already persisted, etc, that wouldn't
+                appear in events_and_context.
             inhibit_local_membership_updates: Stop the local_current_membership
                 from being updated by these events. This should be set to True
                 for backfilled events because backfilled events in the past do
@@ -2028,25 +2023,41 @@ class PersistEventsStore:
             redacted_event_id: The event that was redacted.
         """
 
-        # Fetch the current relation of the event being redacted.
-        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
+        # Fetch the relation of the event being redacted.
+        row = self.db_pool.simple_select_one_txn(
             txn,
             table="event_relations",
             keyvalues={"event_id": redacted_event_id},
-            retcol="relates_to_id",
+            retcols=("relates_to_id", "relation_type"),
             allow_none=True,
         )
+        # Nothing to do if no relation is found.
+        if row is None:
+            return
+
+        redacted_relates_to = row["relates_to_id"]
+        rel_type = row["relation_type"]
+        self.db_pool.simple_delete_txn(
+            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
+        )
+
         # Any relation information for the related event must be cleared.
-        if redacted_relates_to is not None:
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_relations_for_event, (redacted_relates_to,)
-            )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_relations_for_event, (redacted_relates_to,)
+        )
+        if rel_type == RelationTypes.ANNOTATION:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
             )
+        if rel_type == RelationTypes.REFERENCE:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_references_for_event, (redacted_relates_to,)
+            )
+        if rel_type == RelationTypes.REPLACE:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_applicable_edit, (redacted_relates_to,)
             )
+        if rel_type == RelationTypes.THREAD:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_summary, (redacted_relates_to,)
             )
@@ -2057,9 +2068,38 @@ class PersistEventsStore:
                 txn, self.store.get_threads, (room_id,)
             )
 
-        self.db_pool.simple_delete_txn(
-            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
-        )
+            # Find the new latest event in the thread.
+            sql = """
+            SELECT event_id, topological_ordering, stream_ordering
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND relation_type = ?
+            ORDER BY topological_ordering DESC, stream_ordering DESC
+            LIMIT 1
+            """
+            txn.execute(sql, (redacted_relates_to, RelationTypes.THREAD))
+
+            # If a latest event is found, update the threads table, this might
+            # be the same current latest event (if an earlier event in the thread
+            # was redacted).
+            latest_event_row = txn.fetchone()
+            if latest_event_row:
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="threads",
+                    keyvalues={"room_id": room_id, "thread_id": redacted_relates_to},
+                    values={
+                        "latest_event_id": latest_event_row[0],
+                        "topological_ordering": latest_event_row[1],
+                        "stream_ordering": latest_event_row[2],
+                    },
+                )
+
+            # Otherwise, delete the thread: it no longer exists.
+            else:
+                self.db_pool.simple_delete_one_txn(
+                    txn, table="threads", keyvalues={"thread_id": redacted_relates_to}
+                )
 
     def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase) -> None:
         if isinstance(event.content.get("topic"), str):

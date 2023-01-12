@@ -49,6 +49,13 @@ setting in your configuration file.
 See the [configuration manual](usage/configuration/config_documentation.md#oidc_providers) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
+## OIDC Back-Channel Logout
+
+Synapse supports receiving [OpenID Connect Back-Channel Logout](https://openid.net/specs/openid-connect-backchannel-1_0.html) notifications.
+
+This lets the OpenID Connect Provider notify Synapse when a user logs out, so that Synapse can end that user session.
+This feature can be enabled by setting the `backchannel_logout_enabled` property to `true` in the provider configuration, and setting the following URL as destination for Back-Channel Logout notifications in your OpenID Connect Provider: `[synapse public baseurl]/_synapse/client/oidc/backchannel_logout`
+
 ## Sample configs
 
 Here are a few configs for providers that should work with Synapse.
@@ -123,6 +130,9 @@ oidc_providers:
 
 [Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat.
 
+Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
+This can be optionally enabled by setting `backchannel_logout_enabled` to `true` in the Synapse configuration, and by setting the "Backchannel Logout URL" in Keycloak.
+
 Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
 
 1. Click `Clients` in the sidebar and click `Create`
@@ -144,6 +154,8 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Client Protocol | `openid-connect` |
 | Access Type | `confidential` |
 | Valid Redirect URIs | `[synapse public baseurl]/_synapse/client/oidc/callback` |
+| Backchannel Logout URL (optional) | `[synapse public baseurl]/_synapse/client/oidc/backchannel_logout` |
+| Backchannel Logout Session Required (optional) | `On` |
 
 5. Click `Save`
 6. On the Credentials tab, update the fields:
@@ -167,7 +179,9 @@ oidc_providers:
       config:
         localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.name }}"
+    backchannel_logout_enabled: true # Optional
 ```
+
 ### Auth0
 
 [Auth0][auth0] is a hosted SaaS IdP solution.
@@ -576,3 +590,44 @@ oidc_providers:
         display_name_template: "{{ user.first_name }} {{ user.last_name }}"
         email_template: "{{ user.email }}"
 ```
+
+### Mastodon
+
+[Mastodon](https://docs.joinmastodon.org/) instances provide an [OAuth API](https://docs.joinmastodon.org/spec/oauth/), allowing those instances to be used as a single sign-on provider for Synapse.
+
+The first step is to register Synapse as an application with your Mastodon instance, using the [Create an application API](https://docs.joinmastodon.org/methods/apps/#create) (see also [here](https://docs.joinmastodon.org/client/token/)). There are several ways to do this, but in the example below we are using CURL.
+
+This example assumes that:
+* the Mastodon instance website URL is `https://your.mastodon.instance.url`, and
+* Synapse will be registered as an app named `my_synapse_app`.
+
+Send the following request, substituting the value of `synapse_public_baseurl` from your Synapse installation.
+```sh
+curl -d "client_name=my_synapse_app&redirect_uris=https://[synapse_public_baseurl]/_synapse/client/oidc/callback" -X POST https://your.mastodon.instance.url/api/v1/apps
+```
+
+You should receive a response similar to the following. Make sure to save it.
+```json
+{"client_id":"someclientid_123","client_secret":"someclientsecret_123","id":"12345","name":"my_synapse_app","redirect_uri":"https://[synapse_public_baseurl]/_synapse/client/oidc/callback","website":null,"vapid_key":"somerandomvapidkey_123"}
+```
+
+As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a `sub` property, an alternative `subject_claim` has to be set. Your Synapse configuration should include the following:
+
+```yaml
+oidc_providers:
+  - idp_id: my_mastodon
+    idp_name: "Mastodon Instance Example"
+    discover: false
+    issuer: "https://your.mastodon.instance.url/@admin"
+    client_id: "someclientid_123"    
+    client_secret: "someclientsecret_123"
+    authorization_endpoint: "https://your.mastodon.instance.url/oauth/authorize"
+    token_endpoint: "https://your.mastodon.instance.url/oauth/token"
+    userinfo_endpoint: "https://your.mastodon.instance.url/api/v1/accounts/verify_credentials"
+    scopes: ["read"]
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+```
+
+Note that the fields `client_id` and `client_secret` are taken from the CURL response above.

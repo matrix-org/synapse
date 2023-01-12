@@ -343,6 +343,7 @@ class RequestRatelimiter:
         requester: Requester,
         update: bool = True,
         is_admin_redaction: bool = False,
+        n_actions: int = 1,
     ) -> None:
         """Ratelimits requests.
 
@@ -355,6 +356,8 @@ class RequestRatelimiter:
             is_admin_redaction: Whether this is a room admin/moderator
                 redacting an event. If so then we may apply different
                 ratelimits depending on config.
+            n_actions: Multiplier for the number of actions to apply to the
+                rate limiter at once.
 
         Raises:
             LimitExceededError if the request should be ratelimited
@@ -383,7 +386,9 @@ class RequestRatelimiter:
         if is_admin_redaction and self.admin_redaction_ratelimiter:
             # If we have separate config for admin redactions, use a separate
             # ratelimiter as to not have user_ids clash
-            await self.admin_redaction_ratelimiter.ratelimit(requester, update=update)
+            await self.admin_redaction_ratelimiter.ratelimit(
+                requester, update=update, n_actions=n_actions
+            )
         else:
             # Override rate and burst count per-user
             await self.request_ratelimiter.ratelimit(
@@ -391,4 +396,5 @@ class RequestRatelimiter:
                 rate_hz=messages_per_second,
                 burst_count=burst_count,
                 update=update,
+                n_actions=n_actions,
             )
