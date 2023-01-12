@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.75.0rc1 where device lists could be miscalculated with some sync filters.
