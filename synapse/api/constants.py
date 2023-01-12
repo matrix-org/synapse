@@ -154,6 +154,7 @@ class EduTypes:
 
 class RejectedReason:
     AUTH_ERROR: Final = "auth_error"
+    OVERSIZED_EVENT: Final = "oversized_event"
 
 
 class RoomCreationPreset:

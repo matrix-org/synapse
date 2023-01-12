@@ -34,8 +34,6 @@ logger = logging.getLogger(__name__)
 
 MAX_DISPLAYNAME_LEN = 256
 MAX_AVATAR_URL_LEN = 1000
-MAX_AVATAR_NFT_LEN = 10000
-MAX_MATADATA_LEN = 10000
 
 
 class ProfileHandler:
@@ -76,8 +74,6 @@ class ProfileHandler:
             return {
                 "displayname": profileinfo.display_name,
                 "avatar_url": profileinfo.avatar_url,
-                "avatar_nft": profileinfo.avatar_nft,
-                "metadata": profileinfo.metadata,
             }
         else:
             try:
@@ -278,90 +274,6 @@ class ProfileHandler:
 
         await self.store.set_profile_avatar_url(
             target_user.localpart, avatar_url_to_set
-        )
-
-        profile = await self.store.get_profileinfo(target_user.localpart)
-        await self.user_directory_handler.handle_local_profile_change(
-            target_user.to_string(), profile
-        )
-
-        await self._third_party_rules.on_profile_update(
-            target_user.to_string(), profile, by_admin, deactivation
-        )
-
-        await self._update_join_states(requester, target_user)
-
-    async def set_profile_info(
-        self,
-        target_user: UserID,
-        requester: Requester,
-        new_avatar_nft: str,
-        new_metadata: str,
-        by_admin: bool = False,
-        deactivation: bool = False,
-    ) -> None:
-        """Set new avatar_nft and nft metadata for a user.
-
-        Args:
-            target_user: the user whose avatar URL is to be changed.
-            requester: The user attempting to make this change.
-            new_avatar_nft: The avatar_nft URL to give this user.
-            new_metadata: The metadata info to give this user.
-            by_admin: Whether this change was made by an administrator.
-            deactivation: Whether this change was made while deactivating the user.
-        """
-
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "User is not hosted on this homeserver")
-
-        if not by_admin and target_user != requester.user:
-            raise AuthError(400, "Cannot set another user's avatar_url")
-
-        if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            if profile.avatar_url:
-                raise SynapseError(
-                    400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
-                )
-
-        if not isinstance(new_avatar_nft, str):
-            raise SynapseError(
-                400, "'avatar_nft' must be a string", errcode=Codes.INVALID_PARAM
-            )
-
-        if not isinstance(new_metadata, str):
-            raise SynapseError(
-                400, "'matadata' must be a string", errcode=Codes.INVALID_PARAM
-            )
-
-        # FIXME: NFT头像, matadata是一个json string
-        if len(new_avatar_nft) > MAX_AVATAR_NFT_LEN:
-            raise SynapseError(
-                400, "AvatarNft URL is too long (max %i)" % (MAX_AVATAR_NFT_LEN,)
-            )
-
-        if len(new_metadata) > MAX_MATADATA_LEN:
-            raise SynapseError(
-                400, "Metadata is too long (max %i)" % (MAX_MATADATA_LEN,)
-            )
-
-        avatar_nft_to_set: Optional[str] = new_avatar_nft
-        if new_avatar_nft == "":
-            avatar_nft_to_set = None
-
-        metadata_to_set: Optional[str] = new_metadata
-        if new_metadata == "":
-            metadata_to_set = None
-
-        # Same like set_displayname
-        if by_admin:
-            requester = create_requester(
-                target_user, authenticated_entity=requester.authenticated_entity
-            )
-
-        # FIXME: 存图片和matadata
-        await self.store.set_profile_info(
-            target_user.localpart, avatar_nft_to_set, metadata_to_set
         )
 
         profile = await self.store.get_profileinfo(target_user.localpart)

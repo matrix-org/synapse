@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 import attr
 
@@ -103,7 +103,7 @@ class RoomVersion:
     # is not enough to mark it "supported": the push rule evaluator also needs to
     # support the flag. Unknown flags are ignored by the evaluator, making conditions
     # fail if used.
-    msc3931_push_features: List[str]  # values from PushRuleRoomFlag
+    msc3931_push_features: Tuple[str, ...]  # values from PushRuleRoomFlag
 
 
 class RoomVersions:
@@ -124,7 +124,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V2 = RoomVersion(
         "2",
@@ -143,7 +143,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V3 = RoomVersion(
         "3",
@@ -162,7 +162,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V4 = RoomVersion(
         "4",
@@ -181,7 +181,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V5 = RoomVersion(
         "5",
@@ -200,7 +200,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V6 = RoomVersion(
         "6",
@@ -219,7 +219,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -238,7 +238,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V7 = RoomVersion(
         "7",
@@ -257,7 +257,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V8 = RoomVersion(
         "8",
@@ -276,7 +276,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V9 = RoomVersion(
         "9",
@@ -295,7 +295,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     MSC3787 = RoomVersion(
         "org.matrix.msc3787",
@@ -314,7 +314,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     V10 = RoomVersion(
         "10",
@@ -333,7 +333,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     MSC2716v4 = RoomVersion(
         "org.matrix.msc2716v4",
@@ -352,7 +352,7 @@ class RoomVersions:
         msc2716_redactions=True,
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        msc3931_push_features=(),
     )
     MSC1767v10 = RoomVersion(
         # MSC1767 (Extensible Events) based on room version "10"
@@ -372,7 +372,7 @@ class RoomVersions:
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,
-        msc3931_push_features=[PushRuleRoomFlag.EXTENSIBLE_EVENTS],
+        msc3931_push_features=(PushRuleRoomFlag.EXTENSIBLE_EVENTS,),
     )
 
 

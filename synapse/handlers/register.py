@@ -46,8 +46,8 @@ from synapse.replication.http.register import (
     ReplicationRegisterServlet,
 )
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types.state import StateFilter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -195,16 +195,16 @@ class RegistrationHandler:
                         errcode=Codes.FORBIDDEN,
                     )
 
-        # if guest_access_token is None:
-        #     try:
-        #         int(localpart)
-        #         raise SynapseError(
-        #             400,
-        #             "Numeric user IDs are reserved for guest users.",
-        #             errcode=Codes.INVALID_USERNAME,
-        #         )
-        #     except ValueError:
-        #         pass
+        if guest_access_token is None:
+            try:
+                int(localpart)
+                raise SynapseError(
+                    400,
+                    "Numeric user IDs are reserved for guest users.",
+                    errcode=Codes.INVALID_USERNAME,
+                )
+            except ValueError:
+                pass
 
     async def register_user(
         self,

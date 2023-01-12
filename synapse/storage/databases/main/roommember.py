@@ -260,7 +260,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
             sql = """
-                SELECT state_key, display_name, avatar_url, avatar_nft, metadata FROM room_memberships as m
+                SELECT state_key, display_name, avatar_url FROM room_memberships as m
                 INNER JOIN current_state_events as c
                 ON m.event_id = c.event_id
                 AND m.room_id = c.room_id
@@ -269,7 +269,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             """
             txn.execute(sql, (room_id, Membership.JOIN))
 
-            return {r[0]: ProfileInfo(display_name=r[1], avatar_url=r[2], avatar_nft=r[3], metadata=r[4]) for r in txn}
+            return {r[0]: ProfileInfo(display_name=r[1], avatar_url=r[2]) for r in txn}
 
         return await self.db_pool.runInteraction(
             "get_users_in_room_with_profiles",
