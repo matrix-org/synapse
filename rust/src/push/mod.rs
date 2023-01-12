@@ -418,6 +418,7 @@ pub struct FilteredPushRules {
     msc1767_enabled: bool,
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
+    msc3952_intentional_mentions: bool,
 }
 
 #[pymethods]
@@ -429,6 +430,7 @@ impl FilteredPushRules {
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
+        msc3952_intentional_mentions: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -436,6 +438,7 @@ impl FilteredPushRules {
             msc1767_enabled,
             msc3381_polls_enabled,
             msc3664_enabled,
+            msc3952_intentional_mentions,
         }
     }
 
@@ -466,6 +469,11 @@ impl FilteredPushRules {
                 }
 
                 if !self.msc3381_polls_enabled && rule.rule_id.contains("org.matrix.msc3930") {
+                    return false;
+                }
+
+                if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
+                {
                     return false;
                 }
 

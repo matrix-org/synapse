@@ -129,6 +129,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
         bulk_evaluator._action_for_event_by_user.assert_not_called()
 
+    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
     def test_mentions(self) -> None:
         """Test the behavior of an event which includes invalid mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
