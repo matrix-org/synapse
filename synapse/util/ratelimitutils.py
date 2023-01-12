@@ -377,7 +377,7 @@ class _PerHostRatelimiter:
 
         def start_next_request() -> None:
             # We only remove the completed request from the list when we're about to
-            # start the next one, otherwise we can admit extra requests.
+            # start the next one, otherwise we can allow extra requests through.
             self.current_processing.discard(request_id)
             try:
                 # start processing the next item on the queue.
