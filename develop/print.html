@@ -1771,6 +1771,13 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1760"><a class="header" href="#upgrading-to-v1760">Upgrading to v1.76.0</a></h1>
+<h2 id="changes-to-the-account-data-replication-streams"><a class="header" href="#changes-to-the-account-data-replication-streams">Changes to the account data replication streams</a></h2>
+<p>Synapse has changed the format of the account data replication streams (between
+workers). This is a forwards- and backwards-incompatible change: v1.75 workers
+cannot process account data replicated by v1.76 workers, and vice versa.</p>
+<p>Once all workers are upgraded to v1.76 (or downgraded to v1.75), account data
+replication will resume as normal.</p>
 <h1 id="upgrading-to-v1740"><a class="header" href="#upgrading-to-v1740">Upgrading to v1.74.0</a></h1>
 <h2 id="unicode-support-in-user-search"><a class="header" href="#unicode-support-in-user-search">Unicode support in user search</a></h2>
 <p>This version introduces optional support for an <a href="https://github.com/matrix-org/synapse/pull/14464">improved user search dealing with Unicode characters</a>.</p>
