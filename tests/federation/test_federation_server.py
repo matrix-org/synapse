@@ -224,7 +224,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         channel = self.make_signed_federation_request(
             "PUT",
-            f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/x?omit_members=true",
             content=join_event_dict,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
