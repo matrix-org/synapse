@@ -310,6 +310,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.hs = hs
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
+            hs.get_reactor(),
             hs.get_clock(),
             FederationRatelimitSettings(
                 # Time window of 2s
