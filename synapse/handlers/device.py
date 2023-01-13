@@ -346,6 +346,7 @@ class DeviceHandler(DeviceWorkerHandler):
         super().__init__(hs)
 
         self.federation_sender = hs.get_federation_sender()
+        self._account_data_handler = hs.get_account_data_handler()
         self._storage_controllers = hs.get_storage_controllers()
 
         self.device_list_updater = DeviceListUpdater(hs, self)
@@ -515,7 +516,7 @@ class DeviceHandler(DeviceWorkerHandler):
             if self.hs.config.experimental.msc3890_enabled:
                 # Remove any local notification settings for this device in accordance
                 # with MSC3890.
-                await self.store.remove_account_data_for_user(
+                await self._account_data_handler.remove_account_data_for_user(
                     user_id,
                     f"org.matrix.msc3890.local_notification_settings.{device_id}",
                 )
