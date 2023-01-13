@@ -521,8 +521,8 @@ class RoomSummaryHandler:
 
         It should return true if:
 
-        * The requester is joined or can join the room (per MSC3173).
-        * The origin server has any user that is joined or can join the room.
+        * The requesting user is joined or can join the room (per MSC3173); or
+        * The origin server has any user that is joined or can join the room; or
         * The history visibility is set to world readable.
 
         Args:
