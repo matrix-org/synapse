@@ -843,7 +843,9 @@ def _members_omitted_parser(response: SendJoinResponse) -> Generator[None, Any, 
     while True:
         val = yield
         if not isinstance(val, bool):
-            raise TypeError("members_omitted (formerly org.matrix.msc370c.partial_state) must be a boolean")
+            raise TypeError(
+                "members_omitted (formerly org.matrix.msc370c.partial_state) must be a boolean"
+            )
         response.members_omitted = val
 
 
