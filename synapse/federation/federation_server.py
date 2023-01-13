@@ -1502,7 +1502,7 @@ def _get_event_ids_for_partial_state_join(
     prev_state_ids: StateMap[str],
     summary: Dict[str, MemberSummary],
 ) -> Collection[str]:
-    """Calculate state to be retuned in a partial_state send_join
+    """Calculate state to be returned in a partial_state send_join
 
     Args:
         join_event: the join event being send_joined

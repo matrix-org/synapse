@@ -1152,7 +1152,7 @@ class FederationClient(FederationBase):
                 state=signed_state,
                 auth_chain=signed_auth,
                 origin=destination,
-                partial_state=response.partial_state,
+                partial_state=response.members_omitted,
                 servers_in_room=response.servers_in_room or [],
             )
 
