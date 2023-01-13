@@ -176,6 +176,12 @@ class FederationHandler:
         # Partial state syncs currently only run on the main process, so it's okay to
         # track them in-memory for now.
         self._active_partial_state_syncs: Set[str] = set()
+        # Tracks partial state syncs we may want to restart.
+        # A dictionary mapping room IDs to (initial destination, other destinations)
+        # tuples.
+        self._partial_state_syncs_to_restart: Dict[
+            str, Tuple[Optional[str], Collection[str]]
+        ] = {}
 
         # if this is the main process, fire off a background process to resume
         # any partial-state-resync operations which were in flight when we
@@ -1694,6 +1700,14 @@ class FederationHandler:
 
         async def _sync_partial_state_room_wrapper() -> None:
             if room_id in self._active_partial_state_syncs:
+                # Mark the partial state sync as possibly needing a restart.
+                # We want to do this when the partial state sync is about to fail
+                # because we've been kicked from the room, but we rejoin before the sync
+                # finishes falling over.
+                self._partial_state_syncs_to_restart[room_id] = (
+                    initial_destination,
+                    other_destinations,
+                )
                 return
 
             self._active_partial_state_syncs.add(room_id)
@@ -1705,7 +1719,30 @@ class FederationHandler:
                     room_id=room_id,
                 )
             finally:
+                # Check whether the room is still partial stated, while we still claim
+                # to be the active sync. Usually, the partial state flag will be gone,
+                # unless we left and rejoined the room, or the sync failed.
+                is_still_partial_state_room = await self.store.is_partial_state_room(
+                    room_id
+                )
                 self._active_partial_state_syncs.remove(room_id)
+
+                # Check if we need to restart the sync.
+                if room_id in self._partial_state_syncs_to_restart:
+                    (
+                        restart_initial_destination,
+                        restart_other_destinations,
+                    ) = self._partial_state_syncs_to_restart[room_id]
+
+                    # Clear the restart flag.
+                    self._partial_state_syncs_to_restart.pop(room_id, None)
+
+                    if is_still_partial_state_room:
+                        self._start_partial_state_room_sync(
+                            initial_destination=restart_initial_destination,
+                            other_destinations=restart_other_destinations,
+                            room_id=room_id,
+                        )
 
         run_as_background_process(
             desc="sync_partial_state_room", func=_sync_partial_state_room_wrapper
