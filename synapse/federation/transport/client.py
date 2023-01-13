@@ -351,13 +351,16 @@ class TransportLayerClient:
         room_id: str,
         event_id: str,
         content: JsonDict,
+        omit_members: bool,
     ) -> "SendJoinResponse":
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
         query_params: Dict[str, str] = {}
         if self._faster_joins_enabled:
             # lazy-load state on join
-            query_params["org.matrix.msc3706.partial_state"] = "true"
-            query_params["omit_members"] = "true"
+            query_params["org.matrix.msc3706.partial_state"] = (
+                "true" if omit_members else "false"
+            )
+            query_params["omit_members"] = "true" if omit_members else "false"
 
         return await self.client.put_json(
             destination=destination,
