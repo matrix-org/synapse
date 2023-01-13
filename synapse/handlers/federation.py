@@ -176,7 +176,7 @@ class FederationHandler:
         # were shut down.
         if not hs.config.worker.worker_app:
             run_as_background_process(
-                "resume_sync_partial_state_room", self._resume_sync_partial_state_room
+                "resume_sync_partial_state_room", self._resume_partial_state_room_sync
             )
 
     @trace
@@ -1660,7 +1660,7 @@ class FederationHandler:
         # well.
         return None
 
-    async def _resume_sync_partial_state_room(self) -> None:
+    async def _resume_partial_state_room_sync(self) -> None:
         """Resumes resyncing of all partial-state rooms after a restart."""
         assert not self.config.worker.worker_app
 
