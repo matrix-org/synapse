@@ -84,7 +84,7 @@ jobs:
         run: |-
           sudo apt-get -qq update
           sudo apt-get install -qqy libolm3 libolm-dev
-          go install -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+          go install -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
       - name: Run Complement
         run: ./scripts-dev/complement.sh
         env:
