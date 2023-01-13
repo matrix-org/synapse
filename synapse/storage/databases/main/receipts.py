@@ -633,9 +633,9 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             allow_none=True,
         )
 
-        if res is None:
+        if res is None and self.hs.is_mine_id(user_id):
             logger.warning(
-                "Sending receipt for unknown event, roomID=%s, eventID=%s",
+                "Sending local user receipt for unknown event, roomID=%s, eventID=%s",
                 room_id,
                 event_id,
             )
