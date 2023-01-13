@@ -73,12 +73,9 @@ class ExperimentalConfig(Config):
             "msc3202_transaction_extensions", False
         )
 
-        # MSC3706 (server-side support for partial state in /send_join responses)
-        self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
-
         # experimental support for faster joins over federation
         # (MSC2775, MSC3706, MSC3895)
-        # requires a target server with msc3706_enabled enabled.
+        # requires a target server that can provide a partial join response (MSC3706)
         self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
 
         # MSC3720 (Account status endpoint)
