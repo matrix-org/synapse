@@ -2234,6 +2234,8 @@ class PersistEventsStore:
                 ),
             )
 
+            self.store.beeper_add_notification_counts_txn(txn, notifiable_events)
+
         # Now we delete the staging area for *all* events that were being
         # persisted.
         txn.execute_batch(
