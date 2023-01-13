@@ -6919,6 +6919,20 @@ other workers.</p>
       - names: [client, federation]
 </code></pre>
 <hr />
+<h3 id="worker_manhole"><a class="header" href="#worker_manhole"><code>worker_manhole</code></a></h3>
+<p>A worker may have a listener for <a href="usage/configuration/../../manhole.html"><code>manhole</code></a>.
+It allows server administrators to access a Python shell on the worker.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">worker_manhole: 9000
+</code></pre>
+<p>This is a short form for:</p>
+<pre><code class="language-yaml">worker_listeners:
+  - port: 9000
+    bind_addresses: ['127.0.0.1']
+    type: manhole
+</code></pre>
+<p>It needs also an additional <a href="usage/configuration/config_documentation.html#manhole_settings"><code>manhole_settings</code></a> configuration.</p>
+<hr />
 <h3 id="worker_daemonize"><a class="header" href="#worker_daemonize"><code>worker_daemonize</code></a></h3>
 <p>Specifies whether the worker should be started as a daemon process.
 If Synapse is being managed by <a href="usage/configuration/../../systemd-with-workers/">systemd</a>, this option
