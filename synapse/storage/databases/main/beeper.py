@@ -217,6 +217,7 @@ class BeeperStore(SQLBaseStore):
             txn.execute(sql)
             orders = list(txn)
             if not orders:
+                logger.info("No user counts aggregated")
                 return
 
             max_stream_ordering = max(orders)
@@ -224,6 +225,7 @@ class BeeperStore(SQLBaseStore):
                 "UPDATE beeper_user_notification_counts_stream_ordering SET stream_ordering = ?",
                 max_stream_ordering,
             )
+            txn.execute("DELETE FROM beeper_user_notification_counts WHERE aggregated")
 
             logger.info(f"Aggregated {len(orders)} notification count rows")
 
