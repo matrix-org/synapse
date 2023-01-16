@@ -1142,9 +1142,9 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
-            if response.partial_state and not response.servers_in_room:
+            if response.members_omitted and not response.servers_in_room:
                 raise InvalidResponseError(
-                    "partial_state was set, but no servers were listed in the room"
+                    "members_omitted was set, but no servers were listed in the room"
                 )
 
             return SendJoinResult(
@@ -1152,7 +1152,7 @@ class FederationClient(FederationBase):
                 state=signed_state,
                 auth_chain=signed_auth,
                 origin=destination,
-                partial_state=response.partial_state,
+                partial_state=response.members_omitted,
                 servers_in_room=response.servers_in_room or [],
             )
 

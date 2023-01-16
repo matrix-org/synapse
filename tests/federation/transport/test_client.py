@@ -68,11 +68,11 @@ class SendJoinParserTestCase(TestCase):
         self.assertEqual(len(parsed_response.state), 1, parsed_response)
         self.assertEqual(parsed_response.event_dict, {}, parsed_response)
         self.assertIsNone(parsed_response.event, parsed_response)
-        self.assertFalse(parsed_response.partial_state, parsed_response)
+        self.assertFalse(parsed_response.members_omitted, parsed_response)
         self.assertEqual(parsed_response.servers_in_room, None, parsed_response)
 
     def test_partial_state(self) -> None:
-        """Check that the partial_state flag is correctly parsed"""
+        """Check that the members_omitted flag is correctly parsed"""
 
         def parse(response: JsonDict) -> bool:
             parser = SendJoinParser(RoomVersions.V1, False)
@@ -83,7 +83,7 @@ class SendJoinParserTestCase(TestCase):
 
             # Retrieve and check the parsed SendJoinResponse
             parsed_response = parser.finish()
-            return parsed_response.partial_state
+            return parsed_response.members_omitted
 
         self.assertTrue(parse({"members_omitted": True}))
         self.assertTrue(parse({"org.matrix.msc3706.partial_state": True}))
