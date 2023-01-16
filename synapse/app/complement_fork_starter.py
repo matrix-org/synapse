@@ -120,8 +120,9 @@ def _worker_entrypoint(
         signal.signal(sig, handler)
 
     # Install the asyncio reactor if the SYNAPSE_ASYNC_IO_REACTOR is set to 1.
-    # It unsets the environ variable to avoid re-installing it in synapse/__init__.py
-    if strtobool(os.environ.pop("SYNAPSE_ASYNC_IO_REACTOR", "0")):
+    if strtobool(
+        os.environ.get("SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR", "0")
+    ):
         import asyncio
 
         from twisted.internet.asyncioreactor import AsyncioSelectorReactor
