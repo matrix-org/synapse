@@ -178,8 +178,10 @@ class BeeperStore(SQLBaseStore):
                         event_stream_ordering > (
                             SELECT event_stream_ordering FROM beeper_user_notification_counts_stream_ordering
                         )
-                        -- Arbitrary 100k offset for now
-                        AND event_stream_ordering < SELECT MAX(stream_ordering) - 100000 FROM events
+                        AND event_stream_ordering < (
+                            -- Arbitrary 100k offset for now
+                            SELECT MAX(stream_ordering) - 100000 FROM events
+                        )
                 )
                 UPDATE
                     beeper_user_notification_counts AS epc
