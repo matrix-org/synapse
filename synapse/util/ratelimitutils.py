@@ -34,7 +34,6 @@ from prometheus_client.core import Counter
 from typing_extensions import ContextManager
 
 from twisted.internet import defer
-from twisted.internet.interfaces import IReactorTime
 
 from synapse.api.errors import LimitExceededError
 from synapse.config.ratelimiting import FederationRatelimitSettings
@@ -147,14 +146,12 @@ class FederationRateLimiter:
 
     def __init__(
         self,
-        reactor: IReactorTime,
         clock: Clock,
         config: FederationRatelimitSettings,
         metrics_name: Optional[str] = None,
     ):
         """
         Args:
-            reactor
             clock
             config
             metrics_name: The name of the rate limiter so we can differentiate it
@@ -166,7 +163,7 @@ class FederationRateLimiter:
 
         def new_limiter() -> "_PerHostRatelimiter":
             return _PerHostRatelimiter(
-                reactor=reactor, clock=clock, config=config, metrics_name=metrics_name
+                clock=clock, config=config, metrics_name=metrics_name
             )
 
         self.ratelimiters: DefaultDict[
@@ -197,14 +194,12 @@ class FederationRateLimiter:
 class _PerHostRatelimiter:
     def __init__(
         self,
-        reactor: IReactorTime,
         clock: Clock,
         config: FederationRatelimitSettings,
         metrics_name: Optional[str] = None,
     ):
         """
         Args:
-            reactor
             clock
             config
             metrics_name: The name of the rate limiter so we can differentiate it
@@ -212,7 +207,6 @@ class _PerHostRatelimiter:
                 for this rate limiter.
                 from the rest in the metrics
         """
-        self.reactor = reactor
         self.clock = clock
         self.metrics_name = metrics_name
 
@@ -388,4 +382,4 @@ class _PerHostRatelimiter:
             except KeyError:
                 pass
 
-        self.reactor.callLater(0.0, start_next_request)
+        self.clock.call_later(0.0, start_next_request)
