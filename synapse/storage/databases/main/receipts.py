@@ -634,10 +634,9 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
         )
 
         if res is None and self.hs.is_mine_id(user_id):
-            logger.warning(
-                "Sending local user receipt for unknown event, roomID=%s, eventID=%s",
-                room_id,
-                event_id,
+            raise ValueError(
+                "Local users cannot send receipts for unknown event, "
+                f"roomID={room_id}, eventID={event_id}",
             )
 
         stream_ordering = int(res["stream_ordering"]) if res else None
@@ -709,6 +708,11 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             },
             where_clause=where_clause,
         )
+
+        if self.hs.is_mine_id(user_id):
+            self.beeper_clear_notification_counts_txn(  # type: ignore[attr-defined]
+                txn, user_id, room_id, stream_ordering
+            )
 
         return rx_ts
 

@@ -584,7 +584,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                 ],
                 ApplicationService.NS_ROOMS: [
                     {
-                        "regex": "!fakeroom_.*",
+                        "regex": ".*",
                         "exclusive": True,
                     }
                 ],
@@ -594,15 +594,19 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Now, pretend that we receive a large burst of read receipts (300 total) that
         # all come in at once.
         for i in range(300):
+            room_id = self.helper.create_room_as(self.local_user, tok=self.local_user_token)
+            resp = self.helper.send(room_id, tok=self.local_user_token)
+            event_id = resp["event_id"]
+
             self.get_success(
                 # Insert a fake read receipt into the database
                 self.hs.get_datastores().main.insert_receipt(
                     # We have to use unique room ID + user ID combinations here, as the db query
                     # is an upsert.
-                    room_id=f"!fakeroom_{i}:test",
+                    room_id=room_id,
                     receipt_type="m.read",
                     user_id=self.local_user,
-                    event_ids=[f"$eventid_{i}"],
+                    event_ids=[event_id],
                     thread_id=None,
                     data={},
                 )

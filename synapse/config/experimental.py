@@ -140,3 +140,8 @@ class ExperimentalConfig(Config):
             # Enable room version (and thus applicable push rules from MSC3931/3932)
             version_id = RoomVersions.MSC1767v10.identifier
             KNOWN_ROOM_VERSIONS[version_id] = RoomVersions.MSC1767v10
+
+        self.beeper_user_notification_counts_enabled = experimental.get(
+            "beeper_user_notification_counts_enabled",
+            False,
+        )
