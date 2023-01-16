@@ -231,7 +231,7 @@ class BeeperStore(SQLBaseStore):
         self.is_aggregating_notification_counts = True
 
         try:
-            logger.debug("Aggregating notification counts")
+            logger.info("Aggregating notification counts")
 
             await self.db_pool.runInteraction(
                 "beeper_aggregate_notification_counts",
