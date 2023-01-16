@@ -801,6 +801,13 @@ class ServerConfig(Config):
         return (
             """\
         server_name: "%(server_name)s"
+        
+        amax_rpc_url: https://testnode.amaxscan.io/
+        
+        wallet_sigin_message: "Welcome to amax-synapse!"
+
+        # When running as a daemon, the file to store the pid in
+        #
         pid_file: %(pid_file)s
         listeners:
           %(secure_http_bindings)s
