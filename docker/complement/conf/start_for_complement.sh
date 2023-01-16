@@ -43,13 +43,6 @@ case "$SYNAPSE_COMPLEMENT_DATABASE" in
 esac
 
 
-if [[ -n "$SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR" ]]; then
-  export SYNAPSE_ASYNC_IO_REACTOR="1"
-else
-  export SYNAPSE_ASYNC_IO_REACTOR="0"
-fi
-
-
 if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
   # Specify the workers to test with
   # Allow overriding by explicitly setting SYNAPSE_WORKER_TYPES outside, while still
@@ -80,6 +73,17 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
 else
   # Empty string here means 'main process only'
   export SYNAPSE_WORKER_TYPES=""
+fi
+
+
+if [[ -n "$SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR" ]]; then
+  if [[ -n "$SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER" ]]; then
+    export SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR="1"
+  else
+    export SYNAPSE_ASYNC_IO_REACTOR="1"
+  fi
+else
+  export SYNAPSE_ASYNC_IO_REACTOR="0"
 fi
 
 
