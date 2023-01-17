@@ -183,7 +183,6 @@ Either:
 - manually update `pyproject.toml`; then `poetry lock --no-update`; or else
 - `poetry add packagename`. See `poetry add --help`; note the `--dev`,
   `--extras` and `--optional` flags in particular.
-  - **NB**: this specifies the new package with a version given by a "caret bound". This won't get forced to its lowest version in the old deps CI job: see [this TODO](https://github.com/matrix-org/synapse/blob/4e1374373857f2f7a911a31c50476342d9070681/.ci/scripts/test_old_deps.sh#L35-L39).
 
 Include the updated `pyproject.toml` and `poetry.lock` files in your commit.
 
