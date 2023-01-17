@@ -325,7 +325,7 @@ class ReplicationDataHandler:
             # anyway in that case we don't need to wait.
             return
 
-        current_position = self._streams[stream_name].current_token(self._instance_name)
+        current_position = self._streams[stream_name].current_token(instance_name)
         if position <= current_position:
             # We're already past the position
             return
