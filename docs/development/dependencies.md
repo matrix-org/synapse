@@ -260,7 +260,7 @@ doesn't require poetry. (It's what we use in CI too). However, you could try
 
 ## Check the version of poetry with `poetry --version`.
 
-The minimum version of poetry supported by Synapse is 1.2.
+The minimum version of poetry supported by Synapse is 1.3.2.
 
 It can also be useful to check the version of `poetry-core` in use. If you've
 installed `poetry` with `pipx`, try `pipx runpip poetry list | grep
