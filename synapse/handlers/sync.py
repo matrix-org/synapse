@@ -1909,7 +1909,7 @@ class SyncHandler:
     async def _have_rooms_changed(
         self,
         sync_result_builder: "SyncResultBuilder",
-        un_partial_stated_rooms: Set[str],
+        un_partial_stated_rooms: AbstractSet[str],
     ) -> bool:
         """Returns whether there may be any new events that should be sent down
         the sync. Returns True if there are.
@@ -1939,7 +1939,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         ignored_users: FrozenSet[str],
-        un_partial_stated_rooms: Set[str],
+        un_partial_stated_rooms: AbstractSet[str],
     ) -> _RoomChanges:
         """Determine the changes in rooms to report to the user.
 
