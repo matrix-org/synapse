@@ -437,9 +437,16 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
         partial_state = False
         if self._msc3706_enabled:
-            partial_state = parse_boolean_from_args(
-                query, "org.matrix.msc3706.partial_state", default=False
-            )
+            # The stable query parameter wins, if it disagrees with the unstable
+            # parameter for some reason.
+            stable_param = parse_boolean_from_args(query, "omit_members", default=None)
+            if stable_param is not None:
+                partial_state = stable_param
+            else:
+                partial_state = parse_boolean_from_args(
+                    query, "org.matrix.msc3706.partial_state", default=False
+                )
+
         result = await self.handler.on_send_join_request(
             origin, content, room_id, caller_supports_partial_state=partial_state
         )

@@ -69,6 +69,8 @@ class _BackgroundUpdates:
 
     EVENTS_POPULATE_STATE_KEY_REJECTIONS = "events_populate_state_key_rejections"
 
+    EVENTS_JUMP_TO_DATE_INDEX = "events_jump_to_date_index"
+
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _CalculateChainCover:
@@ -258,6 +260,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.EVENTS_POPULATE_STATE_KEY_REJECTIONS,
             self._background_events_populate_state_key_rejections,
+        )
+
+        # Add an index that would be useful for jumping to date using
+        # get_event_id_for_timestamp.
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.EVENTS_JUMP_TO_DATE_INDEX,
+            index_name="events_jump_to_date_idx",
+            table="events",
+            columns=["room_id", "origin_server_ts"],
+            where_clause="NOT outlier",
         )
 
     async def _background_reindex_fields_sender(

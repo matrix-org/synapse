@@ -27,7 +27,7 @@ from typing import (
 )
 
 from synapse.api.constants import AccountDataTypes
-from synapse.replication.tcp.streams import AccountDataStream, TagAccountDataStream
+from synapse.replication.tcp.streams import AccountDataStream
 from synapse.storage._base import db_to_json
 from synapse.storage.database import (
     DatabasePool,
@@ -454,9 +454,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     def process_replication_position(
         self, stream_name: str, instance_name: str, token: int
     ) -> None:
-        if stream_name == TagAccountDataStream.NAME:
-            self._account_data_id_gen.advance(instance_name, token)
-        elif stream_name == AccountDataStream.NAME:
+        if stream_name == AccountDataStream.NAME:
             self._account_data_id_gen.advance(instance_name, token)
         super().process_replication_position(stream_name, instance_name, token)
 
