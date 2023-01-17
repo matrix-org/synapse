@@ -92,12 +92,13 @@ process, for example:
 
 ## Changes to the account data replication streams
 
-Synapse has changed the format of the account data replication streams (between
-workers). This is a forwards- and backwards-incompatible change: v1.75 workers
-cannot process account data replicated by v1.76 workers, and vice versa.
+Synapse has changed the format of the account data and devices replication
+streams (between workers). This is a forwards- and backwards-incompatible
+change: v1.75 workers cannot process account data replicated by v1.76 workers,
+and vice versa.
 
 Once all workers are upgraded to v1.76 (or downgraded to v1.75), account data
-replication will resume as normal.
+and device replication will resume as normal.
 
 
 # Upgrading to v1.74.0
