@@ -2,6 +2,13 @@
 
 This is a quick cheat sheet for developers on how to use [`poetry`](https://python-poetry.org/).
 
+# Installing
+
+See the [contributing guide](contributing_guide.md#4-install-the-dependencies).
+
+Developers should use Poetry 1.3.2 or higher. If you encounter problems related
+to poetry, please [double-check your poetry version](#check-the-version-of-poetry-with-poetry---version).
+
 # Background
 
 Synapse uses a variety of third-party Python packages to function as a homeserver.
@@ -123,7 +130,7 @@ context of poetry's venv, without having to run `poetry shell` beforehand.
 ## ...reset my venv to the locked environment?
 
 ```shell
-poetry install --extras all --remove-untracked
+poetry install --all-extras --sync
 ```
 
 ## ...delete everything and start over from scratch?
@@ -195,7 +202,7 @@ poetry remove packagename
 ```
 
 ought to do the trick. Alternatively, manually update `pyproject.toml` and
-`poetry lock --no-update`. Include the updated `pyproject.toml` and poetry.lock`
+`poetry lock --no-update`. Include the updated `pyproject.toml` and `poetry.lock`
 files in your commit.
 
 ## ...update the version range for an existing dependency?
