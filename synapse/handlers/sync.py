@@ -1821,16 +1821,16 @@ class SyncHandler:
         # of a non lazy-loading-members sync.
         un_partial_stated_rooms = set()
         if not sync_result_builder.sync_config.filter_collection.lazy_load_members():
-            un_partial_state_rooms_since = 0
+            un_partial_stated_rooms_since = 0
             if sync_result_builder.since_token is not None:
-                un_partial_state_rooms_since = (
-                    sync_result_builder.since_token.un_partial_state_rooms_key
+                un_partial_stated_rooms_since = (
+                    sync_result_builder.since_token.un_partial_stated_rooms_key
                 )
 
             un_partial_stated_rooms = (
                 await self.store.get_un_partial_stated_rooms_between(
-                    un_partial_state_rooms_since,
-                    sync_result_builder.now_token.un_partial_state_rooms_key,
+                    un_partial_stated_rooms_since,
+                    sync_result_builder.now_token.un_partial_stated_rooms_key,
                 )
             )
 
