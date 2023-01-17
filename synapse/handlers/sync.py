@@ -1926,9 +1926,9 @@ class SyncHandler:
 
         stream_id = since_token.room_key.stream
         for room_id in sync_result_builder.joined_room_ids:
-            # If a room has been un partial stated in the meantime,
-            # let's consider it has changes and deal with it accordingly
-            # in _get_rooms_changed.
+            # If a room has been un partial stated during the sync period,
+            # assume it has seen some kind of change. We'll process that
+            # change later, in _get_rooms_changed.
             if room_id in un_partial_stated_rooms:
                 return True
             if self.store.has_room_changed_since(room_id, stream_id):
@@ -2144,9 +2144,10 @@ class SyncHandler:
 
             newly_joined = room_id in newly_joined_rooms
 
-            # In case of a non lazy-loading-members sync we want to include
-            # rooms that got un partial stated in the meantime, and we need
-            # to include the full state of them.
+            # Partially joined rooms are omitted from non lazy-loading-members
+            # syncs until the resync completes and that room is fully stated. 
+            # When that happens, we need to include their full state in 
+            # the next non-lazy-loading sync.
             if (
                 not sync_config.filter_collection.lazy_load_members()
                 and room_id in un_partial_stated_rooms

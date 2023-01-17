@@ -1293,7 +1293,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         `current_id` inclusive.
 
         Returns:
-            The list of rooms.
+            The list of room ids.
         """
 
         if last_id == current_id:
