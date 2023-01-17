@@ -202,14 +202,20 @@ class StateHandler:
             room_id: the room_id containing the given events.
             event_ids: the events whose state should be fetched and resolved.
             await_full_state: if `True`, will block if we do not yet have complete state
-                at the given `event_id`s, regardless of whether `state_filter` is
-                satisfied by partial state.
+                at these events and `state_filter` is not satisfied by partial state.
+                Defaults to `True`.
 
         Returns:
             the state dict (a mapping from (event_type, state_key) -> event_id) which
             holds the resolution of the states after the given event IDs.
         """
         logger.debug("calling resolve_state_groups from compute_state_after_events")
+        if (
+            await_full_state
+            and state_filter
+            and not state_filter.must_await_full_state(self.hs.is_mine_id)
+        ):
+            await_full_state = False
         ret = await self.resolve_state_groups_for_events(
             room_id, event_ids, await_full_state
         )

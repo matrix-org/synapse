@@ -36,6 +36,7 @@ __pycache__/
 
 # For direnv users
 /.envrc
+.direnv/
 
 # IDEs
 /.idea/

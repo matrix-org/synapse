@@ -136,7 +136,7 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 #### ArchLinux
 
 The quickest way to get up and running with ArchLinux is probably with the community package
-<https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
+<https://archlinux.org/packages/community/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
@@ -200,7 +200,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.10.
+- Python 3.7 or later, up to Python 3.11.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 If building on an uncommon architecture for which pre-built wheels are
