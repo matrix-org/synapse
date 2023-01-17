@@ -51,6 +51,14 @@ jobs:
       - run: "pip install 'click==8.1.1' 'GitPython>=3.1.20'"
       - run: scripts-dev/check_schema_delta.py --force-colors
 
+  check-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - run: .ci/scripts/check_lockfile.py
   lint:
     uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2"
     with:
@@ -163,6 +171,7 @@ jobs:
       - lint-pydantic
       - check-sampleconfig
       - check-schema-delta
+      - check-lockfile
       - lint-clippy
       - lint-rustfmt
     runs-on: ubuntu-latest
