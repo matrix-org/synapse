@@ -17,7 +17,7 @@
 
 # Irritatingly, there is no blessed guide on how to distribute an application with its
 # poetry-managed environment in a docker image. We have opted for
-# `poetry export | pip install -r /dev/stdin`, but beware: we have experiene bugs in
+# `poetry export | pip install -r /dev/stdin`, but beware: we have experienced bugs in
 # in `poetry export` in the past.
 
 ARG PYTHON_VERSION=3.9

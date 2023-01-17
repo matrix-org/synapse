@@ -103,7 +103,7 @@ and device replication will resume as normal.
 ## Minimum version of Poetry is now 1.3.2
 
 The minimum supported version of Poetry is now 1.3.2 (previously 1.2.0, [since 
-Synapse 1.XX](#upgrading-to-v1670)). If you have used `poetry install` to 
+Synapse 1.67](#upgrading-to-v1670)). If you have used `poetry install` to 
 install Synapse from a source checkout, you should upgrade poetry: see its
 [installation instructions](https://python-poetry.org/docs/#installation).
 For all other installation methods, no acction is required.
