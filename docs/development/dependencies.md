@@ -240,9 +240,6 @@ poetry export --extras all
 
 Be wary of bugs in `poetry export` and `pip install -r requirements.txt`.
 
-Note: `poetry export` will be made a plugin in Poetry 1.2. Additional config may
-be required.
-
 ## ...build a test wheel?
 
 I usually use
