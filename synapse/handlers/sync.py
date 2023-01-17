@@ -1613,9 +1613,9 @@ class SyncHandler:
         now_token = sync_result_builder.now_token
         since_stream_id = 0
         if sync_result_builder.since_token is not None:
-            since_stream_id = int(sync_result_builder.since_token.to_device_key)
+            since_stream_id = sync_result_builder.since_token.to_device_key
 
-        if device_id is not None and since_stream_id != int(now_token.to_device_key):
+        if device_id is not None and since_stream_id != now_token.to_device_key:
             messages, stream_id = await self.store.get_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
@@ -1684,7 +1684,7 @@ class SyncHandler:
             )
 
             push_rules_changed = await self.store.have_push_rules_changed_for_user(
-                user_id, int(since_token.push_rules_key)
+                user_id, since_token.push_rules_key
             )
 
             if push_rules_changed:
@@ -1823,20 +1823,16 @@ class SyncHandler:
         if not sync_result_builder.sync_config.filter_collection.lazy_load_members():
             un_partial_state_rooms_since = 0
             if sync_result_builder.since_token is not None:
-                un_partial_state_rooms_since = int(
+                un_partial_state_rooms_since = (
                     sync_result_builder.since_token.un_partial_state_rooms_key
                 )
 
-            un_partial_state_rooms_now = int(
-                sync_result_builder.now_token.un_partial_state_rooms_key
-            )
-            if un_partial_state_rooms_since != un_partial_state_rooms_now:
-                un_partial_stated_rooms = (
-                    await self.store.get_un_partial_stated_rooms_between(
-                        un_partial_state_rooms_since,
-                        un_partial_state_rooms_now,
-                    )
+            un_partial_stated_rooms = (
+                await self.store.get_un_partial_stated_rooms_between(
+                    un_partial_state_rooms_since,
+                    sync_result_builder.now_token.un_partial_state_rooms_key,
                 )
+            )
 
         # 2. We check up front if anything has changed, if it hasn't then there is
         # no point in going further.
