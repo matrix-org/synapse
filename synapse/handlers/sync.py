@@ -2145,8 +2145,8 @@ class SyncHandler:
             newly_joined = room_id in newly_joined_rooms
 
             # Partially joined rooms are omitted from non lazy-loading-members
-            # syncs until the resync completes and that room is fully stated. 
-            # When that happens, we need to include their full state in 
+            # syncs until the resync completes and that room is fully stated.
+            # When that happens, we need to include their full state in
             # the next non-lazy-loading sync.
             if (
                 not sync_config.filter_collection.lazy_load_members()
