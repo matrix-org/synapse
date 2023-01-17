@@ -33,11 +33,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
       - uses: matrix-org/setup-python-poetry@v1
         with:
+          python-version: "3.x"
           extras: "all"
       - run: poetry run scripts-dev/generate_sample_config.sh --check
       - run: poetry run scripts-dev/config-lint.sh
