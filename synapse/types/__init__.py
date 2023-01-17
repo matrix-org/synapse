@@ -634,7 +634,7 @@ class StreamToken:
     """A collection of keys joined together by underscores in the following
     order and which represent the position in their respective streams.
 
-    ex. `s2633508_17_338_6732159_1082514_541479_274711_265584_1`
+    ex. `s2633508_17_338_6732159_1082514_541479_274711_265584_1_379`
         1. `room_key`: `s2633508` which is a `RoomStreamToken`
            - `RoomStreamToken`'s can also look like `t426-2633508` or `m56~2.58~3.59`
            - See the docstring for `RoomStreamToken` for more details.
