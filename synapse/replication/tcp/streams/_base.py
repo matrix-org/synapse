@@ -463,6 +463,7 @@ class DeviceListsStream(Stream):
     @attr.s(slots=True, frozen=True, auto_attribs=True)
     class DeviceListsStreamRow:
         entity: str
+        # Indicates that a user has signed their own device with their user-signing key
         is_signature: bool
 
     NAME = "device_lists"
