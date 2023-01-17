@@ -164,9 +164,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     backfilled=True,
                 )
         elif stream_name == CachesStream.NAME:
-            if self._cache_id_gen:
-                self._cache_id_gen.advance(instance_name, token)
-
             for row in rows:
                 if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     if row.keys is None:
@@ -181,6 +178,14 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == CachesStream.NAME:
+            if self._cache_id_gen:
+                self._cache_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def _process_event_stream_row(self, token: int, row: EventsStreamRow) -> None:
         data = row.data
@@ -198,8 +203,14 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 backfilled=False,
             )
         elif row.type == EventsStreamCurrentStateRow.TypeId:
-            # TODO: Nothing to do here, handled in events_worker, cleanup?
-            pass
+            assert isinstance(data, EventsStreamCurrentStateRow)
+            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)
+
+            if data.type == EventTypes.Member:
+                self.get_rooms_for_user_with_stream_ordering.invalidate(
+                    (data.state_key,)
+                )
+                self.get_rooms_for_user.invalidate((data.state_key,))
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 

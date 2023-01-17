@@ -71,6 +71,7 @@ from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import PersistedEventPosition, RoomStreamToken
 from synapse.util.caches.descriptors import cached
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
@@ -395,6 +396,23 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # config. We don't do this now as otherwise two processes could conflict
         # during startup which would cause one to die.
         self._need_to_reset_federation_stream_positions = self._send_federation
+
+        events_max = self.get_room_max_stream_ordering()
+        event_cache_prefill, min_event_val = self.db_pool.get_cache_dict(
+            db_conn,
+            "events",
+            entity_column="room_id",
+            stream_column="stream_ordering",
+            max_value=events_max,
+        )
+        self._events_stream_cache = StreamChangeCache(
+            "EventsRoomStreamChangeCache",
+            min_event_val,
+            prefilled_cache=event_cache_prefill,
+        )
+        self._membership_stream_cache = StreamChangeCache(
+            "MembershipStreamChangeCache", events_max
+        )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
         self._min_stream_order_on_start = self.get_room_min_stream_ordering()

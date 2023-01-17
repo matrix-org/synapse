@@ -148,6 +148,9 @@ class ReplicationDataHandler:
             rows: a list of Stream.ROW_TYPE objects as returned by Stream.parse_row.
         """
         self.store.process_replication_rows(stream_name, instance_name, token, rows)
+        # NOTE: this must be called after process_replication_rows to ensure any
+        # cache invalidations are first handled before any stream ID advances.
+        self.store.process_replication_position(stream_name, instance_name, token)
 
         if self.send_handler:
             await self.send_handler.process_replication_rows(stream_name, token, rows)

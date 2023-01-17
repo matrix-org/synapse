@@ -249,22 +249,6 @@ class EventsWorkerStore(SQLBaseStore):
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        event_cache_prefill, min_event_val = self.db_pool.get_cache_dict(
-            db_conn,
-            "events",
-            entity_column="room_id",
-            stream_column="stream_ordering",
-            max_value=events_max,
-        )
-        self._events_stream_cache = StreamChangeCache(
-            "EventsRoomStreamChangeCache",
-            min_event_val,
-            prefilled_cache=event_cache_prefill,
-        )
-        self._membership_stream_cache = StreamChangeCache(
-            "MembershipStreamChangeCache", events_max
-        )
-
         if hs.config.worker.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
@@ -325,35 +309,14 @@ class EventsWorkerStore(SQLBaseStore):
             id_column="chain_id",
         )
 
-    def process_replication_rows(
-        self,
-        stream_name: str,
-        instance_name: str,
-        token: int,
-        rows: Iterable[Any],
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
     ) -> None:
-        # Process event stream replication rows, handling both the ID generators from the events
-        # worker store and the stream change caches in this store as the two are interlinked.
         if stream_name == EventsStream.NAME:
-            for row in rows:
-                if row.type == EventsStreamEventRow.TypeId:
-                    self._events_stream_cache.entity_has_changed(
-                        row.data.room_id, token
-                    )
-                    if row.data.type == EventTypes.Member:
-                        self._membership_stream_cache.entity_has_changed(
-                            row.data.state_key, token
-                        )
-                if row.type == EventsStreamCurrentStateRow.TypeId:
-                    self._curr_state_delta_stream_cache.entity_has_changed(
-                        row.data.room_id, token
-                    )
-            # Important that the ID gen advances after stream change caches
             self._stream_id_gen.advance(instance_name, token)
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
-
-        super().process_replication_rows(stream_name, instance_name, token, rows)
+        super().process_replication_position(stream_name, instance_name, token)
 
     async def have_censored_event(self, event_id: str) -> bool:
         """Check if an event has been censored, i.e. if the content of the event has been erased

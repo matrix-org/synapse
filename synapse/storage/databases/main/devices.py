@@ -163,14 +163,19 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     ) -> None:
         if stream_name == DeviceListsStream.NAME:
             self._invalidate_caches_for_devices(token, rows)
-            # Important that the ID gen advances after stream change caches
-            self._device_list_id_gen.advance(instance_name, token)
         elif stream_name == UserSignatureStream.NAME:
             for row in rows:
                 self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
-            # Important that the ID gen advances after stream change caches
-            self._device_list_id_gen.advance(instance_name, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == DeviceListsStream.NAME:
+            self._device_list_id_gen.advance(instance_name, token)
+        elif stream_name == UserSignatureStream.NAME:
+            self._device_list_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def _invalidate_caches_for_devices(
         self, token: int, rows: Iterable[DeviceListsStream.DeviceListsStreamRow]

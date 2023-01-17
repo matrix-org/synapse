@@ -160,9 +160,14 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     self._device_federation_outbox_stream_cache.entity_has_changed(
                         row.entity, token
                     )
-            # Important that the ID gen advances after stream change caches
-            self._device_inbox_id_gen.advance(instance_name, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == ToDeviceStream.NAME:
+            self._device_inbox_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def get_to_device_stream_token(self) -> int:
         return self._device_inbox_id_gen.get_current_token()

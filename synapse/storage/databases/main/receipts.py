@@ -600,10 +600,14 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
                     row.room_id, row.receipt_type, row.user_id
                 )
                 self._receipts_stream_cache.entity_has_changed(row.room_id, token)
-            # Important that the ID gen advances after stream change caches
-            self._receipts_id_gen.advance(instance_name, token)
-
         return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == ReceiptsStream.NAME:
+            self._receipts_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def _insert_linearized_receipt_txn(
         self,
