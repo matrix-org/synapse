@@ -148,6 +148,10 @@
 
                         <h1 id="managing-dependencies-with-poetry"><a class="header" href="#managing-dependencies-with-poetry">Managing dependencies with Poetry</a></h1>
 <p>This is a quick cheat sheet for developers on how to use <a href="https://python-poetry.org/"><code>poetry</code></a>.</p>
+<h1 id="installing"><a class="header" href="#installing">Installing</a></h1>
+<p>See the <a href="contributing_guide.html#4-install-the-dependencies">contributing guide</a>.</p>
+<p>Developers should use Poetry 1.3.2 or higher. If you encounter problems related
+to poetry, please <a href="#check-the-version-of-poetry-with-poetry---version">double-check your poetry version</a>.</p>
 <h1 id="background"><a class="header" href="#background">Background</a></h1>
 <p>Synapse uses a variety of third-party Python packages to function as a homeserver.
 Some of these are direct dependencies, listed in <code>pyproject.toml</code> under the
@@ -240,7 +244,7 @@ e.g. <code>mypy</code> instead of <code>poetry run mypy</code>; <code>python</co
 context of poetry's venv, without having to run <code>poetry shell</code> beforehand.</p>
 <h1 id="how-do-i"><a class="header" href="#how-do-i">How do I...</a></h1>
 <h2 id="reset-my-venv-to-the-locked-environment"><a class="header" href="#reset-my-venv-to-the-locked-environment">...reset my venv to the locked environment?</a></h2>
-<pre><code class="language-shell">poetry install --extras all --remove-untracked
+<pre><code class="language-shell">poetry install --all-extras --sync
 </code></pre>
 <h2 id="delete-everything-and-start-over-from-scratch"><a class="header" href="#delete-everything-and-start-over-from-scratch">...delete everything and start over from scratch?</a></h2>
 <pre><code class="language-shell"># Stop the current virtualenv if active
@@ -286,11 +290,7 @@ useful.</p>
 <ul>
 <li>manually update <code>pyproject.toml</code>; then <code>poetry lock --no-update</code>; or else</li>
 <li><code>poetry add packagename</code>. See <code>poetry add --help</code>; note the <code>--dev</code>,
-<code>--extras</code> and <code>--optional</code> flags in particular.
-<ul>
-<li><strong>NB</strong>: this specifies the new package with a version given by a &quot;caret bound&quot;. This won't get forced to its lowest version in the old deps CI job: see <a href="https://github.com/matrix-org/synapse/blob/4e1374373857f2f7a911a31c50476342d9070681/.ci/scripts/test_old_deps.sh#L35-L39">this TODO</a>.</li>
-</ul>
-</li>
+<code>--extras</code> and <code>--optional</code> flags in particular.</li>
 </ul>
 <p>Include the updated <code>pyproject.toml</code> and <code>poetry.lock</code> files in your commit.</p>
 <h2 id="remove-a-dependency"><a class="header" href="#remove-a-dependency">...remove a dependency?</a></h2>
@@ -298,7 +298,7 @@ useful.</p>
 <pre><code class="language-shell">poetry remove packagename
 </code></pre>
 <p>ought to do the trick. Alternatively, manually update <code>pyproject.toml</code> and
-<code>poetry lock --no-update</code>. Include the updated <code>pyproject.toml</code> and poetry.lock`
+<code>poetry lock --no-update</code>. Include the updated <code>pyproject.toml</code> and <code>poetry.lock</code>
 files in your commit.</p>
 <h2 id="update-the-version-range-for-an-existing-dependency"><a class="header" href="#update-the-version-range-for-an-existing-dependency">...update the version range for an existing dependency?</a></h2>
 <p>Best done by manually editing <code>pyproject.toml</code>, then <code>poetry lock --no-update</code>.
@@ -326,8 +326,6 @@ poetry lock --no-update
 <pre><code class="language-shell">poetry export --extras all
 </code></pre>
 <p>Be wary of bugs in <code>poetry export</code> and <code>pip install -r requirements.txt</code>.</p>
-<p>Note: <code>poetry export</code> will be made a plugin in Poetry 1.2. Additional config may
-be required.</p>
 <h2 id="build-a-test-wheel"><a class="header" href="#build-a-test-wheel">...build a test wheel?</a></h2>
 <p>I usually use</p>
 <pre><code class="language-shell">poetry run pip install build &amp;&amp; poetry run python -m build
@@ -337,7 +335,7 @@ doesn't require poetry. (It's what we use in CI too). However, you could try
 <code>poetry build</code> too.</p>
 <h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
 <h2 id="check-the-version-of-poetry-with-poetry---version"><a class="header" href="#check-the-version-of-poetry-with-poetry---version">Check the version of poetry with <code>poetry --version</code>.</a></h2>
-<p>The minimum version of poetry supported by Synapse is 1.2.</p>
+<p>The minimum version of poetry supported by Synapse is 1.3.2.</p>
 <p>It can also be useful to check the version of <code>poetry-core</code> in use. If you've
 installed <code>poetry</code> with <code>pipx</code>, try <code>pipx runpip poetry list | grep poetry-core</code>.</p>
 <h2 id="clear-caches-poetry-cache-clear---all-pypi"><a class="header" href="#clear-caches-poetry-cache-clear---all-pypi">Clear caches: <code>poetry cache clear --all pypi</code>.</a></h2>
