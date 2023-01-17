@@ -238,7 +238,7 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 the ICU native dependency and its development headers
 so that PyICU can build since no prebuilt wheels are available.</p>
 <p>You can follow <a href="https://pypi.org/project/PyICU/">the PyICU documentation</a> to do so,
-and then do <code>pip install matrix-synapse[icu]</code> for a PyPI install.</p>
+and then do <code>pip install matrix-synapse[user-search]</code> for a PyPI install.</p>
 <p>Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.</p>
 <h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
@@ -791,8 +791,8 @@ federation requests.</p>
 <a href="https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api">Delete Room API</a>.</p>
 <h2 id="user-interactive-authentication-fallback-templates-can-now-display-errors"><a class="header" href="#user-interactive-authentication-fallback-templates-can-now-display-errors">User-interactive authentication fallback templates can now display errors</a></h2>
 <p>This may affect you if you make use of custom HTML templates for the
-<a href="../synapse/res/templates/recaptcha.html">reCAPTCHA</a> or
-<a href="../synapse/res/templates/terms.html">terms</a> fallback pages.</p>
+<a href="https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/recaptcha.html">reCAPTCHA (<code>synapse/res/templates/recaptcha.html</code>)</a> or
+<a href="https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/terms.html">terms (<code>synapse/res/templates/terms.html</code>)</a> fallback pages.</p>
 <p>The template is now provided an <code>error</code> variable if the authentication
 process failed. See the default templates linked above for an example.</p>
 <h2 id="removal-of-out-of-date-email-pushers"><a class="header" href="#removal-of-out-of-date-email-pushers">Removal of out-of-date email pushers</a></h2>
@@ -1256,7 +1256,7 @@ INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
 is configured to use SSO and a custom
 <code>sso_redirect_confirm_template_dir</code> configuration then these templates
 will need to be copied from
-<a href="synapse/res/templates">synapse/res/templates</a> into that directory.</p>
+<a href="https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates"><code>synapse/res/templates</code></a> into that directory.</p>
 <h2 id="synapse-sso-plugins-method-deprecation"><a class="header" href="#synapse-sso-plugins-method-deprecation">Synapse SSO Plugins Method Deprecation</a></h2>
 <p>Plugins using the <code>complete_sso_login</code> method of
 <code>synapse.module_api.ModuleApi</code> should update to using the async/await

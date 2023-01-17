@@ -321,7 +321,7 @@ The latest version of Synapse can be installed from <a href="setup/installation.
 <a href="https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/">https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/</a></p>
 <h4 id="archlinux"><a class="header" href="#archlinux">ArchLinux</a></h4>
 <p>The quickest way to get up and running with ArchLinux is probably with the community package
-<a href="https://www.archlinux.org/packages/community/any/matrix-synapse/">https://www.archlinux.org/packages/community/any/matrix-synapse/</a>, which should pull in most of
+<a href="https://archlinux.org/packages/community/x86_64/matrix-synapse/">https://archlinux.org/packages/community/x86_64/matrix-synapse/</a>, which should pull in most of
 the necessary dependencies.</p>
 <p>pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):</p>
 <pre><code class="language-sh">sudo pip install --upgrade pip
@@ -362,7 +362,7 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <p>System requirements:</p>
 <ul>
 <li>POSIX-compliant system (tested on Linux &amp; OS X)</li>
-<li>Python 3.7 or later, up to Python 3.10.</li>
+<li>Python 3.7 or later, up to Python 3.11.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
 <p>If building on an uncommon architecture for which pre-built wheels are
@@ -673,7 +673,7 @@ low-level postgres library is installed, which you can do with
 the relevant package.</p>
 </li>
 <li>
-<p>If you installed synapse <a href="setup/installation.html#installing-from-source">in a
+<p>If you installed synapse <a href="setup/installation.html#installing-as-a-python-module-from-pypi">in a
 virtualenv</a>, you can install
 the library with:</p>
 <pre><code>~/synapse/env/bin/pip install &quot;matrix-synapse[postgres]&quot;
@@ -901,7 +901,7 @@ listens to traffic on localhost. (Do not change <code>bind_addresses</code> to <
 when using a containerized Synapse, as that will prevent it from responding
 to proxied traffic.)</p>
 <p>Optionally, you can also set
-<a href="../usage/configuration/config_documentation.html#listeners"><code>request_id_header</code></a>
+<a href="./usage/configuration/config_documentation.html#listeners"><code>request_id_header</code></a>
 so that the server extracts and re-uses the same request ID format that the
 reverse proxy is using.</p>
 <h2 id="reverse-proxy-configuration-examples"><a class="header" href="#reverse-proxy-configuration-examples">Reverse-proxy configuration examples</a></h2>
@@ -1778,7 +1778,7 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 the ICU native dependency and its development headers
 so that PyICU can build since no prebuilt wheels are available.</p>
 <p>You can follow <a href="https://pypi.org/project/PyICU/">the PyICU documentation</a> to do so,
-and then do <code>pip install matrix-synapse[icu]</code> for a PyPI install.</p>
+and then do <code>pip install matrix-synapse[user-search]</code> for a PyPI install.</p>
 <p>Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.</p>
 <h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
@@ -2331,8 +2331,8 @@ federation requests.</p>
 <a href="https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api">Delete Room API</a>.</p>
 <h2 id="user-interactive-authentication-fallback-templates-can-now-display-errors"><a class="header" href="#user-interactive-authentication-fallback-templates-can-now-display-errors">User-interactive authentication fallback templates can now display errors</a></h2>
 <p>This may affect you if you make use of custom HTML templates for the
-<a href="../synapse/res/templates/recaptcha.html">reCAPTCHA</a> or
-<a href="../synapse/res/templates/terms.html">terms</a> fallback pages.</p>
+<a href="https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/recaptcha.html">reCAPTCHA (<code>synapse/res/templates/recaptcha.html</code>)</a> or
+<a href="https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/terms.html">terms (<code>synapse/res/templates/terms.html</code>)</a> fallback pages.</p>
 <p>The template is now provided an <code>error</code> variable if the authentication
 process failed. See the default templates linked above for an example.</p>
 <h2 id="removal-of-out-of-date-email-pushers"><a class="header" href="#removal-of-out-of-date-email-pushers">Removal of out-of-date email pushers</a></h2>
@@ -2796,7 +2796,7 @@ INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
 is configured to use SSO and a custom
 <code>sso_redirect_confirm_template_dir</code> configuration then these templates
 will need to be copied from
-<a href="synapse/res/templates">synapse/res/templates</a> into that directory.</p>
+<a href="https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates"><code>synapse/res/templates</code></a> into that directory.</p>
 <h2 id="synapse-sso-plugins-method-deprecation"><a class="header" href="#synapse-sso-plugins-method-deprecation">Synapse SSO Plugins Method Deprecation</a></h2>
 <p>Plugins using the <code>complete_sso_login</code> method of
 <code>synapse.module_api.ModuleApi</code> should update to using the async/await
@@ -3966,6 +3966,138 @@ delete any device that hasn't been accessed for more than the specified amount o
 <p>Example configuration:</p>
 <pre><code class="language-yaml">delete_stale_devices_after: 1y
 </code></pre>
+<hr />
+<h3 id="email-3"><a class="header" href="#email-3"><code>email</code></a></h3>
+<p>Configuration for sending emails from Synapse.</p>
+<p>Server admins can configure custom templates for email content. See
+<a href="usage/configuration/../../templates.html">here</a> for more information.</p>
+<p>This setting has the following sub-options:</p>
+<ul>
+<li>
+<p><code>smtp_host</code>: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.</p>
+</li>
+<li>
+<p><code>smtp_port</code>: The port on the mail server for outgoing SMTP. Defaults to 465 if <code>force_tls</code> is true, else 25.</p>
+<p><em>Changed in Synapse 1.64.0:</em> the default port is now aware of <code>force_tls</code>.</p>
+</li>
+<li>
+<p><code>smtp_user</code> and <code>smtp_pass</code>: Username/password for authentication to the SMTP server. By default, no
+authentication is attempted.</p>
+</li>
+<li>
+<p><code>force_tls</code>: By default, Synapse connects over plain text and then optionally upgrades
+to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
+and the option <code>require_transport_security</code> is ignored.
+It is recommended to enable this if supported by your mail server.</p>
+<p><em>New in Synapse 1.64.0.</em></p>
+</li>
+<li>
+<p><code>require_transport_security</code>: Set to true to require TLS transport security for SMTP.
+By default, Synapse will connect over plain text, and will then switch to
+TLS via STARTTLS <em>if the SMTP server supports it</em>. If this option is set,
+Synapse will refuse to connect unless the server supports STARTTLS.</p>
+</li>
+<li>
+<p><code>enable_tls</code>: By default, if the server supports TLS, it will be used, and the server
+must present a certificate that is valid for 'smtp_host'. If this option
+is set to false, TLS will not be used.</p>
+</li>
+<li>
+<p><code>notif_from</code>: defines the &quot;From&quot; address to use when sending emails.
+It must be set if email sending is enabled. The placeholder '%(app)s' will be replaced by the application name,
+which is normally set in <code>app_name</code>, but may be overridden by the
+Matrix client application. Note that the placeholder must be written '%(app)s', including the
+trailing 's'.</p>
+</li>
+<li>
+<p><code>app_name</code>: <code>app_name</code> defines the default value for '%(app)s' in <code>notif_from</code> and email
+subjects. It defaults to 'Matrix'.</p>
+</li>
+<li>
+<p><code>enable_notifs</code>: Set to true to enable sending emails for messages that the user
+has missed. Disabled by default.</p>
+</li>
+<li>
+<p><code>notif_for_new_users</code>: Set to false to disable automatic subscription to email
+notifications for new users. Enabled by default.</p>
+</li>
+<li>
+<p><code>client_base_url</code>: Custom URL for client links within the email notifications. By default
+links will be based on &quot;https://matrix.to&quot;. (This setting used to be called <code>riot_base_url</code>;
+the old name is still supported for backwards-compatibility but is now deprecated.)</p>
+</li>
+<li>
+<p><code>validation_token_lifetime</code>: Configures the time that a validation email will expire after sending.
+Defaults to 1h.</p>
+</li>
+<li>
+<p><code>invite_client_location</code>: The web client location to direct users to during an invite. This is passed
+to the identity server as the <code>org.matrix.web_client_location</code> key. Defaults
+to unset, giving no guidance to the identity server.</p>
+</li>
+<li>
+<p><code>subjects</code>: Subjects to use when sending emails from Synapse. The placeholder '%(app)s' will
+be replaced with the value of the <code>app_name</code> setting, or by a value dictated by the Matrix client application.
+In addition, each subject can use the following placeholders: '%(person)s', which will be replaced by the displayname
+of the user(s) that sent the message(s), e.g. &quot;Alice and Bob&quot;, and '%(room)s', which will be replaced by the name of the room the
+message(s) have been sent to, e.g. &quot;My super room&quot;. In addition, emails related to account administration will
+can use the '%(server_name)s' placeholder, which will be replaced by the value of the
+<code>server_name</code> setting in your Synapse configuration.</p>
+<p>Here is a list of subjects for notification emails that can be set:</p>
+<ul>
+<li><code>message_from_person_in_room</code>: Subject to use to notify about one message from one or more user(s) in a
+room which has a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;</li>
+<li><code>message_from_person</code>: Subject to use to notify about one message from one or more user(s) in a
+room which doesn't have a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;</li>
+<li><code>messages_from_person</code>: Subject to use to notify about multiple messages from one or more users in
+a room which doesn't have a name. Defaults to &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;</li>
+<li><code>messages_in_room</code>: Subject to use to notify about multiple messages in a room which has a
+name. Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;</li>
+<li><code>messages_in_room_and_others</code>: Subject to use to notify about multiple messages in multiple rooms.
+Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;</li>
+<li><code>messages_from_person_and_others</code>: Subject to use to notify about multiple messages from multiple persons in
+multiple rooms. This is similar to the setting above except it's used when
+the room in which the notification was triggered has no name. Defaults to
+&quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;</li>
+<li><code>invite_from_person_to_room</code>: Subject to use to notify about an invite to a room which has a name.
+Defaults to  &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;</li>
+<li><code>invite_from_person</code>: Subject to use to notify about an invite to a room which doesn't have a
+name. Defaults to &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;</li>
+<li><code>password_reset</code>: Subject to use when sending a password reset email. Defaults to &quot;[%(server_name)s] Password reset&quot;</li>
+<li><code>email_validation</code>: Subject to use when sending a verification email to assert an address's
+ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
+</ul>
+</li>
+</ul>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">email:
+  smtp_host: mail.server
+  smtp_port: 587
+  smtp_user: &quot;exampleusername&quot;
+  smtp_pass: &quot;examplepassword&quot;
+  force_tls: true
+  require_transport_security: true
+  enable_tls: false
+  notif_from: &quot;Your Friendly %(app)s homeserver &lt;noreply@example.com&gt;&quot;
+  app_name: my_branded_matrix_server
+  enable_notifs: true
+  notif_for_new_users: false
+  client_base_url: &quot;http://localhost/riot&quot;
+  validation_token_lifetime: 15m
+  invite_client_location: https://app.element.io
+
+  subjects:
+    message_from_person_in_room: &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;
+    message_from_person: &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;
+    messages_from_person: &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;
+    messages_in_room: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;
+    messages_in_room_and_others: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;
+    messages_from_person_and_others: &quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;
+    invite_from_person_to_room: &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;
+    invite_from_person: &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;
+    password_reset: &quot;[%(server_name)s] Password reset&quot;
+    email_validation: &quot;[%(server_name)s] Validate your email&quot;
+</code></pre>
 <h2 id="homeserver-blocking"><a class="header" href="#homeserver-blocking">Homeserver blocking</a></h2>
 <p>Useful options for Synapse admins.</p>
 <hr />
@@ -4421,7 +4553,7 @@ durations.</p>
 <li><code>max_cache_memory_usage</code> sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
 They will continue to be evicted until the memory usage drops below the <code>target_memory_usage</code>, set in
 the setting below, or until the <code>min_cache_ttl</code> is hit. There is no default value for this option.</li>
-<li><code>target_memory_usage</code> sets a rough target for the desired memory usage of the caches. There is no default value
+<li><code>target_cache_memory_usage</code> sets a rough target for the desired memory usage of the caches. There is no default value
 for this option.</li>
 <li><code>min_cache_ttl</code> sets a limit under which newer cache entries are not evicted and is only applied when
 caches are actively being evicted/<code>max_cache_memory_usage</code> has been exceeded. This is to protect hot caches
@@ -4481,7 +4613,7 @@ connection pool. For a reference to valid arguments, see:</p>
 <ul>
 <li>for <a href="https://docs.python.org/3/library/sqlite3.html#sqlite3.connect">sqlite</a></li>
 <li>for <a href="https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS">postgres</a></li>
-<li>for <a href="https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__">the connection pool</a></li>
+<li>for <a href="https://docs.twistedmatrix.com/en/stable/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__">the connection pool</a></li>
 </ul>
 </li>
 </ul>
@@ -5512,20 +5644,20 @@ state events are shared with users:</p>
 <p>To change the default behavior, use the following sub-options:</p>
 <ul>
 <li>
-<p><code>disable_default_event_types</code>: boolean. Set to <code>true</code> to disable the above 
+<p><code>disable_default_event_types</code>: boolean. Set to <code>true</code> to disable the above
 defaults. If this is enabled, only the event types listed in
 <code>additional_event_types</code> are shared. Defaults to <code>false</code>.</p>
 </li>
 <li>
-<p><code>additional_event_types</code>: A list of additional state events to include in the 
-events to be shared. By default, this list is empty (so only the default event 
+<p><code>additional_event_types</code>: A list of additional state events to include in the
+events to be shared. By default, this list is empty (so only the default event
 types are shared).</p>
 <p>Each entry in this list should be either a single string or a list of two
-strings. </p>
+strings.</p>
 <ul>
 <li>A standalone string <code>t</code> represents all events with type <code>t</code> (i.e.
 with no restrictions on state keys).</li>
-<li>A pair of strings <code>[t, s]</code> represents a single event with type <code>t</code> and 
+<li>A pair of strings <code>[t, s]</code> represents a single event with type <code>t</code> and
 state key <code>s</code>. The same type can appear in two entries with different state
 keys: in this situation, both state keys are included in prejoin state.</li>
 </ul>
@@ -5918,8 +6050,14 @@ values are <code>client_secret_basic</code> (default), <code>client_secret_post<
 <code>none</code>.</p>
 </li>
 <li>
+<p><code>pkce_method</code>: Whether to use proof key for code exchange when requesting
+and exchanging the token. Valid values are: <code>auto</code>, <code>always</code>, or <code>never</code>. Defaults
+to <code>auto</code>, which uses PKCE if supported during metadata discovery. Set to <code>always</code>
+to force enable PKCE or <code>never</code> to force disable PKCE.</p>
+</li>
+<li>
 <p><code>scopes</code>: list of scopes to request. This should normally include the &quot;openid&quot;
-scope. Defaults to [&quot;openid&quot;].</p>
+scope. Defaults to <code>[&quot;openid&quot;]</code>.</p>
 </li>
 <li>
 <p><code>authorization_endpoint</code>: the oauth2 authorization endpoint. Required if
@@ -5973,9 +6111,23 @@ module's <code>parse_config</code> method.</p>
 <p>For the default provider, the following settings are available:</p>
 <ul>
 <li>
+<p><code>subject_template</code>: Jinja2 template for a unique identifier for the user.
+Defaults to <code>{{ user.sub }}</code>, which OpenID Connect compliant providers should provide.</p>
+<p>This replaces and overrides <code>subject_claim</code>.</p>
+</li>
+<li>
 <p><code>subject_claim</code>: name of the claim containing a unique identifier
 for the user. Defaults to 'sub', which OpenID Connect
 compliant providers should provide.</p>
+<p><em>Deprecated in Synapse v1.75.0.</em></p>
+</li>
+<li>
+<p><code>picture_template</code>: Jinja2 template for an url for the user's profile picture.
+Defaults to <code>{{ user.picture }}</code>, which OpenID Connect compliant providers should
+provide and has to refer to a direct image file such as PNG, JPEG, or GIF image file.</p>
+<p>This replaces and overrides <code>picture_claim</code>.</p>
+<p>Currently only supported in monolithic (single-process) server configurations
+where the media repository runs within the Synapse process.</p>
 </li>
 <li>
 <p><code>picture_claim</code>: name of the claim containing an url for the user's profile picture.
@@ -5983,6 +6135,7 @@ Defaults to 'picture', which OpenID Connect compliant providers should provide
 and has to refer to a direct image file such as PNG, JPEG, or GIF image file.</p>
 <p>Currently only supported in monolithic (single-process) server configurations
 where the media repository runs within the Synapse process.</p>
+<p><em>Deprecated in Synapse v1.75.0.</em></p>
 </li>
 <li>
 <p><code>localpart_template</code>: Jinja2 template for the localpart of the MXID.
@@ -6230,138 +6383,6 @@ adding a 3PID).</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">ui_auth:
     session_timeout: &quot;15s&quot;
-</code></pre>
-<hr />
-<h3 id="email-3"><a class="header" href="#email-3"><code>email</code></a></h3>
-<p>Configuration for sending emails from Synapse.</p>
-<p>Server admins can configure custom templates for email content. See
-<a href="usage/configuration/../../templates.html">here</a> for more information.</p>
-<p>This setting has the following sub-options:</p>
-<ul>
-<li>
-<p><code>smtp_host</code>: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.</p>
-</li>
-<li>
-<p><code>smtp_port</code>: The port on the mail server for outgoing SMTP. Defaults to 465 if <code>force_tls</code> is true, else 25.</p>
-<p><em>Changed in Synapse 1.64.0:</em> the default port is now aware of <code>force_tls</code>.</p>
-</li>
-<li>
-<p><code>smtp_user</code> and <code>smtp_pass</code>: Username/password for authentication to the SMTP server. By default, no
-authentication is attempted.</p>
-</li>
-<li>
-<p><code>force_tls</code>: By default, Synapse connects over plain text and then optionally upgrades
-to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
-and the option <code>require_transport_security</code> is ignored.
-It is recommended to enable this if supported by your mail server.</p>
-<p><em>New in Synapse 1.64.0.</em></p>
-</li>
-<li>
-<p><code>require_transport_security</code>: Set to true to require TLS transport security for SMTP.
-By default, Synapse will connect over plain text, and will then switch to
-TLS via STARTTLS <em>if the SMTP server supports it</em>. If this option is set,
-Synapse will refuse to connect unless the server supports STARTTLS.</p>
-</li>
-<li>
-<p><code>enable_tls</code>: By default, if the server supports TLS, it will be used, and the server
-must present a certificate that is valid for 'smtp_host'. If this option
-is set to false, TLS will not be used.</p>
-</li>
-<li>
-<p><code>notif_from</code>: defines the &quot;From&quot; address to use when sending emails.
-It must be set if email sending is enabled. The placeholder '%(app)s' will be replaced by the application name,
-which is normally set in <code>app_name</code>, but may be overridden by the
-Matrix client application. Note that the placeholder must be written '%(app)s', including the
-trailing 's'.</p>
-</li>
-<li>
-<p><code>app_name</code>: <code>app_name</code> defines the default value for '%(app)s' in <code>notif_from</code> and email
-subjects. It defaults to 'Matrix'.</p>
-</li>
-<li>
-<p><code>enable_notifs</code>: Set to true to enable sending emails for messages that the user
-has missed. Disabled by default.</p>
-</li>
-<li>
-<p><code>notif_for_new_users</code>: Set to false to disable automatic subscription to email
-notifications for new users. Enabled by default.</p>
-</li>
-<li>
-<p><code>client_base_url</code>: Custom URL for client links within the email notifications. By default
-links will be based on &quot;https://matrix.to&quot;. (This setting used to be called <code>riot_base_url</code>;
-the old name is still supported for backwards-compatibility but is now deprecated.)</p>
-</li>
-<li>
-<p><code>validation_token_lifetime</code>: Configures the time that a validation email will expire after sending.
-Defaults to 1h.</p>
-</li>
-<li>
-<p><code>invite_client_location</code>: The web client location to direct users to during an invite. This is passed
-to the identity server as the <code>org.matrix.web_client_location</code> key. Defaults
-to unset, giving no guidance to the identity server.</p>
-</li>
-<li>
-<p><code>subjects</code>: Subjects to use when sending emails from Synapse. The placeholder '%(app)s' will
-be replaced with the value of the <code>app_name</code> setting, or by a value dictated by the Matrix client application.
-In addition, each subject can use the following placeholders: '%(person)s', which will be replaced by the displayname
-of the user(s) that sent the message(s), e.g. &quot;Alice and Bob&quot;, and '%(room)s', which will be replaced by the name of the room the
-message(s) have been sent to, e.g. &quot;My super room&quot;. In addition, emails related to account administration will
-can use the '%(server_name)s' placeholder, which will be replaced by the value of the
-<code>server_name</code> setting in your Synapse configuration.</p>
-<p>Here is a list of subjects for notification emails that can be set:</p>
-<ul>
-<li><code>message_from_person_in_room</code>: Subject to use to notify about one message from one or more user(s) in a
-room which has a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;</li>
-<li><code>message_from_person</code>: Subject to use to notify about one message from one or more user(s) in a
-room which doesn't have a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;</li>
-<li><code>messages_from_person</code>: Subject to use to notify about multiple messages from one or more users in
-a room which doesn't have a name. Defaults to &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;</li>
-<li><code>messages_in_room</code>: Subject to use to notify about multiple messages in a room which has a
-name. Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;</li>
-<li><code>messages_in_room_and_others</code>: Subject to use to notify about multiple messages in multiple rooms.
-Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;</li>
-<li><code>messages_from_person_and_others</code>: Subject to use to notify about multiple messages from multiple persons in
-multiple rooms. This is similar to the setting above except it's used when
-the room in which the notification was triggered has no name. Defaults to
-&quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;</li>
-<li><code>invite_from_person_to_room</code>: Subject to use to notify about an invite to a room which has a name.
-Defaults to  &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;</li>
-<li><code>invite_from_person</code>: Subject to use to notify about an invite to a room which doesn't have a
-name. Defaults to &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;</li>
-<li><code>password_reset</code>: Subject to use when sending a password reset email. Defaults to &quot;[%(server_name)s] Password reset&quot;</li>
-<li><code>email_validation</code>: Subject to use when sending a verification email to assert an address's
-ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
-</ul>
-</li>
-</ul>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">email:
-  smtp_host: mail.server
-  smtp_port: 587
-  smtp_user: &quot;exampleusername&quot;
-  smtp_pass: &quot;examplepassword&quot;
-  force_tls: true
-  require_transport_security: true
-  enable_tls: false
-  notif_from: &quot;Your Friendly %(app)s homeserver &lt;noreply@example.com&gt;&quot;
-  app_name: my_branded_matrix_server
-  enable_notifs: true
-  notif_for_new_users: false
-  client_base_url: &quot;http://localhost/riot&quot;
-  validation_token_lifetime: 15m
-  invite_client_location: https://app.element.io
-
-  subjects:
-    message_from_person_in_room: &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;
-    message_from_person: &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;
-    messages_from_person: &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;
-    messages_in_room: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;
-    messages_in_room_and_others: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;
-    messages_from_person_and_others: &quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;
-    invite_from_person_to_room: &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;
-    invite_from_person: &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;
-    password_reset: &quot;[%(server_name)s] Password reset&quot;
-    email_validation: &quot;[%(server_name)s] Validate your email&quot;
 </code></pre>
 <hr />
 <h2 id="push"><a class="header" href="#push">Push</a></h2>
@@ -6773,6 +6794,33 @@ defaults to the main process.</p>
 <pre><code class="language-yaml">run_background_tasks_on: worker1
 </code></pre>
 <hr />
+<h3 id="update_user_directory_from_worker"><a class="header" href="#update_user_directory_from_worker"><code>update_user_directory_from_worker</code></a></h3>
+<p>The <a href="usage/configuration/../../workers.html#updating-the-user-directory">worker</a> that is used to
+update the user directory. If not provided this defaults to the main process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">update_user_directory_from_worker: worker1
+</code></pre>
+<p><em>Added in Synapse 1.59.0.</em></p>
+<hr />
+<h3 id="notify_appservices_from_worker"><a class="header" href="#notify_appservices_from_worker"><code>notify_appservices_from_worker</code></a></h3>
+<p>The <a href="usage/configuration/../../workers.html#notifying-application-services">worker</a> that is used to
+send output traffic to Application Services. If not provided this defaults
+to the main process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">notify_appservices_from_worker: worker1
+</code></pre>
+<p><em>Added in Synapse 1.59.0.</em></p>
+<hr />
+<h3 id="media_instance_running_background_jobs"><a class="header" href="#media_instance_running_background_jobs"><code>media_instance_running_background_jobs</code></a></h3>
+<p>The <a href="usage/configuration/../../workers.html#synapseappmedia_repository">worker</a> that is used to run
+background tasks for media repository. If running multiple media repositories
+you must configure a single instance to run the background tasks. If not provided
+this defaults to the main process or your single <code>media_repository</code> worker.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">media_instance_running_background_jobs: worker1
+</code></pre>
+<p><em>Added in Synapse 1.16.0.</em></p>
+<hr />
 <h3 id="redis"><a class="header" href="#redis"><code>redis</code></a></h3>
 <p>Configuration for Redis when using workers. This <em>must</em> be enabled when using workers.
 This setting has the following sub-options:</p>
@@ -6861,7 +6909,7 @@ other workers.</p>
 <hr />
 <h3 id="worker_daemonize"><a class="header" href="#worker_daemonize"><code>worker_daemonize</code></a></h3>
 <p>Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by <a href="usage/configuration/../../systemd-with-workers/README.html">systemd</a>, this option
+If Synapse is being managed by <a href="usage/configuration/../../systemd-with-workers/">systemd</a>, this option
 must be omitted or set to <code>false</code>.</p>
 <p>Defaults to <code>false</code>.</p>
 <p>Example configuration:</p>
@@ -7494,88 +7542,36 @@ Edit your Synapse config file and change the <code>oidc_config</code> section:</
         localpart_template: &quot;{{ user.preferred_username.split('@')[0] }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
 </code></pre>
-<h3 id="dex"><a class="header" href="#dex">Dex</a></h3>
-<p><a href="https://github.com/dexidp/dex">Dex</a> is a simple, open-source OpenID Connect Provider.
-Although it is designed to help building a full-blown provider with an
-external database, it can be configured with static passwords in a config file.</p>
-<p>Follow the <a href="https://dexidp.io/docs/getting-started/">Getting Started guide</a>
-to install Dex.</p>
-<p>Edit <code>examples/config-dev.yaml</code> config file from the Dex repo to add a client:</p>
-<pre><code class="language-yaml">staticClients:
-- id: synapse
-  secret: secret
-  redirectURIs:
-  - '[synapse public baseurl]/_synapse/client/oidc/callback'
-  name: 'Synapse'
-</code></pre>
-<p>Run with <code>dex serve examples/config-dev.yaml</code>.</p>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: dex
-    idp_name: &quot;My Dex server&quot;
-    skip_verification: true # This is needed as Dex is served on an insecure endpoint
-    issuer: &quot;http://127.0.0.1:5556/dex&quot;
-    client_id: &quot;synapse&quot;
-    client_secret: &quot;secret&quot;
-    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+<h3 id="apple"><a class="header" href="#apple">Apple</a></h3>
+<p>Configuring &quot;Sign in with Apple&quot; (SiWA) requires an Apple Developer account.</p>
+<p>You will need to create a new &quot;Services ID&quot; for SiWA, and create and download a
+private key with &quot;SiWA&quot; enabled.</p>
+<p>As well as the private key file, you will need:</p>
+<ul>
+<li>Client ID: the &quot;identifier&quot; you gave the &quot;Services ID&quot;</li>
+<li>Team ID: a 10-character ID associated with your developer account.</li>
+<li>Key ID: the 10-character identifier for the key.</li>
+</ul>
+<p><a href="https://help.apple.com/developer-account/?lang=en#/dev77c875b7e">Apple's developer documentation</a>
+has more information on setting up SiWA.</p>
+<p>The synapse config will look like this:</p>
+<pre><code class="language-yaml">  - idp_id: apple
+    idp_name: Apple
+    issuer: &quot;https://appleid.apple.com&quot;
+    client_id: &quot;your-client-id&quot; # Set to the &quot;identifier&quot; for your &quot;ServicesID&quot;
+    client_auth_method: &quot;client_secret_post&quot;
+    client_secret_jwt_key:
+      key_file: &quot;/path/to/AuthKey_KEYIDCODE.p8&quot;  # point to your key file
+      jwt_header:
+        alg: ES256
+        kid: &quot;KEYIDCODE&quot;   # Set to the 10-char Key ID
+      jwt_payload:
+        iss: TEAMIDCODE    # Set to the 10-char Team ID
+    scopes: [&quot;name&quot;, &quot;email&quot;, &quot;openid&quot;]
+    authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
     user_mapping_provider:
       config:
-        localpart_template: &quot;{{ user.name }}&quot;
-        display_name_template: &quot;{{ user.name|capitalize }}&quot;
-</code></pre>
-<h3 id="keycloak"><a class="header" href="#keycloak">Keycloak</a></h3>
-<p><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a> is an opensource IdP maintained by Red Hat.</p>
-<p>Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
-This can be optionally enabled by setting <code>backchannel_logout_enabled</code> to <code>true</code> in the Synapse configuration, and by setting the &quot;Backchannel Logout URL&quot; in Keycloak.</p>
-<p>Follow the <a href="https://www.keycloak.org/getting-started">Getting Started Guide</a> to install Keycloak and set up a realm.</p>
-<ol>
-<li>
-<p>Click <code>Clients</code> in the sidebar and click <code>Create</code></p>
-</li>
-<li>
-<p>Fill in the fields as below:</p>
-</li>
-</ol>
-<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
-<tr><td>Client ID</td><td><code>synapse</code></td></tr>
-<tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
-</tbody></table>
-<ol start="3">
-<li>Click <code>Save</code></li>
-<li>Fill in the fields as below:</li>
-</ol>
-<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
-<tr><td>Client ID</td><td><code>synapse</code></td></tr>
-<tr><td>Enabled</td><td><code>On</code></td></tr>
-<tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
-<tr><td>Access Type</td><td><code>confidential</code></td></tr>
-<tr><td>Valid Redirect URIs</td><td><code>[synapse public baseurl]/_synapse/client/oidc/callback</code></td></tr>
-<tr><td>Backchannel Logout URL (optional)</td><td> <code>[synapse public baseurl]/_synapse/client/oidc/backchannel_logout</code></td></tr>
-<tr><td>Backchannel Logout Session Required (optional)</td><td> <code>On</code></td></tr>
-</tbody></table>
-<ol start="5">
-<li>Click <code>Save</code></li>
-<li>On the Credentials tab, update the fields:</li>
-</ol>
-<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
-<tr><td>Client Authenticator</td><td><code>Client ID and Secret</code></td></tr>
-</tbody></table>
-<ol start="7">
-<li>Click <code>Regenerate Secret</code></li>
-<li>Copy Secret</li>
-</ol>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: keycloak
-    idp_name: &quot;My KeyCloak server&quot;
-    issuer: &quot;https://127.0.0.1:8443/realms/{realm_name}&quot;
-    client_id: &quot;synapse&quot;
-    client_secret: &quot;copy secret generated from above&quot;
-    scopes: [&quot;openid&quot;, &quot;profile&quot;]
-    user_mapping_provider:
-      config:
-        localpart_template: &quot;{{ user.preferred_username }}&quot;
-        display_name_template: &quot;{{ user.name }}&quot;
-    backchannel_logout_enabled: true # Optional
+        email_template: &quot;{{ user.email }}&quot;
 </code></pre>
 <h3 id="auth0"><a class="header" href="#auth0">Auth0</a></h3>
 <p><a href="https://auth0.com/">Auth0</a> is a hosted SaaS IdP solution.</p>
@@ -7656,253 +7652,34 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
         localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot; # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 </code></pre>
-<h3 id="lemonldap"><a class="header" href="#lemonldap">LemonLDAP</a></h3>
-<p><a href="https://lemonldap-ng.org/">LemonLDAP::NG</a> is an open-source IdP solution.</p>
-<ol>
-<li>Create an OpenID Connect Relying Parties in LemonLDAP::NG</li>
-<li>The parameters are:</li>
-</ol>
-<ul>
-<li>Client ID under the basic menu of the new Relying Parties (<code>Options &gt; Basic &gt; Client ID</code>)</li>
-<li>Client secret (<code>Options &gt; Basic &gt; Client secret</code>)</li>
-<li>JWT Algorithm: RS256 within the security menu of the new Relying Parties
-(<code>Options &gt; Security &gt; ID Token signature algorithm</code> and <code>Options &gt; Security &gt; Access Token signature algorithm</code>)</li>
-<li>Scopes: OpenID, Email and Profile</li>
-<li>Allowed redirection addresses for login (<code>Options &gt; Basic &gt; Allowed redirection addresses for login</code> ) :
-<code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
-</ul>
+<h3 id="dex"><a class="header" href="#dex">Dex</a></h3>
+<p><a href="https://github.com/dexidp/dex">Dex</a> is a simple, open-source OpenID Connect Provider.
+Although it is designed to help building a full-blown provider with an
+external database, it can be configured with static passwords in a config file.</p>
+<p>Follow the <a href="https://dexidp.io/docs/getting-started/">Getting Started guide</a>
+to install Dex.</p>
+<p>Edit <code>examples/config-dev.yaml</code> config file from the Dex repo to add a client:</p>
+<pre><code class="language-yaml">staticClients:
+- id: synapse
+  secret: secret
+  redirectURIs:
+  - '[synapse public baseurl]/_synapse/client/oidc/callback'
+  name: 'Synapse'
+</code></pre>
+<p>Run with <code>dex serve examples/config-dev.yaml</code>.</p>
 <p>Synapse config:</p>
 <pre><code class="language-yaml">oidc_providers:
-  - idp_id: lemonldap
-    idp_name: lemonldap
-    discover: true
-    issuer: &quot;https://auth.example.org/&quot; # TO BE FILLED: replace with your domain
-    client_id: &quot;your client id&quot; # TO BE FILLED
-    client_secret: &quot;your client secret&quot; # TO BE FILLED
-    scopes:
-      - &quot;openid&quot;
-      - &quot;profile&quot;
-      - &quot;email&quot;
-    user_mapping_provider:
-      config:
-        localpart_template: &quot;{{ user.preferred_username }}}&quot;
-        # TO BE FILLED: If your users have names in LemonLDAP::NG and you want those in Synapse, this should be replaced with user.name|capitalize or any valid filter.
-        display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot;
-</code></pre>
-<h3 id="github"><a class="header" href="#github">GitHub</a></h3>
-<p><a href="https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps">GitHub</a> is a bit special as it is not an OpenID Connect compliant provider, but
-just a regular OAuth2 provider.</p>
-<p>The <a href="https://developer.github.com/v3/users/#get-the-authenticated-user"><code>/user</code> API endpoint</a>
-can be used to retrieve information on the authenticated user. As the Synapse
-login mechanism needs an attribute to uniquely identify users, and that endpoint
-does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
-<ol>
-<li>Create a new OAuth application: <a href="https://github.com/settings/applications/new">https://github.com/settings/applications/new</a>.</li>
-<li>Set the callback URL to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
-</ol>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: github
-    idp_name: Github
-    idp_brand: &quot;github&quot;  # optional: styling hint for clients
-    discover: false
-    issuer: &quot;https://github.com/&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    authorization_endpoint: &quot;https://github.com/login/oauth/authorize&quot;
-    token_endpoint: &quot;https://github.com/login/oauth/access_token&quot;
-    userinfo_endpoint: &quot;https://api.github.com/user&quot;
-    scopes: [&quot;read:user&quot;]
-    user_mapping_provider:
-      config:
-        subject_claim: &quot;id&quot;
-        localpart_template: &quot;{{ user.login }}&quot;
-        display_name_template: &quot;{{ user.name }}&quot;
-</code></pre>
-<h3 id="google"><a class="header" href="#google">Google</a></h3>
-<p><a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a> is an OpenID certified authentication and authorisation provider.</p>
-<ol>
-<li>Set up a project in the Google API Console (see 
-<a href="https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup">documentation</a>).</li>
-<li>Add an &quot;OAuth Client ID&quot; for a Web Application under &quot;Credentials&quot;.</li>
-<li>Copy the Client ID and Client Secret, and add the following to your synapse config:
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: google
-    idp_name: Google
-    idp_brand: &quot;google&quot;  # optional: styling hint for clients
-    issuer: &quot;https://accounts.google.com/&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    scopes: [&quot;openid&quot;, &quot;profile&quot;, &quot;email&quot;] # email is optional, read below
-    user_mapping_provider:
-      config:
-        localpart_template: &quot;{{ user.given_name|lower }}&quot;
-        display_name_template: &quot;{{ user.name }}&quot;
-        email_template: &quot;{{ user.email }}&quot; # needs &quot;email&quot; in scopes above
-</code></pre>
-</li>
-<li>Back in the Google console, add this Authorized redirect URI: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
-</ol>
-<h3 id="twitch"><a class="header" href="#twitch">Twitch</a></h3>
-<ol>
-<li>Setup a developer account on <a href="https://dev.twitch.tv/">Twitch</a></li>
-<li>Obtain the OAuth 2.0 credentials by <a href="https://dev.twitch.tv/console/apps/">creating an app</a></li>
-<li>Add this OAuth Redirect URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
-</ol>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: twitch
-    idp_name: Twitch
-    issuer: &quot;https://id.twitch.tv/oauth2/&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    client_auth_method: &quot;client_secret_post&quot;
-    user_mapping_provider:
-      config:
-        localpart_template: &quot;{{ user.preferred_username }}&quot;
-        display_name_template: &quot;{{ user.name }}&quot;
-</code></pre>
-<h3 id="gitlab"><a class="header" href="#gitlab">GitLab</a></h3>
-<ol>
-<li>Create a <a href="https://gitlab.com/profile/applications">new application</a>.</li>
-<li>Add the <code>read_user</code> and <code>openid</code> scopes.</li>
-<li>Add this Callback URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
-</ol>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: gitlab
-    idp_name: Gitlab
-    idp_brand: &quot;gitlab&quot;  # optional: styling hint for clients
-    issuer: &quot;https://gitlab.com/&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    client_auth_method: &quot;client_secret_post&quot;
-    scopes: [&quot;openid&quot;, &quot;read_user&quot;]
-    user_profile_method: &quot;userinfo_endpoint&quot;
-    user_mapping_provider:
-      config:
-        localpart_template: '{{ user.nickname }}'
-        display_name_template: '{{ user.name }}'
-</code></pre>
-<h3 id="facebook"><a class="header" href="#facebook">Facebook</a></h3>
-<ol start="0">
-<li>You will need a Facebook developer account. You can register for one
-<a href="https://developers.facebook.com/async/registration/">here</a>.</li>
-<li>On the <a href="https://developers.facebook.com/apps/">apps</a> page of the developer
-console, &quot;Create App&quot;, and choose &quot;Build Connected Experiences&quot;.</li>
-<li>Once the app is created, add &quot;Facebook Login&quot; and choose &quot;Web&quot;. You don't
-need to go through the whole form here.</li>
-<li>In the left-hand menu, open &quot;Products&quot;/&quot;Facebook Login&quot;/&quot;Settings&quot;.
-<ul>
-<li>Add <code>[synapse public baseurl]/_synapse/client/oidc/callback</code> as an OAuth Redirect
-URL.</li>
-</ul>
-</li>
-<li>In the left-hand menu, open &quot;Settings/Basic&quot;. Here you can copy the &quot;App ID&quot;
-and &quot;App Secret&quot; for use below.</li>
-</ol>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">  - idp_id: facebook
-    idp_name: Facebook
-    idp_brand: &quot;facebook&quot;  # optional: styling hint for clients
-    discover: false
-    issuer: &quot;https://www.facebook.com&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    scopes: [&quot;openid&quot;, &quot;email&quot;]
-    authorization_endpoint: &quot;https://facebook.com/dialog/oauth&quot;
-    token_endpoint: &quot;https://graph.facebook.com/v9.0/oauth/access_token&quot;
-    jwks_uri: &quot;https://www.facebook.com/.well-known/oauth/openid/jwks/&quot;
-    user_mapping_provider:
-      config:
-        display_name_template: &quot;{{ user.name }}&quot;
-        email_template: &quot;{{ user.email }}&quot;
-</code></pre>
-<p>Relevant documents:</p>
-<ul>
-<li><a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow">Manually Build a Login Flow</a></li>
-<li><a href="https://developers.facebook.com/docs/graph-api/using-graph-api/">Using Facebook's Graph API</a></li>
-<li><a href="https://developers.facebook.com/docs/graph-api/reference/user">Reference to the User endpoint</a></li>
-</ul>
-<p>Facebook do have an <a href="https://www.facebook.com/.well-known/openid-configuration">OIDC discovery endpoint</a>,
-but it has a <code>response_types_supported</code> which excludes &quot;code&quot; (which we rely on, and
-is even mentioned in their <a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow#login">documentation</a>),
-so we have to disable discovery and configure the URIs manually.</p>
-<h3 id="gitea"><a class="header" href="#gitea">Gitea</a></h3>
-<p>Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.</p>
-<p>The <a href="https://try.gitea.io/api/swagger#/user/userGetCurrent"><code>/user</code> API endpoint</a>
-can be used to retrieve information on the authenticated user. As the Synapse
-login mechanism needs an attribute to uniquely identify users, and that endpoint
-does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
-<ol>
-<li>Create a new application.</li>
-<li>Add this Callback URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
-</ol>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: gitea
-    idp_name: Gitea
-    discover: false
-    issuer: &quot;https://your-gitea.com/&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
-    client_auth_method: client_secret_post
-    scopes: [] # Gitea doesn't support Scopes
-    authorization_endpoint: &quot;https://your-gitea.com/login/oauth/authorize&quot;
-    token_endpoint: &quot;https://your-gitea.com/login/oauth/access_token&quot;
-    userinfo_endpoint: &quot;https://your-gitea.com/api/v1/user&quot;
-    user_mapping_provider:
-      config:
-        subject_claim: &quot;id&quot;
-        localpart_template: &quot;{{ user.login }}&quot;
-        display_name_template: &quot;{{ user.full_name }}&quot;
-</code></pre>
-<h3 id="xwiki"><a class="header" href="#xwiki">XWiki</a></h3>
-<p>Install <a href="https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/">OpenID Connect Provider</a> extension in your <a href="https://www.xwiki.org">XWiki</a> instance.</p>
-<p>Synapse config:</p>
-<pre><code class="language-yaml">oidc_providers:
-  - idp_id: xwiki
-    idp_name: &quot;XWiki&quot;
-    issuer: &quot;https://myxwikihost/xwiki/oidc/&quot;
-    client_id: &quot;your-client-id&quot; # TO BE FILLED
-    client_auth_method: none
+  - idp_id: dex
+    idp_name: &quot;My Dex server&quot;
+    skip_verification: true # This is needed as Dex is served on an insecure endpoint
+    issuer: &quot;http://127.0.0.1:5556/dex&quot;
+    client_id: &quot;synapse&quot;
+    client_secret: &quot;secret&quot;
     scopes: [&quot;openid&quot;, &quot;profile&quot;]
-    user_profile_method: &quot;userinfo_endpoint&quot;
     user_mapping_provider:
       config:
-        localpart_template: &quot;{{ user.preferred_username }}&quot;
-        display_name_template: &quot;{{ user.name }}&quot;
-</code></pre>
-<h3 id="apple"><a class="header" href="#apple">Apple</a></h3>
-<p>Configuring &quot;Sign in with Apple&quot; (SiWA) requires an Apple Developer account.</p>
-<p>You will need to create a new &quot;Services ID&quot; for SiWA, and create and download a
-private key with &quot;SiWA&quot; enabled.</p>
-<p>As well as the private key file, you will need:</p>
-<ul>
-<li>Client ID: the &quot;identifier&quot; you gave the &quot;Services ID&quot;</li>
-<li>Team ID: a 10-character ID associated with your developer account.</li>
-<li>Key ID: the 10-character identifier for the key.</li>
-</ul>
-<p><a href="https://help.apple.com/developer-account/?lang=en#/dev77c875b7e">Apple's developer documentation</a>
-has more information on setting up SiWA.</p>
-<p>The synapse config will look like this:</p>
-<pre><code class="language-yaml">  - idp_id: apple
-    idp_name: Apple
-    issuer: &quot;https://appleid.apple.com&quot;
-    client_id: &quot;your-client-id&quot; # Set to the &quot;identifier&quot; for your &quot;ServicesID&quot;
-    client_auth_method: &quot;client_secret_post&quot;
-    client_secret_jwt_key:
-      key_file: &quot;/path/to/AuthKey_KEYIDCODE.p8&quot;  # point to your key file
-      jwt_header:
-        alg: ES256
-        kid: &quot;KEYIDCODE&quot;   # Set to the 10-char Key ID
-      jwt_payload:
-        iss: TEAMIDCODE    # Set to the 10-char Team ID
-    scopes: [&quot;name&quot;, &quot;email&quot;, &quot;openid&quot;]
-    authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
-    user_mapping_provider:
-      config:
-        email_template: &quot;{{ user.email }}&quot;
+        localpart_template: &quot;{{ user.name }}&quot;
+        display_name_template: &quot;{{ user.name|capitalize }}&quot;
 </code></pre>
 <h3 id="django-oauth-toolkit"><a class="header" href="#django-oauth-toolkit">Django OAuth Toolkit</a></h3>
 <p><a href="https://github.com/jazzband/django-oauth-toolkit">django-oauth-toolkit</a> is a
@@ -7952,6 +7729,242 @@ needed to add OAuth2 capabilities to your Django projects. It supports
         display_name_template: &quot;{{ user.first_name }} {{ user.last_name }}&quot;
         email_template: &quot;{{ user.email }}&quot;
 </code></pre>
+<h3 id="facebook"><a class="header" href="#facebook">Facebook</a></h3>
+<ol start="0">
+<li>You will need a Facebook developer account. You can register for one
+<a href="https://developers.facebook.com/async/registration/">here</a>.</li>
+<li>On the <a href="https://developers.facebook.com/apps/">apps</a> page of the developer
+console, &quot;Create App&quot;, and choose &quot;Build Connected Experiences&quot;.</li>
+<li>Once the app is created, add &quot;Facebook Login&quot; and choose &quot;Web&quot;. You don't
+need to go through the whole form here.</li>
+<li>In the left-hand menu, open &quot;Products&quot;/&quot;Facebook Login&quot;/&quot;Settings&quot;.
+<ul>
+<li>Add <code>[synapse public baseurl]/_synapse/client/oidc/callback</code> as an OAuth Redirect
+URL.</li>
+</ul>
+</li>
+<li>In the left-hand menu, open &quot;Settings/Basic&quot;. Here you can copy the &quot;App ID&quot;
+and &quot;App Secret&quot; for use below.</li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">  - idp_id: facebook
+    idp_name: Facebook
+    idp_brand: &quot;facebook&quot;  # optional: styling hint for clients
+    discover: false
+    issuer: &quot;https://www.facebook.com&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    scopes: [&quot;openid&quot;, &quot;email&quot;]
+    authorization_endpoint: &quot;https://facebook.com/dialog/oauth&quot;
+    token_endpoint: &quot;https://graph.facebook.com/v9.0/oauth/access_token&quot;
+    jwks_uri: &quot;https://www.facebook.com/.well-known/oauth/openid/jwks/&quot;
+    user_mapping_provider:
+      config:
+        display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
+<p>Relevant documents:</p>
+<ul>
+<li><a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow">Manually Build a Login Flow</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/using-graph-api/">Using Facebook's Graph API</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/reference/user">Reference to the User endpoint</a></li>
+</ul>
+<p>Facebook do have an <a href="https://www.facebook.com/.well-known/openid-configuration">OIDC discovery endpoint</a>,
+but it has a <code>response_types_supported</code> which excludes &quot;code&quot; (which we rely on, and
+is even mentioned in their <a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow#login">documentation</a>),
+so we have to disable discovery and configure the URIs manually.</p>
+<h3 id="github"><a class="header" href="#github">GitHub</a></h3>
+<p><a href="https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps">GitHub</a> is a bit special as it is not an OpenID Connect compliant provider, but
+just a regular OAuth2 provider.</p>
+<p>The <a href="https://developer.github.com/v3/users/#get-the-authenticated-user"><code>/user</code> API endpoint</a>
+can be used to retrieve information on the authenticated user. As the Synapse
+login mechanism needs an attribute to uniquely identify users, and that endpoint
+does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
+<ol>
+<li>Create a new OAuth application: <a href="https://github.com/settings/applications/new">https://github.com/settings/applications/new</a>.</li>
+<li>Set the callback URL to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: github
+    idp_name: Github
+    idp_brand: &quot;github&quot;  # optional: styling hint for clients
+    discover: false
+    issuer: &quot;https://github.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    authorization_endpoint: &quot;https://github.com/login/oauth/authorize&quot;
+    token_endpoint: &quot;https://github.com/login/oauth/access_token&quot;
+    userinfo_endpoint: &quot;https://api.github.com/user&quot;
+    scopes: [&quot;read:user&quot;]
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;id&quot;
+        localpart_template: &quot;{{ user.login }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="gitlab"><a class="header" href="#gitlab">GitLab</a></h3>
+<ol>
+<li>Create a <a href="https://gitlab.com/profile/applications">new application</a>.</li>
+<li>Add the <code>read_user</code> and <code>openid</code> scopes.</li>
+<li>Add this Callback URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: gitlab
+    idp_name: Gitlab
+    idp_brand: &quot;gitlab&quot;  # optional: styling hint for clients
+    issuer: &quot;https://gitlab.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    client_auth_method: &quot;client_secret_post&quot;
+    scopes: [&quot;openid&quot;, &quot;read_user&quot;]
+    user_profile_method: &quot;userinfo_endpoint&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: '{{ user.nickname }}'
+        display_name_template: '{{ user.name }}'
+</code></pre>
+<h3 id="gitea"><a class="header" href="#gitea">Gitea</a></h3>
+<p>Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.</p>
+<p>The <a href="https://try.gitea.io/api/swagger#/user/userGetCurrent"><code>/user</code> API endpoint</a>
+can be used to retrieve information on the authenticated user. As the Synapse
+login mechanism needs an attribute to uniquely identify users, and that endpoint
+does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
+<ol>
+<li>Create a new application.</li>
+<li>Add this Callback URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: gitea
+    idp_name: Gitea
+    discover: false
+    issuer: &quot;https://your-gitea.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    client_auth_method: client_secret_post
+    scopes: [] # Gitea doesn't support Scopes
+    authorization_endpoint: &quot;https://your-gitea.com/login/oauth/authorize&quot;
+    token_endpoint: &quot;https://your-gitea.com/login/oauth/access_token&quot;
+    userinfo_endpoint: &quot;https://your-gitea.com/api/v1/user&quot;
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;id&quot;
+        localpart_template: &quot;{{ user.login }}&quot;
+        display_name_template: &quot;{{ user.full_name }}&quot;
+</code></pre>
+<h3 id="google"><a class="header" href="#google">Google</a></h3>
+<p><a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a> is an OpenID certified authentication and authorisation provider.</p>
+<ol>
+<li>Set up a project in the Google API Console (see 
+<a href="https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup">documentation</a>).</li>
+<li>Add an &quot;OAuth Client ID&quot; for a Web Application under &quot;Credentials&quot;.</li>
+<li>Copy the Client ID and Client Secret, and add the following to your synapse config:
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: google
+    idp_name: Google
+    idp_brand: &quot;google&quot;  # optional: styling hint for clients
+    issuer: &quot;https://accounts.google.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    scopes: [&quot;openid&quot;, &quot;profile&quot;, &quot;email&quot;] # email is optional, read below
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.given_name|lower }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot; # needs &quot;email&quot; in scopes above
+</code></pre>
+</li>
+<li>Back in the Google console, add this Authorized redirect URI: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
+</ol>
+<h3 id="keycloak"><a class="header" href="#keycloak">Keycloak</a></h3>
+<p><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a> is an opensource IdP maintained by Red Hat.</p>
+<p>Keycloak supports OIDC Back-Channel Logout, which sends logout notification to Synapse, so that Synapse users get logged out when they log out from Keycloak.
+This can be optionally enabled by setting <code>backchannel_logout_enabled</code> to <code>true</code> in the Synapse configuration, and by setting the &quot;Backchannel Logout URL&quot; in Keycloak.</p>
+<p>Follow the <a href="https://www.keycloak.org/guides">Getting Started Guide</a> to install Keycloak and set up a realm.</p>
+<ol>
+<li>
+<p>Click <code>Clients</code> in the sidebar and click <code>Create</code></p>
+</li>
+<li>
+<p>Fill in the fields as below:</p>
+</li>
+</ol>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Client ID</td><td><code>synapse</code></td></tr>
+<tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
+</tbody></table>
+<ol start="3">
+<li>Click <code>Save</code></li>
+<li>Fill in the fields as below:</li>
+</ol>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Client ID</td><td><code>synapse</code></td></tr>
+<tr><td>Enabled</td><td><code>On</code></td></tr>
+<tr><td>Client Protocol</td><td><code>openid-connect</code></td></tr>
+<tr><td>Access Type</td><td><code>confidential</code></td></tr>
+<tr><td>Valid Redirect URIs</td><td><code>[synapse public baseurl]/_synapse/client/oidc/callback</code></td></tr>
+<tr><td>Backchannel Logout URL (optional)</td><td> <code>[synapse public baseurl]/_synapse/client/oidc/backchannel_logout</code></td></tr>
+<tr><td>Backchannel Logout Session Required (optional)</td><td> <code>On</code></td></tr>
+</tbody></table>
+<ol start="5">
+<li>Click <code>Save</code></li>
+<li>On the Credentials tab, update the fields:</li>
+</ol>
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Client Authenticator</td><td><code>Client ID and Secret</code></td></tr>
+</tbody></table>
+<ol start="7">
+<li>Click <code>Regenerate Secret</code></li>
+<li>Copy Secret</li>
+</ol>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: keycloak
+    idp_name: &quot;My KeyCloak server&quot;
+    issuer: &quot;https://127.0.0.1:8443/realms/{realm_name}&quot;
+    client_id: &quot;synapse&quot;
+    client_secret: &quot;copy secret generated from above&quot;
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+    backchannel_logout_enabled: true # Optional
+</code></pre>
+<h3 id="lemonldap"><a class="header" href="#lemonldap">LemonLDAP</a></h3>
+<p><a href="https://lemonldap-ng.org/">LemonLDAP::NG</a> is an open-source IdP solution.</p>
+<ol>
+<li>Create an OpenID Connect Relying Parties in LemonLDAP::NG</li>
+<li>The parameters are:</li>
+</ol>
+<ul>
+<li>Client ID under the basic menu of the new Relying Parties (<code>Options &gt; Basic &gt; Client ID</code>)</li>
+<li>Client secret (<code>Options &gt; Basic &gt; Client secret</code>)</li>
+<li>JWT Algorithm: RS256 within the security menu of the new Relying Parties
+(<code>Options &gt; Security &gt; ID Token signature algorithm</code> and <code>Options &gt; Security &gt; Access Token signature algorithm</code>)</li>
+<li>Scopes: OpenID, Email and Profile</li>
+<li>Allowed redirection addresses for login (<code>Options &gt; Basic &gt; Allowed redirection addresses for login</code> ) :
+<code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ul>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: lemonldap
+    idp_name: lemonldap
+    discover: true
+    issuer: &quot;https://auth.example.org/&quot; # TO BE FILLED: replace with your domain
+    client_id: &quot;your client id&quot; # TO BE FILLED
+    client_secret: &quot;your client secret&quot; # TO BE FILLED
+    scopes:
+      - &quot;openid&quot;
+      - &quot;profile&quot;
+      - &quot;email&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}}&quot;
+        # TO BE FILLED: If your users have names in LemonLDAP::NG and you want those in Synapse, this should be replaced with user.name|capitalize or any valid filter.
+        display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot;
+</code></pre>
 <h3 id="mastodon"><a class="header" href="#mastodon">Mastodon</a></h3>
 <p><a href="https://docs.joinmastodon.org/">Mastodon</a> instances provide an <a href="https://docs.joinmastodon.org/spec/oauth/">OAuth API</a>, allowing those instances to be used as a single sign-on provider for Synapse.</p>
 <p>The first step is to register Synapse as an application with your Mastodon instance, using the <a href="https://docs.joinmastodon.org/methods/apps/#create">Create an application API</a> (see also <a href="https://docs.joinmastodon.org/client/token/">here</a>). There are several ways to do this, but in the example below we are using CURL.</p>
@@ -7983,6 +7996,72 @@ needed to add OAuth2 capabilities to your Django projects. It supports
         subject_claim: &quot;id&quot;
 </code></pre>
 <p>Note that the fields <code>client_id</code> and <code>client_secret</code> are taken from the CURL response above.</p>
+<h3 id="twitch"><a class="header" href="#twitch">Twitch</a></h3>
+<ol>
+<li>Setup a developer account on <a href="https://dev.twitch.tv/">Twitch</a></li>
+<li>Obtain the OAuth 2.0 credentials by <a href="https://dev.twitch.tv/console/apps/">creating an app</a></li>
+<li>Add this OAuth Redirect URL: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: twitch
+    idp_name: Twitch
+    issuer: &quot;https://id.twitch.tv/oauth2/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    client_auth_method: &quot;client_secret_post&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
+<h3 id="twitter"><a class="header" href="#twitter">Twitter</a></h3>
+<p><em>Using Twitter as an identity provider requires using Synapse 1.75.0 or later.</em></p>
+<ol>
+<li>Setup a developer account on <a href="https://developer.twitter.com/en/portal/dashboard">Twitter</a></li>
+<li>Create a project &amp; app.</li>
+<li>Enable user authentication and under &quot;Type of App&quot; choose &quot;Web App, Automated App or Bot&quot;.</li>
+<li>Under &quot;App info&quot; set the callback URL to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
+<li>Obtain the OAuth 2.0 credentials under the &quot;Keys and tokens&quot; tab, copy the &quot;OAuth 2.0 Client ID and Client Secret&quot;</li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: twitter
+    idp_name: Twitter
+    idp_brand: &quot;twitter&quot;  # optional: styling hint for clients
+    discover: false  # Twitter is not OpenID compliant.
+    issuer: &quot;https://twitter.com/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_secret: &quot;your-client-secret&quot; # TO BE FILLED
+    pkce_method: &quot;always&quot;
+    # offline.access providers refresh tokens, tweet.read and users.read needed for userinfo request.
+    scopes: [&quot;offline.access&quot;, &quot;tweet.read&quot;, &quot;users.read&quot;]
+    authorization_endpoint: https://twitter.com/i/oauth2/authorize
+    token_endpoint: https://api.twitter.com/2/oauth2/token
+    userinfo_endpoint: https://api.twitter.com/2/users/me?user.fields=profile_image_url
+    user_mapping_provider:
+      config:
+        subject_template: &quot;{{ user.data.id }}&quot;
+        localpart_template: &quot;{{ user.data.username }}&quot;
+        display_name_template: &quot;{{ user.data.name }}&quot;
+        picture_template: &quot;{{ user.data.profile_image_url }}&quot;
+</code></pre>
+<h3 id="xwiki"><a class="header" href="#xwiki">XWiki</a></h3>
+<p>Install <a href="https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/">OpenID Connect Provider</a> extension in your <a href="https://www.xwiki.org">XWiki</a> instance.</p>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: xwiki
+    idp_name: &quot;XWiki&quot;
+    issuer: &quot;https://myxwikihost/xwiki/oidc/&quot;
+    client_id: &quot;your-client-id&quot; # TO BE FILLED
+    client_auth_method: none
+    scopes: [&quot;openid&quot;, &quot;profile&quot;]
+    user_profile_method: &quot;userinfo_endpoint&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="saml"><a class="header" href="#saml">SAML</a></h1>
 <p>Synapse supports authenticating users via the <a href="https://en.wikipedia.org/wiki/Security_Assertion_Markup_Language">Security Assertion
 Markup Language</a>
@@ -8139,7 +8218,7 @@ specified in the config. It is located at
 <a href="https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/oidc.py"><code>synapse.handlers.oidc.JinjaOidcMappingProvider</code></a>.</p>
 <h2 id="saml-mapping-providers"><a class="header" href="#saml-mapping-providers">SAML Mapping Providers</a></h2>
 <p>The SAML mapping provider can be customized by editing the
-<a href="docs/usage/configuration/config_documentation.html#saml2_config"><code>saml2_config.user_mapping_provider.module</code></a>
+<a href="usage/configuration/config_documentation.html#saml2_config"><code>saml2_config.user_mapping_provider.module</code></a>
 config option.</p>
 <p><code>saml2_config.user_mapping_provider.config</code> allows you to provide custom
 configuration options to the module. Check with the module's documentation for
@@ -9147,8 +9226,8 @@ that Synapse does not allow registering resources for several sub-paths in the <
 namespace (such as anything under <code>/_matrix/client</code> for example). It is strongly
 recommended that modules register their web resources under the <code>/_synapse/client</code>
 namespace.</p>
-<p>The provided resource is a Python class that implements Twisted's <a href="https://twistedmatrix.com/documents/current/api/twisted.web.resource.IResource.html">IResource</a>
-interface (such as <a href="https://twistedmatrix.com/documents/current/api/twisted.web.resource.Resource.html">Resource</a>).</p>
+<p>The provided resource is a Python class that implements Twisted's <a href="https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.IResource.html">IResource</a>
+interface (such as <a href="https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.Resource.html">Resource</a>).</p>
 <p>Only one resource can be registered for a given path. If several modules attempt to
 register a resource for the same path, the module that appears first in Synapse's
 configuration file takes priority.</p>
@@ -10375,7 +10454,7 @@ endpoints to the worker (<code>localhost:8083</code> in the above example).</p>
 <code>synctl</code> or your distribution's preferred service manager such as <code>systemd</code>. We
 recommend the use of <code>systemd</code> where available: for information on setting up
 <code>systemd</code> to start synapse workers, see
-<a href="systemd-with-workers">Systemd with Workers</a>. To use <code>synctl</code>, see
+<a href="systemd-with-workers/">Systemd with Workers</a>. To use <code>synctl</code>, see
 <a href="synctl_workers.html">Using synctl with Workers</a>.</p>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
@@ -10596,7 +10675,7 @@ An <code>event_creator</code> listens for requests from clients to create new ev
 so. It will then pass those events over HTTP replication to any configured event
 persisters (or the main process if none are configured).</p>
 <p>Note that <code>event_creator</code>s and <code>event_persister</code>s are implemented using the same
-<a href="workers.html#synapse.app.generic_worker"><code>synapse.app.generic_worker</code></a>.</p>
+<a href="workers.html#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a>.</p>
 <p>An example <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a>
 configuration with multiple writers:</p>
 <pre><code class="language-yaml">stream_writers:
@@ -10657,7 +10736,8 @@ worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
 <h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
 <p>You can designate one generic worker to update the user directory.</p>
-<p>Specify its name in the shared configuration as follows:</p>
+<p>Specify its name in the <a href="usage/configuration/config_documentation.html#update_user_directory_from_worker">shared configuration</a>
+as follows:</p>
 <pre><code class="language-yaml">update_user_directory_from_worker: worker_name
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
@@ -10673,16 +10753,36 @@ worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
 <p>You can designate one generic worker to send output traffic to Application Services.
 Doesn't handle any REST endpoints itself, but you should specify its name in the
-shared configuration as follows:</p>
+<a href="usage/configuration/config_documentation.html#notify_appservices_from_worker">shared configuration</a>
+as follows:</p>
 <pre><code class="language-yaml">notify_appservices_from_worker: worker_name
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
 after setting this option in the shared configuration!</p>
 <p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
 worker application type.</p>
+<h4 id="push-notifications"><a class="header" href="#push-notifications">Push Notifications</a></h4>
+<p>You can designate generic worker to sending push notifications to
+a <a href="https://spec.matrix.org/v1.5/push-gateway-api/">push gateway</a> such as
+<a href="https://github.com/matrix-org/sygnal">sygnal</a> and email.</p>
+<p>This will stop the main process sending push notifications.</p>
+<p>The workers responsible for sending push notifications can be defined using the
+<a href="usage/configuration/config_documentation.html#pusher_instances"><code>pusher_instances</code></a>
+option. For example:</p>
+<pre><code class="language-yaml">pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+</code></pre>
+<p>Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.</p>
+<p>These workers don't need to accept incoming HTTP requests to send push notifications,
+so no additional reverse proxy configuration is required for pusher workers.</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.pusher</code>
+worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>It is likely this option will be deprecated in the future and is not recommended for new
-installations. Instead, <a href="usage/configuration/config_documentation.html#pusher_instances">use <code>synapse.app.generic_worker</code> with the <code>pusher_instances</code></a>.</p>
+installations. Instead, <a href="workers.html#push-notifications">use <code>synapse.app.generic_worker</code> with the <code>pusher_instances</code></a>.</p>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
 <a href="usage/configuration/config_documentation.html#start_pushers"><code>start_pushers: false</code></a> in the
@@ -10715,7 +10815,7 @@ shared configuration file to stop the main synapse sending appservice notificati
 <p>Note this worker cannot be load-balanced: only one instance should be active.</p>
 <h3 id="synapseappfederation_sender"><a class="header" href="#synapseappfederation_sender"><code>synapse.app.federation_sender</code></a></h3>
 <p>It is likely this option will be deprecated in the future and not recommended for
-new installations. Instead, <a href="usage/configuration/config_documentation.html#federation_sender_instances">use <code>synapse.app.generic_worker</code> with the <code>federation_sender_instances</code></a>. </p>
+new installations. Instead, <a href="usage/configuration/config_documentation.html#federation_sender_instances">use <code>synapse.app.generic_worker</code> with the <code>federation_sender_instances</code></a>.</p>
 <p>Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
 <a href="usage/configuration/config_documentation.html#send_federation"><code>send_federation: false</code></a>
@@ -10779,7 +10879,9 @@ worker_listeners:
 worker_log_config: /etc/matrix-synapse/media-worker-log.yaml
 </code></pre>
 <p>Note that if running multiple media repositories they must be on the same server
-and you must configure a single instance to run the background tasks, e.g.:</p>
+and you must specify a single instance to run the background tasks in the
+<a href="usage/configuration/config_documentation.html#media_instance_running_background_jobs">shared configuration</a>,
+e.g.:</p>
 <pre><code class="language-yaml">media_instance_running_background_jobs: &quot;media-repository-1&quot;
 </code></pre>
 <p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
@@ -10981,7 +11083,7 @@ the changes being applied at a glance.</p>
 <p>Many of the API calls in the admin api will require an <code>access_token</code> for a
 server admin. (Note that a server admin is distinct from a room admin.)</p>
 <p>An existing user can be marked as a server admin by updating the database directly.</p>
-<p>Check your <a href="usage/administration/admin_api/config_documentation.html#database">database settings</a> in the configuration file, connect to the correct database using either <code>psql [database name]</code> (if using PostgreSQL) or <code>sqlite3 path/to/your/database.db</code> (if using SQLite) and elevate the user <code>@foo:bar.com</code> to administrator.</p>
+<p>Check your <a href="usage/administration/admin_api/../../configuration/config_documentation.html#database">database settings</a> in the configuration file, connect to the correct database using either <code>psql [database name]</code> (if using PostgreSQL) or <code>sqlite3 path/to/your/database.db</code> (if using SQLite) and elevate the user <code>@foo:bar.com</code> to administrator.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <p>A new server admin user can also be created using the <code>register_new_matrix_user</code>
@@ -10998,10 +11100,10 @@ providing the token as either a query parameter or a request header. To add it a
 <pre><code class="language-sh">curl --header &quot;Authorization: Bearer &lt;access_token&gt;&quot; &lt;the_rest_of_your_API_request&gt;
 </code></pre>
 <p>For example, suppose we want to
-<a href="usage/administration/admin_api/user_admin_api.html#query-user-account">query the account</a> of the user
+<a href="usage/administration/admin_api/../../../admin_api/user_admin_api.html#query-user-account">query the account</a> of the user
 <code>@foo:bar.com</code>. We need an admin access token (e.g.
 <code>syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk</code>), and we need to know which port
-Synapse's <a href="usage/administration/admin_api/config_documentation.html#listeners"><code>client</code> listener</a> is listening
+Synapse's <a href="usage/administration/admin_api/../../configuration/config_documentation.html#listeners"><code>client</code> listener</a> is listening
 on (e.g. <code>8008</code>). Then we can use the following command to request the account
 information from the Admin API.</p>
 <pre><code class="language-sh">curl --header &quot;Authorization: Bearer syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk&quot; -X GET http://127.0.0.1:8008/_synapse/admin/v2/users/@foo:bar.com
@@ -11013,7 +11115,7 @@ information from the Admin API.</p>
 use it, you must enable the account validity feature (under
 <code>account_validity</code>) in Synapse's configuration.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <h2 id="renew-account"><a class="header" href="#renew-account">Renew account</a></h2>
 <p>This API extends the validity of an account by as much time as configured in the
 <code>period</code> parameter from the <code>account_validity</code> configuration.</p>
@@ -11110,7 +11212,7 @@ background updates which won't be cancelled once started.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="show-reported-events"><a class="header" href="#show-reported-events">Show reported events</a></h1>
 <p>This API returns information about reported events.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/event_reports?from=0&amp;limit=10
 </code></pre>
@@ -11265,7 +11367,7 @@ have a canonical alias set.</li>
 <p>Details about the format of the <code>media_id</code> and storage of the media in the file system
 are documented under <a href="admin_api/../media_repository.html">media repository</a>.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <h2 id="list-all-media-in-a-room"><a class="header" href="#list-all-media-in-a-room">List all media in a room</a></h2>
 <p>This API gets a list of known media in a room.
 However, it only shows media from unencrypted events or rooms.</p>
@@ -11482,7 +11584,7 @@ paginate further back in the room from the point being purged from.</p>
 <p>Note that Synapse requires at least one message in each room, so it will never
 delete the last message in a room.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>POST /_synapse/admin/v1/purge_history/&lt;room_id&gt;[/&lt;event_id&gt;]
 </code></pre>
@@ -11603,7 +11705,7 @@ registration requests, as proposed in
 and stabilised in version 1.2 of the Matrix specification.
 To use it, you will need to enable the <code>registration_requires_token</code> config
 option, and authenticate by providing an <code>access_token</code> for a server admin:
-see <a href="usage/administration/admin_api/../admin_api">Admin API</a>.</p>
+see <a href="usage/administration/admin_api/../admin_api/">Admin API</a>.</p>
 <h2 id="registration-token-objects"><a class="header" href="#registration-token-objects">Registration token objects</a></h2>
 <p>Most endpoints make use of JSON objects that contain details about tokens.
 These objects have the following fields:</p>
@@ -11840,7 +11942,7 @@ to a room with a given <code>room_id_or_alias</code>. You can only modify the me
 local users. The server administrator must be in the room and have permission to
 invite users.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <h2 id="parameters"><a class="header" href="#parameters">Parameters</a></h2>
 <p>The following parameters are available:</p>
 <ul>
@@ -11865,7 +11967,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api">Ad
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <p><strong>Parameters</strong></p>
 <p>The following query parameters are available:</p>
 <ul>
@@ -12223,7 +12325,7 @@ If the room does not define a type, the value will be <code>null</code>.</li>
 sent to a room in a given timeframe. There are various parameters available
 that allow for filtering and ordering the returned list. This API supports pagination.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <p>This endpoint mirrors the <a href="https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3roomsroomidmessages">Matrix Spec defined Messages API</a>.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;/messages
@@ -12848,7 +12950,7 @@ can be used. See <a href="admin_api/../server_notices.html">the server notices d
 <p>Returns information about all local media usage of users. Gives the
 possibility to filter them by time and user.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/statistics/users/media
 </code></pre>
@@ -12922,7 +13024,7 @@ about the user and their local media. Objects contain the following fields:
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="user-admin-api"><a class="header" href="#user-admin-api">User Admin API</a></h1>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <h2 id="query-user-account"><a class="header" href="#query-user-account">Query User Account</a></h2>
 <p>This API returns information about a specific user account.</p>
 <p>The api is:</p>
@@ -14047,7 +14149,7 @@ the remote server before trying again, in ms. This is <code>0</code> if no furth
 <li><code>failure_ts</code> - nullable integer - The first time Synapse tried and failed to reach the
 remote server, in ms. This is <code>null</code> if communication with the remote server has never failed.</li>
 <li><code>last_successful_stream_ordering</code> - nullable integer - The stream ordering of the most
-recent successfully-sent <a href="usage/administration/admin_api/understanding_synapse_through_grafana_graphs.html#federation">PDU</a>
+recent successfully-sent <a href="usage/administration/admin_api/../understanding_synapse_through_grafana_graphs.html#federation">PDU</a>
 to this destination, or <code>null</code> if this information has not been tracked yet.</li>
 </ul>
 </li>
@@ -14120,7 +14222,7 @@ Room objects contain the following fields:
 <ul>
 <li><code>room_id</code> - string - The ID of the room.</li>
 <li><code>stream_ordering</code> - integer -  The stream ordering of the most recent
-successfully-sent <a href="usage/administration/admin_api/understanding_synapse_through_grafana_graphs.html#federation">PDU</a>
+successfully-sent <a href="usage/administration/admin_api/../understanding_synapse_through_grafana_graphs.html#federation">PDU</a>
 to this destination in this room.</li>
 </ul>
 </li>
@@ -14564,7 +14666,7 @@ option. By default, statistics are sent to Matrix.org.</p>
 consider using one of the following known implementations:</p>
 <ul>
 <li><a href="https://github.com/matrix-org/panopticon">Matrix.org's Panopticon</a></li>
-<li><a href="https://gitlab.com/famedly/company/devops/services/barad-dur">Famedly's Barad-dûr</a></li>
+<li><a href="https://gitlab.com/famedly/infra/services/barad-dur">Famedly's Barad-dûr</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="monthly-active-users"><a class="header" href="#monthly-active-users">Monthly Active Users</a></h1>
 <p>Synapse can be configured to record the number of monthly active users (also referred to as MAU) on a given homeserver.
@@ -14876,7 +14978,7 @@ WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h l
 <h2 id="compression-tool"><a class="header" href="#compression-tool">Compression tool</a></h2>
 <p>There is a tool at https://github.com/matrix-org/rust-synapse-compress-state which can compress the <code>state_groups_state</code> on a room by-room basis (essentially, it reduces the number of &quot;full&quot; state groups). This can result in dramatic reductions of the storage used.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="request-log-format"><a class="header" href="#request-log-format">Request log format</a></h1>
-<p>HTTP request logs are written by synapse (see <a href="usage/administration/../synapse/http/site.py"><code>site.py</code></a> for details).</p>
+<p>HTTP request logs are written by synapse (see <a href="https://github.com/matrix-org/synapse/tree/develop/synapse/http/site.py"><code>synapse/http/site.py</code></a> for details).</p>
 <p>See the following for how to decode the dense data available from the default logging configuration.</p>
 <pre><code>2020-10-01 12:00:00,000 - synapse.access.http.8008 - 311 - INFO - PUT-1000- 192.168.0.1 - 8008 - {another-matrix-server.com} Processed request: 0.100sec/-0.000sec (0.000sec, 0.000sec) (0.001sec/0.090sec/3) 11B !200 &quot;PUT /_matrix/federation/v1/send/1600000000000 HTTP/1.1&quot; &quot;Synapse/1.20.1&quot; [0 dbevts]
 -AAAAAAAAAAAAAAAAAAAAA-   -BBBBBBBBBBBBBBBBBBBBBB-   -C-   -DD-   -EEEEEE-  -FFFFFFFFF-   -GG-    -HHHHHHHHHHHHHHHHHHHHHHH-                     -IIIIII- -JJJJJJJ-  -KKKKKK-, -LLLLLL-  -MMMMMMM- -NNNNNN- O  -P- -QQ-  -RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR-   -SSSSSSSSSSSS-   -TTTTTT-
@@ -14912,7 +15014,7 @@ response and will simultaneously return with the first request, but with very
 small processing times.</p>
 <div style="break-before: page; page-break-before: always;"></div><h2 id="admin-faq"><a class="header" href="#admin-faq">Admin FAQ</a></h2>
 <h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
-<p>If your server already has an admin account you should use the <a href="usage/administration/../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a> to promote other accounts to become admins.</p>
+<p>If your server already has an admin account you should use the <a href="usage/administration/../../admin_api/user_admin_api.html#change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a> to promote other accounts to become admins.</p>
 <p>If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
@@ -14980,7 +15082,7 @@ error (typically along the lines of &quot;Invalid signature&quot;). They might s
 something like the following in their logs:</p>
 <pre><code>2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server &lt;server&gt; with key ed25519:a_EqML: Unable to verify signature for &lt;server&gt;
 </code></pre>
-<p>This is normally caused by a misconfiguration in your reverse-proxy. See <a href="usage/administration/docs/reverse_proxy.html">the reverse proxy docs</a> and double-check that your settings are correct.</p>
+<p>This is normally caused by a misconfiguration in your reverse-proxy. See <a href="usage/administration/../../reverse_proxy.html">the reverse proxy docs</a> and double-check that your settings are correct.</p>
 <h2 id="help-synapse-is-slow-and-eats-all-my-ramcpu"><a class="header" href="#help-synapse-is-slow-and-eats-all-my-ramcpu">Help!! Synapse is slow and eats all my RAM/CPU!</a></h2>
 <p>First, ensure you are running the latest version of Synapse, using Python 3
 with a <a href="usage/administration/../../postgres.html">PostgreSQL database</a>.</p>
@@ -15102,8 +15204,8 @@ Synapse developers.
 regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.</p>
 <p>Synapse's code style is documented <a href="development/../code_style.html">here</a>. Please follow
-it, including the conventions for the <a href="development/../code_style.html#configuration-file-format">sample configuration
-file</a>.</p>
+it, including the conventions for <a href="development/../code_style.html#configuration-code-and-documentation-format">configuration
+options and documentation</a>.</p>
 <p>We welcome improvements and additions to our documentation itself! When
 writing new pages, please
 <a href="https://github.com/matrix-org/synapse/tree/develop/docs#adding-to-the-documentation">build <code>docs</code> to a book</a>
@@ -15117,7 +15219,7 @@ or <code>maturin develop</code> (if installed) to rebuild the Rust code. Using <
 is quicker than <code>poetry install</code>, so is recommended when making frequent
 changes to the Rust code.</p>
 <h1 id="8-test-test-test"><a class="header" href="#8-test-test-test">8. Test, test, test!</a></h1>
-<p><a name="test-test-test"></a></p>
+<p><a name="test-test-test" id="test-test-test"></a></p>
 <p>While you're developing and before submitting a patch, you'll
 want to test your code.</p>
 <h2 id="run-the-linters"><a class="header" href="#run-the-linters">Run the linters.</a></h2>
@@ -15288,7 +15390,7 @@ install <a href="https://github.com/GoTestTools/gotestfmt">gotestfmt</a>.</p>
 </ol>
 <h2 id="changelog"><a class="header" href="#changelog">Changelog</a></h2>
 <p>All changes, even minor ones, need a corresponding changelog / newsfragment
-entry. These are managed by <a href="https://github.com/hawkowl/towncrier">Towncrier</a>.</p>
+entry. These are managed by <a href="https://github.com/twisted/towncrier">Towncrier</a>.</p>
 <p>To create a changelog entry, make a new file in the <code>changelog.d</code> directory named
 in the format of <code>PRnumber.type</code>. The type can be one of the following:</p>
 <ul>
@@ -15324,8 +15426,7 @@ chicken-and-egg problem.</p>
 <ol>
 <li>
 <p>Open the PR without a changelog file, see what number you got, and <em>then</em>
-add the changelog file to your branch (see <a href="development/contributing_guide.html#updating-your-pull-request">Updating your pull
-request</a>), or:</p>
+add the changelog file to your branch, or:</p>
 </li>
 <li>
 <p>Look at the <a href="https://github.com/matrix-org/synapse/issues?q=">list of all
@@ -15469,7 +15570,7 @@ errors in code.</p>
 <ul>
 <li><a href="https://black.readthedocs.io/en/stable/">black</a>, a source code formatter;</li>
 <li><a href="https://pycqa.github.io/isort/">isort</a>, which organises each file's imports;</li>
-<li><a href="https://flake8.pycqa.org/en/latest/">flake8</a>, which can spot common errors; and</li>
+<li><a href="https://github.com/charliermarsh/ruff">ruff</a>, which can spot common errors; and</li>
 <li><a href="https://mypy.readthedocs.io/en/stable/">mypy</a>, a type checker.</li>
 </ul>
 <p>Install them with:</p>
@@ -15481,7 +15582,7 @@ errors in code.</p>
 <p>It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
 functionality is supported in your editor for a more convenient
-development workflow. It is not, however, recommended to run <code>flake8</code> or <code>mypy</code>
+development workflow. It is not, however, recommended to run <code>mypy</code>
 on save as they take a while and can be very resource intensive.</p>
 <h2 id="general-rules"><a class="header" href="#general-rules">General rules</a></h2>
 <ul>

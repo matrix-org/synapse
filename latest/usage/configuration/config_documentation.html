@@ -629,6 +629,138 @@ delete any device that hasn't been accessed for more than the specified amount o
 <p>Example configuration:</p>
 <pre><code class="language-yaml">delete_stale_devices_after: 1y
 </code></pre>
+<hr />
+<h3 id="email"><a class="header" href="#email"><code>email</code></a></h3>
+<p>Configuration for sending emails from Synapse.</p>
+<p>Server admins can configure custom templates for email content. See
+<a href="../../templates.html">here</a> for more information.</p>
+<p>This setting has the following sub-options:</p>
+<ul>
+<li>
+<p><code>smtp_host</code>: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.</p>
+</li>
+<li>
+<p><code>smtp_port</code>: The port on the mail server for outgoing SMTP. Defaults to 465 if <code>force_tls</code> is true, else 25.</p>
+<p><em>Changed in Synapse 1.64.0:</em> the default port is now aware of <code>force_tls</code>.</p>
+</li>
+<li>
+<p><code>smtp_user</code> and <code>smtp_pass</code>: Username/password for authentication to the SMTP server. By default, no
+authentication is attempted.</p>
+</li>
+<li>
+<p><code>force_tls</code>: By default, Synapse connects over plain text and then optionally upgrades
+to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
+and the option <code>require_transport_security</code> is ignored.
+It is recommended to enable this if supported by your mail server.</p>
+<p><em>New in Synapse 1.64.0.</em></p>
+</li>
+<li>
+<p><code>require_transport_security</code>: Set to true to require TLS transport security for SMTP.
+By default, Synapse will connect over plain text, and will then switch to
+TLS via STARTTLS <em>if the SMTP server supports it</em>. If this option is set,
+Synapse will refuse to connect unless the server supports STARTTLS.</p>
+</li>
+<li>
+<p><code>enable_tls</code>: By default, if the server supports TLS, it will be used, and the server
+must present a certificate that is valid for 'smtp_host'. If this option
+is set to false, TLS will not be used.</p>
+</li>
+<li>
+<p><code>notif_from</code>: defines the &quot;From&quot; address to use when sending emails.
+It must be set if email sending is enabled. The placeholder '%(app)s' will be replaced by the application name,
+which is normally set in <code>app_name</code>, but may be overridden by the
+Matrix client application. Note that the placeholder must be written '%(app)s', including the
+trailing 's'.</p>
+</li>
+<li>
+<p><code>app_name</code>: <code>app_name</code> defines the default value for '%(app)s' in <code>notif_from</code> and email
+subjects. It defaults to 'Matrix'.</p>
+</li>
+<li>
+<p><code>enable_notifs</code>: Set to true to enable sending emails for messages that the user
+has missed. Disabled by default.</p>
+</li>
+<li>
+<p><code>notif_for_new_users</code>: Set to false to disable automatic subscription to email
+notifications for new users. Enabled by default.</p>
+</li>
+<li>
+<p><code>client_base_url</code>: Custom URL for client links within the email notifications. By default
+links will be based on &quot;https://matrix.to&quot;. (This setting used to be called <code>riot_base_url</code>;
+the old name is still supported for backwards-compatibility but is now deprecated.)</p>
+</li>
+<li>
+<p><code>validation_token_lifetime</code>: Configures the time that a validation email will expire after sending.
+Defaults to 1h.</p>
+</li>
+<li>
+<p><code>invite_client_location</code>: The web client location to direct users to during an invite. This is passed
+to the identity server as the <code>org.matrix.web_client_location</code> key. Defaults
+to unset, giving no guidance to the identity server.</p>
+</li>
+<li>
+<p><code>subjects</code>: Subjects to use when sending emails from Synapse. The placeholder '%(app)s' will
+be replaced with the value of the <code>app_name</code> setting, or by a value dictated by the Matrix client application.
+In addition, each subject can use the following placeholders: '%(person)s', which will be replaced by the displayname
+of the user(s) that sent the message(s), e.g. &quot;Alice and Bob&quot;, and '%(room)s', which will be replaced by the name of the room the
+message(s) have been sent to, e.g. &quot;My super room&quot;. In addition, emails related to account administration will
+can use the '%(server_name)s' placeholder, which will be replaced by the value of the
+<code>server_name</code> setting in your Synapse configuration.</p>
+<p>Here is a list of subjects for notification emails that can be set:</p>
+<ul>
+<li><code>message_from_person_in_room</code>: Subject to use to notify about one message from one or more user(s) in a
+room which has a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;</li>
+<li><code>message_from_person</code>: Subject to use to notify about one message from one or more user(s) in a
+room which doesn't have a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;</li>
+<li><code>messages_from_person</code>: Subject to use to notify about multiple messages from one or more users in
+a room which doesn't have a name. Defaults to &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;</li>
+<li><code>messages_in_room</code>: Subject to use to notify about multiple messages in a room which has a
+name. Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;</li>
+<li><code>messages_in_room_and_others</code>: Subject to use to notify about multiple messages in multiple rooms.
+Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;</li>
+<li><code>messages_from_person_and_others</code>: Subject to use to notify about multiple messages from multiple persons in
+multiple rooms. This is similar to the setting above except it's used when
+the room in which the notification was triggered has no name. Defaults to
+&quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;</li>
+<li><code>invite_from_person_to_room</code>: Subject to use to notify about an invite to a room which has a name.
+Defaults to  &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;</li>
+<li><code>invite_from_person</code>: Subject to use to notify about an invite to a room which doesn't have a
+name. Defaults to &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;</li>
+<li><code>password_reset</code>: Subject to use when sending a password reset email. Defaults to &quot;[%(server_name)s] Password reset&quot;</li>
+<li><code>email_validation</code>: Subject to use when sending a verification email to assert an address's
+ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
+</ul>
+</li>
+</ul>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">email:
+  smtp_host: mail.server
+  smtp_port: 587
+  smtp_user: &quot;exampleusername&quot;
+  smtp_pass: &quot;examplepassword&quot;
+  force_tls: true
+  require_transport_security: true
+  enable_tls: false
+  notif_from: &quot;Your Friendly %(app)s homeserver &lt;noreply@example.com&gt;&quot;
+  app_name: my_branded_matrix_server
+  enable_notifs: true
+  notif_for_new_users: false
+  client_base_url: &quot;http://localhost/riot&quot;
+  validation_token_lifetime: 15m
+  invite_client_location: https://app.element.io
+
+  subjects:
+    message_from_person_in_room: &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;
+    message_from_person: &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;
+    messages_from_person: &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;
+    messages_in_room: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;
+    messages_in_room_and_others: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;
+    messages_from_person_and_others: &quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;
+    invite_from_person_to_room: &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;
+    invite_from_person: &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;
+    password_reset: &quot;[%(server_name)s] Password reset&quot;
+    email_validation: &quot;[%(server_name)s] Validate your email&quot;
+</code></pre>
 <h2 id="homeserver-blocking"><a class="header" href="#homeserver-blocking">Homeserver blocking</a></h2>
 <p>Useful options for Synapse admins.</p>
 <hr />
@@ -1084,7 +1216,7 @@ durations.</p>
 <li><code>max_cache_memory_usage</code> sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
 They will continue to be evicted until the memory usage drops below the <code>target_memory_usage</code>, set in
 the setting below, or until the <code>min_cache_ttl</code> is hit. There is no default value for this option.</li>
-<li><code>target_memory_usage</code> sets a rough target for the desired memory usage of the caches. There is no default value
+<li><code>target_cache_memory_usage</code> sets a rough target for the desired memory usage of the caches. There is no default value
 for this option.</li>
 <li><code>min_cache_ttl</code> sets a limit under which newer cache entries are not evicted and is only applied when
 caches are actively being evicted/<code>max_cache_memory_usage</code> has been exceeded. This is to protect hot caches
@@ -1144,7 +1276,7 @@ connection pool. For a reference to valid arguments, see:</p>
 <ul>
 <li>for <a href="https://docs.python.org/3/library/sqlite3.html#sqlite3.connect">sqlite</a></li>
 <li>for <a href="https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS">postgres</a></li>
-<li>for <a href="https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__">the connection pool</a></li>
+<li>for <a href="https://docs.twistedmatrix.com/en/stable/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__">the connection pool</a></li>
 </ul>
 </li>
 </ul>
@@ -2175,20 +2307,20 @@ state events are shared with users:</p>
 <p>To change the default behavior, use the following sub-options:</p>
 <ul>
 <li>
-<p><code>disable_default_event_types</code>: boolean. Set to <code>true</code> to disable the above 
+<p><code>disable_default_event_types</code>: boolean. Set to <code>true</code> to disable the above
 defaults. If this is enabled, only the event types listed in
 <code>additional_event_types</code> are shared. Defaults to <code>false</code>.</p>
 </li>
 <li>
-<p><code>additional_event_types</code>: A list of additional state events to include in the 
-events to be shared. By default, this list is empty (so only the default event 
+<p><code>additional_event_types</code>: A list of additional state events to include in the
+events to be shared. By default, this list is empty (so only the default event
 types are shared).</p>
 <p>Each entry in this list should be either a single string or a list of two
-strings. </p>
+strings.</p>
 <ul>
 <li>A standalone string <code>t</code> represents all events with type <code>t</code> (i.e.
 with no restrictions on state keys).</li>
-<li>A pair of strings <code>[t, s]</code> represents a single event with type <code>t</code> and 
+<li>A pair of strings <code>[t, s]</code> represents a single event with type <code>t</code> and
 state key <code>s</code>. The same type can appear in two entries with different state
 keys: in this situation, both state keys are included in prejoin state.</li>
 </ul>
@@ -2581,8 +2713,14 @@ values are <code>client_secret_basic</code> (default), <code>client_secret_post<
 <code>none</code>.</p>
 </li>
 <li>
+<p><code>pkce_method</code>: Whether to use proof key for code exchange when requesting
+and exchanging the token. Valid values are: <code>auto</code>, <code>always</code>, or <code>never</code>. Defaults
+to <code>auto</code>, which uses PKCE if supported during metadata discovery. Set to <code>always</code>
+to force enable PKCE or <code>never</code> to force disable PKCE.</p>
+</li>
+<li>
 <p><code>scopes</code>: list of scopes to request. This should normally include the &quot;openid&quot;
-scope. Defaults to [&quot;openid&quot;].</p>
+scope. Defaults to <code>[&quot;openid&quot;]</code>.</p>
 </li>
 <li>
 <p><code>authorization_endpoint</code>: the oauth2 authorization endpoint. Required if
@@ -2636,9 +2774,23 @@ module's <code>parse_config</code> method.</p>
 <p>For the default provider, the following settings are available:</p>
 <ul>
 <li>
+<p><code>subject_template</code>: Jinja2 template for a unique identifier for the user.
+Defaults to <code>{{ user.sub }}</code>, which OpenID Connect compliant providers should provide.</p>
+<p>This replaces and overrides <code>subject_claim</code>.</p>
+</li>
+<li>
 <p><code>subject_claim</code>: name of the claim containing a unique identifier
 for the user. Defaults to 'sub', which OpenID Connect
 compliant providers should provide.</p>
+<p><em>Deprecated in Synapse v1.75.0.</em></p>
+</li>
+<li>
+<p><code>picture_template</code>: Jinja2 template for an url for the user's profile picture.
+Defaults to <code>{{ user.picture }}</code>, which OpenID Connect compliant providers should
+provide and has to refer to a direct image file such as PNG, JPEG, or GIF image file.</p>
+<p>This replaces and overrides <code>picture_claim</code>.</p>
+<p>Currently only supported in monolithic (single-process) server configurations
+where the media repository runs within the Synapse process.</p>
 </li>
 <li>
 <p><code>picture_claim</code>: name of the claim containing an url for the user's profile picture.
@@ -2646,6 +2798,7 @@ Defaults to 'picture', which OpenID Connect compliant providers should provide
 and has to refer to a direct image file such as PNG, JPEG, or GIF image file.</p>
 <p>Currently only supported in monolithic (single-process) server configurations
 where the media repository runs within the Synapse process.</p>
+<p><em>Deprecated in Synapse v1.75.0.</em></p>
 </li>
 <li>
 <p><code>localpart_template</code>: Jinja2 template for the localpart of the MXID.
@@ -2893,138 +3046,6 @@ adding a 3PID).</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">ui_auth:
     session_timeout: &quot;15s&quot;
-</code></pre>
-<hr />
-<h3 id="email"><a class="header" href="#email"><code>email</code></a></h3>
-<p>Configuration for sending emails from Synapse.</p>
-<p>Server admins can configure custom templates for email content. See
-<a href="../../templates.html">here</a> for more information.</p>
-<p>This setting has the following sub-options:</p>
-<ul>
-<li>
-<p><code>smtp_host</code>: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.</p>
-</li>
-<li>
-<p><code>smtp_port</code>: The port on the mail server for outgoing SMTP. Defaults to 465 if <code>force_tls</code> is true, else 25.</p>
-<p><em>Changed in Synapse 1.64.0:</em> the default port is now aware of <code>force_tls</code>.</p>
-</li>
-<li>
-<p><code>smtp_user</code> and <code>smtp_pass</code>: Username/password for authentication to the SMTP server. By default, no
-authentication is attempted.</p>
-</li>
-<li>
-<p><code>force_tls</code>: By default, Synapse connects over plain text and then optionally upgrades
-to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
-and the option <code>require_transport_security</code> is ignored.
-It is recommended to enable this if supported by your mail server.</p>
-<p><em>New in Synapse 1.64.0.</em></p>
-</li>
-<li>
-<p><code>require_transport_security</code>: Set to true to require TLS transport security for SMTP.
-By default, Synapse will connect over plain text, and will then switch to
-TLS via STARTTLS <em>if the SMTP server supports it</em>. If this option is set,
-Synapse will refuse to connect unless the server supports STARTTLS.</p>
-</li>
-<li>
-<p><code>enable_tls</code>: By default, if the server supports TLS, it will be used, and the server
-must present a certificate that is valid for 'smtp_host'. If this option
-is set to false, TLS will not be used.</p>
-</li>
-<li>
-<p><code>notif_from</code>: defines the &quot;From&quot; address to use when sending emails.
-It must be set if email sending is enabled. The placeholder '%(app)s' will be replaced by the application name,
-which is normally set in <code>app_name</code>, but may be overridden by the
-Matrix client application. Note that the placeholder must be written '%(app)s', including the
-trailing 's'.</p>
-</li>
-<li>
-<p><code>app_name</code>: <code>app_name</code> defines the default value for '%(app)s' in <code>notif_from</code> and email
-subjects. It defaults to 'Matrix'.</p>
-</li>
-<li>
-<p><code>enable_notifs</code>: Set to true to enable sending emails for messages that the user
-has missed. Disabled by default.</p>
-</li>
-<li>
-<p><code>notif_for_new_users</code>: Set to false to disable automatic subscription to email
-notifications for new users. Enabled by default.</p>
-</li>
-<li>
-<p><code>client_base_url</code>: Custom URL for client links within the email notifications. By default
-links will be based on &quot;https://matrix.to&quot;. (This setting used to be called <code>riot_base_url</code>;
-the old name is still supported for backwards-compatibility but is now deprecated.)</p>
-</li>
-<li>
-<p><code>validation_token_lifetime</code>: Configures the time that a validation email will expire after sending.
-Defaults to 1h.</p>
-</li>
-<li>
-<p><code>invite_client_location</code>: The web client location to direct users to during an invite. This is passed
-to the identity server as the <code>org.matrix.web_client_location</code> key. Defaults
-to unset, giving no guidance to the identity server.</p>
-</li>
-<li>
-<p><code>subjects</code>: Subjects to use when sending emails from Synapse. The placeholder '%(app)s' will
-be replaced with the value of the <code>app_name</code> setting, or by a value dictated by the Matrix client application.
-In addition, each subject can use the following placeholders: '%(person)s', which will be replaced by the displayname
-of the user(s) that sent the message(s), e.g. &quot;Alice and Bob&quot;, and '%(room)s', which will be replaced by the name of the room the
-message(s) have been sent to, e.g. &quot;My super room&quot;. In addition, emails related to account administration will
-can use the '%(server_name)s' placeholder, which will be replaced by the value of the
-<code>server_name</code> setting in your Synapse configuration.</p>
-<p>Here is a list of subjects for notification emails that can be set:</p>
-<ul>
-<li><code>message_from_person_in_room</code>: Subject to use to notify about one message from one or more user(s) in a
-room which has a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;</li>
-<li><code>message_from_person</code>: Subject to use to notify about one message from one or more user(s) in a
-room which doesn't have a name. Defaults to &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;</li>
-<li><code>messages_from_person</code>: Subject to use to notify about multiple messages from one or more users in
-a room which doesn't have a name. Defaults to &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;</li>
-<li><code>messages_in_room</code>: Subject to use to notify about multiple messages in a room which has a
-name. Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;</li>
-<li><code>messages_in_room_and_others</code>: Subject to use to notify about multiple messages in multiple rooms.
-Defaults to &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;</li>
-<li><code>messages_from_person_and_others</code>: Subject to use to notify about multiple messages from multiple persons in
-multiple rooms. This is similar to the setting above except it's used when
-the room in which the notification was triggered has no name. Defaults to
-&quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;</li>
-<li><code>invite_from_person_to_room</code>: Subject to use to notify about an invite to a room which has a name.
-Defaults to  &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;</li>
-<li><code>invite_from_person</code>: Subject to use to notify about an invite to a room which doesn't have a
-name. Defaults to &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;</li>
-<li><code>password_reset</code>: Subject to use when sending a password reset email. Defaults to &quot;[%(server_name)s] Password reset&quot;</li>
-<li><code>email_validation</code>: Subject to use when sending a verification email to assert an address's
-ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
-</ul>
-</li>
-</ul>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">email:
-  smtp_host: mail.server
-  smtp_port: 587
-  smtp_user: &quot;exampleusername&quot;
-  smtp_pass: &quot;examplepassword&quot;
-  force_tls: true
-  require_transport_security: true
-  enable_tls: false
-  notif_from: &quot;Your Friendly %(app)s homeserver &lt;noreply@example.com&gt;&quot;
-  app_name: my_branded_matrix_server
-  enable_notifs: true
-  notif_for_new_users: false
-  client_base_url: &quot;http://localhost/riot&quot;
-  validation_token_lifetime: 15m
-  invite_client_location: https://app.element.io
-
-  subjects:
-    message_from_person_in_room: &quot;[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...&quot;
-    message_from_person: &quot;[%(app)s] You have a message on %(app)s from %(person)s...&quot;
-    messages_from_person: &quot;[%(app)s] You have messages on %(app)s from %(person)s...&quot;
-    messages_in_room: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room...&quot;
-    messages_in_room_and_others: &quot;[%(app)s] You have messages on %(app)s in the %(room)s room and others...&quot;
-    messages_from_person_and_others: &quot;[%(app)s] You have messages on %(app)s from %(person)s and others...&quot;
-    invite_from_person_to_room: &quot;[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...&quot;
-    invite_from_person: &quot;[%(app)s] %(person)s has invited you to chat on %(app)s...&quot;
-    password_reset: &quot;[%(server_name)s] Password reset&quot;
-    email_validation: &quot;[%(server_name)s] Validate your email&quot;
 </code></pre>
 <hr />
 <h2 id="push"><a class="header" href="#push">Push</a></h2>
@@ -3436,6 +3457,33 @@ defaults to the main process.</p>
 <pre><code class="language-yaml">run_background_tasks_on: worker1
 </code></pre>
 <hr />
+<h3 id="update_user_directory_from_worker"><a class="header" href="#update_user_directory_from_worker"><code>update_user_directory_from_worker</code></a></h3>
+<p>The <a href="../../workers.html#updating-the-user-directory">worker</a> that is used to
+update the user directory. If not provided this defaults to the main process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">update_user_directory_from_worker: worker1
+</code></pre>
+<p><em>Added in Synapse 1.59.0.</em></p>
+<hr />
+<h3 id="notify_appservices_from_worker"><a class="header" href="#notify_appservices_from_worker"><code>notify_appservices_from_worker</code></a></h3>
+<p>The <a href="../../workers.html#notifying-application-services">worker</a> that is used to
+send output traffic to Application Services. If not provided this defaults
+to the main process.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">notify_appservices_from_worker: worker1
+</code></pre>
+<p><em>Added in Synapse 1.59.0.</em></p>
+<hr />
+<h3 id="media_instance_running_background_jobs"><a class="header" href="#media_instance_running_background_jobs"><code>media_instance_running_background_jobs</code></a></h3>
+<p>The <a href="../../workers.html#synapseappmedia_repository">worker</a> that is used to run
+background tasks for media repository. If running multiple media repositories
+you must configure a single instance to run the background tasks. If not provided
+this defaults to the main process or your single <code>media_repository</code> worker.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">media_instance_running_background_jobs: worker1
+</code></pre>
+<p><em>Added in Synapse 1.16.0.</em></p>
+<hr />
 <h3 id="redis"><a class="header" href="#redis"><code>redis</code></a></h3>
 <p>Configuration for Redis when using workers. This <em>must</em> be enabled when using workers.
 This setting has the following sub-options:</p>
@@ -3524,7 +3572,7 @@ other workers.</p>
 <hr />
 <h3 id="worker_daemonize"><a class="header" href="#worker_daemonize"><code>worker_daemonize</code></a></h3>
 <p>Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by <a href="../../systemd-with-workers/README.html">systemd</a>, this option
+If Synapse is being managed by <a href="../../systemd-with-workers/">systemd</a>, this option
 must be omitted or set to <code>false</code>.</p>
 <p>Defaults to <code>false</code>.</p>
 <p>Example configuration:</p>
