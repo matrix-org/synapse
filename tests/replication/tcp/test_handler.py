@@ -77,7 +77,7 @@ class ChannelsTestCase(BaseMultiWorkerStreamTestCase):
         )
 
     def test_wait_for_stream_position(self) -> None:
-        """Check that wait for stream position correctly waits and update from the
+        """Check that wait for stream position correctly waits for an update from the
         correct instance.
         """
         store = self.hs.get_datastores().main
