@@ -179,8 +179,15 @@ class BeeperStore(SQLBaseStore):
                             SELECT event_stream_ordering FROM beeper_user_notification_counts_stream_ordering
                         )
                         AND event_stream_ordering < (
-                            -- Arbitrary 100k offset for now
-                            SELECT MAX(stream_ordering) - 100000 FROM events
+                            -- Select highest stream ordering from events over one hour,
+                            -- this is to avoid serialization issues with the most
+                            -- recent events/receipts
+                            SELECT stream_ordering FROM events
+                            WHERE origin_server_ts < (
+                                (EXTRACT(EPOCH from NOW()) - 3600) * 1000
+                            )
+                            ORDER BY stream_ordering DESC
+                            LIMIT 1
                         )
                 )
                 UPDATE
