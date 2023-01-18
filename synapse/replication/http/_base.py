@@ -352,6 +352,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         instance_name=instance_name,
                         stream_name=stream_name,
                         position=position,
+                        raise_on_timeout=False,
                     )
 
                 return result
@@ -413,6 +414,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 instance_name=content[_STREAM_POSITION_KEY]["instance_name"],
                 stream_name=stream_name,
                 position=position,
+                raise_on_timeout=False,
             )
 
         if self.CACHE:
