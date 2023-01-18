@@ -40,7 +40,10 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_in_list_sql_clause,
 )
-from synapse.storage.databases.main.stream import generate_pagination_where_clause
+from synapse.storage.databases.main.stream import (
+    generate_pagination_bounds,
+    generate_pagination_where_clause,
+)
 from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
@@ -207,23 +210,22 @@ class RelationsWorkerStore(SQLBaseStore):
             where_clause.append("type = ?")
             where_args.append(event_type)
 
+        order, from_bound, to_bound = generate_pagination_bounds(
+            direction,
+            from_token.room_key if from_token else None,
+            to_token.room_key if to_token else None,
+        )
+
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_token.room_key.as_historical_tuple()
-            if from_token
-            else None,
-            to_token=to_token.room_key.as_historical_tuple() if to_token else None,
+            from_token=from_bound,
+            to_token=to_bound,
             engine=self.database_engine,
         )
 
         if pagination_clause:
             where_clause.append(pagination_clause)
-
-        if direction == "b":
-            order = "DESC"
-        else:
-            order = "ASC"
 
         sql = """
             SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
