@@ -297,7 +297,7 @@ to "1".
 
 Currently defaults to ["10"](https://spec.matrix.org/v1.5/rooms/v10/).
 
-_Changed in Synapse X.Y:_ the default version room version was increased from [9](https://spec.matrix.org/v1.5/rooms/v9/) to [10](https://spec.matrix.org/v1.5/rooms/v10/).
+_Changed in Synapse 1.76:_ the default version room version was increased from [9](https://spec.matrix.org/v1.5/rooms/v9/) to [10](https://spec.matrix.org/v1.5/rooms/v10/).
 
 Example configuration:
 ```yaml
