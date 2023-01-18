@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.config.login import LoginConfig
+from .login import LoginConfig
 from ._base import RootConfig
 from .account_validity import AccountValidityConfig
 from .api import ApiConfig
