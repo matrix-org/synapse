@@ -1831,6 +1831,7 @@ class SyncHandler:
                 await self.store.get_un_partial_stated_rooms_between(
                     un_partial_stated_rooms_since,
                     sync_result_builder.now_token.un_partial_stated_rooms_key,
+                    sync_result_builder.joined_room_ids,
                 )
             )
 

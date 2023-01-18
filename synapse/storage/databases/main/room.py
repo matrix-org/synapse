@@ -1287,7 +1287,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         return self._un_partial_stated_rooms_stream_id_gen.get_current_token()
 
     async def get_un_partial_stated_rooms_between(
-        self, last_id: int, current_id: int
+        self, last_id: int, current_id: int, room_ids: Collection[str]
     ) -> Set[str]:
         """Get all rooms that got un partial stated between `last_id` exclusive and
         `current_id` inclusive.
@@ -1304,9 +1304,14 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         ) -> Set[str]:
             sql = """
                 SELECT DISTINCT room_id FROM un_partial_stated_room_stream
-                WHERE ? < stream_id AND stream_id <= ?
+                WHERE ? < stream_id AND stream_id <= ? AND
             """
-            txn.execute(sql, (last_id, current_id))
+
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+
+            txn.execute(sql + clause, [last_id, current_id] + list(args))
 
             return {r[0] for r in txn}
 
