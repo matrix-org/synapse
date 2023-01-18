@@ -17,14 +17,8 @@
 
 # Irritatingly, there is no blessed guide on how to distribute an application with its
 # poetry-managed environment in a docker image. We have opted for
-# `poetry export | pip install -r /dev/stdin`, but there are known bugs in
-# in `poetry export` whose fixes (scheduled for poetry 1.2) have yet to be released.
-# In case we get bitten by those bugs in the future, the recommendations here might
-# be useful:
-#     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
-#     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
-
-
+# `poetry export | pip install -r /dev/stdin`, but beware: we have experienced bugs in
+# in `poetry export` in the past.
 
 ARG PYTHON_VERSION=3.9
 
@@ -49,7 +43,7 @@ RUN \
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry==1.2.0"
+  pip install --user "poetry==1.3.2"
 
 WORKDIR /synapse
 

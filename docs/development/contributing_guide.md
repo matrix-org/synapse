@@ -67,7 +67,7 @@ pipx install poetry
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
 for other installation methods.
 
-Synapse requires Poetry version 1.2.0 or later.
+Developing Synapse requires Poetry version 1.3.2 or later.
 
 Next, open a terminal and install dependencies as follows:
 
