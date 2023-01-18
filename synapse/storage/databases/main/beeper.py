@@ -229,8 +229,11 @@ class BeeperStore(SQLBaseStore):
 
             max_stream_ordering = max(orders)
             txn.execute(
-                "UPDATE beeper_user_notification_counts_stream_ordering SET stream_ordering = ?",
-                max_stream_ordering,
+                """
+                    UPDATE beeper_user_notification_counts_stream_ordering
+                    SET event_stream_ordering = ?
+                """,
+                (max_stream_ordering,),
             )
             txn.execute("DELETE FROM beeper_user_notification_counts WHERE aggregated")
 
