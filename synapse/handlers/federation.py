@@ -1732,10 +1732,7 @@ class FederationHandler:
                     (
                         restart_initial_destination,
                         restart_other_destinations,
-                    ) = self._partial_state_syncs_to_restart[room_id]
-
-                    # Clear the restart flag.
-                    self._partial_state_syncs_to_restart.pop(room_id, None)
+                    ) = self._partial_state_syncs_to_restart.pop(room_id)
 
                     if is_still_partial_state_room:
                         self._start_partial_state_room_sync(
