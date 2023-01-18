@@ -1819,8 +1819,12 @@ class SyncHandler:
 
         # Retrieve rooms that got un partial stated in the meantime, only useful in case
         # of a non lazy-loading-members sync.
+        # We also skip calculating that in case of initial sync since we don't need it.
         un_partial_stated_rooms = set()
-        if not sync_result_builder.sync_config.filter_collection.lazy_load_members():
+        if (
+            since_token
+            and not sync_result_builder.sync_config.filter_collection.lazy_load_members()
+        ):
             un_partial_stated_rooms_since = 0
             if sync_result_builder.since_token is not None:
                 un_partial_stated_rooms_since = (
