@@ -17,7 +17,7 @@ import logging
 import re
 import urllib.parse
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, ClassVar, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -111,7 +111,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     RETRY_ON_CONNECT_ERROR = True
     RETRY_ON_CONNECT_ERROR_ATTEMPTS = 5  # =63s (2^6-1)
 
-    WAIT_FOR_STREAMS = True
+    WAIT_FOR_STREAMS: ClassVar[bool] = True
 
     def __init__(self, hs: "HomeServer"):
         if self.CACHE:
