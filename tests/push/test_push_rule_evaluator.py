@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union, cast
 
 import frozendict
 
@@ -30,7 +30,7 @@ from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
 from synapse.synapse_rust.push import PushRuleEvaluator
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -39,7 +39,7 @@ from tests.test_utils.event_injection import create_event, inject_member_event
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
-        self, content: JsonDict, related_events=None
+        self, content: JsonMapping, related_events: Optional[JsonDict] = None
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
             {
@@ -59,7 +59,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             _flatten_dict(event),
             room_member_count,
             sender_power_level,
-            power_levels.get("notifications", {}),
+            cast(Dict[str, int], power_levels.get("notifications", {})),
             {} if related_events is None else related_events,
             True,
             event.room_version.msc3931_push_features,
@@ -70,9 +70,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         """Check for a matching display name in the body of the event."""
         evaluator = self._get_evaluator({"body": "foo bar baz"})
 
-        condition = {
-            "kind": "contains_display_name",
-        }
+        condition = {"kind": "contains_display_name"}
 
         # Blank names are skipped.
         self.assertFalse(evaluator.matches(condition, "@user:test", ""))
@@ -93,7 +91,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
 
     def _assert_matches(
-        self, condition: JsonDict, content: JsonDict, msg: Optional[str] = None
+        self, condition: JsonDict, content: JsonMapping, msg: Optional[str] = None
     ) -> None:
         evaluator = self._get_evaluator(content)
         self.assertTrue(evaluator.matches(condition, "@user:test", "display_name"), msg)
@@ -287,7 +285,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         This tests the behaviour of tweaks_for_actions.
         """
 
-        actions = [
+        actions: List[Union[Dict[str, str], str]] = [
             {"set_tweak": "sound", "value": "default"},
             {"set_tweak": "highlight"},
             "notify",
@@ -298,7 +296,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {"sound": "default", "highlight": True},
         )
 
-    def test_related_event_match(self):
+    def test_related_event_match(self) -> None:
         evaluator = self._get_evaluator(
             {
                 "m.relates_to": {
@@ -397,7 +395,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             )
         )
 
-    def test_related_event_match_with_fallback(self):
+    def test_related_event_match_with_fallback(self) -> None:
         evaluator = self._get_evaluator(
             {
                 "m.relates_to": {
@@ -469,7 +467,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             )
         )
 
-    def test_related_event_match_no_related_event(self):
+    def test_related_event_match_no_related_event(self) -> None:
         evaluator = self._get_evaluator(
             {"msgtype": "m.text", "body": "Message without related event"}
         )
@@ -518,7 +516,9 @@ class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         # Define an application service so that we can register appservice users
         self._service_token = "some_token"
         self._service = ApplicationService(

@@ -31,7 +31,12 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    AccountDataTypes,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -1403,11 +1408,14 @@ class SyncHandler:
 
         logger.debug("Fetching room data")
 
-        res = await self._generate_sync_entry_for_rooms(
+        (
+            newly_joined_rooms,
+            newly_joined_or_invited_or_knocked_users,
+            newly_left_rooms,
+            newly_left_users,
+        ) = await self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_or_invited_or_knocked_users, _, _ = res
-        _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
@@ -1789,6 +1797,7 @@ class SyncHandler:
             - newly_left_rooms
             - newly_left_users
         """
+
         since_token = sync_result_builder.since_token
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
@@ -2327,7 +2336,9 @@ class SyncHandler:
 
             account_data_events = []
             if tags is not None:
-                account_data_events.append({"type": "m.tag", "content": {"tags": tags}})
+                account_data_events.append(
+                    {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
+                )
 
             for account_data_type, content in account_data.items():
                 account_data_events.append(

@@ -8,7 +8,9 @@ It also prints out the example lines for Synapse main configuration file.
 
 Remember to route necessary endpoints directly to a worker associated with it.
 
-If you run the script as-is, it will create workers with the replication listener starting from port 8034 and another, regular http listener starting from 8044. If you don't need all of the stream writers listed in the script, just remove them from the ```STREAM_WRITERS``` array.
+If you run the script as-is, it will create workers with the replication listener starting from port 8034 and another, regular http listener starting from 8044. If you don't need all of the stream writers listed in the script, just remove them from the ```STREAM_WRITERS``` array. 
+
+Hint: Note that `worker_pid_file` is required if `worker_daemonize` is `true`. Uncomment and/or modify the line if needed.
 
 ```sh
 #!/bin/bash
@@ -46,9 +48,11 @@ worker_listeners:
 
   - type: http
     port: $(expr $HTTP_START_PORT + $i)
+    x_forwarded: true
     resources:
       - names: [client]
 
+#worker_pid_file: DATADIR/${STREAM_WRITERS[$i]}.pid
 worker_log_config: /etc/matrix-synapse/stream-writer-log.yaml
 EOF
 HOMESERVER_YAML_INSTANCE_MAP+=$"  ${STREAM_WRITERS[$i]}_stream_writer:
@@ -91,7 +95,9 @@ Simply run the script to create YAML files in the current folder and print out t
 
 ```console
 $ ./create_stream_writers.sh
-
+```
+You should receive an output similar to the following:
+```console
 # Add these lines to your homeserver.yaml.
 # Don't forget to configure your reverse proxy and
 # necessary endpoints to their respective worker.

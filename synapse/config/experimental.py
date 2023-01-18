@@ -17,6 +17,7 @@ from typing import Any, Optional
 import attr
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
+from synapse.config import ConfigError
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -74,11 +75,15 @@ class ExperimentalConfig(Config):
         )
 
         # MSC3706 (server-side support for partial state in /send_join responses)
+        # Synapse will always serve partial state responses to requests using the stable
+        # query parameter `omit_members`. If this flag is set, Synapse will also serve
+        # partial state responses to requests using the unstable query parameter
+        # `org.matrix.msc3706.partial_state`.
         self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
 
         # experimental support for faster joins over federation
         # (MSC2775, MSC3706, MSC3895)
-        # requires a target server with msc3706_enabled enabled.
+        # requires a target server that can provide a partial join response (MSC3706)
         self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
 
         # MSC3720 (Account status endpoint)
@@ -92,6 +97,9 @@ class ExperimentalConfig(Config):
 
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
+
+        # MSC3391: Removing account data.
+        self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
@@ -127,6 +135,17 @@ class ExperimentalConfig(Config):
             "msc3886_endpoint", None
         )
 
+        # MSC3890: Remotely silence local notifications
+        # Note: This option requires "experimental_features.msc3391_enabled" to be
+        # set to "true", in order to communicate account data deletions to clients.
+        self.msc3890_enabled: bool = experimental.get("msc3890_enabled", False)
+        if self.msc3890_enabled and not self.msc3391_enabled:
+            raise ConfigError(
+                "Option 'experimental_features.msc3391' must be set to 'true' to "
+                "enable 'experimental_features.msc3890'. MSC3391 functionality is "
+                "required to communicate account data deletions to clients."
+            )
+
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
 
@@ -139,3 +158,6 @@ class ExperimentalConfig(Config):
 
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
+
+        # MSC3925: do not replace events with their edits
+        self.msc3925_inhibit_edit = experimental.get("msc3925_inhibit_edit", False)

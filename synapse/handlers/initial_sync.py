@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
-from synapse.api.constants import EduTypes, EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig
@@ -239,7 +239,7 @@ class InitialSyncHandler:
                 tags = tags_by_room.get(event.room_id)
                 if tags:
                     account_data_events.append(
-                        {"type": "m.tag", "content": {"tags": tags}}
+                        {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
                     )
 
                 account_data = account_data_by_room.get(event.room_id, {})
@@ -326,7 +326,9 @@ class InitialSyncHandler:
         account_data_events = []
         tags = await self.store.get_tags_for_room(user_id, room_id)
         if tags:
-            account_data_events.append({"type": "m.tag", "content": {"tags": tags}})
+            account_data_events.append(
+                {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
+            )
 
         account_data = await self.store.get_account_data_for_room(user_id, room_id)
         for account_data_type, content in account_data.items():
