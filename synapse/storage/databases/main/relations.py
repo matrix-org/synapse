@@ -41,11 +41,12 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.stream import (
+    generate_next_token,
     generate_pagination_bounds,
     generate_pagination_where_clause,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
+from synapse.types import JsonDict, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -268,16 +269,9 @@ class RelationsWorkerStore(SQLBaseStore):
                 topo_orderings = topo_orderings[:limit]
                 stream_orderings = stream_orderings[:limit]
 
-                topo = topo_orderings[-1]
-                token = stream_orderings[-1]
-                if direction == "b":
-                    # Tokens are positions between events.
-                    # This token points *after* the last event in the chunk.
-                    # We need it to point to the event before it in the chunk
-                    # when we are going backwards so we subtract one from the
-                    # stream part.
-                    token -= 1
-                next_key = RoomStreamToken(topo, token)
+                next_key = generate_next_token(
+                    direction, topo_orderings[-1], stream_orderings[-1]
+                )
 
                 if from_token:
                     next_token = from_token.copy_and_replace(
