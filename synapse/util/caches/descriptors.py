@@ -21,6 +21,7 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Coroutine,
     Dict,
     Generic,
     Hashable,
@@ -58,7 +59,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 class CachedFunction(Generic[F]):
-    invalidate: Callable[[Tuple[Any, ...]], None]
+    invalidate: Callable[[Tuple[Any, ...]], Union[None, Coroutine]]
     invalidate_all: Callable[[], None]
     invalidate_external: Any = None
     prefill: Callable[[Tuple[Any, ...], Any], None]
