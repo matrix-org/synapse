@@ -8,7 +8,7 @@ logger = logging.Logger(__name__)
 
 
 class LoginConfig(Config):
-    section = "amax_login"
+    section = "login"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         #   amax_login:
