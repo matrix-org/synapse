@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from twisted.web.server import Request
 
 from synapse.http.server import HttpServer
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.logging.opentracing import active_span
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict
@@ -78,7 +77,7 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
         return {}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str
+        self, request: Request, content: JsonDict, user_id: str
     ) -> Tuple[int, Optional[JsonDict]]:
         user_devices = await self.device_list_updater.user_device_resync(user_id)
 
@@ -138,9 +137,8 @@ class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
         return {"user_ids": user_ids}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request
+        self, request: Request, content: JsonDict
     ) -> Tuple[int, Dict[str, Optional[JsonDict]]]:
-        content = parse_json_object_from_request(request)
         user_ids: List[str] = content["user_ids"]
 
         logger.info("Resync for %r", user_ids)
@@ -205,10 +203,8 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request
+        self, request: Request, content: JsonDict
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         user_id = content["user_id"]
         device_id = content["device_id"]
         keys = content["keys"]

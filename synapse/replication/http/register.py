@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Optional, Tuple
 from twisted.web.server import Request
 
 from synapse.http.server import HttpServer
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict
 
@@ -96,10 +95,8 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str
+        self, request: Request, content: JsonDict, user_id: str
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         await self.registration_handler.check_registration_ratelimit(content["address"])
 
         # Always default admin users to approved (since it means they were created by
@@ -150,10 +147,8 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
         return {"auth_result": auth_result, "access_token": access_token}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str
+        self, request: Request, content: JsonDict, user_id: str
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         auth_result = content["auth_result"]
         access_token = content["access_token"]
 
