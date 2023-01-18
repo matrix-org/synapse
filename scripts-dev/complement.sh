@@ -234,8 +234,6 @@ fi
 if [[ -n "$ASYNCIO_REACTOR" ]]; then
   # Enable the Twisted asyncio reactor
   export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=true
-else
-  export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=
 fi
 
 

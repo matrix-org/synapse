@@ -521,19 +521,6 @@ jobs:
           - arrangement: workers
             database: Postgres
 
-          - arrangement: monolith
-            database: SQLite
-            reactor: asyncio
-
-          - arrangement: monolith
-            database: Postgres
-            reactor: asyncio
-
-          - arrangement: workers
-            database: Postgres
-            reactor: asyncio
-
-
     steps:
       - name: Run actions/checkout@v3 for synapse
         uses: actions/checkout@v3
@@ -554,12 +541,11 @@ jobs:
 
       - run: |
           set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} \
-          WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} \
-          ASYNCIO_REACTOR=${{ (matrix.reactor == 'asyncio') && 1 || '' }} \
-          COMPLEMENT_DIR=`pwd`/complement \
-            synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
+        env:
+          POSTGRES: ${{ (matrix.database == 'Postgres') && 1 || '' }}
+          WORKERS: ${{ (matrix.arrangement == 'workers') && 1 || '' }}
         name: Run Complement Tests
 
   cargo-test:
