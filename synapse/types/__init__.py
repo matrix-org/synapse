@@ -627,6 +627,7 @@ class StreamKeyType:
     PUSH_RULES: Final = "push_rules_key"
     TO_DEVICE: Final = "to_device_key"
     DEVICE_LIST: Final = "device_list_key"
+    UN_PARTIAL_STATED_ROOMS = "un_partial_stated_rooms_key"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
