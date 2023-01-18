@@ -108,11 +108,14 @@ def prepare_database(
         # so we start one before running anything. This ensures that any upgrades
         # are either applied completely, or not at all.
         #
-        # psycopg2 does automatically start transactions, and while this is technically
-        # harmless to do there as well, doing so results in nested transactions. Those
-        # will generate warnings in Postgres' logs per query, and we'd rather like to
+        # psycopg2 does not automatically start transactions when in autocommit mode.
+        # While it is technically harmless nest transactions in postgres, doing so
+        # results in warnings in Postgres' logs per query. And we'd rather like to
         # avoid doing that.
-        if isinstance(database_engine, Sqlite3Engine):
+        if isinstance(database_engine, Sqlite3Engine) or (
+            isinstance(database_engine, PostgresEngine)
+            and db_conn.autocommit
+        ):
             cur.execute("BEGIN TRANSACTION")
 
         logger.info("%r: Checking existing schema version", databases)
