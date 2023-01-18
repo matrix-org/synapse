@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Collection, List, Optional, Tuple
 from unittest.mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
@@ -22,8 +25,18 @@ from synapse.api.errors import (
     ResourceLimitError,
     SynapseError,
 )
+from synapse.module_api import ModuleApi
+from synapse.server import HomeServer
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias, RoomID, UserID, create_requester
+from synapse.types import (
+    JsonDict,
+    Requester,
+    RoomAlias,
+    RoomID,
+    UserID,
+    create_requester,
+)
+from synapse.util import Clock
 
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
@@ -33,96 +46,99 @@ from .. import unittest
 
 
 class TestSpamChecker:
-    def __init__(self, config, api):
+    def __init__(self, config: None, api: ModuleApi):
         api.register_spam_checker_callbacks(
             check_registration_for_spam=self.check_registration_for_spam,
         )
 
     @staticmethod
-    def parse_config(config):
-        return config
+    def parse_config(config: JsonDict) -> None:
+        return None
 
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-        auth_provider_id,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str],
+    ) -> RegistrationBehaviour:
         pass
 
 
 class DenyAll(TestSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-        auth_provider_id,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.DENY
 
 
 class BanAll(TestSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-        auth_provider_id,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.SHADOW_BAN
 
 
 class BanBadIdPUser(TestSpamChecker):
     async def check_registration_for_spam(
-        self, email_threepid, username, request_info, auth_provider_id=None
-    ):
+        self,
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str] = None,
+    ) -> RegistrationBehaviour:
         # Reject any user coming from CAS and whose username contains profanity
-        if auth_provider_id == "cas" and "flimflob" in username:
+        if auth_provider_id == "cas" and username and "flimflob" in username:
             return RegistrationBehaviour.DENY
         return RegistrationBehaviour.ALLOW
 
 
 class TestLegacyRegistrationSpamChecker:
-    def __init__(self, config, api):
+    def __init__(self, config: None, api: ModuleApi):
         pass
 
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
         pass
 
 
 class LegacyAllowAll(TestLegacyRegistrationSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.ALLOW
 
 
 class LegacyDenyAll(TestLegacyRegistrationSpamChecker):
     async def check_registration_for_spam(
         self,
-        email_threepid,
-        username,
-        request_info,
-    ):
+        email_threepid: Optional[dict],
+        username: Optional[str],
+        request_info: Collection[Tuple[str, str]],
+    ) -> RegistrationBehaviour:
         return RegistrationBehaviour.DENY
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """Tests the RegistrationHandler."""
 
-    def make_homeserver(self, reactor, clock):
-        reactor.advance(1)
-
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        reactor.advance(1)  # type: ignore
         hs_config = self.default_config()
 
         # some of the tests rely on us having a user consent version
@@ -147,7 +163,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastores().main
         self.lots_of_users = 100
@@ -155,7 +171,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         self.requester = create_requester("@requester:test")
 
-    def test_user_is_created_and_logged_in_if_doesnt_exist(self):
+    def test_user_is_created_and_logged_in_if_doesnt_exist(self) -> None:
         frank = UserID.from_string("@frank:test")
         user_id = frank.to_string()
         requester = create_requester(user_id)
@@ -166,7 +182,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertIsInstance(result_token, str)
         self.assertGreater(len(result_token), 20)
 
-    def test_if_user_exists(self):
+    def test_if_user_exists(self) -> None:
         store = self.hs.get_datastores().main
         frank = UserID.from_string("@frank:test")
         self.get_success(
@@ -182,12 +198,12 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertTrue(result_token is not None)
 
     @override_config({"limit_usage_by_mau": False})
-    def test_mau_limits_when_disabled(self):
+    def test_mau_limits_when_disabled(self) -> None:
         # Ensure does not throw exception
         self.get_success(self.get_or_create_user(self.requester, "a", "display_name"))
 
     @override_config({"limit_usage_by_mau": True})
-    def test_get_or_create_user_mau_not_blocked(self):
+    def test_get_or_create_user_mau_not_blocked(self) -> None:
         self.store.count_monthly_users = Mock(
             return_value=make_awaitable(self.hs.config.server.max_mau_value - 1)
         )
@@ -195,7 +211,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.get_success(self.get_or_create_user(self.requester, "c", "User"))
 
     @override_config({"limit_usage_by_mau": True})
-    def test_get_or_create_user_mau_blocked(self):
+    def test_get_or_create_user_mau_blocked(self) -> None:
         self.store.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.lots_of_users)
         )
@@ -213,7 +229,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
     @override_config({"limit_usage_by_mau": True})
-    def test_register_mau_blocked(self):
+    def test_register_mau_blocked(self) -> None:
         self.store.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.lots_of_users)
         )
@@ -231,7 +247,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     @override_config(
         {"auto_join_rooms": ["#room:test"], "auto_join_rooms_for_guests": False}
     )
-    def test_auto_join_rooms_for_guests(self):
+    def test_auto_join_rooms_for_guests(self) -> None:
         user_id = self.get_success(
             self.handler.register_user(localpart="jeff", make_guest=True),
         )
@@ -239,7 +255,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(rooms), 0)
 
     @override_config({"auto_join_rooms": ["#room:test"]})
-    def test_auto_create_auto_join_rooms(self):
+    def test_auto_create_auto_join_rooms(self) -> None:
         room_alias_str = "#room:test"
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
@@ -251,7 +267,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(rooms), 1)
 
     @override_config({"auto_join_rooms": []})
-    def test_auto_create_auto_join_rooms_with_no_rooms(self):
+    def test_auto_create_auto_join_rooms_with_no_rooms(self) -> None:
         frank = UserID.from_string("@frank:test")
         user_id = self.get_success(self.handler.register_user(frank.localpart))
         self.assertEqual(user_id, frank.to_string())
@@ -259,7 +275,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(rooms), 0)
 
     @override_config({"auto_join_rooms": ["#room:another"]})
-    def test_auto_create_auto_join_where_room_is_another_domain(self):
+    def test_auto_create_auto_join_where_room_is_another_domain(self) -> None:
         frank = UserID.from_string("@frank:test")
         user_id = self.get_success(self.handler.register_user(frank.localpart))
         self.assertEqual(user_id, frank.to_string())
@@ -269,13 +285,13 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     @override_config(
         {"auto_join_rooms": ["#room:test"], "autocreate_auto_join_rooms": False}
     )
-    def test_auto_create_auto_join_where_auto_create_is_false(self):
+    def test_auto_create_auto_join_where_auto_create_is_false(self) -> None:
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
     @override_config({"auto_join_rooms": ["#room:test"]})
-    def test_auto_create_auto_join_rooms_when_user_is_not_a_real_user(self):
+    def test_auto_create_auto_join_rooms_when_user_is_not_a_real_user(self) -> None:
         room_alias_str = "#room:test"
         self.store.is_real_user = Mock(return_value=make_awaitable(False))
         user_id = self.get_success(self.handler.register_user(localpart="support"))
@@ -286,7 +302,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
 
     @override_config({"auto_join_rooms": ["#room:test"]})
-    def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
+    def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self) -> None:
         room_alias_str = "#room:test"
 
         self.store.count_real_users = Mock(return_value=make_awaitable(1))
@@ -301,7 +317,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(rooms), 1)
 
     @override_config({"auto_join_rooms": ["#room:test"]})
-    def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(self):
+    def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(
+        self,
+    ) -> None:
         self.store.count_real_users = Mock(return_value=make_awaitable(2))
         self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
@@ -314,7 +332,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             "autocreate_auto_join_rooms_federated": False,
         }
     )
-    def test_auto_create_auto_join_rooms_federated(self):
+    def test_auto_create_auto_join_rooms_federated(self) -> None:
         """
         Auto-created rooms that are private require an invite to go to the user
         (instead of directly joining it).
@@ -341,7 +359,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     @override_config(
         {"auto_join_rooms": ["#room:test"], "auto_join_mxid_localpart": "support"}
     )
-    def test_auto_join_mxid_localpart(self):
+    def test_auto_join_mxid_localpart(self) -> None:
         """
         Ensure the user still needs up in the room created by a different user.
         """
@@ -378,7 +396,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             "auto_join_mxid_localpart": "support",
         }
     )
-    def test_auto_create_auto_join_room_preset(self):
+    def test_auto_create_auto_join_room_preset(self) -> None:
         """
         Auto-created rooms that are private require an invite to go to the user
         (instead of directly joining it).
@@ -418,7 +436,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             "auto_join_mxid_localpart": "support",
         }
     )
-    def test_auto_create_auto_join_room_preset_guest(self):
+    def test_auto_create_auto_join_room_preset_guest(self) -> None:
         """
         Auto-created rooms that are private require an invite to go to the user
         (instead of directly joining it).
@@ -456,7 +474,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             "auto_join_mxid_localpart": "support",
         }
     )
-    def test_auto_create_auto_join_room_preset_invalid_permissions(self):
+    def test_auto_create_auto_join_room_preset_invalid_permissions(self) -> None:
         """
         Auto-created rooms that are private require an invite, check that
         registration doesn't completely break if the inviter doesn't have proper
@@ -527,7 +545,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             "auto_join_rooms": ["#room:test"],
         },
     )
-    def test_auto_create_auto_join_where_no_consent(self):
+    def test_auto_create_auto_join_where_no_consent(self) -> None:
         """Test to ensure that the first user is not auto-joined to a room if
         they have not given general consent.
         """
@@ -552,19 +570,19 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 1)
 
-    def test_register_support_user(self):
+    def test_register_support_user(self) -> None:
         user_id = self.get_success(
             self.handler.register_user(localpart="user", user_type=UserTypes.SUPPORT)
         )
         d = self.store.is_support_user(user_id)
         self.assertTrue(self.get_success(d))
 
-    def test_register_not_support_user(self):
+    def test_register_not_support_user(self) -> None:
         user_id = self.get_success(self.handler.register_user(localpart="user"))
         d = self.store.is_support_user(user_id)
         self.assertFalse(self.get_success(d))
 
-    def test_invalid_user_id_length(self):
+    def test_invalid_user_id_length(self) -> None:
         invalid_user_id = "x" * 256
         self.get_failure(
             self.handler.register_user(localpart=invalid_user_id), SynapseError
@@ -579,7 +597,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             ]
         }
     )
-    def test_spam_checker_deny(self):
+    def test_spam_checker_deny(self) -> None:
         """A spam checker can deny registration, which results in an error."""
         self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
 
@@ -592,7 +610,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             ]
         }
     )
-    def test_spam_checker_legacy_allow(self):
+    def test_spam_checker_legacy_allow(self) -> None:
         """Tests that a legacy spam checker implementing the legacy 3-arg version of the
         check_registration_for_spam callback is correctly called.
 
@@ -612,7 +630,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             ]
         }
     )
-    def test_spam_checker_legacy_deny(self):
+    def test_spam_checker_legacy_deny(self) -> None:
         """Tests that a legacy spam checker implementing the legacy 3-arg version of the
         check_registration_for_spam callback is correctly called.
 
@@ -632,7 +650,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             ]
         }
     )
-    def test_spam_checker_shadow_ban(self):
+    def test_spam_checker_shadow_ban(self) -> None:
         """A spam checker can choose to shadow-ban a user, which allows registration to succeed."""
         user_id = self.get_success(self.handler.register_user(localpart="user"))
 
@@ -662,7 +680,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             ]
         }
     )
-    def test_spam_checker_receives_sso_type(self):
+    def test_spam_checker_receives_sso_type(self) -> None:
         """Test rejecting registration based on SSO type"""
         f = self.get_failure(
             self.handler.register_user(localpart="bobflimflob", auth_provider_id="cas"),
@@ -680,8 +698,12 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
     async def get_or_create_user(
-        self, requester, localpart, displayname, password_hash=None
-    ):
+        self,
+        requester: Requester,
+        localpart: str,
+        displayname: Optional[str],
+        password_hash: Optional[str] = None,
+    ) -> Tuple[str, str]:
         """Creates a new user if the user does not exist,
         else revokes all previous access tokens and generates a new one.
 
@@ -736,13 +758,15 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
     """Tests auto-join on remote rooms."""
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.room_id = "!roomid:remotetest"
 
-        async def update_membership(*args, **kwargs):
+        async def update_membership(*args: Any, **kwargs: Any) -> None:
             pass
 
-        async def lookup_room_alias(*args, **kwargs):
+        async def lookup_room_alias(
+            *args: Any, **kwargs: Any
+        ) -> Tuple[RoomID, List[str]]:
             return RoomID.from_string(self.room_id), ["remotetest"]
 
         self.room_member_handler = Mock(spec=["update_membership", "lookup_room_alias"])
@@ -752,12 +776,12 @@ class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(room_member_handler=self.room_member_handler)
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastores().main
 
     @override_config({"auto_join_rooms": ["#room:remotetest"]})
-    def test_auto_create_auto_join_remote_room(self):
+    def test_auto_create_auto_join_remote_room(self) -> None:
         """Tests that we don't attempt to create remote rooms, and that we don't attempt
         to invite ourselves to rooms we're not in."""
 

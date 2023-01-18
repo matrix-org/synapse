@@ -610,6 +610,8 @@ class FederationEventHandler:
             self._state_storage_controller.notify_event_un_partial_stated(
                 event.event_id
             )
+            # Notify that there's a new row in the un_partial_stated_events stream.
+            self._notifier.notify_replication()
 
     @trace
     async def backfill(
@@ -1421,7 +1423,7 @@ class FederationEventHandler:
         """
 
         try:
-            await self._store.mark_remote_user_device_cache_as_stale(sender)
+            await self._store.mark_remote_users_device_caches_as_stale((sender,))
 
             # Immediately attempt a resync in the background
             if self._config.worker.worker_app:

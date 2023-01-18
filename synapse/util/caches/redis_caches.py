@@ -8,6 +8,7 @@ from typing import (
     Generic,
     List,
     Optional,
+    Tuple,
     Union,
     cast,
 )
@@ -75,7 +76,7 @@ def redisCached(
                 await redis_shard_cache.set(cache_name, cache_key, value)
             return value
 
-        async def _invalidate(key: KT) -> None:
+        async def _invalidate(key: Tuple[Any, ...]) -> None:
             return await redis_shard_cache.delete(
                 cache_name,
                 _redis_key(key),
