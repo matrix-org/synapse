@@ -109,8 +109,8 @@ def prepare_database(
         # are either applied completely, or not at all.
         #
         # psycopg2 does not automatically start transactions when in autocommit mode.
-        # While it is technically harmless nest transactions in postgres, doing so
-        # results in warnings in Postgres' logs per query. And we'd rather like to
+        # While it is technically harmless to nest transactions in postgres, doing so
+        # results in a warning in Postgres' logs per query. And we'd rather like to
         # avoid doing that.
         if isinstance(database_engine, Sqlite3Engine) or (
             isinstance(database_engine, PostgresEngine)
