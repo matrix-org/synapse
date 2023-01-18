@@ -148,7 +148,7 @@ jobs:
         run: |
           set -x
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -yqq python3 pipx
-          pipx install poetry==1.2.0
+          pipx install poetry==1.3.2
 
           poetry remove -n twisted
           poetry add -n --extras tls git+https://github.com/twisted/twisted.git#trunk

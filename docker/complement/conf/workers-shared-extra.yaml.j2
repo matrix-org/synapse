@@ -94,8 +94,6 @@ allow_device_name_lookup_over_federation: true
 experimental_features:
   # Enable history backfilling support
   msc2716_enabled: true
-  # server-side support for partial state in /send_join responses
-  msc3706_enabled: true
   {% if not workers_in_use %}
   # client-side support for partial state in /send_join responses
   faster_joins: true

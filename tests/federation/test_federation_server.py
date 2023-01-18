@@ -211,9 +211,8 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
-    @override_config({"experimental_features": {"msc3706_enabled": True}})
     def test_send_join_partial_state(self) -> None:
-        """When MSC3706 support is enabled, /send_join should return partial state"""
+        """/send_join should return partial state, if requested"""
         joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
         join_result = self._make_join(joining_user)
 
