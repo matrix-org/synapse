@@ -43,6 +43,7 @@ from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
+from synapse.replication.tcp.streams.partial_state import UnPartialStatedRoomStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -139,6 +140,13 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             self._un_partial_stated_rooms_stream_id_gen = StreamIdGenerator(
                 db_conn, "un_partial_stated_room_stream", "stream_id"
             )
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == UnPartialStatedRoomStream.NAME:
+            self._un_partial_stated_rooms_stream_id_gen.advance(instance_name, token)
+        return super().process_replication_position(stream_name, instance_name, token)
 
     async def store_room(
         self,
@@ -2371,4 +2379,5 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 DELETE FROM device_lists_remote_pending
                 WHERE stream_id <= ?
             """
+            txn.execute(sql, (device_lists_stream_id,))
             txn.execute(sql, (device_lists_stream_id,))
