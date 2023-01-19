@@ -7059,9 +7059,10 @@ trusted_key_servers:
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="logging-sample-configuration-file"><a class="header" href="#logging-sample-configuration-file">Logging Sample Configuration File</a></h1>
 <p>Below is a sample logging configuration file. This file can be tweaked to control how your
-homeserver will output logs. A restart of the server is generally required to apply any
-changes made to this file. The value of the <code>log_config</code> option in your homeserver
-config should be the path to this file.</p>
+homeserver will output logs. The value of the <code>log_config</code> option in your homeserver config
+should be the path to this file.</p>
+<p>To apply changes made to this file, send Synapse a SIGHUP signal (or, if using <code>systemd</code>, run
+<code>systemctl reload</code> on the Synapse service).</p>
 <p>Note that a default logging configuration (shown below) is created automatically alongside
 the homeserver config when following the <a href="usage/configuration/../../setup/installation.html">installation instructions</a>.
 It should be named <code>&lt;SERVERNAME&gt;.log.config</code> by default.</p>
