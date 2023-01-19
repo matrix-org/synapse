@@ -1378,12 +1378,19 @@ class SyncHandler:
                 else:
                     mutable_joined_room_ids.discard(room_id)
 
+        mutable_rooms_to_exclude = set(self.rooms_to_exclude_globally)
+        if not sync_config.filter_collection.lazy_load_members():
+            # Exclude all partially stated rooms from this sync.
+            for room_id in mutable_joined_room_ids:
+                if await self.store.is_partial_state_room(room_id):
+                    mutable_rooms_to_exclude.add(room_id)
+
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
             (
                 room_id
                 for room_id in mutable_joined_room_ids
-                if room_id not in self.rooms_to_exclude_globally
+                if room_id not in mutable_rooms_to_exclude
             )
         )
 
@@ -1400,7 +1407,7 @@ class SyncHandler:
             since_token=since_token,
             now_token=now_token,
             joined_room_ids=joined_room_ids,
-            excluded_room_ids=frozenset(self.rooms_to_exclude_globally),
+            excluded_room_ids=frozenset(mutable_rooms_to_exclude),
             membership_change_events=membership_change_events,
         )
 
