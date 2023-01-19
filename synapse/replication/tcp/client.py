@@ -207,6 +207,11 @@ class ReplicationDataHandler:
             # we don't need to optimise this for multiple rows.
             for row in rows:
                 if row.type != EventsStreamEventRow.TypeId:
+                    # The row's data is an `EventsStreamCurrentStateRow`.
+                    # When finishing up a partial state join, the current state of a
+                    # room will change without any new events being persisted, so we
+                    # must poke the replication callbacks ourselves.
+                    self.notifier.notify_replication()
                     continue
                 assert isinstance(row, EventsStreamRow)
                 assert isinstance(row.data, EventsStreamEventRow)

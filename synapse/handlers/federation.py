@@ -1735,10 +1735,6 @@ class FederationHandler:
                     # Poke the notifier so that other workers see the write to
                     # the un-partial-stated rooms stream.
                     self._notifier.notify_replication()
-
-                    # TODO(faster_joins) update room stats and user directory?
-                    #   https://github.com/matrix-org/synapse/issues/12814
-                    #   https://github.com/matrix-org/synapse/issues/12815
                     return
 
                 # we raced against more events arriving with partial state. Go round
