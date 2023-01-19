@@ -199,6 +199,9 @@ class GenericWorkerServer(HomeServer):
                             "A 'media' listener is configured but the media"
                             " repository is disabled. Ignoring."
                         )
+                elif name == "health":
+                    # Skip loading, health resource is always included
+                    continue
 
                 if name == "openid" and "federation" not in res.names:
                     # Only load the openid resource separately if federation resource
