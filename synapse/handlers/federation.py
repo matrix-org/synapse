@@ -179,7 +179,7 @@ class FederationHandler:
         # Tracks partial state syncs we may want to restart.
         # A dictionary mapping room IDs to (initial destination, other destinations)
         # tuples.
-        self._partial_state_syncs_to_restart: Dict[
+        self._partial_state_syncs_maybe_needing_restart: Dict[
             str, Tuple[Optional[str], Collection[str]]
         ] = {}
 
@@ -1704,7 +1704,7 @@ class FederationHandler:
                 # We want to do this when the partial state sync is about to fail
                 # because we've been kicked from the room, but we rejoin before the sync
                 # finishes falling over.
-                self._partial_state_syncs_to_restart[room_id] = (
+                self._partial_state_syncs_maybe_needing_restart[room_id] = (
                     initial_destination,
                     other_destinations,
                 )
@@ -1728,11 +1728,11 @@ class FederationHandler:
                 self._active_partial_state_syncs.remove(room_id)
 
                 # Check if we need to restart the sync.
-                if room_id in self._partial_state_syncs_to_restart:
+                if room_id in self._partial_state_syncs_maybe_needing_restart:
                     (
                         restart_initial_destination,
                         restart_other_destinations,
-                    ) = self._partial_state_syncs_to_restart.pop(room_id)
+                    ) = self._partial_state_syncs_maybe_needing_restart.pop(room_id)
 
                     if is_still_partial_state_room:
                         self._start_partial_state_room_sync(
