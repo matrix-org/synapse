@@ -110,6 +110,10 @@ event_fetch_ongoing_gauge = Gauge(
 )
 
 
+class InvalidEventError(Exception):
+    """The event retrieved from the database is invalid and cannot be used."""
+
+
 @attr.s(slots=True, auto_attribs=True)
 class EventCacheEntry:
     event: EventBase
@@ -1299,7 +1303,7 @@ class EventsWorkerStore(SQLBaseStore):
                 # invites, so just accept it for all membership events.
                 #
                 if d["type"] != EventTypes.Member:
-                    raise Exception(
+                    raise InvalidEventError(
                         "Room %s for event %s is unknown" % (d["room_id"], event_id)
                     )
 
