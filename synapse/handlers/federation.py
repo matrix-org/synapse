@@ -1688,7 +1688,7 @@ class FederationHandler:
         other_destinations: Collection[str],
         room_id: str,
     ) -> None:
-        """Starts the background process to resync the state of a partial-state room,
+        """Starts the background process to resync the state of a partial state room,
         if it is not already running.
 
         Args:
@@ -1700,10 +1700,27 @@ class FederationHandler:
 
         async def _sync_partial_state_room_wrapper() -> None:
             if room_id in self._active_partial_state_syncs:
-                # Mark the partial state sync as possibly needing a restart.
-                # We want to do this when the partial state sync is about to fail
-                # because we've been kicked from the room, but we rejoin before the sync
-                # finishes falling over.
+                # Another local user has joined the room while there is already a
+                # partial state sync running. This implies that there is a new join
+                # event to un-partial state. We might find ourselves in one of a few
+                # scenarios:
+                #  1. There is an existing partial state sync. The partial state sync
+                #     un-partial states the new join event before completing and all is
+                #     well.
+                #  2. Before the latest join, the homeserver was no longer in the room
+                #     and there is an existing partial state sync from our previous
+                #     membership of the room. The partial state sync may have:
+                #      a) succeeded, but not yet terminated. The room will not be
+                #         un-partial stated again unless we restart the partial state
+                #         sync.
+                #      b) failed, because we were no longer in the room and remote
+                #         homeservers were refusing our requests, but not yet
+                #         terminated. After the latest join, remote homeservers may
+                #         start answering our requests again, so we should restart the
+                #         partial state sync.
+                # In the cases where we would want to restart the partial state sync,
+                # the room would have the partial state flag when the partial state sync
+                # terminates.
                 self._partial_state_syncs_maybe_needing_restart[room_id] = (
                     initial_destination,
                     other_destinations,
@@ -1719,15 +1736,17 @@ class FederationHandler:
                     room_id=room_id,
                 )
             finally:
-                # Check whether the room is still partial stated, while we still claim
-                # to be the active sync. Usually, the partial state flag will be gone,
-                # unless we left and rejoined the room, or the sync failed.
+                # Read the room's partial state flag while we still hold the claim to
+                # being the active partial state sync (so that another partial state
+                # sync can't come along and mess with it under us).
+                # Normally, the partial state flag will be gone. If it isn't, then we
+                # may find ourselves in scenario 2a or 2b as described in the comment
+                # above, where we want to restart the partial state sync.
                 is_still_partial_state_room = await self.store.is_partial_state_room(
                     room_id
                 )
                 self._active_partial_state_syncs.remove(room_id)
 
-                # Check if we need to restart the sync.
                 if room_id in self._partial_state_syncs_maybe_needing_restart:
                     (
                         restart_initial_destination,
