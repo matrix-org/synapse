@@ -248,7 +248,6 @@ class AccountDataHandler:
                 instance_name=random.choice(self._account_data_writers),
                 user_id=user_id,
                 account_data_type=account_data_type,
-                content={},
             )
             return response["max_stream_id"]
 
