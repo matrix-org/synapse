@@ -1277,13 +1277,10 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
         return result["join_event_id"], result["device_lists_stream_id"]
 
-    def get_un_partial_stated_rooms_token(self) -> int:
-        # TODO(faster_joins, multiple writers): This is inappropriate if there
-        #     are multiple writers because workers that don't write often will
-        #     hold all readers up.
-        #     (See `MultiWriterIdGenerator.get_persisted_upto_position` for an
-        #      explanation.)
-        return self._un_partial_stated_rooms_stream_id_gen.get_current_token()
+    def get_un_partial_stated_rooms_token(self, instance_name: str) -> int:
+        return self._un_partial_stated_rooms_stream_id_gen.get_current_token_for_writer(
+            instance_name
+        )
 
     async def get_un_partial_stated_rooms_from_stream(
         self, instance_name: str, last_id: int, current_id: int, limit: int

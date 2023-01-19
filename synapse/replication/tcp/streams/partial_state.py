@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING
 import attr
 
 from synapse.replication.tcp.streams import Stream
-from synapse.replication.tcp.streams._base import current_token_without_instance
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -43,7 +42,7 @@ class UnPartialStatedRoomStream(Stream):
         super().__init__(
             hs.get_instance_name(),
             # TODO(faster_joins, multiple writers): we need to account for instance names
-            current_token_without_instance(store.get_un_partial_stated_rooms_token),
+            store.get_un_partial_stated_rooms_token,
             store.get_un_partial_stated_rooms_from_stream,
         )
 
