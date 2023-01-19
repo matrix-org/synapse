@@ -86,8 +86,9 @@ def _load_rules(
     filtered_rules = FilteredPushRules(
         push_rules,
         enabled_map,
-        msc3664_enabled=experimental_config.msc3664_enabled,
         msc1767_enabled=experimental_config.msc1767_enabled,
+        msc3664_enabled=experimental_config.msc3664_enabled,
+        msc3381_polls_enabled=experimental_config.msc3381_polls_enabled,
     )
 
     return filtered_rules
