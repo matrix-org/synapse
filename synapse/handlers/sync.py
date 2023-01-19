@@ -1400,6 +1400,7 @@ class SyncHandler:
             since_token=since_token,
             now_token=now_token,
             joined_room_ids=joined_room_ids,
+            excluded_room_ids=frozenset(self.rooms_to_exclude_globally),
             membership_change_events=membership_change_events,
         )
 
@@ -2183,7 +2184,7 @@ class SyncHandler:
         room_list = await self.store.get_rooms_for_local_user_where_membership_is(
             user_id=user_id,
             membership_list=Membership.LIST,
-            excluded_rooms=self.rooms_to_exclude_globally,
+            excluded_rooms=sync_result_builder.excluded_room_ids,
         )
 
         room_entries = []
@@ -2554,6 +2555,7 @@ class SyncResultBuilder:
         since_token: The token supplied by user, or None.
         now_token: The token to sync up to.
         joined_room_ids: List of rooms the user is joined to
+        excluded_room_ids: Set of room ids we should omit from the /sync response.
 
         # The following mirror the fields in a sync response
         presence
@@ -2570,6 +2572,7 @@ class SyncResultBuilder:
     since_token: Optional[StreamToken]
     now_token: StreamToken
     joined_room_ids: FrozenSet[str]
+    excluded_room_ids: FrozenSet[str]
     membership_change_events: List[EventBase]
 
     presence: List[UserPresenceState] = attr.Factory(list)

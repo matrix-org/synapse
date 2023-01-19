@@ -47,7 +47,13 @@ from synapse.storage.roommember import (
     ProfileInfo,
     RoomsForUser,
 )
-from synapse.types import JsonDict, PersistedEventPosition, StateMap, get_domain_from_id
+from synapse.types import (
+    JsonDict,
+    PersistedEventPosition,
+    StateMap,
+    StrCollection,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
@@ -385,7 +391,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self,
         user_id: str,
         membership_list: Collection[str],
-        excluded_rooms: Optional[List[str]] = None,
+        excluded_rooms: StrCollection = (),
     ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
         matches one in the membership list.
