@@ -50,6 +50,8 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
   # -n True if the length of string is non-zero.
   # -z True if the length of string is zero.
   if [[ -z "$SYNAPSE_WORKER_TYPES" ]]; then
+    # This list corresponds to the keys of the WORKERS_CONFIG dict in
+    # synapse/docker/configure_workers_and_start.py
     export SYNAPSE_WORKER_TYPES="\
       event_persister, \
       event_persister, \
@@ -64,7 +66,12 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       synchrotron, \
       client_reader, \
       appservice, \
-      pusher"
+      pusher,  \
+      account_data,  \
+      presence,  \
+      receipts,  \
+      to_device,  \
+      typing"
 
   fi
   log "Workers requested: $SYNAPSE_WORKER_TYPES"

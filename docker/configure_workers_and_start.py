@@ -57,6 +57,11 @@ MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 # Stream Writers require "client" and "replication" listeners because they
 #   have to attach by instance_map to the master process and have client endpoints.
 WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
+    # NOTE: Any new entries added to this list should also be added to the
+    # SYNAPSE_WORKER_TYPES environment variable in
+    # docker/complement/conf/start_for_complement.sh in order to include
+    # those workers in the worker-mode Complement runs in CI, and when
+    # using scripts-dev/complement.sh locally.
     "pusher": {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
