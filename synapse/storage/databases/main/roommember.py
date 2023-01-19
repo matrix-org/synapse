@@ -15,6 +15,7 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Collection,
     Dict,
     FrozenSet,
@@ -418,10 +419,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
         # Now we filter out forgotten and excluded rooms
-        rooms_to_exclude: Set[str] = await self.get_forgotten_rooms_for_user(user_id)
+        rooms_to_exclude = await self.get_forgotten_rooms_for_user(user_id)
 
         if excluded_rooms is not None:
-            rooms_to_exclude.update(set(excluded_rooms))
+            # Take a copy to avoid mutating the in-cache set
+            rooms_to_exclude = set(rooms_to_exclude)
+            rooms_to_exclude.update(excluded_rooms)
 
         return [room for room in rooms if room.room_id not in rooms_to_exclude]
 
@@ -1175,7 +1178,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return count == 0
 
     @cached()
-    async def get_forgotten_rooms_for_user(self, user_id: str) -> Set[str]:
+    async def get_forgotten_rooms_for_user(self, user_id: str) -> AbstractSet[str]:
         """Gets all rooms the user has forgotten.
 
         Args:
