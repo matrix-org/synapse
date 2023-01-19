@@ -2380,4 +2380,3 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 WHERE stream_id <= ?
             """
             txn.execute(sql, (device_lists_stream_id,))
-            txn.execute(sql, (device_lists_stream_id,))

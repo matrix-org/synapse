@@ -410,9 +410,6 @@ class EventsWorkerStore(SQLBaseStore):
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
         elif stream_name == UnPartialStatedEventStream.NAME:
-            logger.info(
-                "Advancing %s token to %s", UnPartialStatedEventStream.NAME, token
-            )
             self._un_partial_stated_events_stream_id_gen.advance(instance_name, token)
         super().process_replication_position(stream_name, instance_name, token)
 
