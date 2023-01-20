@@ -1914,7 +1914,7 @@ class SyncHandler:
 
         assert since_token
 
-        if membership_change_events:
+        if membership_change_events or sync_result_builder.retransmit_room_ids:
             return True
 
         stream_id = since_token.room_key.stream
@@ -1961,7 +1961,7 @@ class SyncHandler:
         for event in membership_change_events:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
-        newly_joined_rooms: List[str] = []
+        newly_joined_rooms: List[str] = list(sync_result_builder.retransmit_room_ids)
         newly_left_rooms: List[str] = []
         room_entries: List[RoomSyncResultBuilder] = []
         invited: List[InvitedSyncResult] = []
