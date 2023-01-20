@@ -23,6 +23,7 @@ from twisted.web.server import Request
 from synapse.http.site import SynapseRequest
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
 from synapse.logging.context import LoggingContext, LoggingContextFilter
+from synapse.types import JsonDict
 
 from tests.logging import LoggerCleanupMixin
 from tests.server import FakeChannel, get_clock
@@ -30,11 +31,11 @@ from tests.unittest import TestCase
 
 
 class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.output = StringIO()
         self.reactor, _ = get_clock()
 
-    def get_log_line(self):
+    def get_log_line(self) -> JsonDict:
         # One log message, with a single trailing newline.
         data = self.output.getvalue()
         logs = data.splitlines()
@@ -42,7 +43,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertEqual(data.count("\n"), 1)
         return json.loads(logs[0])
 
-    def test_terse_json_output(self):
+    def test_terse_json_output(self) -> None:
         """
         The Terse JSON formatter converts log messages to JSON.
         """
@@ -64,7 +65,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
 
-    def test_extra_data(self):
+    def test_extra_data(self) -> None:
         """
         Additional information can be included in the structured logging.
         """
@@ -96,7 +97,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertEqual(log["int"], 3)
         self.assertIs(log["bool"], True)
 
-    def test_json_output(self):
+    def test_json_output(self) -> None:
         """
         The Terse JSON formatter converts log messages to JSON.
         """
@@ -117,7 +118,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
 
-    def test_with_context(self):
+    def test_with_context(self) -> None:
         """
         The logging context should be added to the JSON response.
         """
@@ -142,7 +143,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertEqual(log["log"], "Hello there, wally!")
         self.assertEqual(log["request"], "name")
 
-    def test_with_request_context(self):
+    def test_with_request_context(self) -> None:
         """
         Information from the logging context request should be added to the JSON response.
         """
@@ -205,7 +206,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertEqual(log["protocol"], "1.1")
         self.assertEqual(log["user_agent"], "")
 
-    def test_with_exception(self):
+    def test_with_exception(self) -> None:
         """
         The logging exception type & value should be added to the JSON response.
         """

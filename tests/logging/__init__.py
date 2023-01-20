@@ -17,7 +17,7 @@ from tests.unittest import TestCase
 
 
 class LoggerCleanupMixin(TestCase):
-    def get_logger(self, handler):
+    def get_logger(self, handler: logging.Handler) -> logging.Logger:
         """
         Attach a handler to a logger and add clean-ups to remove revert this.
         """
