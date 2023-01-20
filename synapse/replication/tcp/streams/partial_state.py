@@ -41,7 +41,6 @@ class UnPartialStatedRoomStream(Stream):
         store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
-            # TODO(faster_joins, multiple writers): we need to account for instance names
             store.get_un_partial_stated_rooms_token,
             store.get_un_partial_stated_rooms_from_stream,
         )
@@ -69,7 +68,6 @@ class UnPartialStatedEventStream(Stream):
         store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
-            # TODO(faster_joins, multiple writers): we need to account for instance names
             store.get_un_partial_stated_events_token,
             store.get_un_partial_stated_events_from_stream,
         )
