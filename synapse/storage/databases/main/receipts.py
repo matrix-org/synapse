@@ -73,6 +73,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             self._receipts_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="receipts",
                 instance_name=self._instance_name,
                 tables=[("receipts_linearized", "instance_name", "stream_id")],
@@ -91,6 +92,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             # SQLite).
             self._receipts_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "receipts_linearized",
                 "stream_id",
                 is_writer=hs.get_instance_name() in hs.config.worker.writers.receipts,
