@@ -404,6 +404,9 @@ class ModuleApiTestCase(HomeserverTestCase):
             self.module_api.send_local_online_presence_to([remote_user_id])
         )
 
+        # We don't always send out federation immediately, so we advance the clock.
+        self.reactor.advance(1000)
+
         # Check that a presence update was sent as part of a federation transaction
         found_update = False
         calls = (
