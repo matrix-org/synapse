@@ -628,7 +628,22 @@ class FederationHandler:
                 pass
 
             ret = await self.federation_client.send_join(
-                host_list, event, room_version_obj
+                host_list,
+                event,
+                room_version_obj,
+                # Perform a full join when we are already in the room and it is a full
+                # state room, since we are not allowed to persist a partial state join
+                # event in a full state room. In the future, we could optimize this by
+                # always performing a partial state join and computing the state
+                # ourselves or retrieving it from the remote homeserver if necessary.
+                #
+                # There's a race where we leave the room, then perform a full join
+                # anyway. This should end up being fast anyway, since we would already
+                # have the full room state and auth chain persisted.
+                partial_state=(
+                    not is_host_joined
+                    or await self.store.is_partial_state_room(room_id)
+                ),
             )
 
             event = ret.event
