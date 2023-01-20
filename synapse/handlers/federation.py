@@ -633,6 +633,10 @@ class FederationHandler:
                 pass
 
             async with self._is_partial_state_room_linearizer.queue(room_id):
+                already_partial_state_room = await self.store.is_partial_state_room(
+                    room_id
+                )
+
                 ret = await self.federation_client.send_join(
                     host_list,
                     event,
@@ -647,10 +651,7 @@ class FederationHandler:
                     # There's a race where we leave the room, then perform a full join
                     # anyway. This should end up being fast anyway, since we would
                     # already have the full room state and auth chain persisted.
-                    partial_state=(
-                        not is_host_joined
-                        or await self.store.is_partial_state_room(room_id)
-                    ),
+                    partial_state=not is_host_joined or already_partial_state_room,
                 )
 
                 event = ret.event
@@ -679,10 +680,14 @@ class FederationHandler:
                     state_events=state,
                 )
 
-                if ret.partial_state:
+                if ret.partial_state and not already_partial_state_room:
                     # Mark the room as having partial state.
                     # The background process is responsible for unmarking this flag,
                     # even if the join fails.
+                    # TODO(faster_joins):
+                    #     We may want to reset the partial state info if it's from an
+                    #     old, failed partial state join.
+                    #     https://github.com/matrix-org/synapse/issues/13000
                     await self.store.store_partial_state_room(
                         room_id=room_id,
                         servers=ret.servers_in_room,
@@ -714,7 +719,11 @@ class FederationHandler:
                     # Record the join event id for future use (when we finish the full
                     # join). We have to do this after persisting the event to keep
                     # foreign key constraints intact.
-                    if ret.partial_state:
+                    if ret.partial_state and not already_partial_state_room:
+                        # TODO(faster_joins):
+                        #     We may want to reset the partial state info if it's from
+                        #     an old, failed partial state join.
+                        #     https://github.com/matrix-org/synapse/issues/13000
                         await self.store.write_partial_state_rooms_join_event_id(
                             room_id, event.event_id
                         )
