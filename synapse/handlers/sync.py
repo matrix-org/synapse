@@ -1378,12 +1378,32 @@ class SyncHandler:
                 else:
                     mutable_joined_room_ids.discard(room_id)
 
+        # Tweak the set of rooms to return to the client for eager (non-lazy) syncs.
         mutable_rooms_to_exclude = set(self.rooms_to_exclude_globally)
         if not sync_config.filter_collection.lazy_load_members():
+            # Non-lazy syncs should never include partially stated rooms.
             # Exclude all partially stated rooms from this sync.
             for room_id in mutable_joined_room_ids:
                 if await self.store.is_partial_state_room(room_id):
                     mutable_rooms_to_exclude.add(room_id)
+
+        # Incremental eager syncs should additionally include rooms that
+        # - we are joined to
+        # - are full-stated
+        # - became fully-stated at some point during the sync period
+        # (These rooms will have been omitted during a previous eager sync.)
+        forced_newly_joined_room_ids = set()
+        if since_token and not sync_config.filter_collection.lazy_load_members():
+            un_partial_stated_rooms = (
+                await self.store.get_un_partial_stated_rooms_between(
+                    since_token.un_partial_stated_rooms_key,
+                    now_token.un_partial_stated_rooms_key,
+                    mutable_joined_room_ids,
+                )
+            )
+            for room_id in un_partial_stated_rooms:
+                if not await self.store.is_partial_state_room(room_id):
+                    forced_newly_joined_room_ids.add(room_id)
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
@@ -1408,7 +1428,7 @@ class SyncHandler:
             now_token=now_token,
             joined_room_ids=joined_room_ids,
             excluded_room_ids=frozenset(mutable_rooms_to_exclude),
-            forced_newly_joined_room_ids=frozenset(),
+            forced_newly_joined_room_ids=frozenset(forced_newly_joined_room_ids),
             membership_change_events=membership_change_events,
         )
 
@@ -1914,7 +1934,7 @@ class SyncHandler:
 
         assert since_token
 
-        if membership_change_events or sync_result_builder.retransmit_room_ids:
+        if membership_change_events or sync_result_builder.forced_newly_joined_room_ids:
             return True
 
         stream_id = since_token.room_key.stream
@@ -1961,7 +1981,9 @@ class SyncHandler:
         for event in membership_change_events:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
-        newly_joined_rooms: List[str] = list(sync_result_builder.retransmit_room_ids)
+        newly_joined_rooms: List[str] = list(
+            sync_result_builder.forced_newly_joined_room_ids
+        )
         newly_left_rooms: List[str] = []
         room_entries: List[RoomSyncResultBuilder] = []
         invited: List[InvitedSyncResult] = []
