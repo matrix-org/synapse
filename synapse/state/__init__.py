@@ -308,12 +308,7 @@ class StateHandler:
             # if we're given the state before the event, then we use that
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
-
-            # .. though we need to get a state group for it if we don't have it
-            if not current_state_group:
-                state_group_before_event = None
-            else:
-                state_group_before_event = current_state_group
+            state_group_before_event = current_state_group
 
             # the partial_state flag must be provided
             assert partial_state is not None
@@ -390,7 +385,7 @@ class StateHandler:
                 prev_group=state_group_before_event_prev_group,
                 delta_ids=deltas_to_state_group_before_event,
                 partial_state=partial_state,
-                state_map=state_ids_before_event,
+                state_map_before_event=state_ids_before_event,
             )
 
         #
@@ -420,7 +415,7 @@ class StateHandler:
             prev_group=state_group_before_event,
             delta_ids=delta_ids,
             partial_state=partial_state,
-            state_map=state_ids_before_event,
+            state_map_before_event=state_ids_before_event,
         )
 
     async def compute_event_context(

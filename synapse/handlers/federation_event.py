@@ -27,7 +27,6 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    Union,
 )
 
 from prometheus_client import Counter, Histogram

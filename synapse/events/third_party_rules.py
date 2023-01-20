@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
 from twisted.internet.defer import CancelledError
 
 from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
+from synapse.events.snapshot import UnpersistedEventContextBase
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import Requester, StateMap
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
@@ -233,7 +233,7 @@ class ThirdPartyEventRules:
     async def check_event_allowed(
         self,
         event: EventBase,
-        context: Union[EventContext, UnpersistedEventContextBase],
+        context: UnpersistedEventContextBase,
     ) -> Tuple[bool, Optional[dict]]:
         """Check if a provided event should be allowed in the given context.
 

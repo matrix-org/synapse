@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 import attr
 from frozendict import frozendict
 
-# from synapse.api.constants import EventTypes
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
@@ -329,7 +328,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
          partial_state: Whether the event has partial state.
 
-        state_map: A map of the state before the event, i.e. the state at `state_group_before_event`
+        state_map_before_event: A map of the state before the event, i.e. the state at `state_group_before_event`
     """
 
     _storage: "StorageControllers"
@@ -339,7 +338,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
     prev_group: Optional[int]
     delta_ids: Optional[StateMap[str]]
     partial_state: Optional[bool]
-    state_map: Optional[StateMap[str]] = None
+    state_map_before_event: Optional[StateMap[str]] = None
 
     async def get_prev_state_ids(
         self, state_filter: Optional["StateFilter"] = None
@@ -354,8 +353,8 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
             Maps a (type, state_key) to the event ID of the state event matching
             this tuple.
         """
-        if self.state_map:
-            return self.state_map
+        if self.state_map_before_event:
+            return self.state_map_before_event
 
         assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
@@ -376,17 +375,16 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         assert self.partial_state is not None
         # If we have a full set of state for at/before the event but don't have a state
         # group for that state, we need to get one
-        if self.state_map:
-            if self.state_group_before_event is None:
-                state_group_before_event = await self._storage.state.store_state_group(
-                    event.event_id,
-                    event.room_id,
-                    prev_group=None,
-                    delta_ids=None,
-                    current_state_ids=self.state_map,
-                )
-                self.state_group_before_event = state_group_before_event
-                self.prev_group = state_group_before_event
+        if self.state_map_before_event and self.state_group_before_event is None:
+            state_group_before_event = await self._storage.state.store_state_group(
+                event.event_id,
+                event.room_id,
+                prev_group=self.prev_group,
+                delta_ids=self.delta_ids,
+                current_state_ids=self.state_map_before_event,
+            )
+            self.state_group_before_event = state_group_before_event
+            self.prev_group = state_group_before_event
         if not event.is_state():
             return EventContext.with_state(
                 storage=self._storage,
@@ -404,9 +402,9 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                 state_group_after_event = await self._storage.state.store_state_group(
                     event.event_id,
                     event.room_id,
-                    prev_group=self.prev_group,
-                    delta_ids=self.delta_ids,
-                    current_state_ids=self.state_map,
+                    prev_group=self.state_group_before_event,
+                    delta_ids=self.state_delta_due_to_event,
+                    current_state_ids=self.state_map_before_event,
                 )
             else:
                 state_group_after_event = await self._storage.state.store_state_group(
