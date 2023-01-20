@@ -759,7 +759,7 @@ class Notifier:
         self._federation_client.wake_destination(server)
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class ReplicationNotifier:
     """Tracks callbacks for things that need to know about stream changes.
 
