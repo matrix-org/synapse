@@ -15,19 +15,19 @@ worker_name: generic_worker$i
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
-worker_main_http_uri: http://localhost:8008/
-
 worker_listeners:
   - type: http
     port: 808$i
+    x_forwarded: true
     resources:
       - names: [client, federation]
 
 worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+#worker_pid_file: DATADIR/generic_worker$i.pid
 EOF
 done
 ```
 
 This would create five generic workers with a unique `worker_name` field in each file and listening on ports 8081-8085.
 
-Customise the script to your needs.
+Customise the script to your needs. Note that `worker_pid_file` is required if `worker_daemonize` is `true`. Uncomment and/or modify the line if needed.

@@ -8,6 +8,7 @@ worker_replication_http_port: 9093
 worker_listeners:
   - type: http
     port: 8085
+    x_forwarded: true
     resources:
       - names: [media]
 

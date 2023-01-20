@@ -1542,12 +1542,23 @@ class EventCreationHandler:
         external federation senders don't have to recalculate it themselves.
         """
 
-        for event, _ in events_and_context:
-            if not self._external_cache.is_enabled():
-                return
+        if not self._external_cache.is_enabled():
+            return
 
-            # If external cache is enabled we should always have this.
-            assert self._external_cache_joined_hosts_updates is not None
+        # If external cache is enabled we should always have this.
+        assert self._external_cache_joined_hosts_updates is not None
+
+        for event, event_context in events_and_context:
+            if event_context.partial_state:
+                # To populate the cache for a partial-state event, we either have to
+                # block until full state, which the code below does, or change the
+                # meaning of cache values to be the list of hosts to which we plan to
+                # send events and calculate that instead.
+                #
+                # The federation senders don't use the external cache when sending
+                # events in partial-state rooms anyway, so let's not bother populating
+                # the cache.
+                continue
 
             # We actually store two mappings, event ID -> prev state group,
             # state group -> joined hosts, which is much more space efficient

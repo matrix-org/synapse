@@ -2155,6 +2155,11 @@ class PresenceFederationQueue:
         # This should only be called on a presence writer.
         assert self._presence_writer
 
+        if not states or not destinations:
+            # Ignore calls which either don't have any new states or don't need
+            # to be sent anywhere.
+            return
+
         if self._federation:
             self._federation.send_presence_to_destinations(
                 states=states,

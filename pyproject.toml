@@ -48,11 +48,6 @@ line-length = 88
 #  E731: do not assign a lambda expression, use a def
 #  E501: Line too long (black enforces this for us)
 #
-# See https://github.com/charliermarsh/ruff/#pyflakes
-#  F401: unused import
-#  F811: Redefinition of unused
-#  F821: Undefined name
-#
 # flake8-bugbear compatible checks. Its error codes are described at
 # https://github.com/charliermarsh/ruff/#flake8-bugbear
 #  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
@@ -64,9 +59,6 @@ ignore = [
     "B024",
     "E501",
     "E731",
-    "F401",
-    "F811",
-    "F821",
 ]
 select = [
     # pycodestyle checks.
@@ -97,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.74.0"
+version = "1.75.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -317,7 +309,7 @@ all = [
 # We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-ruff = "0.0.215"
+ruff = "0.0.224"
 
 # Typechecking
 mypy = "*"

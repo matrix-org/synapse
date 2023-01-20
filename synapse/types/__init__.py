@@ -77,6 +77,10 @@ JsonMapping = Mapping[str, Any]
 # A JSON-serialisable object.
 JsonSerializable = object
 
+# Collection[str] that does not include str itself; str being a Sequence[str]
+# is very misleading and results in bugs.
+StrCollection = Union[Tuple[str, ...], List[str], Set[str]]
+
 
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
@@ -600,6 +604,12 @@ class RoomStreamToken:
         elif self.instance_map:
             entries = []
             for name, pos in self.instance_map.items():
+                if pos <= self.stream:
+                    # Ignore instances who are below the minimum stream position
+                    # (we might know they've advanced without seeing a recent
+                    # write from them).
+                    continue
+
                 instance_id = await store.get_id_for_instance(name)
                 entries.append(f"{instance_id}.{pos}")
 

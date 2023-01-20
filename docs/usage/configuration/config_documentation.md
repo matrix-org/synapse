@@ -295,7 +295,9 @@ Known room versions are listed [here](https://spec.matrix.org/latest/rooms/#comp
 For example, for room version 1, `default_room_version` should be set
 to "1".
 
-Currently defaults to "9".
+Currently defaults to ["10"](https://spec.matrix.org/v1.5/rooms/v10/).
+
+_Changed in Synapse 1.76:_ the default version room version was increased from [9](https://spec.matrix.org/v1.5/rooms/v9/) to [10](https://spec.matrix.org/v1.5/rooms/v10/).
 
 Example configuration:
 ```yaml
@@ -422,6 +424,10 @@ Sub-options for each listener include:
 
 * `port`: the TCP port to bind to.
 
+* `tag`: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to `None`, is optional and only valid for listener with `type: http`.
+See the docs [request log format](../administration/request_log.md).
+
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
@@ -475,6 +481,12 @@ Valid resource names are:
 * `replication`: the HTTP replication API (/_synapse/replication). See [here](../../workers.md).
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
+
+* `health`: the [health check endpoint](../../reverse_proxy.md#health-check-endpoint). This endpoint
+  is by default active for all other resources and does not have to be activated separately.
+  This is only useful if you want to use the health endpoint explicitly on a dedicated port or
+  for [workers](../../workers.md) and containers without listener e.g.
+  [application services](../../workers.md#notifying-application-services).
 
 Example configuration #1:
 ```yaml
@@ -3462,8 +3474,8 @@ This setting defines options related to the user directory.
 This option has the following sub-options:
 * `enabled`:  Defines whether users can search the user directory. If false then
    empty responses are returned to all queries. Defaults to true.
-* `search_all_users`: Defines whether to search all users visible to your HS when searching
-   the user directory. If false, search results will only contain users
+* `search_all_users`: Defines whether to search all users visible to your HS at the time the search is performed. If set to true, will return all users who share a room with the user from the homeserver.
+   If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
 
@@ -4019,6 +4031,27 @@ worker_listeners:
     resources:
       - names: [client, federation]
 ```
+---
+### `worker_manhole`
+
+A worker may have a listener for [`manhole`](../../manhole.md).
+It allows server administrators to access a Python shell on the worker.
+
+Example configuration:
+```yaml
+worker_manhole: 9000
+```
+
+This is a short form for:
+```yaml
+worker_listeners:
+  - port: 9000
+    bind_addresses: ['127.0.0.1']
+    type: manhole
+```
+
+It needs also an additional [`manhole_settings`](#manhole_settings) configuration.
+
 ---
 ### `worker_daemonize`
 

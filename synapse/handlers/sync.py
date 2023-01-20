@@ -31,7 +31,12 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    AccountDataTypes,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -1793,10 +1798,6 @@ class SyncHandler:
             - newly_left_users
         """
 
-        # If the request doesn't care about rooms then nothing to do!
-        if sync_result_builder.sync_config.filter_collection.blocks_all_rooms():
-            return set(), set(), set(), set()
-
         since_token = sync_result_builder.since_token
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
@@ -2335,7 +2336,9 @@ class SyncHandler:
 
             account_data_events = []
             if tags is not None:
-                account_data_events.append({"type": "m.tag", "content": {"tags": tags}})
+                account_data_events.append(
+                    {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
+                )
 
             for account_data_type, content in account_data.items():
                 account_data_events.append(

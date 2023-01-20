@@ -16,6 +16,7 @@ import logging
 import random
 from typing import TYPE_CHECKING, Awaitable, Callable, Collection, List, Optional, Tuple
 
+from synapse.api.constants import AccountDataTypes
 from synapse.replication.http.account_data import (
     ReplicationAddRoomAccountDataRestServlet,
     ReplicationAddTagRestServlet,
@@ -335,7 +336,11 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
 
         for room_id, room_tags in tags.items():
             results.append(
-                {"type": "m.tag", "content": {"tags": room_tags}, "room_id": room_id}
+                {
+                    "type": AccountDataTypes.TAG,
+                    "content": {"tags": room_tags},
+                    "room_id": room_id,
+                }
             )
 
         (
