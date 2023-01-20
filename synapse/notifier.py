@@ -46,6 +46,7 @@ from synapse.types import (
     JsonDict,
     PersistedEventPosition,
     RoomStreamToken,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -691,7 +692,7 @@ class Notifier:
 
     async def _get_room_ids(
         self, user: UserID, explicit_room_id: Optional[str]
-    ) -> Tuple[Collection[str], bool]:
+    ) -> Tuple[StrCollection, bool]:
         joined_room_ids = await self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
