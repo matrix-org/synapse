@@ -599,7 +599,23 @@ class FederationHandler:
 
         self._federation_event_handler.room_queues[room_id] = []
 
-        await self._clean_room_for_join(room_id)
+        is_host_joined = await self.store.is_host_joined(room_id, self.server_name)
+
+        if not is_host_joined:
+            # We may have old forward extremities lying around if the homeserver left
+            # the room completely in the past. Clear them out.
+            #
+            # Note that this check-then-clear is subject to races where
+            #  * the homeserver is in the room and stops being in the room just after
+            #    the check. We won't reset the forward extremities, but that's okay,
+            #    since they will be almost up to date.
+            #  * the homeserver is not in the room and starts being in the room just
+            #    after the check. This can't happen, since `RoomMemberHandler` has a
+            #    linearizer lock which prevents concurrent remote joins into the same
+            #    room.
+            # In short, the races either have an acceptable outcome or should be
+            # impossible.
+            await self._clean_room_for_join(room_id)
 
         try:
             # Try the host we successfully got a response to /make_join/
