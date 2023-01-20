@@ -191,6 +191,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="events",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -200,6 +201,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._backfill_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="backfill",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -217,12 +219,14 @@ class EventsWorkerStore(SQLBaseStore):
             # SQLite).
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "events",
                 "stream_ordering",
                 is_writer=hs.get_instance_name() in hs.config.worker.writers.events,
             )
             self._backfill_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "events",
                 "stream_ordering",
                 step=-1,
@@ -300,6 +304,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._un_partial_stated_events_stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="un_partial_stated_event_stream",
                 instance_name=hs.get_instance_name(),
                 tables=[
@@ -311,7 +316,10 @@ class EventsWorkerStore(SQLBaseStore):
             )
         else:
             self._un_partial_stated_events_stream_id_gen = StreamIdGenerator(
-                db_conn, "un_partial_stated_event_stream", "stream_id"
+                db_conn,
+                hs.get_replication_notifier(),
+                "un_partial_stated_event_stream",
+                "stream_id",
             )
 
     def get_un_partial_stated_events_token(self, instance_name: str) -> int:
