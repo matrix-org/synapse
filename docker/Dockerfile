@@ -25,9 +25,8 @@
 #     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
 
 
-ARG PYTHON_VERSION=3.9
+ARG PYTHON_VERSION=3.11
 ARG BASE_IMAGE=docker.io/python:${PYTHON_VERSION}-slim-bullseye
-
 
 ###
 ### Stage 0: generate requirements.txt
@@ -41,11 +40,11 @@ FROM $BASE_IMAGE as requirements
 # Here we use it to set up a cache for apt (and below for pip), to improve
 # rebuild speeds on slow connections.
 RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -qq && apt-get install -yqq \
-      build-essential git libffi-dev libssl-dev curl \
-    && rm -rf /var/lib/apt/lists/*
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update -qq && apt-get install -yqq \
+  build-essential git libffi-dev libssl-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install rust and ensure its in the PATH
 ENV RUSTUP_HOME=/rust
@@ -79,9 +78,9 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 # Otherwise, just create an empty requirements file so that the Dockerfile can
 # proceed.
 RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
-    /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}; \
+  /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}; \
   else \
-    touch /synapse/requirements.txt; \
+  touch /synapse/requirements.txt; \
   fi
 
 ###
@@ -91,25 +90,24 @@ FROM $BASE_IMAGE as builder
 
 # install the OS build deps
 RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update -qq && apt-get install -yqq \
-    git \
-    build-essential \
-    libffi-dev \
-    libjpeg-dev \
-    libpq-dev \
-    libssl-dev \
-    libwebp-dev \
-    libxml++2.6-dev \
-    libxslt1-dev \
-    openssl \
-    zlib1g-dev \
-    git \
-    curl \
-    libicu-dev \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update -qq && apt-get install -yqq \
+  build-essential \
+  libffi-dev \
+  libjpeg-dev \
+  libpq-dev \
+  libssl-dev \
+  libwebp-dev \
+  libxml++2.6-dev \
+  libxslt1-dev \
+  openssl \
+  zlib1g-dev \
+  git \
+  curl \
+  libicu-dev \
+  pkg-config \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install rust and ensure its in the PATH
 ENV RUSTUP_HOME=/rust
@@ -161,9 +159,9 @@ ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
 RUN --mount=type=cache,target=/synapse/target,sharing=locked \
   --mount=type=cache,target=${CARGO_HOME}/registry,sharing=locked \
   if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
-    pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
+  pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
   else \
-    pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
+  pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
   fi
 
 # Beeper: pyston fixes
@@ -185,20 +183,20 @@ LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git
 LABEL org.opencontainers.image.licenses='Apache-2.0'
 
 RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update -qq && apt-get install -yqq \
-    curl \
-    gosu \
-    libjpeg62-turbo \
-    libpq5 \
-    libwebp6 \
-    xmlsec1 \
-    libjemalloc2 \
-    libicu67 \
-    libssl-dev \
-    openssl \
-    && rm -rf /var/lib/apt/lists/*
+  curl \
+  gosu \
+  libjpeg62-turbo \
+  libpq5 \
+  libwebp6 \
+  xmlsec1 \
+  libjemalloc2 \
+  libicu67 \
+  libssl-dev \
+  openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install/bin /usr/local/bin
 # Copy the python site-packages into /install instead of /usr/local/lib as some environments use different paths
@@ -214,4 +212,4 @@ EXPOSE 8008/tcp 8009/tcp 8448/tcp
 ENTRYPOINT ["/start.py"]
 
 HEALTHCHECK --start-period=5s --interval=15s --timeout=5s \
-    CMD curl -fSs http://localhost:8008/health || exit 1
+  CMD curl -fSs http://localhost:8008/health || exit 1
