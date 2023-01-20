@@ -1408,6 +1408,7 @@ class SyncHandler:
             now_token=now_token,
             joined_room_ids=joined_room_ids,
             excluded_room_ids=frozenset(mutable_rooms_to_exclude),
+            forced_newly_joined_room_ids=frozenset(),
             membership_change_events=membership_change_events,
         )
 
@@ -2563,6 +2564,12 @@ class SyncResultBuilder:
         now_token: The token to sync up to.
         joined_room_ids: List of rooms the user is joined to
         excluded_room_ids: Set of room ids we should omit from the /sync response.
+        forced_newly_jined_room_ids:
+            Rooms that should be presented in the /sync response as if they were
+            newly joined during the sync period, even if that's not the case.
+            (This is useful if the room was previously excluded from a /sync response,
+            and now the client should be made aware of it.)
+            Only used by incremental syncs.
 
         # The following mirror the fields in a sync response
         presence
@@ -2580,6 +2587,7 @@ class SyncResultBuilder:
     now_token: StreamToken
     joined_room_ids: FrozenSet[str]
     excluded_room_ids: FrozenSet[str]
+    forced_newly_joined_room_ids: FrozenSet[str]
     membership_change_events: List[EventBase]
 
     presence: List[UserPresenceState] = attr.Factory(list)
