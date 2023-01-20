@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, List, Mapping, Optional, Union
+from typing import TYPE_CHECKING, List, Mapping, Optional, Union
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -29,7 +29,7 @@ from synapse.event_auth import (
 )
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.types import StateMap, get_domain_from_id
+from synapse.types import StateMap, StrCollection, get_domain_from_id
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -290,7 +290,7 @@ class EventAuthHandler:
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]
-    ) -> Collection[str]:
+    ) -> StrCollection:
         """
         Generate a list of rooms in which membership allows access to a room.
 
@@ -331,7 +331,7 @@ class EventAuthHandler:
 
         return result
 
-    async def is_user_in_rooms(self, room_ids: Collection[str], user_id: str) -> bool:
+    async def is_user_in_rooms(self, room_ids: StrCollection, user_id: str) -> bool:
         """
         Check whether a user is a member of any of the provided rooms.
 
