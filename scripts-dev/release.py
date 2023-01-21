@@ -18,14 +18,16 @@
 """
 
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional
 
 import attr
 import click
@@ -71,17 +73,20 @@ def cli() -> None:
 
         ./scripts-dev/release.py tag
 
-        # ... wait for assets to build ...
+        # wait for assets to build, either manually or with:
+        ./scripts-dev/release.py wait-for-actions
 
         ./scripts-dev/release.py publish
 
         ./scripts-dev/release.py upload
 
-        # Optional: generate some nice links for the announcement
-
         ./scripts-dev/release.py merge-back
 
+        # Optional: generate some nice links for the announcement
         ./scripts-dev/release.py announce
+
+    Alternatively, `./scripts-dev/release.py full` will do all the above
+    as well as guiding you through the manual steps.
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.
@@ -90,6 +95,10 @@ def cli() -> None:
 
 @cli.command()
 def prepare() -> None:
+    _prepare()
+
+
+def _prepare() -> None:
     """Do the initial stages of creating a release, including creating release
     branch, updating changelog and pushing to GitHub.
     """
@@ -165,9 +174,7 @@ def prepare() -> None:
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    # Cast safety: parse() won't return a version.LegacyVersion from our
-    # version string format.
-    parsed_new_version = cast(version.Version, version.parse(new_version))
+    parsed_new_version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
@@ -210,9 +217,7 @@ def prepare() -> None:
                 update_branch(repo)
 
             # Create the new release branch
-            # Type ignore will no longer be needed after GitPython 3.1.28.
-            # See https://github.com/gitpython-developers/GitPython/pull/1419
-            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            repo.create_head(release_branch_name, commit=base_branch)
 
         # Special-case SyTest: we don't actually prepare any files so we may
         # as well push it now (and only when we create a release branch;
@@ -284,6 +289,10 @@ def prepare() -> None:
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
 def tag(gh_token: Optional[str]) -> None:
+    _tag(gh_token)
+
+
+def _tag(gh_token: Optional[str]) -> None:
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
@@ -374,6 +383,10 @@ def tag(gh_token: Optional[str]) -> None:
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
 def publish(gh_token: str) -> None:
+    _publish(gh_token)
+
+
+def _publish(gh_token: str) -> None:
     """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
@@ -410,7 +423,12 @@ def publish(gh_token: str) -> None:
 
 
 @cli.command()
-def upload() -> None:
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def upload(gh_token: Optional[str]) -> None:
+    _upload(gh_token)
+
+
+def _upload(gh_token: Optional[str]) -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -423,18 +441,40 @@ def upload() -> None:
         click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
         click.get_current_context().abort()
 
-    pypi_asset_names = [
-        f"matrix_synapse-{current_version}-py3-none-any.whl",
-        f"matrix-synapse-{current_version}.tar.gz",
-    ]
+    # Query all the assets corresponding to this release.
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_release = gh_repo.get_release(tag_name)
+
+    all_assets = set(gh_release.get_assets())
+
+    # Only accept the wheels and sdist.
+    # Notably: we don't care about debs.tar.xz.
+    asset_names_and_urls = sorted(
+        (asset.name, asset.browser_download_url)
+        for asset in all_assets
+        if asset.name.endswith((".whl", ".tar.gz"))
+    )
+
+    # Print out what we've determined.
+    print("Found relevant assets:")
+    for asset_name, _ in asset_names_and_urls:
+        print(f" - {asset_name}")
+
+    ignored_asset_names = sorted(
+        {asset.name for asset in all_assets}
+        - {asset_name for asset_name, _ in asset_names_and_urls}
+    )
+    print("\nIgnoring irrelevant assets:")
+    for asset_name in ignored_asset_names:
+        print(f" - {asset_name}")
 
     with TemporaryDirectory(prefix=f"synapse_upload_{tag_name}_") as tmpdir:
-        for name in pypi_asset_names:
+        for name, asset_download_url in asset_names_and_urls:
             filename = path.join(tmpdir, name)
-            url = f"https://github.com/matrix-org/synapse/releases/download/{tag_name}/{name}"
 
             click.echo(f"Downloading {name} into {filename}")
-            urllib.request.urlretrieve(url, filename=filename)
+            urllib.request.urlretrieve(asset_download_url, filename=filename)
 
         if click.confirm("Upload to PyPI?", default=True):
             subprocess.run("twine upload *", shell=True, cwd=tmpdir)
@@ -480,7 +520,74 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
 
 
 @cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def wait_for_actions(gh_token: Optional[str]) -> None:
+    _wait_for_actions(gh_token)
+
+
+def _wait_for_actions(gh_token: Optional[str]) -> None:
+    # Find out the version and tag name.
+    current_version = get_package_version()
+    tag_name = f"v{current_version}"
+
+    # Authentication is optional on this endpoint,
+    # but use a token if we have one to reduce the chance of being rate-limited.
+    url = f"https://api.github.com/repos/matrix-org/synapse/actions/runs?branch={tag_name}"
+    headers = {"Accept": "application/vnd.github+json"}
+    if gh_token is not None:
+        headers["authorization"] = f"token {gh_token}"
+    req = urllib.request.Request(url, headers=headers)
+
+    time.sleep(10 * 60)
+    while True:
+        time.sleep(5 * 60)
+        response = urllib.request.urlopen(req)
+        resp = json.loads(response.read())
+
+        if len(resp["workflow_runs"]) == 0:
+            continue
+
+        if all(
+            workflow["status"] != "in_progress" for workflow in resp["workflow_runs"]
+        ):
+            success = (
+                workflow["status"] == "completed" for workflow in resp["workflow_runs"]
+            )
+            if success:
+                _notify("Workflows successful. You can now continue the release.")
+            else:
+                _notify("Workflows failed.")
+                click.confirm("Continue anyway?", abort=True)
+
+            break
+
+
+def _notify(message: str) -> None:
+    # Send a bell character. Most terminals will play a sound or show a notification
+    # for this.
+    click.echo(f"\a{message}")
+
+    # Try and run notify-send, but don't raise an Exception if this fails
+    # (This is best-effort)
+    # TODO Support other platforms?
+    subprocess.run(
+        [
+            "notify-send",
+            "--app-name",
+            "Synapse Release Script",
+            "--expire-time",
+            "3600000",
+            message,
+        ]
+    )
+
+
+@cli.command()
 def merge_back() -> None:
+    _merge_back()
+
+
+def _merge_back() -> None:
     """Merge the release branch back into the appropriate branches.
     All branches will be automatically pulled from the remote and the results
     will be pushed to the remote."""
@@ -519,6 +626,10 @@ def merge_back() -> None:
 
 @cli.command()
 def announce() -> None:
+    _announce()
+
+
+def _announce() -> None:
     """Generate markdown to announce the release."""
 
     current_version = get_package_version()
@@ -548,8 +659,54 @@ Announce the release in
 - #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
 - #synapse:matrix.org (Synapse Admins), bumping the version in the topic
 - #synapse-dev:matrix.org
-- #synapse-package-maintainers:matrix.org"""
+- #synapse-package-maintainers:matrix.org
+
+Ask the designated people to do the blog and tweets."""
         )
+
+
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+def full(gh_token: str) -> None:
+    click.echo("1. If this is a security release, read the security wiki page.")
+    click.echo("2. Check for any release blockers before proceeding.")
+    click.echo("    https://github.com/matrix-org/synapse/labels/X-Release-Blocker")
+
+    click.confirm("Ready?", abort=True)
+
+    click.echo("\n*** prepare ***")
+    _prepare()
+
+    click.echo("Deploy to matrix.org and ensure that it hasn't fallen over.")
+    click.echo("Remember to silence the alerts to prevent alert spam.")
+    click.confirm("Deployed?", abort=True)
+
+    click.echo("\n*** tag ***")
+    _tag(gh_token)
+
+    click.echo("\n*** wait for actions ***")
+    _wait_for_actions(gh_token)
+
+    click.echo("\n*** publish ***")
+    _publish(gh_token)
+
+    click.echo("\n*** upload ***")
+    _upload(gh_token)
+
+    click.echo("\n*** merge back ***")
+    _merge_back()
+
+    click.echo("\nUpdate the Debian repository")
+    click.confirm("Started updating Debian repository?", abort=True)
+
+    click.echo("\nWait for all release methods to be ready.")
+    # Docker should be ready because it was done by the workflows earlier
+    # PyPI should be ready because we just ran upload().
+    # TODO Automatically poll until the Debs have made it to packages.matrix.org
+    click.confirm("Debs ready?", abort=True)
+
+    click.echo("\n*** announce ***")
+    _announce()
 
 
 def get_package_version() -> version.Version:

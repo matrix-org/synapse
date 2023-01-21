@@ -126,6 +126,13 @@ class PresenceRouterTestModule:
 
 
 class PresenceRouterTestCase(FederatingHomeserverTestCase):
+    """
+    Test cases using a custom PresenceRouter
+
+    By default in test cases, federation sending is disabled. This class re-enables it
+    for the main process by setting `federation_sender_instances` to None.
+    """
+
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -150,6 +157,11 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         self.sync_handler = self.hs.get_sync_handler()
         self.module_api = homeserver.get_module_api()
 
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["federation_sender_instances"] = None
+        return config
+
     @override_config(
         {
             "presence": {
@@ -162,7 +174,6 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 }
             },
-            "send_federation": True,
         }
     )
     def test_receiving_all_presence_legacy(self):
@@ -180,7 +191,6 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 },
             ],
-            "send_federation": True,
         }
     )
     def test_receiving_all_presence(self):
@@ -290,7 +300,6 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 }
             },
-            "send_federation": True,
         }
     )
     def test_send_local_online_presence_to_with_module_legacy(self):
@@ -310,7 +319,6 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     },
                 },
             ],
-            "send_federation": True,
         }
     )
     def test_send_local_online_presence_to_with_module(self):

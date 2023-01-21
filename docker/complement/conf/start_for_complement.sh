@@ -45,7 +45,12 @@ esac
 
 if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
   # Specify the workers to test with
-  export SYNAPSE_WORKER_TYPES="\
+  # Allow overriding by explicitly setting SYNAPSE_WORKER_TYPES outside, while still
+  # utilizing WORKERS=1 for backwards compatibility.
+  # -n True if the length of string is non-zero.
+  # -z True if the length of string is zero.
+  if [[ -z "$SYNAPSE_WORKER_TYPES" ]]; then
+    export SYNAPSE_WORKER_TYPES="\
       event_persister, \
       event_persister, \
       background_worker, \
@@ -57,9 +62,12 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       federation_reader, \
       federation_sender, \
       synchrotron, \
+      client_reader, \
       appservice, \
       pusher"
 
+  fi
+  log "Workers requested: $SYNAPSE_WORKER_TYPES"
   # Improve startup times by using a launcher based on fork()
   export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
 else

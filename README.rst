@@ -3,7 +3,7 @@ Synapse |support| |development| |documentation| |license| |pypi| |python|
 =========================================================================
 
 Synapse is an open-source `Matrix <https://matrix.org/>`_ homeserver written and
-maintained by the Matrix.org Foundation. We began rapid development began in 2014,
+maintained by the Matrix.org Foundation. We began rapid development in 2014,
 reaching v1.0.0 in 2019. Development on Synapse and the Matrix protocol itself continues
 in earnest today.
 

@@ -28,8 +28,14 @@ from typing import (
 )
 
 import attr
+from canonicaljson import encode_canonical_json
 
-from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.constants import (
+    MAX_PDU_SIZE,
+    EventContentFields,
+    EventTypes,
+    RelationTypes,
+)
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.types import JsonDict
@@ -397,6 +403,14 @@ class EventClientSerializer:
     clients.
     """
 
+    def __init__(self, inhibit_replacement_via_edits: bool = False):
+        """
+        Args:
+            inhibit_replacement_via_edits: If this is set to True, then events are
+               never replaced by their edits.
+        """
+        self._inhibit_replacement_via_edits = inhibit_replacement_via_edits
+
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -416,6 +430,8 @@ class EventClientSerializer:
                into the event.
             apply_edits: Whether the content of the event should be modified to reflect
                any replacement in `bundle_aggregations[<event_id>].replace`.
+               See also the `inhibit_replacement_via_edits` constructor arg: if that is
+               set to True, then this argument is ignored.
         Returns:
             The serialized event
         """
@@ -489,7 +505,8 @@ class EventClientSerializer:
                 again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
             apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `aggregations.replace`.
+               any replacement in `aggregations.replace` (subject to the
+               `inhibit_replacement_via_edits` constructor arg).
         """
 
         # We have already checked that aggregations exist for this event.
@@ -512,15 +529,21 @@ class EventClientSerializer:
         if event_aggregations.replace:
             # If there is an edit, optionally apply it to the event.
             edit = event_aggregations.replace
-            if apply_edits:
+            if apply_edits and not self._inhibit_replacement_via_edits:
                 self._apply_edit(event, serialized_event, edit)
 
             # Include information about it in the relations dict.
-            serialized_aggregations[RelationTypes.REPLACE] = {
-                "event_id": edit.event_id,
-                "origin_server_ts": edit.origin_server_ts,
-                "sender": edit.sender,
-            }
+            #
+            # Matrix spec v1.5 (https://spec.matrix.org/v1.5/client-server-api/#server-side-aggregation-of-mreplace-relationships)
+            # said that we should only include the `event_id`, `origin_server_ts` and
+            # `sender` of the edit; however MSC3925 proposes extending it to the whole
+            # of the edit, which is what we do here.
+            serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
+                edit,
+                time_now,
+                config=config,
+                apply_edits=False,
+            )
 
         # Include any threaded replies to this event.
         if event_aggregations.thread:
@@ -674,3 +697,27 @@ def validate_canonicaljson(value: Any) -> None:
     elif not isinstance(value, (bool, str)) and value is not None:
         # Other potential JSON values (bool, None, str) are safe.
         raise SynapseError(400, "Unknown JSON value", Codes.BAD_JSON)
+
+
+def maybe_upsert_event_field(
+    event: EventBase, container: JsonDict, key: str, value: object
+) -> bool:
+    """Upsert an event field, but only if this doesn't make the event too large.
+
+    Returns true iff the upsert took place.
+    """
+    if key in container:
+        old_value: object = container[key]
+        container[key] = value
+        # NB: here and below, we assume that passing a non-None `time_now` argument to
+        # get_pdu_json doesn't increase the size of the encoded result.
+        upsert_okay = len(encode_canonical_json(event.get_pdu_json())) <= MAX_PDU_SIZE
+        if not upsert_okay:
+            container[key] = old_value
+    else:
+        container[key] = value
+        upsert_okay = len(encode_canonical_json(event.get_pdu_json())) <= MAX_PDU_SIZE
+        if not upsert_okay:
+            del container[key]
+
+    return upsert_okay

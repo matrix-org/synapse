@@ -31,12 +31,11 @@ case $(dpkg-architecture -q DEB_HOST_ARCH) in
 esac
 
 # Manually install Poetry and export a pip-compatible `requirements.txt`
-# We need a Poetry pre-release as the export command is buggy in < 1.2
 TEMP_VENV="$(mktemp -d)"
 python3 -m venv "$TEMP_VENV"
 source "$TEMP_VENV/bin/activate"
 pip install -U pip
-pip install poetry==1.2.0b1
+pip install poetry==1.3.2
 poetry export \
     --extras all \
     --extras test \
@@ -61,7 +60,7 @@ dh_virtualenv \
     --extras="all,systemd,test" \
     --requirements="exported_requirements.txt"
 
-PACKAGE_BUILD_DIR="debian/matrix-synapse-py3"
+PACKAGE_BUILD_DIR="$(pwd)/debian/matrix-synapse-py3"
 VIRTUALENV_DIR="${PACKAGE_BUILD_DIR}${DH_VIRTUALENV_INSTALL_ROOT}/matrix-synapse"
 TARGET_PYTHON="${VIRTUALENV_DIR}/bin/python"
 
@@ -78,8 +77,13 @@ case "$DEB_BUILD_OPTIONS" in
 
         cp -r tests "$tmpdir"
 
+        # To avoid pulling in the unbuilt Synapse in the local directory
+        pushd /
+
         PYTHONPATH="$tmpdir" \
             "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests
+
+        popd
 
         ;;
 esac

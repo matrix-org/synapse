@@ -25,8 +25,8 @@ class AuthenticationData(RequestBodyModel):
 
     (The name "Authentication Data" is taken directly from the spec.)
 
-    Additional keys will be present, depending on the `type` field. Use `.dict()` to
-    access them.
+    Additional keys will be present, depending on the `type` field. Use
+    `.dict(exclude_unset=True)` to access them.
     """
 
     class Config:
@@ -36,18 +36,20 @@ class AuthenticationData(RequestBodyModel):
     type: Optional[StrictStr] = None
 
 
-class EmailRequestTokenBody(RequestBodyModel):
-    if TYPE_CHECKING:
-        client_secret: StrictStr
-    else:
-        # See also assert_valid_client_secret()
-        client_secret: constr(
-            regex="[0-9a-zA-Z.=_-]",  # noqa: F722
-            min_length=0,
-            max_length=255,
-            strict=True,
-        )
-    email: StrictStr
+if TYPE_CHECKING:
+    ClientSecretStr = StrictStr
+else:
+    # See also assert_valid_client_secret()
+    ClientSecretStr = constr(
+        regex="[0-9a-zA-Z.=_-]",  # noqa: F722
+        min_length=1,
+        max_length=255,
+        strict=True,
+    )
+
+
+class ThreepidRequestTokenBody(RequestBodyModel):
+    client_secret: ClientSecretStr
     id_server: Optional[StrictStr]
     id_access_token: Optional[StrictStr]
     next_link: Optional[StrictStr]
@@ -61,9 +63,25 @@ class EmailRequestTokenBody(RequestBodyModel):
             raise ValueError("id_access_token is required if an id_server is supplied.")
         return token
 
+
+class EmailRequestTokenBody(ThreepidRequestTokenBody):
+    email: StrictStr
+
     # Canonicalise the email address. The addresses are all stored canonicalised
     # in the database. This allows the user to reset his password without having to
     # know the exact spelling (eg. upper and lower case) of address in the database.
     # Without this, an email stored in the database as "foo@bar.com" would cause
     # user requests for "FOO@bar.com" to raise a Not Found error.
     _email_validator = validator("email", allow_reuse=True)(validate_email)
+
+
+if TYPE_CHECKING:
+    ISO3116_1_Alpha_2 = StrictStr
+else:
+    # Per spec: two-letter uppercase ISO-3166-1-alpha-2
+    ISO3116_1_Alpha_2 = constr(regex="[A-Z]{2}", strict=True)
+
+
+class MsisdnRequestTokenBody(ThreepidRequestTokenBody):
+    country: ISO3116_1_Alpha_2
+    phone_number: StrictStr

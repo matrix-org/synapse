@@ -20,31 +20,31 @@ import json
 import os
 import sys
 
+from synapse.util.rust import check_rust_lib_up_to_date
+from synapse.util.stringutils import strtobool
+
 # Check that we're not running on an unsupported Python version.
 if sys.version_info < (3, 7):
     print("Synapse requires Python 3.7 or above.")
     sys.exit(1)
 
 # Allow using the asyncio reactor via env var.
-if bool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", False)):
-    try:
-        from incremental import Version
+if strtobool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", "0")):
+    from incremental import Version
 
-        import twisted
+    import twisted
 
-        # We need a bugfix that is included in Twisted 21.2.0:
-        # https://twistedmatrix.com/trac/ticket/9787
-        if twisted.version < Version("Twisted", 21, 2, 0):
-            print("Using asyncio reactor requires Twisted>=21.2.0")
-            sys.exit(1)
+    # We need a bugfix that is included in Twisted 21.2.0:
+    # https://twistedmatrix.com/trac/ticket/9787
+    if twisted.version < Version("Twisted", 21, 2, 0):
+        print("Using asyncio reactor requires Twisted>=21.2.0")
+        sys.exit(1)
 
-        import asyncio
+    import asyncio
 
-        from twisted.internet import asyncioreactor
+    from twisted.internet import asyncioreactor
 
-        asyncioreactor.install(asyncio.get_event_loop())
-    except ImportError:
-        pass
+    asyncioreactor.install(asyncio.get_event_loop())
 
 # Twisted and canonicaljson will fail to import when this file is executed to
 # get the __version__ during a fresh install. That's OK and subsequent calls to
@@ -78,3 +78,6 @@ if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     from synapse.util.patch_inline_callbacks import do_patch
 
     do_patch()
+
+
+check_rust_lib_up_to_date()

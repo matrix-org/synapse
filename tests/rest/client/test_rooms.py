@@ -20,7 +20,7 @@
 import json
 from http import HTTPStatus
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 from urllib import parse as urlparse
 
 from parameterized import param, parameterized
@@ -35,13 +35,15 @@ from synapse.api.constants import (
     EventTypes,
     Membership,
     PublicRoomsFilterFields,
-    RelationTypes,
     RoomTypes,
 )
 from synapse.api.errors import Codes, HttpResponseException
+from synapse.appservice import ApplicationService
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
-from synapse.rest.client import account, directory, login, profile, room, sync
+from synapse.rest.client import account, directory, login, profile, register, room, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util import Clock
@@ -49,7 +51,10 @@ from synapse.util.stringutils import random_string
 
 from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
+from tests.storage.test_stream import PaginationTestCase
 from tests.test_utils import make_awaitable
+from tests.test_utils.event_injection import create_event
+from tests.unittest import override_config
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -710,7 +715,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(44, channel.resource_usage.db_txn_count)
+        self.assertEqual(33, channel.resource_usage.db_txn_count)
 
     def test_post_room_initial_state(self) -> None:
         # POST with initial_state config key, expect new room id
@@ -723,7 +728,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(50, channel.resource_usage.db_txn_count)
+        self.assertEqual(36, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
@@ -866,6 +871,41 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         self.assertEqual(join_mock.call_count, 0)
+
+    def _create_basic_room(self) -> Tuple[int, object]:
+        """
+        Tries to create a basic room and returns the response code.
+        """
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        return channel.code, channel.json_body
+
+    @override_config(
+        {
+            "rc_message": {"per_second": 0.2, "burst_count": 10},
+        }
+    )
+    def test_room_creation_ratelimiting(self) -> None:
+        """
+        Regression test for #14312, where ratelimiting was made too strict.
+        Clients should be able to create 10 rooms in a row
+        without hitting rate limits, using default rate limit config.
+        (We override rate limiting config back to its default value.)
+
+        To ensure we don't make ratelimiting too generous accidentally,
+        also check that we can't create an 11th room.
+        """
+
+        for _ in range(10):
+            code, json_body = self._create_basic_room()
+            self.assertEqual(code, HTTPStatus.OK, json_body)
+
+        # The 6th room hits the rate limit.
+        code, json_body = self._create_basic_room()
+        self.assertEqual(code, HTTPStatus.TOO_MANY_REQUESTS, json_body)
 
 
 class RoomTopicTestCase(RoomBase):
@@ -1252,6 +1292,120 @@ class RoomJoinTestCase(RoomBase):
         )
 
 
+class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        room.register_servlets,
+        synapse.rest.admin.register_servlets,
+        register.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.appservice_user, _ = self.register_appservice_user(
+            "as_user_potato", self.appservice.token
+        )
+
+        # Create a room as the appservice user.
+        args = {
+            "access_token": self.appservice.token,
+            "user_id": self.appservice_user,
+        }
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/r0/createRoom?{urlparse.urlencode(args)}",
+            content={"visibility": "public"},
+        )
+
+        assert channel.code == 200
+        self.room = channel.json_body["room_id"]
+
+        self.main_store = self.hs.get_datastores().main
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        config = self.default_config()
+
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            # Note: this user does not have to match the regex above
+            sender="@as_main:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = self.setup_test_homeserver(config=config)
+        return hs
+
+    def test_send_event_ts(self) -> None:
+        """Test sending a non-state event with a custom timestamp."""
+        ts = 1
+
+        url_params = {
+            "user_id": self.appservice_user,
+            "ts": ts,
+        }
+        channel = self.make_request(
+            "PUT",
+            path=f"/_matrix/client/r0/rooms/{self.room}/send/m.room.message/1234?"
+            + urlparse.urlencode(url_params),
+            content={"body": "test", "msgtype": "m.text"},
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        # Ensure the event was persisted with the correct timestamp.
+        res = self.get_success(self.main_store.get_event(event_id))
+        self.assertEquals(ts, res.origin_server_ts)
+
+    def test_send_state_event_ts(self) -> None:
+        """Test sending a state event with a custom timestamp."""
+        ts = 1
+
+        url_params = {
+            "user_id": self.appservice_user,
+            "ts": ts,
+        }
+        channel = self.make_request(
+            "PUT",
+            path=f"/_matrix/client/r0/rooms/{self.room}/state/m.room.name?"
+            + urlparse.urlencode(url_params),
+            content={"name": "test"},
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        # Ensure the event was persisted with the correct timestamp.
+        res = self.get_success(self.main_store.get_event(event_id))
+        self.assertEquals(ts, res.origin_server_ts)
+
+    def test_send_membership_event_ts(self) -> None:
+        """Test sending a membership event with a custom timestamp."""
+        ts = 1
+
+        url_params = {
+            "user_id": self.appservice_user,
+            "ts": ts,
+        }
+        channel = self.make_request(
+            "PUT",
+            path=f"/_matrix/client/r0/rooms/{self.room}/state/m.room.member/{self.appservice_user}?"
+            + urlparse.urlencode(url_params),
+            content={"membership": "join", "display_name": "test"},
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        # Ensure the event was persisted with the correct timestamp.
+        res = self.get_success(self.main_store.get_event(event_id))
+        self.assertEquals(ts, res.origin_server_ts)
+
+
 class RoomJoinRatelimitTestCase(RoomBase):
     user_id = "@sid1:red"
 
@@ -1272,10 +1426,22 @@ class RoomJoinRatelimitTestCase(RoomBase):
     )
     def test_join_local_ratelimit(self) -> None:
         """Tests that local joins are actually rate-limited."""
-        for _ in range(3):
-            self.helper.create_room_as(self.user_id)
+        # Create 4 rooms
+        room_ids = [
+            self.helper.create_room_as(self.user_id, is_public=True) for _ in range(4)
+        ]
 
-        self.helper.create_room_as(self.user_id, expect_code=429)
+        joiner_user_id = self.register_user("joiner", "secret")
+        # Now make a new user try to join some of them.
+
+        # The user can join 3 rooms
+        for room_id in room_ids[0:3]:
+            self.helper.join(room_id, joiner_user_id)
+
+        # But the user cannot join a 4th room
+        self.helper.join(
+            room_ids[3], joiner_user_id, expect_code=HTTPStatus.TOO_MANY_REQUESTS
+        )
 
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
@@ -2098,14 +2264,17 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         )
 
     def make_public_rooms_request(
-        self, room_types: Union[List[Union[str, None]], None]
+        self,
+        room_types: Optional[List[Union[str, None]]],
+        instance_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
-        channel = self.make_request(
-            "POST",
-            self.url,
-            {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}},
-            self.token,
-        )
+        body: JsonDict = {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}}
+        if instance_id:
+            body["third_party_instance_id"] = "test|test"
+
+        channel = self.make_request("POST", self.url, body, self.token)
+        self.assertEqual(channel.code, 200)
+
         chunk = channel.json_body["chunk"]
         count = channel.json_body["total_room_count_estimate"]
 
@@ -2115,8 +2284,16 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
 
     def test_returns_both_rooms_and_spaces_if_no_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(None)
-
         self.assertEqual(count, 2)
+
+        # Also check if there's no filter property at all in the body.
+        channel = self.make_request("POST", self.url, {}, self.token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["chunk"]), 2)
+        self.assertEqual(channel.json_body["total_room_count_estimate"], 2)
+
+        chunk, count = self.make_public_rooms_request(None, "test|test")
+        self.assertEqual(count, 0)
 
     def test_returns_only_rooms_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request([None])
@@ -2124,21 +2301,31 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(count, 1)
         self.assertEqual(chunk[0].get("room_type", None), None)
 
+        chunk, count = self.make_public_rooms_request([None], "test|test")
+        self.assertEqual(count, 0)
+
     def test_returns_only_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space"])
 
         self.assertEqual(count, 1)
         self.assertEqual(chunk[0].get("room_type", None), "m.space")
 
+        chunk, count = self.make_public_rooms_request(["m.space"], "test|test")
+        self.assertEqual(count, 0)
+
     def test_returns_both_rooms_and_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space", None])
-
         self.assertEqual(count, 2)
+
+        chunk, count = self.make_public_rooms_request(["m.space", None], "test|test")
+        self.assertEqual(count, 0)
 
     def test_returns_both_rooms_and_spaces_if_array_is_empty(self) -> None:
         chunk, count = self.make_public_rooms_request([])
-
         self.assertEqual(count, 2)
+
+        chunk, count = self.make_public_rooms_request([], "test|test")
+        self.assertEqual(count, 0)
 
 
 class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
@@ -2779,149 +2966,20 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         return event_id
 
 
-class RelationsTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        room.register_servlets,
-        login.register_servlets,
-    ]
-
-    def default_config(self) -> Dict[str, Any]:
-        config = super().default_config()
-        config["experimental_features"] = {"msc3440_enabled": True}
-        return config
-
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.user_id = self.register_user("test", "test")
-        self.tok = self.login("test", "test")
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
-
-        self.second_user_id = self.register_user("second", "test")
-        self.second_tok = self.login("second", "test")
-        self.helper.join(
-            room=self.room_id, user=self.second_user_id, tok=self.second_tok
-        )
-
-        self.third_user_id = self.register_user("third", "test")
-        self.third_tok = self.login("third", "test")
-        self.helper.join(room=self.room_id, user=self.third_user_id, tok=self.third_tok)
-
-        # An initial event with a relation from second user.
-        res = self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "Message 1"},
-            tok=self.tok,
-        )
-        self.event_id_1 = res["event_id"]
-        self.helper.send_event(
-            room_id=self.room_id,
-            type="m.reaction",
-            content={
-                "m.relates_to": {
-                    "rel_type": RelationTypes.ANNOTATION,
-                    "event_id": self.event_id_1,
-                    "key": "👍",
-                }
-            },
-            tok=self.second_tok,
-        )
-
-        # Another event with a relation from third user.
-        res = self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "Message 2"},
-            tok=self.tok,
-        )
-        self.event_id_2 = res["event_id"]
-        self.helper.send_event(
-            room_id=self.room_id,
-            type="m.reaction",
-            content={
-                "m.relates_to": {
-                    "rel_type": RelationTypes.REFERENCE,
-                    "event_id": self.event_id_2,
-                }
-            },
-            tok=self.third_tok,
-        )
-
-        # An event with no relations.
-        self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "No relations"},
-            tok=self.tok,
-        )
-
-    def _filter_messages(self, filter: JsonDict) -> List[JsonDict]:
+class RelationsTestCase(PaginationTestCase):
+    def _filter_messages(self, filter: JsonDict) -> List[str]:
         """Make a request to /messages with a filter, returns the chunk of events."""
+        from_token = self.get_success(
+            self.from_token.to_string(self.hs.get_datastores().main)
+        )
         channel = self.make_request(
             "GET",
-            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, json.dumps(filter)),
+            f"/rooms/{self.room_id}/messages?filter={json.dumps(filter)}&dir=f&from={from_token}",
             access_token=self.tok,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
-        return channel.json_body["chunk"]
-
-    def test_filter_relation_senders(self) -> None:
-        # Messages which second user reacted to.
-        filter = {"related_by_senders": [self.second_user_id]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
-
-        # Messages which third user reacted to.
-        filter = {"related_by_senders": [self.third_user_id]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_2)
-
-        # Messages which either user reacted to.
-        filter = {"related_by_senders": [self.second_user_id, self.third_user_id]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c["event_id"] for c in chunk], [self.event_id_1, self.event_id_2]
-        )
-
-    def test_filter_relation_type(self) -> None:
-        # Messages which have annotations.
-        filter = {"related_by_rel_types": [RelationTypes.ANNOTATION]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
-
-        # Messages which have references.
-        filter = {"related_by_rel_types": [RelationTypes.REFERENCE]}
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_2)
-
-        # Messages which have either annotations or references.
-        filter = {
-            "related_by_rel_types": [
-                RelationTypes.ANNOTATION,
-                RelationTypes.REFERENCE,
-            ]
-        }
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c["event_id"] for c in chunk], [self.event_id_1, self.event_id_2]
-        )
-
-    def test_filter_relation_senders_and_type(self) -> None:
-        # Messages which second user reacted to.
-        filter = {
-            "related_by_senders": [self.second_user_id],
-            "related_by_rel_types": [RelationTypes.ANNOTATION],
-        }
-        chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
+        return [ev["event_id"] for ev in channel.json_body["chunk"]]
 
 
 class ContextTestCase(unittest.HomeserverTestCase):
@@ -3479,3 +3537,60 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_MISSING_PARAM")
+
+
+class TimestampLookupTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self._storage_controllers = self.hs.get_storage_controllers()
+
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+    def _inject_outlier(self, room_id: str) -> EventBase:
+        event, _context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                type="m.test",
+                sender="@test_remote_user:remote",
+            )
+        )
+
+        event.internal_metadata.outlier = True
+        self.get_success(
+            self._storage_controllers.persistence.persist_event(
+                event, EventContext.for_outlier(self._storage_controllers)
+            )
+        )
+        return event
+
+    def test_no_outliers(self) -> None:
+        """
+        Test to make sure `/timestamp_to_event` does not return `outlier` events.
+        We're unable to determine whether an `outlier` is next to a gap so we
+        don't know whether it's actually the closest event. Instead, let's just
+        ignore `outliers` with this endpoint.
+
+        This test is really seeing that we choose the non-`outlier` event behind the
+        `outlier`. Since the gap checking logic considers the latest message in the room
+        as *not* next to a gap, asking over federation does not come into play here.
+        """
+        room_id = self.helper.create_room_as(self.room_owner, tok=self.room_owner_tok)
+
+        outlier_event = self._inject_outlier(room_id)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
+            access_token=self.room_owner_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+
+        # Make sure the outlier event is not returned
+        self.assertNotEqual(channel.json_body["event_id"], outlier_event.event_id)

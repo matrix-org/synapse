@@ -125,7 +125,8 @@ def default_config(
     """
     config_dict = {
         "server_name": name,
-        "send_federation": False,
+        # Setting this to an empty list turns off federation sending.
+        "federation_sender_instances": [],
         "media_store_path": "media",
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
@@ -135,7 +136,6 @@ def default_config(
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
         "password_providers": [],
-        "worker_replication_url": "",
         "worker_app": None,
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
@@ -184,8 +184,9 @@ def default_config(
         # rooms will fail.
         "default_room_version": DEFAULT_ROOM_VERSION,
         # disable user directory updates, because they get done in the
-        # background, which upsets the test runner.
-        "update_user_directory": False,
+        # background, which upsets the test runner. Setting this to an
+        # (obviously) fake worker name disables updating the user directory.
+        "update_user_directory_from_worker": "does_not_exist_worker_name",
         "caches": {"global_factor": 1, "sync_response_cache_duration": 0},
         "listeners": [{"port": 0, "type": "http"}],
     }
@@ -271,9 +272,7 @@ class MockClock:
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        # This type-ignore should be redundant once we use a mypy release with
-        # https://github.com/python/mypy/pull/12668.
-        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))  # type: ignore[arg-type]
+        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))
 
     def cancel_call_later(self, timer: Timer, ignore_errs: bool = False) -> None:
         if timer.expired:

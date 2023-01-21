@@ -69,6 +69,8 @@ class _BackgroundUpdates:
 
     EVENTS_POPULATE_STATE_KEY_REJECTIONS = "events_populate_state_key_rejections"
 
+    EVENTS_JUMP_TO_DATE_INDEX = "events_jump_to_date_index"
+
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _CalculateChainCover:
@@ -258,6 +260,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.EVENTS_POPULATE_STATE_KEY_REJECTIONS,
             self._background_events_populate_state_key_rejections,
+        )
+
+        # Add an index that would be useful for jumping to date using
+        # get_event_id_for_timestamp.
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.EVENTS_JUMP_TO_DATE_INDEX,
+            index_name="events_jump_to_date_idx",
+            table="events",
+            columns=["room_id", "origin_server_ts"],
+            where_clause="NOT outlier",
         )
 
     async def _background_reindex_fields_sender(
@@ -1435,16 +1447,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 ),
             )
 
-            endpoint = None
             row = txn.fetchone()
             if row:
                 endpoint = row[0]
+            else:
+                # if the query didn't return a row, we must be almost done. We just
+                # need to go up to the recorded max_stream_ordering.
+                endpoint = max_stream_ordering_inclusive
 
-            where_clause = "stream_ordering > ?"
-            args = [min_stream_ordering_exclusive]
-            if endpoint:
-                where_clause += " AND stream_ordering <= ?"
-                args.append(endpoint)
+            where_clause = "stream_ordering > ? AND stream_ordering <= ?"
+            args = [min_stream_ordering_exclusive, endpoint]
 
             # now do the updates.
             txn.execute(
@@ -1458,13 +1470,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
             logger.info(
-                "populated new `events` columns up to %s/%i: updated %i rows",
+                "populated new `events` columns up to %i/%i: updated %i rows",
                 endpoint,
                 max_stream_ordering_inclusive,
                 txn.rowcount,
             )
 
-            if endpoint is None:
+            if endpoint >= max_stream_ordering_inclusive:
                 # we're done
                 return True
 

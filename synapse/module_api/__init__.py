@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -86,6 +87,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.device import DeviceHandler
 from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
@@ -110,7 +112,6 @@ from synapse.storage.background_updates import (
 )
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
@@ -123,9 +124,10 @@ from synapse.types import (
     UserProfile,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
@@ -135,6 +137,7 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 P = ParamSpec("P")
+F = TypeVar("F", bound=Callable[..., Any])
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -184,6 +187,42 @@ class UserIpAndAgent:
     last_seen: int
 
 
+def cached(
+    *,
+    max_entries: int = 1000,
+    num_args: Optional[int] = None,
+    uncached_args: Optional[Collection[str]] = None,
+) -> Callable[[F], CachedFunction[F]]:
+    """Returns a decorator that applies a memoizing cache around the function. This
+    decorator behaves similarly to functools.lru_cache.
+
+    Example:
+
+        @cached()
+        def foo('a', 'b'):
+            ...
+
+    Added in Synapse v1.74.0.
+
+    Args:
+        max_entries: The maximum number of entries in the cache. If the cache is full
+            and a new entry is added, the least recently accessed entry will be evicted
+            from the cache.
+        num_args: The number of positional arguments (excluding `self`) to use as cache
+            keys. Defaults to all named args of the function.
+        uncached_args: A list of argument names to not use as the cache key. (`self` is
+            always ignored.) Cannot be used with num_args.
+
+    Returns:
+        A decorator that applies a memoizing cache around the function.
+    """
+    return _cached(
+        max_entries=max_entries,
+        num_args=num_args,
+        uncached_args=uncached_args,
+    )
+
+
 class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
@@ -207,6 +246,7 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
@@ -748,16 +788,16 @@ class ModuleApi:
             )
         )
 
-    def generate_short_term_login_token(
+    async def create_login_token(
         self,
         user_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: str = "",
+        auth_provider_id: Optional[str] = None,
         auth_provider_session_id: Optional[str] = None,
     ) -> str:
-        """Generate a login token suitable for m.login.token authentication
+        """Create a login token suitable for m.login.token authentication
 
-        Added in Synapse v1.9.0.
+        Added in Synapse v1.69.0.
 
         Args:
             user_id: gives the ID of the user that the token is for
@@ -765,14 +805,17 @@ class ModuleApi:
             duration_in_ms: the time that the token will be valid for
 
             auth_provider_id: the ID of the SSO IdP that the user used to authenticate
-               to get this token, if any. This is encoded in the token so that
-               /login can report stats on number of successful logins by IdP.
+                to get this token, if any. This is encoded in the token so that
+                /login can report stats on number of successful logins by IdP.
+
+            auth_provider_session_id: The session ID got during login from the SSO IdP,
+                if any.
         """
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
+        return await self._hs.get_auth_handler().create_login_token_for_user_id(
             user_id,
+            duration_in_ms,
             auth_provider_id,
             auth_provider_session_id,
-            duration_in_ms,
         )
 
     @defer.inlineCallbacks
@@ -781,10 +824,12 @@ class ModuleApi:
     ) -> Generator["defer.Deferred[Any]", Any, None]:
         """Invalidate an access token for a user
 
+        Can only be called from the main process.
+
         Added in Synapse v0.25.0.
 
         Args:
-            access_token(str): access token
+            access_token: access token
 
         Returns:
             twisted.internet.defer.Deferred - resolves once the access token
@@ -793,6 +838,10 @@ class ModuleApi:
         Raises:
             synapse.api.errors.AuthError: the access token is invalid
         """
+        assert isinstance(
+            self._device_handler, DeviceHandler
+        ), "invalidate_access_token can only be called on the main process"
+
         # see if the access token corresponds to a device
         user_info = yield defer.ensureDeferred(
             self._auth.get_user_by_access_token(access_token)
@@ -802,7 +851,7 @@ class ModuleApi:
         if device_id:
             # delete the device, which will also delete its access tokens
             yield defer.ensureDeferred(
-                self._hs.get_device_handler().delete_devices(user_id, [device_id])
+                self._device_handler.delete_devices(user_id, [device_id])
             )
         else:
             # no associated device. Just delete the access token.
@@ -829,36 +878,46 @@ class ModuleApi:
             **kwargs: named args to be passed to func
 
         Returns:
-            Deferred[object]: result of func
+            Result of func
         """
         # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
             self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
         )
 
-    def complete_sso_login(
-        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
-    ) -> None:
-        """Complete a SSO login by redirecting the user to a page to confirm whether they
-        want their access token sent to `client_redirect_url`, or redirect them to that
-        URL with a token directly if the URL matches with one of the whitelisted clients.
+    def register_cached_function(self, cached_func: CachedFunction) -> None:
+        """Register a cached function that should be invalidated across workers.
+        Invalidation local to a worker can be done directly using `cached_func.invalidate`,
+        however invalidation that needs to go to other workers needs to call `invalidate_cache`
+        on the module API instead.
 
-        This is deprecated in favor of complete_sso_login_async.
-
-        Added in Synapse v1.11.1.
+        Added in Synapse v1.69.0.
 
         Args:
-            registered_user_id: The MXID that has been registered as a previous step of
-                of this SSO login.
-            request: The request to respond to.
-            client_redirect_url: The URL to which to offer to redirect the user (or to
-                redirect them directly if whitelisted).
+            cached_function: The cached function that will be registered to receive invalidation
+            locally and from other workers.
         """
-        self._auth_handler._complete_sso_login(
-            registered_user_id,
-            "<unknown>",
-            request,
-            client_redirect_url,
+        self._store.register_external_cached_function(
+            f"{cached_func.__module__}.{cached_func.__name__}", cached_func
+        )
+
+    async def invalidate_cache(
+        self, cached_func: CachedFunction, keys: Tuple[Any, ...]
+    ) -> None:
+        """Invalidate a cache entry of a cached function across workers. The cached function
+        needs to be registered on all workers first with `register_cached_function`.
+
+        Added in Synapse v1.69.0.
+
+        Args:
+            cached_function: The cached function that needs an invalidation
+            keys: keys of the entry to invalidate, usually matching the arguments of the
+            cached function.
+        """
+        cached_func.invalidate(keys)
+        await self._store.send_invalidation_to_replication(
+            f"{cached_func.__module__}.{cached_func.__name__}",
+            keys,
         )
 
     async def complete_sso_login_async(
@@ -911,8 +970,7 @@ class ModuleApi:
                 to represent 'any') of the room state to acquire.
 
         Returns:
-            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
-                The filtered state events in the room.
+            The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
             self._storage_controllers.state.get_current_state_ids(
@@ -1526,6 +1584,33 @@ class ModuleApi:
         )
 
         return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
+
+    async def set_displayname(
+        self,
+        user_id: UserID,
+        new_displayname: str,
+        deactivation: bool = False,
+    ) -> None:
+        """Sets a user's display name.
+
+        Added in Synapse v1.76.0.
+
+        Args:
+            user_id:
+                The user whose display name is to be changed.
+            new_displayname:
+                The new display name to give the user.
+            deactivation:
+                Whether this change was made while deactivating the user.
+        """
+        requester = create_requester(user_id)
+        await self._hs.get_profile_handler().set_displayname(
+            target_user=user_id,
+            requester=requester,
+            new_displayname=new_displayname,
+            by_admin=True,
+            deactivation=deactivation,
+        )
 
 
 class PublicRoomListManager:

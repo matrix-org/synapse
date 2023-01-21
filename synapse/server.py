@@ -105,8 +105,9 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
-from synapse.notifier import Notifier
+from synapse.notifier import Notifier, ReplicationNotifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -220,8 +221,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    tls_server_context_factory: Optional[IOpenSSLContextFactory]
-
     def __init__(
         self,
         hostname: str,
@@ -256,6 +255,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
+
+        # This attribute is set by the free function `refresh_certificate`.
+        self.tls_server_context_factory: Optional[IOpenSSLContextFactory] = None
 
     def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
@@ -314,7 +316,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
-    def start_listening(self) -> None:
+    def start_listening(self) -> None:  # noqa: B027 (no-op by design)
         """Start the HTTP, manhole, metrics, etc listeners
 
         Does nothing in this base class; overridden in derived classes to start the
@@ -340,7 +342,17 @@ class HomeServer(metaclass=abc.ABCMeta):
         return domain_specific_string.domain == self.hostname
 
     def is_mine_id(self, string: str) -> bool:
-        return string.split(":", 1)[1] == self.hostname
+        """Determines whether a user ID or room alias originates from this homeserver.
+
+        Returns:
+            `True` if the hostname part of the user ID or room alias matches this
+            homeserver.
+            `False` otherwise, or if the user ID or room alias is malformed.
+        """
+        localpart_hostname = string.split(":", 1)
+        if len(localpart_hostname) < 2:
+            return False
+        return localpart_hostname[1] == self.hostname
 
     @cache_in_self
     def get_clock(self) -> Clock:
@@ -376,6 +388,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_notifier(self) -> Notifier:
         return Notifier(self)
+
+    @cache_in_self
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
     @cache_in_self
     def get_auth(self) -> Auth:
@@ -498,7 +514,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_device_handler(self):
+    def get_device_handler(self) -> DeviceWorkerHandler:
         if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
@@ -731,7 +747,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self.config.experimental.msc3925_inhibit_edit)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -829,3 +845,8 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
+
+    @cache_in_self
+    def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:
+        """Usage metrics shared between phone home stats and the prometheus exporter."""
+        return CommonUsageMetricsManager(self)

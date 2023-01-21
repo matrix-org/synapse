@@ -16,9 +16,8 @@ import copy
 from typing import Any, Dict, List, Optional
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.types import UserID
-
-from .baserules import FilteredPushRules, PushRule
 
 
 def format_push_rules_for_user(
@@ -27,14 +26,11 @@ def format_push_rules_for_user(
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
-    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
-        "global": {},
-        "device": {},
-    }
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {"global": {}}
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
-    for r, enabled in ruleslist:
+    for r, enabled in ruleslist.rules():
         template_name = _priority_class_to_template_name(r.priority_class)
 
         rulearray = rules["global"][template_name]
@@ -44,6 +40,12 @@ def format_push_rules_for_user(
             continue
 
         rulearray.append(template_rule)
+
+        pattern_type = template_rule.pop("pattern_type", None)
+        if pattern_type == "user_id":
+            template_rule["pattern"] = user.to_string()
+        elif pattern_type == "user_localpart":
+            template_rule["pattern"] = user.localpart
 
         template_rule["enabled"] = enabled
 
@@ -94,19 +96,21 @@ def _rule_to_template(rule: PushRule) -> Optional[Dict[str, Any]]:
         if len(rule.conditions) != 1:
             return None
         thecond = rule.conditions[0]
-        if "pattern" not in thecond:
-            return None
+
         templaterule = {"actions": rule.actions}
-        templaterule["pattern"] = thecond["pattern"]
+        if "pattern" in thecond:
+            templaterule["pattern"] = thecond["pattern"]
+        elif "pattern_type" in thecond:
+            templaterule["pattern_type"] = thecond["pattern_type"]
+        else:
+            return None
     else:
         # This should not be reached unless this function is not kept in sync
         # with PRIORITY_CLASS_INVERSE_MAP.
         raise ValueError("Unexpected template_name: %s" % (template_name,))
 
-    if unscoped_rule_id:
-        templaterule["rule_id"] = unscoped_rule_id
-    if rule.default:
-        templaterule["default"] = True
+    templaterule["rule_id"] = unscoped_rule_id
+    templaterule["default"] = rule.default
     return templaterule
 
 

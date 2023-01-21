@@ -207,7 +207,7 @@ class ExpiringCache(Generic[KT, VT]):
         items from the cache.
 
         Returns:
-            bool: Whether the cache changed size or not.
+            Whether the cache changed size or not.
         """
         new_size = int(self._original_max_size * factor)
         if new_size != self._max_size:

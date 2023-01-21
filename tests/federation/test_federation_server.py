@@ -211,9 +211,8 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
-    @override_config({"experimental_features": {"msc3706_enabled": True}})
-    def test_send_join_partial_state(self):
-        """When MSC3706 support is enabled, /send_join should return partial state"""
+    def test_send_join_partial_state(self) -> None:
+        """/send_join should return partial state, if requested"""
         joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
         join_result = self._make_join(joining_user)
 
@@ -224,7 +223,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         channel = self.make_signed_federation_request(
             "PUT",
-            f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/x?omit_members=true",
             content=join_event_dict,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
@@ -240,6 +239,9 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
                 ("m.room.power_levels", ""),
                 ("m.room.join_rules", ""),
                 ("m.room.history_visibility", ""),
+                # Users included here because they're heroes.
+                ("m.room.member", "@kermit:test"),
+                ("m.room.member", "@fozzie:test"),
             ],
         )
 
@@ -249,9 +251,9 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         ]
         self.assertCountEqual(
             returned_auth_chain_events,
-            [
-                ("m.room.member", "@kermit:test"),
-            ],
+            # TODO: change the test so that we get at least one event in the auth chain
+            #   here.
+            [],
         )
 
         # the room should show that the new user is a member

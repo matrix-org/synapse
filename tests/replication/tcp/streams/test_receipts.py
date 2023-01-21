@@ -33,7 +33,12 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         # tell the master to send a new receipt
         self.get_success(
             self.hs.get_datastores().main.insert_receipt(
-                "!room:blue", "m.read", USER_ID, ["$event:blue"], {"a": 1}
+                "!room:blue",
+                "m.read",
+                USER_ID,
+                ["$event:blue"],
+                thread_id=None,
+                data={"a": 1},
             )
         )
         self.replicate()
@@ -48,6 +53,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         self.assertEqual("m.read", row.receipt_type)
         self.assertEqual(USER_ID, row.user_id)
         self.assertEqual("$event:blue", row.event_id)
+        self.assertIsNone(row.thread_id)
         self.assertEqual({"a": 1}, row.data)
 
         # Now let's disconnect and insert some data.
@@ -57,7 +63,12 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
 
         self.get_success(
             self.hs.get_datastores().main.insert_receipt(
-                "!room2:blue", "m.read", USER_ID, ["$event2:foo"], {"a": 2}
+                "!room2:blue",
+                "m.read",
+                USER_ID,
+                ["$event2:foo"],
+                thread_id=None,
+                data={"a": 2},
             )
         )
         self.replicate()

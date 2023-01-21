@@ -199,9 +199,15 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
     def test_stringy_power_levels(self) -> None:
         """The room upgrade converts stringy power levels to proper integers."""
+        # Create a room on room version < 10.
+        room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_token, room_version="9"
+        )
+        self.helper.join(room_id, self.other, tok=self.other_token)
+
         # Retrieve the room's current power levels.
         power_levels = self.helper.get_state(
-            self.room_id,
+            room_id,
             "m.room.power_levels",
             tok=self.creator_token,
         )
@@ -217,14 +223,14 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
             # conscience, we ought to ensure it's upgrading from a sufficiently old
             # version of room.
             self.helper.send_state(
-                self.room_id,
+                room_id,
                 "m.room.power_levels",
                 body=power_levels,
                 tok=self.creator_token,
             )
 
         # Upgrade the room. Check the homeserver reports success.
-        channel = self._upgrade_room()
+        channel = self._upgrade_room(room_id=room_id)
         self.assertEqual(200, channel.code, channel.result)
 
         # Extract the new room ID.

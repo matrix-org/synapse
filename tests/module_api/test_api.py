@@ -110,6 +110,24 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
+    def test_can_set_displayname(self):
+        localpart = "alice_wants_a_new_displayname"
+        user_id = self.register_user(
+            localpart, "1234", displayname="Alice", admin=False
+        )
+        found_userinfo = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+
+        self.get_success(
+            self.module_api.set_displayname(
+                found_userinfo.user_id, "Bob", deactivation=False
+            )
+        )
+        found_profile = self.get_success(
+            self.module_api.get_profile_for_user(localpart)
+        )
+
+        self.assertEqual(found_profile.display_name, "Bob")
+
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
@@ -336,7 +354,8 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Test sending local online presence to users from the main process
         _test_sending_local_online_presence_to_local_user(self, test_with_workers=False)
 
-    @override_config({"send_federation": True})
+    # Enable federation sending on the main process.
+    @override_config({"federation_sender_instances": None})
     def test_send_local_online_presence_to_federation(self):
         """Tests that send_local_presence_to_users sends local online presence to remote users."""
         # Create a user who will send presence updates
@@ -384,6 +403,9 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.get_success(
             self.module_api.send_local_online_presence_to([remote_user_id])
         )
+
+        # We don't always send out federation immediately, so we advance the clock.
+        self.reactor.advance(1000)
 
         # Check that a presence update was sent as part of a federation transaction
         found_update = False
@@ -778,8 +800,11 @@ def _test_sending_local_online_presence_to_local_user(
             worker process. The test users will still sync with the main process. The purpose of testing
             with a worker is to check whether a Synapse module running on a worker can inform other workers/
             the main process that they should include additional presence when a user next syncs.
+            If this argument is True, `test_case` MUST be an instance of BaseMultiWorkerStreamTestCase.
     """
     if test_with_workers:
+        assert isinstance(test_case, BaseMultiWorkerStreamTestCase)
+
         # Create a worker process to make module_api calls against
         worker_hs = test_case.make_worker_hs(
             "synapse.app.generic_worker", {"worker_name": "presence_writer"}

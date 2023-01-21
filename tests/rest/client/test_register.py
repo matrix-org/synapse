@@ -22,7 +22,11 @@ import pkg_resources
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
+from synapse.api.constants import (
+    APP_SERVICE_REGISTRATION_TYPE,
+    ApprovalNoticeMedium,
+    LoginType,
+)
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import account, account_validity, login, logout, register, sync
@@ -764,6 +768,32 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 400, channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.USER_IN_USE)
+
+    @override_config(
+        {
+            "experimental_features": {
+                "msc3866": {
+                    "enabled": True,
+                    "require_approval_for_new_accounts": True,
+                }
+            }
+        }
+    )
+    def test_require_approval(self) -> None:
+        channel = self.make_request(
+            "POST",
+            "register",
+            {
+                "username": "kermit",
+                "password": "monkey",
+                "auth": {"type": LoginType.DUMMY},
+            },
+        )
+        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(Codes.USER_AWAITING_APPROVAL, channel.json_body["errcode"])
+        self.assertEqual(
+            ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
+        )
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):

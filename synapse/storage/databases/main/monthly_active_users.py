@@ -217,7 +217,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         def _reap_users(txn: LoggingTransaction, reserved_users: List[str]) -> None:
             """
             Args:
-                reserved_users (tuple): reserved users to preserve
+                reserved_users: reserved users to preserve
             """
 
             thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
@@ -370,8 +370,8 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         should not appear in the MAU stats).
 
         Args:
-            txn (cursor):
-            user_id (str): user to add/update
+            txn:
+            user_id: user to add/update
         """
         assert (
             self._update_on_this_worker
@@ -401,7 +401,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         add the user to the monthly active tables
 
         Args:
-            user_id(str): the user_id to query
+            user_id: the user_id to query
         """
         assert (
             self._update_on_this_worker

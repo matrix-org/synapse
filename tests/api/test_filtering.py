@@ -35,6 +35,8 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
+    if "content" not in kwargs:
+        kwargs["content"] = {}
     return make_event_from_dict(kwargs)
 
 
@@ -44,18 +46,35 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.datastore = hs.get_datastores().main
 
     def test_errors_on_invalid_filters(self):
+        # See USER_FILTER_SCHEMA for the filter schema.
         invalid_filters = [
-            {"boom": {}},
+            # `account_data` must be a dictionary
             {"account_data": "Hello World"},
+            # `event_fields` entries must not contain backslashes
             {"event_fields": [r"\\foo"]},
-            {"room": {"timeline": {"limit": 0}, "state": {"not_bars": ["*"]}}},
+            # `event_format` must be "client" or "federation"
             {"event_format": "other"},
+            # `not_rooms` must contain valid room IDs
             {"room": {"not_rooms": ["#foo:pik-test"]}},
+            # `senders` must contain valid user IDs
             {"presence": {"senders": ["@bar;pik.test.com"]}},
         ]
         for filter in invalid_filters:
             with self.assertRaises(SynapseError):
                 self.filtering.check_valid_filter(filter)
+
+    def test_ignores_unknown_filter_fields(self):
+        # For forward compatibility, we must ignore unknown filter fields.
+        # See USER_FILTER_SCHEMA for the filter schema.
+        filters = [
+            {"org.matrix.msc9999.future_option": True},
+            {"presence": {"org.matrix.msc9999.future_option": True}},
+            {"room": {"org.matrix.msc9999.future_option": True}},
+            {"room": {"timeline": {"org.matrix.msc9999.future_option": True}}},
+        ]
+        for filter in filters:
+            self.filtering.check_valid_filter(filter)
+            # Must not raise.
 
     def test_valid_filters(self):
         valid_filters = [
@@ -357,6 +376,66 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
+    @unittest.override_config({"experimental_features": {"msc3874_enabled": True}})
+    def test_filter_rel_type(self):
+        definition = {"org.matrix.msc3874.rel_types": ["m.thread"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={},
+        )
+
+        self.assertFalse(Filter(self.hs, definition)._check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={"m.relates_to": {"event_id": "$abc", "rel_type": "m.reference"}},
+        )
+
+        self.assertFalse(Filter(self.hs, definition)._check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={"m.relates_to": {"event_id": "$abc", "rel_type": "m.thread"}},
+        )
+
+        self.assertTrue(Filter(self.hs, definition)._check(event))
+
+    @unittest.override_config({"experimental_features": {"msc3874_enabled": True}})
+    def test_filter_not_rel_type(self):
+        definition = {"org.matrix.msc3874.not_rel_types": ["m.thread"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={"m.relates_to": {"event_id": "$abc", "rel_type": "m.thread"}},
+        )
+
+        self.assertFalse(Filter(self.hs, definition)._check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={},
+        )
+
+        self.assertTrue(Filter(self.hs, definition)._check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={"m.relates_to": {"event_id": "$abc", "rel_type": "m.reference"}},
+        )
+
+        self.assertTrue(Filter(self.hs, definition)._check(event))
+
     def test_filter_presence_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
         filter_id = self.get_success(
@@ -456,7 +535,6 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(filtered_room_ids, ["!allowed:example.com"])
 
-    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_filter_relations(self):
         events = [
             # An event without a relation.

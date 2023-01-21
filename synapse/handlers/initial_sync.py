@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
-from synapse.api.constants import EduTypes, EventTypes, Membership
+from synapse.api.constants import AccountDataTypes, EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig
@@ -57,13 +57,7 @@ class InitialSyncHandler:
         self.validator = EventValidator()
         self.snapshot_cache: ResponseCache[
             Tuple[
-                str,
-                Optional[StreamToken],
-                Optional[StreamToken],
-                str,
-                Optional[int],
-                bool,
-                bool,
+                str, Optional[StreamToken], Optional[StreamToken], str, int, bool, bool
             ]
         ] = ResponseCache(hs.get_clock(), "initial_sync_cache")
         self._event_serializer = hs.get_event_client_serializer()
@@ -154,11 +148,6 @@ class InitialSyncHandler:
 
         public_room_ids = await self.store.get_public_room_ids()
 
-        if pagin_config.limit is not None:
-            limit = pagin_config.limit
-        else:
-            limit = 10
-
         serializer_options = SerializeEventConfig(as_client_event=as_client_event)
 
         async def handle_room(event: RoomsForUser) -> None:
@@ -210,7 +199,7 @@ class InitialSyncHandler:
                             run_in_background(
                                 self.store.get_recent_events_for_room,
                                 event.room_id,
-                                limit=limit,
+                                limit=pagin_config.limit,
                                 end_token=room_end_token,
                             ),
                             deferred_room_state,
@@ -250,7 +239,7 @@ class InitialSyncHandler:
                 tags = tags_by_room.get(event.room_id)
                 if tags:
                     account_data_events.append(
-                        {"type": "m.tag", "content": {"tags": tags}}
+                        {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
                     )
 
                 account_data = account_data_by_room.get(event.room_id, {})
@@ -337,7 +326,9 @@ class InitialSyncHandler:
         account_data_events = []
         tags = await self.store.get_tags_for_room(user_id, room_id)
         if tags:
-            account_data_events.append({"type": "m.tag", "content": {"tags": tags}})
+            account_data_events.append(
+                {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
+            )
 
         account_data = await self.store.get_account_data_for_room(user_id, room_id)
         for account_data_type, content in account_data.items():
@@ -360,15 +351,11 @@ class InitialSyncHandler:
             member_event_id
         )
 
-        limit = pagin_config.limit if pagin_config else None
-        if limit is None:
-            limit = 10
-
         leave_position = await self.store.get_position_for_event(member_event_id)
         stream_token = leave_position.to_room_stream_token()
 
         messages, token = await self.store.get_recent_events_for_room(
-            room_id, limit=limit, end_token=stream_token
+            room_id, limit=pagin_config.limit, end_token=stream_token
         )
 
         messages = await filter_events_for_client(
@@ -420,10 +407,6 @@ class InitialSyncHandler:
 
         now_token = self.hs.get_event_sources().get_current_token()
 
-        limit = pagin_config.limit if pagin_config else None
-        if limit is None:
-            limit = 10
-
         room_members = [
             m
             for m in current_state.values()
@@ -467,7 +450,7 @@ class InitialSyncHandler:
                     run_in_background(
                         self.store.get_recent_events_for_room,
                         room_id,
-                        limit=limit,
+                        limit=pagin_config.limit,
                         end_token=now_token.room_key,
                     ),
                 ),

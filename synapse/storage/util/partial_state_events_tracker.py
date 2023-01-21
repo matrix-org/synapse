@@ -24,6 +24,7 @@ from synapse.logging.opentracing import trace_with_opname
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.util import unwrapFirstError
+from synapse.util.cancellation import cancellable
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ class PartialStateEventsTracker:
                 o.callback(None)
 
     @trace_with_opname("PartialStateEventsTracker.await_full_state")
+    @cancellable
     async def await_full_state(self, event_ids: Collection[str]) -> None:
         """Wait for all the given events to have full state.
 
@@ -154,6 +156,7 @@ class PartialCurrentStateTracker:
                 o.callback(None)
 
     @trace_with_opname("PartialCurrentStateTracker.await_full_state")
+    @cancellable
     async def await_full_state(self, room_id: str) -> None:
         # We add the deferred immediately so that the DB call to check for
         # partial state doesn't race when we unpartial the room.

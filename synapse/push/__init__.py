@@ -116,6 +116,8 @@ class PusherConfig:
     last_stream_ordering: int
     last_success: Optional[int]
     failing_since: Optional[int]
+    enabled: bool
+    device_id: Optional[str]
 
     def as_dict(self) -> Dict[str, Any]:
         """Information that can be retrieved about a pusher after creation."""
@@ -128,6 +130,8 @@ class PusherConfig:
             "lang": self.lang,
             "profile_tag": self.profile_tag,
             "pushkey": self.pushkey,
+            "enabled": self.enabled,
+            "device_id": self.device_id,
         }
 
 

@@ -13,9 +13,33 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.types import RoomAlias, UserID, map_username_to_mxid_localpart
+from synapse.types import (
+    RoomAlias,
+    UserID,
+    get_domain_from_id,
+    get_localpart_from_id,
+    map_username_to_mxid_localpart,
+)
 
 from tests import unittest
+
+
+class IsMineIDTests(unittest.HomeserverTestCase):
+    def test_is_mine_id(self) -> None:
+        self.assertTrue(self.hs.is_mine_id("@user:test"))
+        self.assertTrue(self.hs.is_mine_id("#room:test"))
+        self.assertTrue(self.hs.is_mine_id("invalid:test"))
+
+        self.assertFalse(self.hs.is_mine_id("@user:test\0"))
+        self.assertFalse(self.hs.is_mine_id("@user"))
+
+    def test_two_colons(self) -> None:
+        """Test handling of IDs containing more than one colon."""
+        # The domain starts after the first colon.
+        # These functions must interpret things consistently.
+        self.assertFalse(self.hs.is_mine_id("@user:test:test"))
+        self.assertEqual("user", get_localpart_from_id("@user:test:test"))
+        self.assertEqual("test:test", get_domain_from_id("@user:test:test"))
 
 
 class UserIDTestCase(unittest.HomeserverTestCase):

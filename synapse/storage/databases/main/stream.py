@@ -72,6 +72,7 @@ from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import PersistedEventPosition, RoomStreamToken
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -356,6 +357,24 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
         )
         args.extend(event_filter.related_by_rel_types)
 
+    if event_filter.rel_types:
+        clauses.append(
+            "(%s)"
+            % " OR ".join(
+                "event_relation.relation_type = ?" for _ in event_filter.rel_types
+            )
+        )
+        args.extend(event_filter.rel_types)
+
+    if event_filter.not_rel_types:
+        clauses.append(
+            "((%s) OR event_relation.relation_type IS NULL)"
+            % " AND ".join(
+                "event_relation.relation_type != ?" for _ in event_filter.not_rel_types
+            )
+        )
+        args.extend(event_filter.not_rel_types)
+
     return " AND ".join(clauses), args
 
 
@@ -396,6 +415,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
+        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
     def get_room_max_stream_ordering(self) -> int:
         """Get the stream_ordering of regular events that we have committed up to
@@ -597,6 +617,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return ret, key
 
+    @cancellable
     async def get_membership_changes_for_user(
         self,
         user_id: str,
@@ -780,13 +801,66 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             before this stream ordering.
         """
 
-        last_row = await self.get_room_event_before_stream_ordering(
-            room_id=room_id,
-            stream_ordering=end_token.stream,
+        def get_last_event_in_room_before_stream_ordering_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[str]:
+            # We need to handle the fact that the stream tokens can be vector
+            # clocks. We do this by getting all rows between the minimum and
+            # maximum stream ordering in the token, plus one row less than the
+            # minimum stream ordering. We then filter the results against the
+            # token and return the first row that matches.
+
+            sql = """
+                SELECT * FROM (
+                    SELECT instance_name, stream_ordering, topological_ordering, event_id
+                    FROM events
+                    LEFT JOIN rejections USING (event_id)
+                    WHERE room_id = ?
+                        AND ? < stream_ordering AND stream_ordering <= ?
+                        AND NOT outlier
+                        AND rejections.event_id IS NULL
+                    ORDER BY stream_ordering DESC
+                ) AS a
+                UNION
+                SELECT * FROM (
+                    SELECT instance_name, stream_ordering, topological_ordering, event_id
+                    FROM events
+                    LEFT JOIN rejections USING (event_id)
+                    WHERE room_id = ?
+                        AND stream_ordering <= ?
+                        AND NOT outlier
+                        AND rejections.event_id IS NULL
+                    ORDER BY stream_ordering DESC
+                    LIMIT 1
+                ) AS b
+            """
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    end_token.stream,
+                    end_token.get_max_stream_pos(),
+                    room_id,
+                    end_token.stream,
+                ),
+            )
+
+            for instance_name, stream_ordering, topological_ordering, event_id in txn:
+                if _filter_results(
+                    lower_token=None,
+                    upper_token=end_token,
+                    instance_name=instance_name,
+                    topological_ordering=topological_ordering,
+                    stream_ordering=stream_ordering,
+                ):
+                    return event_id
+
+            return None
+
+        return await self.db_pool.runInteraction(
+            "get_last_event_in_room_before_stream_ordering",
+            get_last_event_in_room_before_stream_ordering_txn,
         )
-        if last_row:
-            return last_row[2]
-        return None
 
     async def get_current_room_stream_token_for_room_id(
         self, room_id: str
@@ -1022,28 +1096,31 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "after": {"event_ids": events_after, "token": end_token},
         }
 
-    async def get_all_new_events_stream(
-        self, from_id: int, current_id: int, limit: int, get_prev_content: bool = False
-    ) -> Tuple[int, List[EventBase], Dict[str, Optional[int]]]:
+    async def get_all_new_event_ids_stream(
+        self,
+        from_id: int,
+        current_id: int,
+        limit: int,
+    ) -> Tuple[int, Dict[str, Optional[int]]]:
         """Get all new events
 
-        Returns all events with from_id < stream_ordering <= current_id.
+        Returns all event ids with from_id < stream_ordering <= current_id.
 
         Args:
             from_id:  the stream_ordering of the last event we processed
             current_id:  the stream_ordering of the most recently processed event
             limit: the maximum number of events to return
-            get_prev_content: whether to fetch previous event content
 
         Returns:
-            A tuple of (next_id, events, event_to_received_ts), where `next_id`
+            A tuple of (next_id, event_to_received_ts), where `next_id`
             is the next value to pass as `from_id` (it will either be the
             stream_ordering of the last returned event, or, if fewer than `limit`
             events were found, the `current_id`). The `event_to_received_ts` is
-            a dictionary mapping event ID to the event `received_ts`.
+            a dictionary mapping event ID to the event `received_ts`, sorted by ascending
+            stream_ordering.
         """
 
-        def get_all_new_events_stream_txn(
+        def get_all_new_event_ids_stream_txn(
             txn: LoggingTransaction,
         ) -> Tuple[int, Dict[str, Optional[int]]]:
             sql = (
@@ -1068,15 +1145,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             return upper_bound, event_to_received_ts
 
         upper_bound, event_to_received_ts = await self.db_pool.runInteraction(
-            "get_all_new_events_stream", get_all_new_events_stream_txn
+            "get_all_new_event_ids_stream", get_all_new_event_ids_stream_txn
         )
 
-        events = await self.get_events_as_list(
-            event_to_received_ts.keys(),
-            get_prev_content=get_prev_content,
-        )
-
-        return upper_bound, events, event_to_received_ts
+        return upper_bound, event_to_received_ts
 
     async def get_federation_out_pos(self, typ: str) -> int:
         if self._need_to_reset_federation_stream_positions:
@@ -1200,8 +1272,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             `to_token`), or `limit` is zero.
         """
 
-        assert int(limit) >= 0
-
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
         # we have a bit of asymmetry when it comes to equalities.
@@ -1280,8 +1350,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # Multiple labels could cause the same event to appear multiple times.
                 needs_distinct = True
 
-        # If there is a filter on relation_senders and relation_types join to the
-        # relations table.
+        # If there is a relation_senders and relation_types filter join to the
+        # relations table to get events related to the current event.
         if event_filter and (
             event_filter.related_by_senders or event_filter.related_by_rel_types
         ):
@@ -1295,6 +1365,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 join_clause += """
                     LEFT JOIN events AS related_event ON (relation.event_id = related_event.event_id)
                 """
+
+        # If there is a not_rel_types filter join to the relations table to get
+        # the event's relation information.
+        if event_filter and (event_filter.rel_types or event_filter.not_rel_types):
+            join_clause += """
+                LEFT JOIN event_relations AS event_relation USING (event_id)
+            """
 
         if needs_distinct:
             select_keywords += " DISTINCT"
@@ -1332,15 +1409,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if rows:
             topo = rows[-1].topological_ordering
-            toke = rows[-1].stream_ordering
+            token = rows[-1].stream_ordering
             if direction == "b":
                 # Tokens are positions between events.
                 # This token points *after* the last event in the chunk.
                 # We need it to point to the event before it in the chunk
                 # when we are going backwards so we subtract one from the
                 # stream part.
-                toke -= 1
-            next_token = RoomStreamToken(topo, toke)
+                token -= 1
+            next_token = RoomStreamToken(topo, token)
         else:
             # TODO (erikj): We should work out what to do here instead.
             next_token = to_token if to_token else from_token

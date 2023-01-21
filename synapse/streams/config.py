@@ -35,17 +35,19 @@ class PaginationConfig:
     from_token: Optional[StreamToken]
     to_token: Optional[StreamToken]
     direction: str
-    limit: Optional[int]
+    limit: int
 
     @classmethod
     async def from_request(
         cls,
         store: "DataStore",
         request: SynapseRequest,
-        raise_invalid_params: bool = True,
-        default_limit: Optional[int] = None,
+        default_limit: int,
+        default_dir: str = "f",
     ) -> "PaginationConfig":
-        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
+        direction = parse_string(
+            request, "dir", default=default_dir, allowed_values=["f", "b"]
+        )
 
         from_tok_str = parse_string(request, "from")
         to_tok_str = parse_string(request, "to")
@@ -67,12 +69,10 @@ class PaginationConfig:
             raise SynapseError(400, "'to' parameter is invalid")
 
         limit = parse_integer(request, "limit", default=default_limit)
+        if limit < 0:
+            raise SynapseError(400, "Limit must be 0 or above")
 
-        if limit:
-            if limit < 0:
-                raise SynapseError(400, "Limit must be 0 or above")
-
-            limit = min(int(limit), MAX_LIMIT)
+        limit = min(limit, MAX_LIMIT)
 
         try:
             return PaginationConfig(from_tok, to_tok, direction, limit)

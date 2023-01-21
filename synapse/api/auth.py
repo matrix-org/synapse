@@ -32,12 +32,14 @@ from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import (
+    SynapseTags,
     active_span,
     force_tracing,
     start_active_span,
     trace,
 )
 from synapse.types import Requester, create_requester
+from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -118,6 +120,7 @@ class Auth:
             errcode=Codes.NOT_JOINED,
         )
 
+    @cancellable
     async def get_user_by_req(
         self,
         request: SynapseRequest,
@@ -159,6 +162,12 @@ class Auth:
                 parent_span.set_tag(
                     "authenticated_entity", requester.authenticated_entity
                 )
+                # We tag the Synapse instance name so that it's an easy jumping
+                # off point into the logs. Can also be used to filter for an
+                # instance that is under load.
+                parent_span.set_tag(
+                    SynapseTags.INSTANCE_NAME, self.hs.get_instance_name()
+                )
                 parent_span.set_tag("user_id", requester.user.to_string())
                 if requester.device_id is not None:
                     parent_span.set_tag("device_id", requester.device_id)
@@ -166,6 +175,7 @@ class Auth:
                     parent_span.set_tag("appservice_id", requester.app_service.id)
             return requester
 
+    @cancellable
     async def _wrapped_get_user_by_req(
         self,
         request: SynapseRequest,
@@ -281,6 +291,7 @@ class Auth:
                 403, "Application service has not registered this user (%s)" % user_id
             )
 
+    @cancellable
     async def _get_appservice_user(self, request: Request) -> Optional[Requester]:
         """
         Given a request, reads the request parameters to determine:
@@ -448,15 +459,6 @@ class Auth:
             )
             raise InvalidClientTokenError("Invalid access token passed.")
 
-    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
-        token = self.get_access_token_from_request(request)
-        service = self.store.get_app_service_by_token(token)
-        if not service:
-            logger.warning("Unrecognised appservice access token.")
-            raise InvalidClientTokenError()
-        request.requester = create_requester(service.sender, app_service=service)
-        return service
-
     async def is_server_admin(self, requester: Requester) -> bool:
         """Check if the given user is a local server admin.
 
@@ -523,6 +525,7 @@ class Auth:
         return bool(query_params) or bool(auth_headers)
 
     @staticmethod
+    @cancellable
     def get_access_token_from_request(request: Request) -> str:
         """Extracts the access_token from the request.
 

@@ -1,0 +1,5 @@
+# We make the whole Synapse folder a workspace so that we can run `cargo`
+# commands from the root (rather than having to cd into rust/).
+
+[workspace]
+members = ["rust"]

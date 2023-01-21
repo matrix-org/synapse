@@ -70,7 +70,7 @@ class ReceiptsHandler:
             # If we're not in the room just ditch the event entirely. This is
             # probably an old server that has come back and thinks we're still in
             # the room (or we've been rejoined to the room by a state reset).
-            is_in_room = await self.event_auth_handler.check_host_in_room(
+            is_in_room = await self.event_auth_handler.is_host_in_room(
                 room_id, self.server_name
             )
             if not is_in_room:
@@ -91,13 +91,21 @@ class ReceiptsHandler:
                         )
                         continue
 
+                    # Check if these receipts apply to a thread.
+                    data = user_values.get("data", {})
+                    thread_id = data.get("thread_id")
+                    # If the thread ID is invalid, consider it missing.
+                    if not isinstance(thread_id, str):
+                        thread_id = None
+
                     receipts.append(
                         ReadReceipt(
                             room_id=room_id,
                             receipt_type=receipt_type,
                             user_id=user_id,
                             event_ids=user_values["event_ids"],
-                            data=user_values.get("data", {}),
+                            thread_id=thread_id,
+                            data=data,
                         )
                     )
 
@@ -114,6 +122,7 @@ class ReceiptsHandler:
                 receipt.receipt_type,
                 receipt.user_id,
                 receipt.event_ids,
+                receipt.thread_id,
                 receipt.data,
             )
 
@@ -146,7 +155,12 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_id: str,
+        thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
@@ -156,6 +170,7 @@ class ReceiptsHandler:
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
+            thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
         )
 
@@ -163,10 +178,7 @@ class ReceiptsHandler:
         if not is_new:
             return
 
-        if self.federation_sender and receipt_type not in (
-            ReceiptTypes.READ_PRIVATE,
-            ReceiptTypes.UNSTABLE_READ_PRIVATE,
-        ):
+        if self.federation_sender and receipt_type != ReceiptTypes.READ_PRIVATE:
             await self.federation_sender.send_read_receipt(receipt)
 
 
@@ -206,37 +218,23 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             for event_id, orig_event_content in room.get("content", {}).items():
                 event_content = orig_event_content
                 # If there are private read receipts, additional logic is necessary.
-                if (
-                    ReceiptTypes.READ_PRIVATE in event_content
-                    or ReceiptTypes.UNSTABLE_READ_PRIVATE in event_content
-                ):
+                if ReceiptTypes.READ_PRIVATE in event_content:
                     # Make a copy without private read receipts to avoid leaking
                     # other user's private read receipts..
                     event_content = {
                         receipt_type: receipt_value
                         for receipt_type, receipt_value in event_content.items()
-                        if receipt_type
-                        not in (
-                            ReceiptTypes.READ_PRIVATE,
-                            ReceiptTypes.UNSTABLE_READ_PRIVATE,
-                        )
+                        if receipt_type != ReceiptTypes.READ_PRIVATE
                     }
 
                     # Copy the current user's private read receipt from the
                     # original content, if it exists.
-                    user_private_read_receipt = orig_event_content.get(
-                        ReceiptTypes.READ_PRIVATE, {}
-                    ).get(user_id, None)
+                    user_private_read_receipt = orig_event_content[
+                        ReceiptTypes.READ_PRIVATE
+                    ].get(user_id, None)
                     if user_private_read_receipt:
                         event_content[ReceiptTypes.READ_PRIVATE] = {
                             user_id: user_private_read_receipt
-                        }
-                    user_unstable_private_read_receipt = orig_event_content.get(
-                        ReceiptTypes.UNSTABLE_READ_PRIVATE, {}
-                    ).get(user_id, None)
-                    if user_unstable_private_read_receipt:
-                        event_content[ReceiptTypes.UNSTABLE_READ_PRIVATE] = {
-                            user_id: user_unstable_private_read_receipt
                         }
 
                 # Include the event if there is at least one non-private read
@@ -258,7 +256,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self,
         user: UserID,
         from_key: int,
-        limit: Optional[int],
+        limit: int,
         room_ids: Iterable[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,

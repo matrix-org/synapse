@@ -241,4 +241,4 @@ healthcheck:
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
 You can read about jemalloc by reading the Synapse
-[README](https://github.com/matrix-org/synapse/blob/HEAD/README.rst#help-synapse-is-slow-and-eats-all-my-ram-cpu).
+[Admin FAQ](https://matrix-org.github.io/synapse/latest/usage/administration/admin_faq.html#help-synapse-is-slow-and-eats-all-my-ramcpu).

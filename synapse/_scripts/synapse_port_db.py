@@ -51,6 +51,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.notifier import ReplicationNotifier
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
 from synapse.storage.databases.main import PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
@@ -67,10 +68,12 @@ from synapse.storage.databases.main.media_repository import (
 )
 from synapse.storage.databases.main.presence import PresenceBackgroundUpdateStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
+from synapse.storage.databases.main.receipts import ReceiptsBackgroundUpdateStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
 )
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomBackgroundUpdateStore
 from synapse.storage.databases.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.databases.main.search import SearchBackgroundUpdateStore
@@ -106,10 +109,11 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "local_media_repository": ["safe_from_quarantine"],
-    "users": ["shadow_banned"],
+    "users": ["shadow_banned", "approved"],
     "e2e_fallback_keys_json": ["used"],
     "access_tokens": ["used"],
     "device_lists_changes_in_room": ["converted_to_destinations"],
+    "pushers": ["enabled"],
 }
 
 
@@ -203,6 +207,8 @@ class Store(
     PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
+    ReceiptsBackgroundUpdateStore,
+    RelationsWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -254,6 +260,9 @@ class MockHomeserver:
 
     def should_send_federation(self) -> bool:
         return False
+
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
 
 class Porter:
@@ -1302,7 +1311,7 @@ def main() -> None:
     sqlite_config = {
         "name": "sqlite3",
         "args": {
-            "database": args.sqlite_database,
+            "database": "file:{}?mode=rw".format(args.sqlite_database),
             "cp_min": 1,
             "cp_max": 1,
             "check_same_thread": False,

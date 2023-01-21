@@ -15,7 +15,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
@@ -32,8 +39,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: sudo apt-get -qq install xmlsec1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
@@ -65,7 +79,14 @@ jobs:
         - ${{ github.workspace }}:/src
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
       - name: Patch dependencies
         # Note: The poetry commands want to create a virtualenv in /src/.venv/,
         #       but the sytest-synapse container expects it to be in /venv/.
@@ -88,7 +109,7 @@ jobs:
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
       - name: Upload SyTest logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
@@ -114,8 +135,8 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v2 for synapse
-        uses: actions/checkout@v2
+      - name: Run actions/checkout@v3 for synapse
+        uses: actions/checkout@v3
         with:
           path: synapse
 
@@ -127,12 +148,11 @@ jobs:
         run: |
           set -x
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -yqq python3 pipx
-          pipx install poetry==1.1.14
+          pipx install poetry==1.3.2
 
           poetry remove -n twisted
           poetry add -n --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry lock --no-update
-          # NOT IN 1.1.14 poetry lock --check
         working-directory: synapse
 
       - run: |
@@ -153,8 +173,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+      - uses: actions/checkout@v3
+      - uses: JasonEtco/create-an-issue@e27dddc79c92bc6e4562f268fffa5ed752639abd # v2.9.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

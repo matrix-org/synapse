@@ -27,7 +27,7 @@ class EventSource(Generic[K, R]):
         self,
         user: UserID,
         from_key: K,
-        limit: Optional[int],
+        limit: int,
         room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
