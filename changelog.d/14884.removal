@@ -1,0 +1,1 @@
+Remove undocumented `room_alias` key from `/createRoom` response. Contributed by @thezaidbintariq.
