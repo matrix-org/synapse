@@ -29,6 +29,7 @@ from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
+from tests.server import ThreadedMemoryReactorClock
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
@@ -62,7 +63,11 @@ def _make_edu_transaction_json(edu_type: str, content: JsonDict) -> bytes:
 
 
 class TypingNotificationsTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+    def make_homeserver(
+        self,
+        reactor: ThreadedMemoryReactorClock,
+        clock: Clock,
+    ) -> HomeServer:
         # we mock out the keyring so as to skip the authentication check on the
         # federation API call.
         mock_keyring = Mock(spec=["verify_json_for_server"])
