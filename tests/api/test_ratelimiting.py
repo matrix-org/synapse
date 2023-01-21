@@ -33,7 +33,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
 
     def test_allowed_appservice_ratelimited_via_can_requester_do_action(self):
         appservice = ApplicationService(
-            None,
+            token="fake_token",
             id="foo",
             rate_limited=True,
             sender="@as:example.com",
@@ -66,7 +66,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
 
     def test_allowed_appservice_via_can_requester_do_action(self):
         appservice = ApplicationService(
-            None,
+            token="fake_token",
             id="foo",
             rate_limited=False,
             sender="@as:example.com",
