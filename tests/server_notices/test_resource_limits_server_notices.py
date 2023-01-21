@@ -361,9 +361,10 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
                 tok: The access token of the user that joined the room.
                 room_id: The ID of the room that's been joined.
         """
-        user_id = None
-        tok = None
-        invites = []
+        # We need at least one user to process
+        self.assertGreater(self.hs.config.server.max_mau_value, 0)
+
+        invites = {}
 
         # Register as many users as the MAU limit allows.
         for i in range(self.hs.config.server.max_mau_value):
