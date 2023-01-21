@@ -191,7 +191,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.event_source.get_current_key(), 1)
         events = self.get_success(
             self.event_source.get_new_events(
-                user=U_APPLE, from_key=0, limit=None, room_ids=[ROOM_ID], is_guest=False
+                user=U_APPLE, from_key=0, limit=0, room_ids=[ROOM_ID], is_guest=False
             )
         )
         self.assertEqual(
@@ -262,7 +262,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.event_source.get_current_key(), 1)
         events = self.get_success(
             self.event_source.get_new_events(
-                user=U_APPLE, from_key=0, limit=None, room_ids=[ROOM_ID], is_guest=False
+                user=U_APPLE, from_key=0, limit=0, room_ids=[ROOM_ID], is_guest=False
             )
         )
         self.assertEqual(
@@ -303,7 +303,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             self.event_source.get_new_events(
                 user=U_APPLE,
                 from_key=0,
-                limit=None,
+                limit=0,
                 room_ids=[OTHER_ROOM_ID],
                 is_guest=False,
             )
@@ -356,7 +356,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.event_source.get_current_key(), 1)
         events = self.get_success(
             self.event_source.get_new_events(
-                user=U_APPLE, from_key=0, limit=None, room_ids=[ROOM_ID], is_guest=False
+                user=U_APPLE, from_key=0, limit=0, room_ids=[ROOM_ID], is_guest=False
             )
         )
         self.assertEqual(
@@ -392,7 +392,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             self.event_source.get_new_events(
                 user=U_APPLE,
                 from_key=0,
-                limit=None,
+                limit=0,
                 room_ids=[ROOM_ID],
                 is_guest=False,
             )
@@ -417,7 +417,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             self.event_source.get_new_events(
                 user=U_APPLE,
                 from_key=1,
-                limit=None,
+                limit=0,
                 room_ids=[ROOM_ID],
                 is_guest=False,
             )
@@ -452,7 +452,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             self.event_source.get_new_events(
                 user=U_APPLE,
                 from_key=0,
-                limit=None,
+                limit=0,
                 room_ids=[ROOM_ID],
                 is_guest=False,
             )
