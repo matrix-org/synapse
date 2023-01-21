@@ -1,4 +1,1 @@
-Removed  if room_alias: 
-     result["room_alias"] = room_alias.to_string() 
-from synapse/synapse/handlers/room.py
-Contributed by @thezaidbintariq.
+Remove undocumented `room_alias` key from `/createRoom` response. Contributed by @thezaidbintariq.
