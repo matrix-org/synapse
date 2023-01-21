@@ -1,0 +1,4 @@
+Removed  if room_alias: 
+     result["room_alias"] = room_alias.to_string() 
+from synapse/synapse/handlers/room.py
+Contributed by @thezaidbintariq.
