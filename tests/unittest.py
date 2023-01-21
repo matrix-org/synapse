@@ -223,6 +223,27 @@ def logcontext_clean(target: TV) -> TV:
     return patcher(target)  # type: ignore[call-overload]
 
 
+class HomeserverTestCaseProtocol(Protocol):
+    """
+    A protocol type specifying that a class has access to various common
+    unit test helper methods defined by unittest.TestCase and the classes
+    that inherit from it. Add more methods or properties below as necessary.
+
+    Used for typing mixin classes. See this link for more info:
+    https://mypy.readthedocs.io/en/stable/protocols.html
+
+    TODO: HomeserverTestCase should inherit from this protocol, so that
+    mypy checks that HomeserverTestCase implements these properties/methods.
+    Unfortunately this causes mypy to find many type errors in our test
+    classes, which need to first be fixed.
+    """
+
+    hs: HomeServer
+
+    def get_success(self, d: Awaitable[TV], by: float = 0.0) -> TV:
+        ...
+
+
 class HomeserverTestCase(TestCase):
     """
     A base TestCase that reduces boilerplate for HomeServer-using test cases.
