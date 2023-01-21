@@ -14,7 +14,7 @@
 
 
 import json
-from typing import Dict
+from typing import Dict, List, Set, cast
 from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer
@@ -24,6 +24,7 @@ from twisted.web.resource import Resource
 from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
+from synapse.handlers.typing import TypingWriterHandler
 from synapse.server import HomeServer
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
@@ -98,7 +99,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         mock_notifier = hs.get_notifier()
         self.on_new_event = mock_notifier.on_new_event
 
-        self.handler = hs.get_typing_handler()
+        self.handler = cast(TypingWriterHandler, hs.get_typing_handler())
+
+        # hs.get_typing_handler will return a TypingWriterHandler when calling it
+        # from the main process, and a FollowerTypingHandler on workers.
+        # We rely on methods only available on the former, so assert we have the
+        # correct type here.
+        self.assertIsInstance(self.handler, TypingWriterHandler)
 
         self.event_source = hs.get_event_sources().sources.typing
 

@@ -21,7 +21,17 @@
 import abc
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -479,7 +489,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PresenceRouter(self)
 
     @cache_in_self
-    def get_typing_handler(self) -> FollowerTypingHandler:
+    def get_typing_handler(self) -> Union[TypingWriterHandler, FollowerTypingHandler]:
         if self.get_instance_name() in self.config.worker.writers.typing:
             # Use get_typing_writer_handler to ensure that we use the same
             # cached version.
