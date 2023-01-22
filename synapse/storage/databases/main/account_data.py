@@ -75,6 +75,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             self._account_data_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="account_data",
                 instance_name=self._instance_name,
                 tables=[
@@ -95,6 +96,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             # SQLite).
             self._account_data_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "room_account_data",
                 "stream_id",
                 extra_tables=[("room_tags_revisions", "stream_id")],
