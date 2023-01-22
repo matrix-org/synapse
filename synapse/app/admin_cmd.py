@@ -101,8 +101,18 @@ class AdminCmdServer(HomeServer):
 
 
 async def export_data_command(hs: HomeServer, args: argparse.Namespace) -> None:
-    """Export data for a user."""
+    """Export data for a user.
 
+        This code defines an asynchronous function named "export_data_command" that 
+        takes in two arguments: "hs" which is an instance of the "HomeServer" class, 
+        and "args" which is an instance of the "argparse.Namespace" class. The function
+        exports data for a specific user by using the "export_user_data" method of 
+        the "HomeServer" class's "get_admin_handler" attribute. The method takes in 
+        two arguments: the "user_id" which is passed in from the "args" variable, 
+        and "FileExfiltrationWriter(user_id, directory=directory)" which is a class that writes 
+        the exported data to a specified directory. The result of the "export_user_data" method is 
+        stored in the "res" variable, and then printed out.
+    """
     user_id = args.user_id
     directory = args.output_directory
 
