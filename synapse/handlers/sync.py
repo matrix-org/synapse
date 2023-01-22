@@ -1391,7 +1391,7 @@ class SyncHandler:
         # - we are joined to
         # - are full-stated
         # - became fully-stated at some point during the sync period
-        # (These rooms will have been omitted during a previous eager sync.)
+        #   (These rooms will have been omitted during a previous eager sync.)
         forced_newly_joined_room_ids = set()
         if since_token and not sync_config.filter_collection.lazy_load_members():
             un_partial_stated_rooms = (
