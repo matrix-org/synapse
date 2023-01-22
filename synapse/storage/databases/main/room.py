@@ -1320,7 +1320,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 self.database_engine, "room_id", room_ids
             )
 
-            txn.execute(sql + clause, [last_id, current_id] + list(args))
+            txn.execute(sql + clause, [last_id, current_id] + args)
 
             return {r[0] for r in txn}
 
