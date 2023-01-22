@@ -62,6 +62,7 @@ class PusherWorkerStore(SQLBaseStore):
         # class below that is used on the main process.
         self._pushers_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
             db_conn,
+            hs.get_replication_notifier(),
             "pushers",
             "id",
             extra_tables=[("deleted_pushers", "stream_id")],
