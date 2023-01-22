@@ -98,13 +98,14 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.on_new_event = self.mock_hs_notifier.on_new_event
 
-        self.handler = cast(TypingWriterHandler, hs.get_typing_handler())
-
         # hs.get_typing_handler will return a TypingWriterHandler when calling it
         # from the main process, and a FollowerTypingHandler on workers.
         # We rely on methods only available on the former, so assert we have the
-        # correct type here.
-        self.assertIsInstance(self.handler, TypingWriterHandler)
+        # correct type here. We have to assign self.handler after the assert,
+        # otherwise mypy will treat it as a FollowerTypingHandler
+        handler = hs.get_typing_handler()
+        assert isinstance(handler, TypingWriterHandler)
+        self.handler = handler
 
         self.event_source = hs.get_event_sources().sources.typing
 
