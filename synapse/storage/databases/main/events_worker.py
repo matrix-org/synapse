@@ -322,11 +322,12 @@ class EventsWorkerStore(SQLBaseStore):
                 "stream_id",
             )
 
-    def get_un_partial_stated_events_token(self) -> int:
-        # TODO(faster_joins, multiple writers): This is inappropriate if there are multiple
-        #     writers because workers that don't write often will hold all
-        #     readers up.
-        return self._un_partial_stated_events_stream_id_gen.get_current_token()
+    def get_un_partial_stated_events_token(self, instance_name: str) -> int:
+        return (
+            self._un_partial_stated_events_stream_id_gen.get_current_token_for_writer(
+                instance_name
+            )
+        )
 
     async def get_un_partial_stated_events_from_stream(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -416,6 +417,8 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen.advance(instance_name, token)
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
+        elif stream_name == UnPartialStatedEventStream.NAME:
+            self._un_partial_stated_events_stream_id_gen.advance(instance_name, token)
         super().process_replication_position(stream_name, instance_name, token)
 
     async def have_censored_event(self, event_id: str) -> bool:
