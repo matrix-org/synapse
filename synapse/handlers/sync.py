@@ -2586,7 +2586,7 @@ class SyncResultBuilder:
         now_token: The token to sync up to.
         joined_room_ids: List of rooms the user is joined to
         excluded_room_ids: Set of room ids we should omit from the /sync response.
-        forced_newly_jined_room_ids:
+        forced_newly_joined_room_ids:
             Rooms that should be presented in the /sync response as if they were
             newly joined during the sync period, even if that's not the case.
             (This is useful if the room was previously excluded from a /sync response,
