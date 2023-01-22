@@ -1869,7 +1869,7 @@ class FederationHandler:
                 async with self._is_partial_state_room_linearizer.queue(room_id):
                     logger.info("Clearing partial-state flag for %s", room_id)
                     success = await self.store.clear_partial_state_room(room_id)
-            
+
                     # Poke the notifier so that other workers see the write to
                     # the un-partial-stated rooms stream.
                     self._notifier.notify_replication()
