@@ -295,7 +295,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
 
 
 class SyncKnockTestCase(
-    unittest.HomeserverTestCase, KnockingStrippedStateEventHelperMixin
+    KnockingStrippedStateEventHelperMixin, unittest.HomeserverTestCase
 ):
     servlets = [
         synapse.rest.admin.register_servlets,

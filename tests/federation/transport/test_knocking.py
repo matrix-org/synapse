@@ -23,14 +23,10 @@ from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
 from tests.test_utils import event_injection
-from tests.unittest import (
-    FederatingHomeserverTestCase,
-    HomeserverTestCaseProtocol,
-    TestCase,
-)
+from tests.unittest import FederatingHomeserverTestCase, HomeserverTestCase
 
 
-class KnockingStrippedStateEventHelperMixin(TestCase, HomeserverTestCaseProtocol):
+class KnockingStrippedStateEventHelperMixin(HomeserverTestCase):
     def send_example_state_events_to_room(
         self,
         hs: "HomeServer",
