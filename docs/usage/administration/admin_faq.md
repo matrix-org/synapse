@@ -183,3 +183,11 @@ This is best diagnosed by matching up the 'Received request' and 'Processed requ
 log lines and looking for any 'Processed request' lines which take more than
 a few seconds to execute. Please let us know at [`#synapse:matrix.org`](https://matrix.to/#/#synapse-dev:matrix.org) if
 you see this failure mode so we can help debug it, however.
+
+How do I export the User Data ?
+---------------------------
+Checkout the [matrix-archiver-sqlite](https://github.com/philipaconrad/matrix-archiver-sqlite).
+It is a command-line tool that exports data for a specific user from a Synapse server and stores it in an SQLite database. This tool exports data in a more comprehensive way, it not only exports the user's chat history, but also exports data like devices and files. This tool could be useful for users who want to backup their data or for administrators who want to migrate data from one server to another.
+It should be noted that this tool is developed by a community member, and it is not an official tool of Synapse. So the functionality and the stability of this tool is not guaranteed.
+
+
