@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._device_handler = hs.get_device_handler()
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
         self._msc3866_enabled = hs.config.experimental.msc3866.enabled
@@ -247,6 +248,21 @@ class AdminHandler:
                 )
                 writer.write_state(room_id, event_id, state)
 
+        # Get the user profile
+        profile = await self.get_user(UserID.from_string(user_id))
+        assert profile
+        writer.write_profile(profile)
+
+        # Get all devices the user has
+        devices = await self._device_handler.get_devices_by_user(user_id)
+        writer.write_devices(devices)
+
+        # Get all connections the user has
+        connections = await self.get_whois(UserID.from_string(user_id))
+        writer.write_connections(
+            connections["devices"][""]["sessions"][0]["connections"]
+        )
+
         return writer.finished()
 
 
@@ -294,6 +310,33 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
             event: The knock event.
             state: A subset of the state at the knock, with a subset of the
                 event keys (type, state_key content and sender).
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_profile(self, profile: JsonDict) -> None:
+        """Write the profile of a user.
+
+        Args:
+            profile: The user profile.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_devices(self, devices: List[JsonDict]) -> None:
+        """Write the devices of a user.
+
+        Args:
+            devices: The list of devices.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_connections(self, connections: List[JsonDict]) -> None:
+        """Write the connections of a user.
+
+        Args:
+            connections: The list of connections / sessions.
         """
         raise NotImplementedError()
 
