@@ -320,7 +320,7 @@ class Notifier:
         new_token: int,
     ) -> None:
         """Used by the resync background processes to wake up all listeners
-        of this room that it just got un-partial-stated.
+        of this room when it is un-partial-stated.
 
         It will also notify replication listeners of the change in stream.
         """
