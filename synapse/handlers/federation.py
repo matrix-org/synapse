@@ -1824,6 +1824,7 @@ class FederationHandler:
             room_id: room to be resynced
         """
         # Assume that we run on the main process for now.
+        # TODO(faster_joins,multiple workers)
         # When moving the sync to workers, we need to ensure that
         #  * `_start_partial_state_room_sync` still prevents duplicate resyncs
         #  * `_is_partial_state_room_linearizer` correctly guards partial state flags
