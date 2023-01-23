@@ -276,11 +276,6 @@ class RoomBeeperInboxStateServlet(RestServlet):
             "/com.beeper.inbox/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/inbox_state",
             releases=(),  # not in the matrix spec, only include under /unstable
         )
-    ) + list(
-        # Improperly namespaced version of the above endpoint (TODO: remove once everything uses the namespaced version)
-        client_patterns(
-            "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/beeper_inbox_state"
-        )
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -313,12 +308,15 @@ class RoomBeeperInboxStateServlet(RestServlet):
             await self.handler.add_account_data_to_room(
                 user_id, room_id, "m.marked_unread", marked_unread
             )
+            logger.info(f"SetBeeperMarkedUnread marked_unread={body['marked_unread']}")
 
         if "done" in body:
-            done = {"updated_ts": ts, "at_ts": ts + body["done"].get("at_delta", 0)}
+            delta_ms = body["done"].get("at_delta", 0)
+            done = {"updated_ts": ts, "at_ts": ts + delta_ms}
             await self.handler.add_account_data_to_room(
                 user_id, room_id, "com.beeper.inbox.done", done
             )
+            logger.info(f"SetBeeperDone done_delta_ms={delta_ms}")
 
         return 200, {}
 
