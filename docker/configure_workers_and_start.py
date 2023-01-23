@@ -20,7 +20,9 @@
 #   * SYNAPSE_SERVER_NAME: The desired server_name of the homeserver.
 #   * SYNAPSE_REPORT_STATS: Whether to report stats.
 #   * SYNAPSE_WORKER_TYPES: A comma separated list of worker names as specified in WORKER_CONFIG
-#         below. Leave empty for no workers.
+#         below. Leave empty for no workers. Append a ':' and a number to multiply that
+#         worker. E.g. 'event_persister:2' would be identical to 'event_persister,
+#         event_persister'.
 #   * SYNAPSE_AS_REGISTRATION_DIR: If specified, a directory in which .yaml and .yml files
 #         will be treated as Application Service registration files.
 #   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
@@ -476,6 +478,39 @@ def generate_worker_files(
     # which exists even if no workers do.
     healthcheck_urls = ["http://localhost:8080/health"]
 
+    # Expand worker_type multiples if requested in shorthand(e.g. worker:2). Checking
+    # for not an actual defined type of worker is done later.
+    # Checking performed:
+    # 1. if worker:2 or more is declared, it will create additional workers up to number
+    # 2. if worker:1, it will create a single copy of this worker as if no number was
+    #   given
+    # 3. if worker:0 is declared, this worker will be ignored. This is to allow for
+    #   scripting and automated expansion and is intended behaviour.
+    # 4. if worker:NaN or is a negative number, it will error and log it.
+    new_worker_types = []
+    for worker_type in worker_types:
+        if ":" in worker_type:
+            x = worker_type.split(":")
+            y = 0
+            # should only be 2 components, a type of worker and an integer as a
+            # string. Cast the number as an int then it can be used as a counter.
+            if len(x) == 2 and x[-1].isdigit():
+                y = int(x[1])
+            else:
+                error(
+                    "Multiplier signal(:) for worker found, but incorrect components: "
+                    + worker_type
+                )
+            # As long as there are more than 0, we add one to the list to make below.
+            while y > 0:
+                new_worker_types.append(x[0])
+                y -= 1
+        else:
+            # If it's not a real worker, it will error out below
+            new_worker_types.append(worker_type)
+
+    # worker_types is now an expanded list of worker types.
+    worker_types = new_worker_types
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
         worker_config = WORKERS_CONFIG.get(worker_type)
