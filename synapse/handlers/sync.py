@@ -1888,6 +1888,7 @@ class SyncHandler:
         # joined or archived).
         async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
+            # Note that this mutates sync_result_builder.{joined,archived}.
             await self._generate_room_entry(
                 sync_result_builder,
                 room_entry,
@@ -1905,7 +1906,7 @@ class SyncHandler:
         sync_result_builder.knocked.extend(knocked)
 
         # 5. Work out which users have joined or left rooms we're in. We use this
-        # to build the device_list part of the sync response in
+        # to build the presence and device_list parts of the sync response in
         # `_generate_sync_entry_for_device_list`.
         (
             newly_joined_or_invited_or_knocked_users,
