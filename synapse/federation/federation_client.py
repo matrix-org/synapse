@@ -1157,6 +1157,11 @@ class FederationClient(FederationBase):
                     "members_omitted was set, but no servers were listed in the room"
                 )
 
+            if response.members_omitted and not partial_state:
+                raise InvalidResponseError(
+                    "members_omitted was set, but we asked for full state"
+                )
+
             return SendJoinResult(
                 event=event,
                 state=signed_state,
