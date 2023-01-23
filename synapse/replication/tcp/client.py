@@ -254,6 +254,7 @@ class ReplicationDataHandler:
                 self._state_storage_controller.notify_room_un_partial_stated(
                     row.room_id
                 )
+                await self.notifier.on_un_partial_stated_room(row.room_id, token)
         elif stream_name == UnPartialStatedEventStream.NAME:
             for row in rows:
                 assert isinstance(row, UnPartialStatedEventStreamRow)
