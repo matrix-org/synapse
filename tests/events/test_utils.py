@@ -18,6 +18,7 @@ from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
+    PowerLevelsContent,
     SerializeEventConfig,
     copy_and_fixup_power_levels_contents,
     maybe_upsert_event_field,
@@ -540,7 +541,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
 
 class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
     def setUp(self) -> None:
-        self.test_content = {
+        self.test_content: PowerLevelsContent = {
             "ban": 50,
             "events": {"m.room.name": 100, "m.room.power_levels": 100},
             "events_default": 0,
@@ -553,10 +554,11 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
             "users_default": 0,
         }
 
-    def _test(self, input):
+    def _test(self, input: PowerLevelsContent) -> None:
         a = copy_and_fixup_power_levels_contents(input)
 
         self.assertEqual(a["ban"], 50)
+        assert isinstance(a["events"], dict)
         self.assertEqual(a["events"]["m.room.name"], 100)
 
         # make sure that changing the copy changes the copy and not the orig
@@ -564,6 +566,7 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
         a["events"]["m.room.power_levels"] = 20
 
         self.assertEqual(input["ban"], 50)
+        assert isinstance(input["events"], dict)
         self.assertEqual(input["events"]["m.room.power_levels"], 100)
 
     def test_unfrozen(self):
@@ -575,7 +578,7 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
 
     def test_stringy_integers(self):
         """String representations of decimal integers are converted to integers."""
-        input = {
+        input: PowerLevelsContent = {
             "a": "100",
             "b": {
                 "foo": 99,
@@ -603,9 +606,9 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
 
     def test_invalid_types_raise_type_error(self) -> None:
         with self.assertRaises(TypeError):
-            copy_and_fixup_power_levels_contents({"a": ["hello", "grandma"]})  # type: ignore[arg-type]
-            copy_and_fixup_power_levels_contents({"a": None})  # type: ignore[arg-type]
+            copy_and_fixup_power_levels_contents({"a": ["hello", "grandma"]})  # type: ignore[dict-item]
+            copy_and_fixup_power_levels_contents({"a": None})  # type: ignore[dict-item]
 
     def test_invalid_nesting_raises_type_error(self) -> None:
         with self.assertRaises(TypeError):
-            copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})
+            copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})  # type: ignore[dict-item]
