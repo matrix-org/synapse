@@ -16,6 +16,8 @@ from unittest.mock import Mock
 
 import attr
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EduTypes
 from synapse.events.presence_router import PresenceRouter, load_legacy_presence_router
 from synapse.federation.units import Transaction
@@ -23,11 +25,13 @@ from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, presence, room
+from synapse.server import HomeServer
 from synapse.types import JsonDict, StreamToken, create_requester
+from synapse.util import Clock
 
 from tests.handlers.test_sync import generate_sync_config
 from tests.test_utils import simple_async_mock
-from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
+from tests.unittest import FederatingHomeserverTestCase, override_config
 
 
 @attr.s
@@ -49,9 +53,7 @@ class LegacyPresenceRouterTestModule:
         }
         return users_to_state
 
-    async def get_interested_users(
-        self, user_id: str
-    ) -> Union[Set[str], str]:
+    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
         if user_id in self._config.users_who_should_receive_all_presence:
             return PresenceRouter.ALL_USERS
 
@@ -76,7 +78,9 @@ class LegacyPresenceRouterTestModule:
         )
         assert isinstance(users_who_should_receive_all_presence, list)
 
-        config.users_who_should_receive_all_presence = users_who_should_receive_all_presence
+        config.users_who_should_receive_all_presence = (
+            users_who_should_receive_all_presence
+        )
 
         return config
 
@@ -99,9 +103,7 @@ class PresenceRouterTestModule:
         }
         return users_to_state
 
-    async def get_interested_users(
-        self, user_id: str
-    ) -> Union[Set[str], str]:
+    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
         if user_id in self._config.users_who_should_receive_all_presence:
             return PresenceRouter.ALL_USERS
 
@@ -126,7 +128,9 @@ class PresenceRouterTestModule:
         )
         assert isinstance(users_who_should_receive_all_presence, list)
 
-        config.users_who_should_receive_all_presence = users_who_should_receive_all_presence
+        config.users_who_should_receive_all_presence = (
+            users_who_should_receive_all_presence
+        )
 
         return config
 
@@ -146,7 +150,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         presence.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
         fed_transport_client = Mock(spec=["send_transaction"])
         fed_transport_client.send_transaction = simple_async_mock({})
@@ -159,7 +163,9 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
         return hs
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.sync_handler = self.hs.get_sync_handler()
         self.module_api = homeserver.get_module_api()
 
@@ -182,7 +188,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             },
         }
     )
-    def test_receiving_all_presence_legacy(self):
+    def test_receiving_all_presence_legacy(self) -> None:
         self.receiving_all_presence_test_body()
 
     @override_config(
@@ -199,10 +205,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             ],
         }
     )
-    def test_receiving_all_presence(self):
+    def test_receiving_all_presence(self) -> None:
         self.receiving_all_presence_test_body()
 
-    def receiving_all_presence_test_body(self):
+    def receiving_all_presence_test_body(self) -> None:
         """Test that a user that does not share a room with another other can receive
         presence for them, due to presence routing.
         """
@@ -308,7 +314,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             },
         }
     )
-    def test_send_local_online_presence_to_with_module_legacy(self):
+    def test_send_local_online_presence_to_with_module_legacy(self) -> None:
         self.send_local_online_presence_to_with_module_test_body()
 
     @override_config(
@@ -327,10 +333,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             ],
         }
     )
-    def test_send_local_online_presence_to_with_module(self):
+    def test_send_local_online_presence_to_with_module(self) -> None:
         self.send_local_online_presence_to_with_module_test_body()
 
-    def send_local_online_presence_to_with_module_test_body(self):
+    def send_local_online_presence_to_with_module_test_body(self) -> None:
         """Tests that send_local_presence_to_users sends local online presence to a set
         of specified local and remote users, with a custom PresenceRouter module enabled.
         """
