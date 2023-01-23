@@ -35,6 +35,7 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
 )
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
 from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
@@ -43,6 +44,7 @@ from synapse.storage.databases.main.event_push_actions import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
@@ -63,6 +65,7 @@ logger = logging.getLogger("synapse.app.admin_cmd")
 
 class AdminCmdSlavedStore(
     FilteringWorkerStore,
+    ClientIpWorkerStore,
     DeviceWorkerStore,
     TagsWorkerStore,
     DeviceInboxWorkerStore,
@@ -82,6 +85,7 @@ class AdminCmdSlavedStore(
     EventsWorkerStore,
     RegistrationWorkerStore,
     RoomWorkerStore,
+    ProfileWorkerStore,
 ):
     def __init__(
         self,
