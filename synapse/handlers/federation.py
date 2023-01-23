@@ -1879,11 +1879,6 @@ class FederationHandler:
                     await self._notifier.on_un_partial_stated_room(
                         room_id, new_stream_id
                     )
-
-                    # Poke the notifier so that other workers see the write to
-                    # the un-partial-stated rooms stream.
-                    self._notifier.notify_replication()
-
                     return
 
                 # we raced against more events arriving with partial state. Go round
