@@ -1709,6 +1709,7 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
+            # TODO Do not fetch room account data if it will be unused.
             (
                 global_account_data,
                 account_data_by_room,
@@ -1725,6 +1726,7 @@ class SyncHandler:
                     sync_config.user
                 )
         else:
+            # TODO Do not fetch room account data if it will be unused.
             (
                 global_account_data,
                 account_data_by_room,
@@ -1837,10 +1839,25 @@ class SyncHandler:
 
         since_token = sync_result_builder.since_token
 
+        # If all rooms are blocked, we can skip bits of processing.
+        block_all_rooms = (
+            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+        )
+
+        # 0. If there are no rooms to return *and* we don't care about presence
+        # or device list updates, there's nothing to do.
+        if (
+            block_all_rooms
+            and block_all_presence_data
+            and not include_device_list_updates
+        ):
+            return set(), set(), set(), set()
+
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
-            since_token is None
+            block_all_rooms
+            or since_token is None
             and sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
 
