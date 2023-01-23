@@ -1463,13 +1463,17 @@ class SyncHandler:
         logger.debug("Fetching to-device data")
         await self._generate_sync_entry_for_to_device(sync_result_builder)
 
-        device_lists = await self._generate_sync_entry_for_device_list(
-            sync_result_builder,
-            newly_joined_rooms=newly_joined_rooms,
-            newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms=newly_left_rooms,
-            newly_left_users=newly_left_users,
-        )
+        include_device_list_updates = since_token and since_token.device_list_key
+        if include_device_list_updates:
+            device_lists = await self._generate_sync_entry_for_device_list(
+                sync_result_builder,
+                newly_joined_rooms=newly_joined_rooms,
+                newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
+                newly_left_rooms=newly_left_rooms,
+                newly_left_users=newly_left_users,
+            )
+        else:
+            device_lists = DeviceListUpdates()
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
@@ -1539,6 +1543,7 @@ class SyncHandler:
 
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
+        assert since_token is not None
 
         # Take a copy since these fields will be mutated later.
         newly_joined_or_invited_or_knocked_users = set(
@@ -1546,92 +1551,85 @@ class SyncHandler:
         )
         newly_left_users = set(newly_left_users)
 
-        if since_token and since_token.device_list_key:
-            # We want to figure out what user IDs the client should refetch
-            # device keys for, and which users we aren't going to track changes
-            # for anymore.
-            #
-            # For the first step we check:
-            #   a. if any users we share a room with have updated their devices,
-            #      and
-            #   b. we also check if we've joined any new rooms, or if a user has
-            #      joined a room we're in.
-            #
-            # For the second step we just find any users we no longer share a
-            # room with by looking at all users that have left a room plus users
-            # that were in a room we've left.
+        # We want to figure out what user IDs the client should refetch
+        # device keys for, and which users we aren't going to track changes
+        # for anymore.
+        #
+        # For the first step we check:
+        #   a. if any users we share a room with have updated their devices,
+        #      and
+        #   b. we also check if we've joined any new rooms, or if a user has
+        #      joined a room we're in.
+        #
+        # For the second step we just find any users we no longer share a
+        # room with by looking at all users that have left a room plus users
+        # that were in a room we've left.
 
-            users_that_have_changed = set()
+        users_that_have_changed = set()
 
-            joined_rooms = sync_result_builder.joined_room_ids
+        joined_rooms = sync_result_builder.joined_room_ids
 
-            # Step 1a, check for changes in devices of users we share a room
-            # with
-            #
-            # We do this in two different ways depending on what we have cached.
-            # If we already have a list of all the user that have changed since
-            # the last sync then it's likely more efficient to compare the rooms
-            # they're in with the rooms the syncing user is in.
-            #
-            # If we don't have that info cached then we get all the users that
-            # share a room with our user and check if those users have changed.
-            cache_result = self.store.get_cached_device_list_changes(
-                since_token.device_list_key
-            )
-            if cache_result.hit:
-                changed_users = cache_result.entities
+        # Step 1a, check for changes in devices of users we share a room
+        # with
+        #
+        # We do this in two different ways depending on what we have cached.
+        # If we already have a list of all the user that have changed since
+        # the last sync then it's likely more efficient to compare the rooms
+        # they're in with the rooms the syncing user is in.
+        #
+        # If we don't have that info cached then we get all the users that
+        # share a room with our user and check if those users have changed.
+        cache_result = self.store.get_cached_device_list_changes(
+            since_token.device_list_key
+        )
+        if cache_result.hit:
+            changed_users = cache_result.entities
 
-                result = await self.store.get_rooms_for_users(changed_users)
+            result = await self.store.get_rooms_for_users(changed_users)
 
-                for changed_user_id, entries in result.items():
-                    # Check if the changed user shares any rooms with the user,
-                    # or if the changed user is the syncing user (as we always
-                    # want to include device list updates of their own devices).
-                    if user_id == changed_user_id or any(
-                        rid in joined_rooms for rid in entries
-                    ):
-                        users_that_have_changed.add(changed_user_id)
-            else:
-                users_that_have_changed = (
-                    await self._device_handler.get_device_changes_in_shared_rooms(
-                        user_id,
-                        sync_result_builder.joined_room_ids,
-                        from_token=since_token,
-                    )
-                )
-
-            # Step 1b, check for newly joined rooms
-            for room_id in newly_joined_rooms:
-                joined_users = await self.store.get_users_in_room(room_id)
-                newly_joined_or_invited_or_knocked_users.update(joined_users)
-
-            # TODO: Check that these users are actually new, i.e. either they
-            # weren't in the previous sync *or* they left and rejoined.
-            users_that_have_changed.update(newly_joined_or_invited_or_knocked_users)
-
-            user_signatures_changed = (
-                await self.store.get_users_whose_signatures_changed(
-                    user_id, since_token.device_list_key
-                )
-            )
-            users_that_have_changed.update(user_signatures_changed)
-
-            # Now find users that we no longer track
-            for room_id in newly_left_rooms:
-                left_users = await self.store.get_users_in_room(room_id)
-                newly_left_users.update(left_users)
-
-            # Remove any users that we still share a room with.
-            left_users_rooms = await self.store.get_rooms_for_users(newly_left_users)
-            for user_id, entries in left_users_rooms.items():
-                if any(rid in joined_rooms for rid in entries):
-                    newly_left_users.discard(user_id)
-
-            return DeviceListUpdates(
-                changed=users_that_have_changed, left=newly_left_users
-            )
+            for changed_user_id, entries in result.items():
+                # Check if the changed user shares any rooms with the user,
+                # or if the changed user is the syncing user (as we always
+                # want to include device list updates of their own devices).
+                if user_id == changed_user_id or any(
+                    rid in joined_rooms for rid in entries
+                ):
+                    users_that_have_changed.add(changed_user_id)
         else:
-            return DeviceListUpdates()
+            users_that_have_changed = (
+                await self._device_handler.get_device_changes_in_shared_rooms(
+                    user_id,
+                    sync_result_builder.joined_room_ids,
+                    from_token=since_token,
+                )
+            )
+
+        # Step 1b, check for newly joined rooms
+        for room_id in newly_joined_rooms:
+            joined_users = await self.store.get_users_in_room(room_id)
+            newly_joined_or_invited_or_knocked_users.update(joined_users)
+
+        # TODO: Check that these users are actually new, i.e. either they
+        # weren't in the previous sync *or* they left and rejoined.
+        users_that_have_changed.update(newly_joined_or_invited_or_knocked_users)
+
+        user_signatures_changed = await self.store.get_users_whose_signatures_changed(
+            user_id, since_token.device_list_key
+        )
+        users_that_have_changed.update(user_signatures_changed)
+
+        # Now find users that we no longer track
+        for room_id in newly_left_rooms:
+            left_users = await self.store.get_users_in_room(room_id)
+            newly_left_users.update(left_users)
+
+        # Remove any users that we still share a room with.
+        left_users_rooms = await self.store.get_rooms_for_users(newly_left_users)
+        for user_id, entries in left_users_rooms.items():
+            if any(rid in joined_rooms for rid in entries):
+                newly_left_users.discard(user_id)
+
+        return DeviceListUpdates(changed=users_that_have_changed, left=newly_left_users)
 
     @trace
     async def _generate_sync_entry_for_to_device(
