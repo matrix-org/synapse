@@ -51,7 +51,7 @@ class LegacyPresenceRouterTestModule:
 
     async def get_interested_users(
         self, user_id: str
-    ) -> Union[Set[str], PresenceRouter.ALL_USERS]:
+    ) -> Union[Set[str], str]:
         if user_id in self._config.users_who_should_receive_all_presence:
             return PresenceRouter.ALL_USERS
 
@@ -71,9 +71,12 @@ class LegacyPresenceRouterTestModule:
         # Initialise a typed config object
         config = PresenceRouterTestConfig()
 
-        config.users_who_should_receive_all_presence = config_dict.get(
+        users_who_should_receive_all_presence = config_dict.get(
             "users_who_should_receive_all_presence"
         )
+        assert isinstance(users_who_should_receive_all_presence, list)
+
+        config.users_who_should_receive_all_presence = users_who_should_receive_all_presence
 
         return config
 
@@ -98,7 +101,7 @@ class PresenceRouterTestModule:
 
     async def get_interested_users(
         self, user_id: str
-    ) -> Union[Set[str], PresenceRouter.ALL_USERS]:
+    ) -> Union[Set[str], str]:
         if user_id in self._config.users_who_should_receive_all_presence:
             return PresenceRouter.ALL_USERS
 
@@ -118,9 +121,12 @@ class PresenceRouterTestModule:
         # Initialise a typed config object
         config = PresenceRouterTestConfig()
 
-        config.users_who_should_receive_all_presence = config_dict.get(
+        users_who_should_receive_all_presence = config_dict.get(
             "users_who_should_receive_all_presence"
         )
+        assert isinstance(users_who_should_receive_all_presence, list)
+
+        config.users_who_should_receive_all_presence = users_who_should_receive_all_presence
 
         return config
 
@@ -447,18 +453,18 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                     continue
 
                 # EDUs can contain multiple presence updates
-                for presence_update in edu["content"]["push"]:
+                for presence_edu in edu["content"]["push"]:
                     # Check for presence updates that contain the user IDs we're after
-                    found_users.add(presence_update["user_id"])
+                    found_users.add(presence_edu["user_id"])
 
                     # Ensure that no offline states are being sent out
-                    self.assertNotEqual(presence_update["presence"], "offline")
+                    self.assertNotEqual(presence_edu["presence"], "offline")
 
         self.assertEqual(found_users, expected_users)
 
 
 def send_presence_update(
-    testcase: TestCase,
+    testcase: FederatingHomeserverTestCase,
     user_id: str,
     access_token: str,
     presence_state: str,
@@ -479,7 +485,7 @@ def send_presence_update(
 
 
 def sync_presence(
-    testcase: TestCase,
+    testcase: FederatingHomeserverTestCase,
     user_id: str,
     since_token: Optional[StreamToken] = None,
 ) -> Tuple[List[UserPresenceState], StreamToken]:
@@ -500,7 +506,7 @@ def sync_presence(
     requester = create_requester(user_id)
     sync_config = generate_sync_config(requester.user.to_string())
     sync_result = testcase.get_success(
-        testcase.sync_handler.wait_for_sync_for_user(
+        testcase.hs.get_sync_handler().wait_for_sync_for_user(
             requester, sync_config, since_token
         )
     )
