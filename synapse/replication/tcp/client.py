@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # How long we allow callers to wait for replication updates before timing out.
-_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 30
+_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 5
 
 
 class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
@@ -207,6 +207,12 @@ class ReplicationDataHandler:
             # we don't need to optimise this for multiple rows.
             for row in rows:
                 if row.type != EventsStreamEventRow.TypeId:
+                    # The row's data is an `EventsStreamCurrentStateRow`.
+                    # When we recompute the current state of a room based on forward
+                    # extremities (see `update_current_state`), no new events are
+                    # persisted, so we must poke the replication callbacks ourselves.
+                    # This functionality is used when finishing up a partial state join.
+                    self.notifier.notify_replication()
                     continue
                 assert isinstance(row, EventsStreamRow)
                 assert isinstance(row.data, EventsStreamEventRow)
@@ -326,7 +332,6 @@ class ReplicationDataHandler:
         instance_name: str,
         stream_name: str,
         position: int,
-        raise_on_timeout: bool = True,
     ) -> None:
         """Wait until this instance has received updates up to and including
         the given stream position.
@@ -335,8 +340,6 @@ class ReplicationDataHandler:
             instance_name
             stream_name
             position
-            raise_on_timeout: Whether to raise an exception if we time out
-                waiting for the updates, or if we log an error and return.
         """
 
         if instance_name == self._instance_name:
@@ -365,19 +368,23 @@ class ReplicationDataHandler:
 
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
-            logger.info("Waiting for repl stream %r to reach %s", stream_name, position)
+            logger.info(
+                "Waiting for repl stream %r to reach %s (%s)",
+                stream_name,
+                position,
+                instance_name,
+            )
             try:
                 await make_deferred_yieldable(deferred)
             except defer.TimeoutError:
                 logger.error("Timed out waiting for stream %s", stream_name)
-
-                if raise_on_timeout:
-                    raise
-
                 return
 
             logger.info(
-                "Finished waiting for repl stream %r to reach %s", stream_name, position
+                "Finished waiting for repl stream %r to reach %s (%s)",
+                stream_name,
+                position,
+                instance_name,
             )
 
     def stop_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:
