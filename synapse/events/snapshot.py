@@ -307,10 +307,10 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
     UnpersistedEventContext must be converted into an EventContext by calling the method
     'persist' on it before it is suitable to be sent to the DB for processing.
 
-        state_group_before_event:
-            the state group at/before the event. This is required if `for_batch` is True.
-        state_group:
-             this will always be None until it is persisted
+        state_group_after_event:
+             this will always be None until it is persisted. The state group after the
+             event. If the event is not a state event, this will be the same as
+             state_group_before_event.
 
         state_group_before_event: The ID of the state group representing the state
          of the room before this event.
@@ -318,17 +318,18 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         state_delta_due_to_event: If the event is a state event, then this is the
          delta of the state between `state_group` and `state_group_before_event`
 
-         prev_group: If it is known, ``state_group``'s prev_group.
+         prev_group_to_state_group_after_event: If it is known, ``state_group_after_event``'s prev_group.
 
              If the event is a state event, this is normally the same as
              ``state_group_before_event``.
 
-         delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
-             and ``state_group``.
+         delta_ids_to_state_group_before_event: If ``prev_group`` is not None, the state delta between ``prev_group``
+             and ``state_group_after_event``.
 
          partial_state: Whether the event has partial state.
 
-        state_map_before_event: A map of the state before the event, i.e. the state at `state_group_before_event`
+        state_map_before_event: A map of the state before the event, i.e. the state at
+        `state_group_before_event`
     """
 
     _storage: "StorageControllers"
@@ -373,9 +374,11 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         for persisting
         """
         assert self.partial_state is not None
+
         # If we have a full set of state for at/before the event but don't have a state
         # group for that state, we need to get one
-        if self.state_map_before_event and self.state_group_before_event is None:
+        if self.state_group_before_event is None:
+            assert self.state_map_before_event
             state_group_before_event = await self._storage.state.store_state_group(
                 event.event_id,
                 event.room_id,
@@ -384,29 +387,14 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                 current_state_ids=self.state_map_before_event,
             )
             self.state_group_before_event = state_group_before_event
-            self.prev_group = state_group_before_event
-        if not event.is_state():
-            return EventContext.with_state(
-                storage=self._storage,
-                state_group=self.state_group_before_event,
-                state_group_before_event=self.state_group_before_event,
-                state_delta_due_to_event=self.state_delta_due_to_event,
-                partial_state=self.partial_state,
-                prev_group=self.prev_group,
-                delta_ids=self.delta_ids,
-            )
+
+        # if the event isn't a state event the state group doesn't change
+        if not self.state_delta_due_to_event:
+            state_group_after_event = self.state_group_before_event
+        # if it is a state event we need to get a state group for it, either we have the
+        # full current state or we have a prev group and delta ids
         else:
-            if not self.prev_group and not self.delta_ids:
-                # if we don't have a prev_group and the delta from the prev_group we need
-                # to store the state group with the full state
-                state_group_after_event = await self._storage.state.store_state_group(
-                    event.event_id,
-                    event.room_id,
-                    prev_group=self.state_group_before_event,
-                    delta_ids=self.state_delta_due_to_event,
-                    current_state_ids=self.state_map_before_event,
-                )
-            else:
+            if self.prev_group is not None:
                 state_group_after_event = await self._storage.state.store_state_group(
                     event.event_id,
                     event.room_id,
@@ -414,16 +402,27 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                     delta_ids=self.delta_ids,
                     current_state_ids=None,
                 )
+            else:
+                assert self.state_map_before_event is not None
+                self.state_map_before_event.update(self.state_delta_due_to_event)
+                state_group_after_event = await self._storage.state.store_state_group(
+                    event.event_id,
+                    event.room_id,
+                    prev_group=self.prev_group,
+                    delta_ids=self.delta_ids,
+                    current_state_ids=self.state_map_before_event,
+                )
+                self.prev_group = self.state_group_before_event
 
-            return EventContext.with_state(
-                storage=self._storage,
-                state_group=state_group_after_event,
-                state_group_before_event=self.state_group_before_event,
-                state_delta_due_to_event=self.state_delta_due_to_event,
-                partial_state=self.partial_state,
-                prev_group=self.prev_group,
-                delta_ids=self.delta_ids,
-            )
+        return EventContext.with_state(
+            storage=self._storage,
+            state_group=state_group_after_event,
+            state_group_before_event=self.state_group_before_event,
+            state_delta_due_to_event=self.state_delta_due_to_event,
+            partial_state=self.partial_state,
+            prev_group=self.prev_group,
+            delta_ids=self.delta_ids,
+        )
 
 
 def _encode_state_dict(

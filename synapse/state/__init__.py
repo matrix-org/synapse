@@ -271,7 +271,7 @@ class StateHandler:
         event: EventBase,
         state_ids_before_event: Optional[StateMap[str]] = None,
         partial_state: Optional[bool] = None,
-        current_state_group: Optional[int] = None,
+        state_group_before_event: Optional[int] = None,
     ) -> UnpersistedEventContextBase:
         """
         Calulates the contents of an unpersisted event context, other than the current
@@ -289,7 +289,7 @@ class StateHandler:
             `False` if `state_ids_before_event` is the full state.
             `None` when `state_ids_before_event` is not provided. In this case, the
             flag will be calculated based on `event`'s prev events.
-        current_state_group:
+        state_group_before_event:
             the current state group at the time of event, if known
         Returns:
             The event context.
@@ -308,7 +308,6 @@ class StateHandler:
             # if we're given the state before the event, then we use that
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
-            state_group_before_event = current_state_group
 
             # the partial_state flag must be provided
             assert partial_state is not None

@@ -1201,7 +1201,7 @@ class EventCreationHandler:
                     event,
                     state_ids_before_event=state_map,
                     partial_state=False,
-                    current_state_group=current_state_group,
+                    state_group_before_event=current_state_group,
                 )
             )
 
