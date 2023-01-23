@@ -292,6 +292,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         to_device_key=0,
                         device_list_key=0,
                         groups_key=0,
+                        un_partial_stated_rooms_key=0,
                     )
 
             return events[:limit], next_token
