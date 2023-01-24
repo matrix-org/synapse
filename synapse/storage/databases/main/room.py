@@ -26,6 +26,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Union,
     cast,
@@ -1294,10 +1295,44 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             instance_name
         )
 
+    async def get_un_partial_stated_rooms_between(
+        self, last_id: int, current_id: int, room_ids: Collection[str]
+    ) -> Set[str]:
+        """Get all rooms that got un partial stated between `last_id` exclusive and
+        `current_id` inclusive.
+
+        Returns:
+            The list of room ids.
+        """
+
+        if last_id == current_id:
+            return set()
+
+        def _get_un_partial_stated_rooms_between_txn(
+            txn: LoggingTransaction,
+        ) -> Set[str]:
+            sql = """
+                SELECT DISTINCT room_id FROM un_partial_stated_room_stream
+                WHERE ? < stream_id AND stream_id <= ? AND
+            """
+
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+
+            txn.execute(sql + clause, [last_id, current_id] + args)
+
+            return {r[0] for r in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_un_partial_stated_rooms_between",
+            _get_un_partial_stated_rooms_between_txn,
+        )
+
     async def get_un_partial_stated_rooms_from_stream(
         self, instance_name: str, last_id: int, current_id: int, limit: int
     ) -> Tuple[List[Tuple[int, Tuple[str]]], int, bool]:
-        """Get updates for caches replication stream.
+        """Get updates for un partial stated rooms replication stream.
 
         Args:
             instance_name: The writer we want to fetch updates from. Unused
@@ -2304,16 +2339,16 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             (room_id,),
         )
 
-    async def clear_partial_state_room(self, room_id: str) -> bool:
+    async def clear_partial_state_room(self, room_id: str) -> Optional[int]:
         """Clears the partial state flag for a room.
 
         Args:
             room_id: The room whose partial state flag is to be cleared.
 
         Returns:
-            `True` if the partial state flag has been cleared successfully.
+            The corresponding stream id for the un-partial-stated rooms stream.
 
-            `False` if the partial state flag could not be cleared because the room
+            `None` if the partial state flag could not be cleared because the room
             still contains events with partial state.
         """
         try:
@@ -2324,7 +2359,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                     room_id,
                     un_partial_state_room_stream_id,
                 )
-                return True
+                return un_partial_state_room_stream_id
         except self.db_pool.engine.module.IntegrityError as e:
             # Assume that any `IntegrityError`s are due to partial state events.
             logger.info(
@@ -2332,7 +2367,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 room_id,
                 e,
             )
-            return False
+            return None
 
     def _clear_partial_state_room_txn(
         self,
