@@ -799,7 +799,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self.next_batch = channel.json_body["next_batch"]
 
 
-class RoomPreviewTestCase(unittest.HomeserverTestCase):
+class BeeperRoomPreviewTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -1034,6 +1034,84 @@ class RoomPreviewTestCase(unittest.HomeserverTestCase):
         )
         self._check_preview_event_ids(
             auth_token=self.tok2, expected={self.room_id: enc_1_body["event_id"]}
+        )
+
+    def test_room_preview_edits(self) -> None:
+        """Tests that /sync returns a room preview with the latest message for room."""
+
+        # One user says hello.
+        # Check that a message we send returns a preview in the room (i.e. have multiple clients?)
+        send_body = self.helper.send(self.room_id, "hello", tok=self.tok)
+        self._check_preview_event_ids(
+            auth_token=self.tok, expected={self.room_id: send_body["event_id"]}
+        )
+
+        # Join new user. Should not show updated preview.
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+        self._check_preview_event_ids(
+            auth_token=self.tok, expected={self.room_id: send_body["event_id"]}
+        )
+
+        # Second user says hello
+        # Check that the new user sending a message updates our preview
+        send_2_body = self.helper.send(self.room_id, "hello again!", tok=self.tok2)
+        self._check_preview_event_ids(self.tok, {self.room_id: send_2_body["event_id"]})
+
+        # First user edits their old message
+        # Check that this doesn't alter the preview
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "body": "hello edit",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": send_body["event_id"],
+                },
+            },
+            tok=self.tok,
+        )
+        self._check_preview_event_ids(self.tok, {self.room_id: send_2_body["event_id"]})
+
+        # Now second user edits their (currently preview) message
+        # Check that this does become the preview
+        send_3_body = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "body": "hello edit",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": send_2_body["event_id"],
+                },
+            },
+            tok=self.tok2,
+        )
+        self._check_preview_event_ids(self.tok, {self.room_id: send_3_body["event_id"]})
+
+        # Now second user edits their (currently preview) message again
+        # Check that this does become the preview, over the previous edit
+        send_4_body = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "body": "hello edit 2",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": send_2_body["event_id"],
+                },
+            },
+            tok=self.tok2,
+        )
+        self._check_preview_event_ids(self.tok, {self.room_id: send_4_body["event_id"]})
+
+        # Finally, first user sends a message and this should become the preview
+        send_5_body = self.helper.send(self.room_id, "hello", tok=self.tok)
+        self._check_preview_event_ids(
+            auth_token=self.tok, expected={self.room_id: send_5_body["event_id"]}
         )
 
 

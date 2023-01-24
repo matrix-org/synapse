@@ -2470,7 +2470,8 @@ class SyncHandler:
                     preview={},
                 )
 
-                if sync_config.beeper_previews:
+                # Only generate previews if we have new events that would change it
+                if batch.events and sync_config.beeper_previews:
                     preview = (
                         await self.store.beeper_preview_event_for_room_id_and_user_id(
                             room_id=room_id, user_id=user_id, to_key=now_token.room_key
