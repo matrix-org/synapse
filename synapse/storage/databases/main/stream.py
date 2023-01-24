@@ -67,7 +67,7 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import PersistedEventPosition, RoomStreamToken
 from synapse.util.caches.descriptors import cached
@@ -944,6 +944,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id
             stream_key
         """
+        if isinstance(self.database_engine, PostgresEngine):
+            min_function = "LEAST"
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            min_function = "MIN"
+        else:
+            raise RuntimeError(f"Unknown database engine {self.database_engine}")
+
         # This query used to be
         #    SELECT COALESCE(MIN(topological_ordering), 0) FROM events
         #    WHERE room_id = ? and events.stream_ordering >= {stream_key}
@@ -954,7 +961,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         #
         # Instead, rollback the stream ordering to that after the most recent event in
         # this room.
-        sql = """
+        sql = f"""
             WITH fallback(max_stream_ordering) AS (
                 SELECT MAX(stream_ordering)
                 FROM events
@@ -963,7 +970,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             SELECT COALESCE(MIN(topological_ordering), 0) FROM events
             WHERE
                 room_id = ?
-                AND events.stream_ordering >= MIN(
+                AND events.stream_ordering >= {min_function}(
                     ?,
                     (SELECT max_stream_ordering FROM fallback)
                 )
