@@ -949,6 +949,11 @@ class EventsWorkerStore(SQLBaseStore):
                 (event_id,), None, update_metrics=update_metrics
             )
             if ret:
+                if not hasattr(ret, "event"):
+                    logger.warning(
+                        "Skipping broken Redis cache item: eventID=%s", event_id
+                    )
+                    continue
                 event_map[event_id] = ret
 
         return event_map
