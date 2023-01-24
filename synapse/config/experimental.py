@@ -84,7 +84,7 @@ class ExperimentalConfig(Config):
         # experimental support for faster joins over federation
         # (MSC2775, MSC3706, MSC3895)
         # requires a target server that can provide a partial join response (MSC3706)
-        self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
+        self.faster_joins_enabled: bool = experimental.get("faster_joins", True)
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
