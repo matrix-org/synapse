@@ -90,6 +90,19 @@ process, for example:
 
 # Upgrading to v1.76.0
 
+## Faster joins are enabled by default
+
+When joining a room for the first time, Synapse 1.76.0rc1 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.
+
+Server admins can opt out of this feature for the time being by setting
+
+```yaml
+experimental:
+    faster_joins: false
+```
+
+in their server config.
+
 ## Changes to the account data replication streams
 
 Synapse has changed the format of the account data and devices replication
