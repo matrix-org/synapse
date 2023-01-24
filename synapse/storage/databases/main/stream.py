@@ -944,12 +944,33 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id
             stream_key
         """
-        sql = (
-            "SELECT coalesce(MIN(topological_ordering), 0) FROM events"
-            " WHERE room_id = ? AND stream_ordering >= ?"
-        )
+        # This query used to be
+        #    SELECT COALESCE(MIN(topological_ordering), 0) FROM events
+        #    WHERE room_id = ? and events.stream_ordering >= {stream_key}
+        # which returns 0 if the stream_key is newer than any event in
+        # the room. That's not wrong, but it seems to interact oddly with backfill,
+        # requiring a second call to /messages to actually backfill from a remote
+        # homeserver.
+        #
+        # Instead, rollback the stream ordering to that after the most recent event in
+        # this room.
+        sql = """
+            WITH fallback(max_stream_ordering) AS (
+                SELECT MAX(stream_ordering)
+                FROM events
+                WHERE room_id = ?
+            )
+            SELECT COALESCE(MIN(topological_ordering), 0) FROM events
+            WHERE
+                room_id = ?
+                AND events.stream_ordering >= MIN(
+                    ?,
+                    (SELECT max_stream_ordering FROM fallback)
+                )
+        """
+
         row = await self.db_pool.execute(
-            "get_current_topological_token", None, sql, room_id, stream_key
+            "get_current_topological_token", None, sql, room_id, room_id, stream_key
         )
         return row[0][0] if row else 0
 
