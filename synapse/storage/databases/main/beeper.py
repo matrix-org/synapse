@@ -28,6 +28,8 @@ class BeeperStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
+        self.database = database
+
         self.user_notification_counts_enabled: bool = (
             hs.config.experimental.beeper_user_notification_counts_enabled
         )
@@ -182,7 +184,11 @@ class BeeperStore(SQLBaseStore):
         if not self.user_notification_counts_enabled:
             return
 
-        def aggregate_txn(txn: LoggingTransaction) -> None:
+        def aggregate_txn(
+            self,
+            txn: LoggingTransaction,
+            limit: int,
+        ) -> int:
             sql = """
                 WITH recent_rows AS (  -- Aggregate the tables, flag aggregated rows for deletion
                     SELECT
@@ -205,6 +211,9 @@ class BeeperStore(SQLBaseStore):
                             ORDER BY stream_ordering DESC
                             LIMIT 1
                         )
+                    -- Oldest first, to reduce serialization issues
+                    ORDER BY event_stream_ordering ASC
+                    LIMIT {limit}
                 )
                 UPDATE
                     beeper_user_notification_counts AS epc
@@ -235,13 +244,15 @@ class BeeperStore(SQLBaseStore):
                     AND epc.user_id = agg.user_id
                 RETURNING
                     event_stream_ordering;
-            """
+            """.format(
+                limit=limit
+            )
 
             txn.execute(sql)
             orders = list(txn)
             if not orders:
                 logger.info("No user counts aggregated")
-                return
+                return 0
 
             max_stream_ordering = max(orders)
             txn.execute(
@@ -255,17 +266,28 @@ class BeeperStore(SQLBaseStore):
 
             logger.info(f"Aggregated {len(orders)} notification count rows")
 
+            return txn.rowcount
+
         if self.is_aggregating_notification_counts:
             return
 
         self.is_aggregating_notification_counts = True
+        limit = 1000
 
         try:
             logger.info("Aggregating notification counts")
 
-            await self.db_pool.runInteraction(
-                "beeper_aggregate_notification_counts",
-                aggregate_txn,
-            )
+            last_batch = limit + 1
+            while last_batch > limit:
+                last_batch = await self.db_pool.runInteraction(
+                    "beeper_aggregate_notification_counts",
+                    self.aggregate_notification_counts_txn,
+                    limit=limit,
+                )
+                await self._clock.sleep(1.0)
+
+        except self.database.engine.module.OperationalError:
+            logger.exception("Failed to aggregate notifications")
+
         finally:
             self.is_aggregating_notification_counts = False
