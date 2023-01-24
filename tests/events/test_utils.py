@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest as stdlib_unittest
-from typing import Any, List, Optional
+from typing import Any, List, Mapping, Optional
 
 from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
@@ -560,7 +560,7 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
         a = copy_and_fixup_power_levels_contents(input)
 
         self.assertEqual(a["ban"], 50)
-        assert isinstance(a["events"], dict)
+        assert isinstance(a["events"], Mapping)
         self.assertEqual(a["events"]["m.room.name"], 100)
 
         # make sure that changing the copy changes the copy and not the orig
@@ -568,7 +568,7 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
         a["events"]["m.room.power_levels"] = 20
 
         self.assertEqual(input["ban"], 50)
-        assert isinstance(input["events"], dict)
+        assert isinstance(input["events"], Mapping)
         self.assertEqual(input["events"]["m.room.power_levels"], 100)
 
     def test_unfrozen(self) -> None:
