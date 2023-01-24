@@ -124,6 +124,7 @@ jobs:
             .
 
           if [ "${{ github.ref_name }}" = "beeper" ]; then
+            docker pull ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }}
             docker tag \
               ${{ secrets.CI_REGISTRY }}/synapse:$tag-${{ github.sha }} \
               ${{ secrets.CI_REGISTRY }}/synapse:latest
