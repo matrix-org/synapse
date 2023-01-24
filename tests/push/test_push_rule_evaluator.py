@@ -42,7 +42,8 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self,
         content: JsonMapping,
         *,
-        mentions: Optional[Set[str]] = None,
+        user_mentions: Optional[Set[str]] = None,
+        room_mention: bool = False,
         related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
@@ -61,7 +62,8 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
-            mentions or set(),
+            user_mentions or set(),
+            room_mention,
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
@@ -104,14 +106,16 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, mentions=set())
+        evaluator = self._get_evaluator({}, user_mentions=set())
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator({}, mentions={"@user:test"})
+        evaluator = self._get_evaluator({}, user_mentions={"@user:test"})
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
-        evaluator = self._get_evaluator({}, mentions={"@another:test", "@user:test"})
+        evaluator = self._get_evaluator(
+            {}, user_mentions={"@another:test", "@user:test"}
+        )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
         # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
@@ -121,19 +125,18 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         """Check for room mentions."""
         condition = {"kind": "org.matrix.msc3952.is_room_mention"}
 
-        # No mentions shouldn't match.
+        # No room mention shouldn't match.
         evaluator = self._get_evaluator({})
         self.assertFalse(evaluator.matches(condition, None, None))
 
-        # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, mentions=set())
-        self.assertFalse(evaluator.matches(condition, None, None))
-
-        # The @room appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator({}, mentions={"@room"})
+        # Room mention should match.
+        evaluator = self._get_evaluator({}, room_mention=True)
         self.assertTrue(evaluator.matches(condition, None, None))
 
-        evaluator = self._get_evaluator({}, mentions={"@another:test", "@room"})
+        # A room mention and user mention is valid.
+        evaluator = self._get_evaluator(
+            {}, user_mentions={"@another:test"}, room_mention=True
+        )
         self.assertTrue(evaluator.matches(condition, None, None))
 
         # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions

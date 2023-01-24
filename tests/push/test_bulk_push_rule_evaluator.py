@@ -170,21 +170,35 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
             return len(result) > 0
 
-        # Not including the mentions field should result in no notifications.
+        # Not including the mentions field should not notify.
         self.assertFalse(create_and_process())
+        # An empty mentions field should not notify.
+        self.assertFalse(create_and_process({}))
 
-        # Invalid data should be ignored.
+        # Non-dict mentions should be ignored.
         mentions: Any
-        for mentions in (None, True, False, "foo", {}):
+        for mentions in (None, True, False, 1, "foo", []):
             self.assertFalse(create_and_process(mentions))
 
-        # The Matrix ID appearing anywhere in the mentions list should match
-        self.assertTrue(create_and_process([self.alice]))
-        self.assertTrue(create_and_process(["@another:test", self.alice]))
+        # A non-list should be ignored.
+        for mentions in (None, True, False, 1, "foo", {}):
+            self.assertFalse(create_and_process({"user_ids": mentions}))
 
-        # The Matrix ID appearing > 10 entries into the list should be ignored.
-        self.assertFalse(create_and_process(["@another:test"] * 10 + [self.alice]))
+        # The Matrix ID appearing anywhere in the list should notify.
+        self.assertTrue(create_and_process({"user_ids": [self.alice]}))
+        self.assertTrue(create_and_process({"user_ids": ["@another:test", self.alice]}))
 
-        # Invalid entries in the list are ignored, but count towards the limit.
-        self.assertTrue(create_and_process([None, True, False, {}, [], self.alice]))
-        self.assertFalse(create_and_process([None] * 10 + [self.alice]))
+        # Duplicate user IDs should notify.
+        self.assertTrue(create_and_process({"user_ids": [self.alice, self.alice]}))
+
+        # Invalid entries in the list are ignored.
+        self.assertFalse(create_and_process({"user_ids": [None, True, False, {}, []]}))
+        self.assertTrue(
+            create_and_process({"user_ids": [None, True, False, {}, [], self.alice]})
+        )
+
+        # Room mentions should notify.
+        self.assertTrue(create_and_process({"room": True}))
+        # A non-True should not notify.
+        for mentions in (None, False, 1, "foo", [], {}):
+            self.assertFalse(create_and_process({"room": mentions}))

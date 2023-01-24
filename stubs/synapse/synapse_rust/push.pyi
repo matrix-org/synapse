@@ -56,7 +56,8 @@ class PushRuleEvaluator:
     def __init__(
         self,
         flattened_keys: Mapping[str, str],
-        mentions: Set[str],
+        user_mentions: Set[str],
+        room_mention: bool,
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],

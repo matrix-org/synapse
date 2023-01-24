@@ -68,8 +68,10 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
-    /// The mentions that were part of the message, note this has
-    mentions: BTreeSet<String>,
+    /// The user mentions that were part of the message.
+    user_mentions: BTreeSet<String>,
+    /// True if the message is a room message.
+    room_mention: bool,
 
     /// The number of users in the room.
     room_member_count: u64,
@@ -103,7 +105,8 @@ impl PushRuleEvaluator {
     #[new]
     pub fn py_new(
         flattened_keys: BTreeMap<String, String>,
-        mentions: BTreeSet<String>,
+        user_mentions: BTreeSet<String>,
+        room_mention: bool,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
@@ -120,7 +123,8 @@ impl PushRuleEvaluator {
         Ok(PushRuleEvaluator {
             flattened_keys,
             body,
-            mentions,
+            user_mentions,
+            room_mention,
             room_member_count,
             notification_power_levels,
             sender_power_level,
@@ -236,12 +240,12 @@ impl PushRuleEvaluator {
             }
             KnownCondition::IsUserMention => {
                 if let Some(uid) = user_id {
-                    self.mentions.contains(uid)
+                    self.user_mentions.contains(uid)
                 } else {
                     false
                 }
             }
-            KnownCondition::IsRoomMention => self.mentions.contains("@room"),
+            KnownCondition::IsRoomMention => self.room_mention,
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
                     if !dn.is_empty() {
@@ -438,6 +442,7 @@ fn push_rule_evaluator() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         BTreeSet::new(),
+        false,
         10,
         Some(0),
         BTreeMap::new(),
@@ -464,6 +469,7 @@ fn test_requires_room_version_supports_condition() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         BTreeSet::new(),
+        false,
         10,
         Some(0),
         BTreeMap::new(),
