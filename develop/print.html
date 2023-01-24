@@ -1772,6 +1772,13 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1760"><a class="header" href="#upgrading-to-v1760">Upgrading to v1.76.0</a></h1>
+<h2 id="faster-joins-are-enabled-by-default"><a class="header" href="#faster-joins-are-enabled-by-default">Faster joins are enabled by default</a></h2>
+<p>When joining a room for the first time, Synapse 1.76.0rc1 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.</p>
+<p>Server admins can opt out of this feature for the time being by setting</p>
+<pre><code class="language-yaml">experimental:
+    faster_joins: false
+</code></pre>
+<p>in their server config.</p>
 <h2 id="changes-to-the-account-data-replication-streams"><a class="header" href="#changes-to-the-account-data-replication-streams">Changes to the account data replication streams</a></h2>
 <p>Synapse has changed the format of the account data and devices replication
 streams (between workers). This is a forwards- and backwards-incompatible
