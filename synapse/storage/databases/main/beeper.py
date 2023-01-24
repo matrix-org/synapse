@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
 from synapse.events import EventBase
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -176,6 +177,7 @@ class BeeperStore(SQLBaseStore):
 
         txn.execute(sql, (user_id, room_id, stream_ordering))
 
+    @wrap_as_background_process("beeper_aggregate_notification_counts")
     async def beeper_aggregate_notification_counts(self) -> None:
         if not self.user_notification_counts_enabled:
             return
