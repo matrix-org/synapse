@@ -184,11 +184,7 @@ class BeeperStore(SQLBaseStore):
         if not self.user_notification_counts_enabled:
             return
 
-        def aggregate_txn(
-            self,
-            txn: LoggingTransaction,
-            limit: int,
-        ) -> int:
+        def aggregate_txn(txn: LoggingTransaction, limit: int) -> int:
             sql = """
                 WITH recent_rows AS (  -- Aggregate the tables, flag aggregated rows for deletion
                     SELECT
@@ -281,7 +277,7 @@ class BeeperStore(SQLBaseStore):
             while last_batch > limit:
                 last_batch = await self.db_pool.runInteraction(
                     "beeper_aggregate_notification_counts",
-                    self.aggregate_notification_counts_txn,
+                    aggregate_txn,
                     limit=limit,
                 )
                 await self._clock.sleep(1.0)
