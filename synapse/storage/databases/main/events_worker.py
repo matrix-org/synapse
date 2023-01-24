@@ -259,18 +259,19 @@ class EventsWorkerStore(SQLBaseStore):
             RedisLruCache[Tuple[str], EventCacheEntry],
         ]
 
-        external_sharded_cache = hs.get_external_sharded_cache()
-        if external_sharded_cache.is_enabled():
-            self._get_event_cache = RedisLruCache(
-                cache_name="*getEvent*",
-                max_size=hs.config.caches.event_cache_size,
-                redis_shard_cache=external_sharded_cache,
-            )
-        else:
-            self._get_event_cache = AsyncLruCache(
-                cache_name="*getEvent*",
-                max_size=hs.config.caches.event_cache_size,
-            )
+        # TODO: fix / re-enable
+        # external_sharded_cache = hs.get_external_sharded_cache()
+        # if external_sharded_cache.is_enabled():
+        #     self._get_event_cache = RedisLruCache(
+        #         cache_name="*getEvent*",
+        #         max_size=hs.config.caches.event_cache_size,
+        #         redis_shard_cache=external_sharded_cache,
+        #     )
+        # else:
+        self._get_event_cache = AsyncLruCache(
+            cache_name="*getEvent*",
+            max_size=hs.config.caches.event_cache_size,
+        )
 
         # Map from event ID to a deferred that will result in a map from event
         # ID to cache entry. Note that the returned dict may not have the
