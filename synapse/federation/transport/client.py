@@ -102,6 +102,10 @@ class TransportLayerClient:
             destination,
             path=path,
             args={"event_id": event_id},
+            # This can take a looooooong time for large rooms. Give this a generous
+            # timeout, to avoid the partial state resync timing out early and trying
+            # a bunch of servers who haven't see our join yet.
+            timeout=600,
             parser=_StateParser(room_version),
         )
 
