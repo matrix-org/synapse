@@ -913,7 +913,9 @@ class ExcludeRoomTestCase(unittest.HomeserverTestCase):
 
         # We need to manually append the room ID, because we can't know the ID before
         # creating the room, and we can't set the config after starting the homeserver.
-        self.hs.get_sync_handler().rooms_to_exclude.append(self.excluded_room_id)
+        self.hs.get_sync_handler().rooms_to_exclude_globally.append(
+            self.excluded_room_id
+        )
 
     def test_join_leave(self) -> None:
         """Tests that rooms are correctly excluded from the 'join' and 'leave' sections of
