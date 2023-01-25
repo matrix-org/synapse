@@ -173,3 +173,8 @@ class ExperimentalConfig(Config):
         self.msc3952_intentional_mentions = experimental.get(
             "msc3952_intentional_mentions", False
         )
+
+        # MSC3959: Do not generate notifications for edits.
+        self.msc3958_supress_edit_notifs = experimental.get(
+            "msc3958_supress_edit_notifs", False
+        )
