@@ -1,1 +1,1 @@
-Improve performance of looking up partial-state status.
+Faster joins: Improve performance of looking up partial-state status of rooms.

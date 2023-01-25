@@ -1408,7 +1408,7 @@ class SyncHandler:
             forced_newly_joined_room_ids.update(
                 room_id
                 for room_id, is_partial_state in results.items()
-                if is_partial_state
+                if not is_partial_state
             )
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
