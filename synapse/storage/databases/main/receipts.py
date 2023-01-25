@@ -958,7 +958,7 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
                 HAVING COUNT(*) > 1
             """
             txn.execute(sql, (ROW_ID_NAME,))
-            duplicate_keys = cast(List[Tuple[int, str, str, str]], list(txn))
+            duplicate_keys = cast(List[Tuple[int, int, str, str, str]], list(txn))
 
             # Then remove duplicate receipts, keeping the one with the highest
             # `stream_id`. Since there might be duplicate rows with the same
