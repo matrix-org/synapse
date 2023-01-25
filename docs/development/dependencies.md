@@ -258,6 +258,20 @@ because [`build`](https://github.com/pypa/build) is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 `poetry build` too.
 
+## ...handle a Dependabot pull request?
+
+Synapse uses Dependabot to keep the `poetry.lock` file up-to-date. When it
+creates a pull request a GitHub Action will run to automatically create a changelog
+file. Ensure that:
+
+* the lockfile changes look reasonable;
+* the upstream changelog file (linked in the description) doesn't include any
+  breaking changes;
+* continuous integration passes (due to permissions, the GitHub Actions run on
+  the changelog commit will fail, look at the initial commit of the pull request);
+
+In particular, any updates to the type hints (usually packages which start with `types-`)
+should be safe to merge if linting passes.
 
 # Troubleshooting
 
