@@ -51,8 +51,7 @@ If you uses [Poetry](../../development/dependencies.md#managing-dependencies-wit
 to run Synapse:
 
 ```console
-poetry run python -m synapse.app.admin_cmd -c <config_file> export-data <user_id>
---output-directory <directory_path>
+poetry run python -m synapse.app.admin_cmd -c <config_file> export-data <user_id> --output-directory <directory_path>
 ```
 
 The directory to store the exported data must be empty.
