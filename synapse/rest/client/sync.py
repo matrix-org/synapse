@@ -536,13 +536,14 @@ class SyncRestServlet(RestServlet):
             if self._msc2654_enabled:
                 result["org.matrix.msc2654.unread_count"] = room.unread_count
 
-            if room.preview and "event" in room.preview:
-                room.preview["event"] = self._event_serializer.serialize_events(
-                    [room.preview["event"]],
-                    time_now,
-                    config=serialize_options,
-                )[0]
-            result["com.beeper.inbox.preview"] = room.preview
+            if room.preview:
+                if "event" in room.preview:
+                    room.preview["event"] = self._event_serializer.serialize_events(
+                        [room.preview["event"]],
+                        time_now,
+                        config=serialize_options,
+                    )[0]
+                result["com.beeper.inbox.preview"] = room.preview
 
         return result
 

@@ -2467,7 +2467,7 @@ class SyncHandler:
                     unread_thread_notifications={},
                     summary=summary,
                     unread_count=0,
-                    preview={},
+                    preview=None,
                 )
 
                 # Only generate previews if we have new events that would change it

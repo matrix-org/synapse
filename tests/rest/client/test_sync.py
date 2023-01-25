@@ -873,15 +873,16 @@ class BeeperRoomPreviewTestCase(unittest.HomeserverTestCase):
                 channel.json_body.get("rooms", {}).get("join", {}).get(room_id, {})
             )
 
-            preview_id = room_entry.get("com.beeper.inbox.preview", {}).get(
-                "event_id", {}
-            )
-
-            self.assertEqual(
-                preview_id,
-                expected_entry,
-                room_entry,
-            )
+            preview = room_entry.get("com.beeper.inbox.preview")
+            if preview:
+                preview_id = preview.get("event_id")
+                self.assertEqual(
+                    preview_id,
+                    expected_entry,
+                    room_entry,
+                )
+            else:
+                self.assertIsNone(expected_entry, room_entry)
 
         # Store the next batch for the next request.
         self.next_batches[auth_token] = channel.json_body["next_batch"]
@@ -1112,6 +1113,34 @@ class BeeperRoomPreviewTestCase(unittest.HomeserverTestCase):
         send_5_body = self.helper.send(self.room_id, "hello", tok=self.tok)
         self._check_preview_event_ids(
             auth_token=self.tok, expected={self.room_id: send_5_body["event_id"]}
+        )
+
+    def test_room_preview_no_change(self) -> None:
+        """Tests that /sync only includes previews when we have new events."""
+
+        self.helper.join(room=self.room_id, user=self.user_id, tok=self.tok)
+
+        send_body = self.helper.send(self.room_id, "hello", tok=self.tok)
+
+        # Should have preview on first sync
+        self._check_preview_event_ids(
+            auth_token=self.tok,
+            expected={self.room_id: send_body["event_id"]},
+        )
+
+        # Should have no preview on second sync (no timeline changes)
+        self._check_preview_event_ids(
+            auth_token=self.tok,
+            expected={self.room_id: None},
+        )
+
+        # Send a join event, this isn't previewed but will be in the timeline
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+
+        # Should have preview because we have timeline, but preview is unchanged
+        self._check_preview_event_ids(
+            auth_token=self.tok,
+            expected={self.room_id: send_body["event_id"]},
         )
 
 
