@@ -60,9 +60,9 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, RetentionPolicy, ThirdPartyInstanceID
+from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyInstanceID
 from synapse.util import json_encoder
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
 
 if TYPE_CHECKING:
@@ -1273,6 +1273,25 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
 
         return entry is not None
+
+    @cachedList(cached_method_name="is_partial_State_room", list_name="room_ids")
+    async def is_partial_state_rooms(self, room_ids: StrCollection) -> Mapping[str, bool]:
+        """Checks if this room has partial state.
+
+        Returns true if this is a "partial-state" room, which means that the state
+        at events in the room, and `current_state_events`, may not yet be
+        complete.
+        """
+
+        entries = set(await self.db_pool.simple_select_many_batch(
+            table="partial_state_rooms",
+            column="room_id",
+            iterable=room_ids,
+            retcols=("room_id",),
+            desc="is_partial_state_room",
+        ))
+
+        return {room_id: room_id in entries for room_id in room_ids}
 
     async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
         self, room_id: str
