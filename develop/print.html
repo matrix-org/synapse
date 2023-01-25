@@ -16426,6 +16426,19 @@ poetry lock --no-update
 <p>because <a href="https://github.com/pypa/build"><code>build</code></a> is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 <code>poetry build</code> too.</p>
+<h2 id="handle-a-dependabot-pull-request"><a class="header" href="#handle-a-dependabot-pull-request">...handle a Dependabot pull request?</a></h2>
+<p>Synapse uses Dependabot to keep the <code>poetry.lock</code> file up-to-date. When it
+creates a pull request a GitHub Action will run to automatically create a changelog
+file. Ensure that:</p>
+<ul>
+<li>the lockfile changes look reasonable;</li>
+<li>the upstream changelog file (linked in the description) doesn't include any
+breaking changes;</li>
+<li>continuous integration passes (due to permissions, the GitHub Actions run on
+the changelog commit will fail, look at the initial commit of the pull request);</li>
+</ul>
+<p>In particular, any updates to the type hints (usually packages which start with <code>types-</code>)
+should be safe to merge if linting passes.</p>
 <h1 id="troubleshooting-4"><a class="header" href="#troubleshooting-4">Troubleshooting</a></h1>
 <h2 id="check-the-version-of-poetry-with-poetry---version"><a class="header" href="#check-the-version-of-poetry-with-poetry---version">Check the version of poetry with <code>poetry --version</code>.</a></h2>
 <p>The minimum version of poetry supported by Synapse is 1.3.2.</p>
