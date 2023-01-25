@@ -950,30 +950,30 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             # https://github.com/matrix-org/synapse/issues/14406.
             # We expect the following query to use the per-thread receipt index and take
             # less than a minute.
-            sql = """
-                SELECT MAX(stream_id), ?, room_id, receipt_type, user_id
+            sql = f"""
+                SELECT MAX(stream_id), {ROW_ID_NAME}, room_id, receipt_type, user_id
                 FROM receipts_linearized
                 WHERE thread_id IS NULL
                 GROUP BY room_id, receipt_type, user_id
                 HAVING COUNT(*) > 1
             """
-            txn.execute(sql, (ROW_ID_NAME,))
+            txn.execute(sql)
             duplicate_keys = cast(List[Tuple[int, int, str, str, str]], list(txn))
 
             # Then remove duplicate receipts, keeping the one with the highest
             # `stream_id`. Since there might be duplicate rows with the same
             # `stream_id`, we delete by the rowid instead.
             for _, row_id, room_id, receipt_type, user_id in duplicate_keys:
-                sql = """
+                sql = f"""
                     DELETE FROM receipts_linearized
                     WHERE
                         room_id = ? AND
                         receipt_type = ? AND
                         user_id = ? AND
                         thread_id IS NULL AND
-                        ? != ?
+                        {ROW_ID_NAME} != ?
                 """
-                txn.execute(sql, (room_id, receipt_type, user_id, ROW_ID_NAME, row_id))
+                txn.execute(sql, (room_id, receipt_type, user_id, row_id))
 
         await self.db_pool.runInteraction(
             self.RECEIPTS_LINEARIZED_UNIQUE_INDEX_UPDATE_NAME,
