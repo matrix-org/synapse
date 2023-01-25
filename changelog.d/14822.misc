@@ -1,1 +1,0 @@
-Add `cargo fmt` and `cargo clippy` to the lint script.

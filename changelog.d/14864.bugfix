@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.64.0 when using room version 10 with frozen events enabled.

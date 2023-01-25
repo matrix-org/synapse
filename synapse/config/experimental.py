@@ -84,7 +84,7 @@ class ExperimentalConfig(Config):
         # experimental support for faster joins over federation
         # (MSC2775, MSC3706, MSC3895)
         # requires a target server that can provide a partial join response (MSC3706)
-        self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
+        self.faster_joins_enabled: bool = experimental.get("faster_joins", True)
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
@@ -145,6 +145,13 @@ class ExperimentalConfig(Config):
                 "enable 'experimental_features.msc3890'. MSC3391 functionality is "
                 "required to communicate account data deletions to clients."
             )
+
+        # MSC3381: Polls.
+        # In practice, supporting polls in Synapse only requires an implementation of
+        # MSC3930: Push rules for MSC3391 polls; which is what this option enables.
+        self.msc3381_polls_enabled: bool = experimental.get(
+            "msc3381_polls_enabled", False
+        )
 
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)

@@ -493,8 +493,6 @@ class StateStorageController:
                  up to date.
         """
         # FIXME(faster_joins): what do we do here?
-        #   https://github.com/matrix-org/synapse/issues/12814
-        #   https://github.com/matrix-org/synapse/issues/12815
         #   https://github.com/matrix-org/synapse/issues/13008
 
         return await self.stores.main.get_partial_current_state_deltas(
