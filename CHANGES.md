@@ -1,6 +1,12 @@
 Synapse 1.76.0rc1 (2023-01-25)
 ==============================
 
+This release is the first to enable faster joins ([MSC3706](https://github.com/matrix-org/matrix-spec-proposals/pull/3706) and [MSC3902](https://github.com/matrix-org/matrix-spec-proposals/pull/3902)) by default. Admins can opt-out see [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.76/upgrade.md#faster-joins-are-enabled-by-default for more details.
+
+The upgrade from 1.75 to 1.76 changes the account data replication streams in a backwards-incompatible manner. Server operators running a multi-worker deployment should consult [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.76/docs/upgrade.md#changes-to-the-account-data-replication-streams).
+
+Those who are `poetry install`ing from source using our lockfile should ensure their poetry version is 1.3.2 or higher; [see upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.76/docs/upgrade.md#minimum-version-of-poetry-is-now-132).
+
 Features
 --------
 
