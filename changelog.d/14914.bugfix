@@ -1,1 +1,1 @@
-Faster joins: Fix a bug where device list EDUs could fail to be handled after a restart when a faster join sync is in progress.
+Faster joins: Fix a bug introduced in Synapse 1.69 where device list EDUs could fail to be handled after a restart when a faster join sync is in progress.
