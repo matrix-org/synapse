@@ -15082,6 +15082,11 @@ small processing times.</p>
 <h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
 <pre><code class="language-sql">SELECT NAME from users;
 </code></pre>
+<h2 id="how-can-i-export-user-data"><a class="header" href="#how-can-i-export-user-data">How can I export user data?</a></h2>
+<p>Synapse includes a Python command to export data for a specific user. It takes the homeserver
+configuration file and the full Matrix ID of the user to export:</p>
+<pre><code class="language-console">python -m synapse.app.admin_cmd -c &lt;config_file&gt; export-data &lt;user_id&gt;
+</code></pre>
 <h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords</a></h2>
 <p>Users can reset their password through their client. Alternatively, a server admin
 can reset a user's password using the <a href="usage/administration/../../admin_api/user_admin_api.html#reset-password">admin API</a>.</p>
