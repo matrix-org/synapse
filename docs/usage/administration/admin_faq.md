@@ -34,7 +34,8 @@ SELECT NAME from users;
 
 How can I export user data?
 ---
-Export data of specific user by running a python script that exports data and takes in user_id and config file as arguments.
+Synapse includes a Python command to export data for a specific user. It takes the homeserver
+configuration file and the full Matrix ID of the user to export:
 ```console
 python -m synapse.app.admin_cmd -c <config_file> export-data <user_id>
 ```
