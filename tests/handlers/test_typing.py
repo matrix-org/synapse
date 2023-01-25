@@ -14,7 +14,7 @@
 
 
 import json
-from typing import Dict, List, Set, cast
+from typing import Dict, List, Set
 from unittest.mock import ANY, Mock, call
 
 from twisted.test.proto_helpers import MemoryReactor
