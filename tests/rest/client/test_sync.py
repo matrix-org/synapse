@@ -294,9 +294,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             self.make_request("GET", sync_url % (access_token, next_batch))
 
 
-class SyncKnockTestCase(
-    unittest.HomeserverTestCase, KnockingStrippedStateEventHelperMixin
-):
+class SyncKnockTestCase(KnockingStrippedStateEventHelperMixin):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
