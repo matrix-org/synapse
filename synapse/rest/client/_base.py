@@ -43,15 +43,19 @@ def client_patterns(
     Returns:
         An iterable of patterns.
     """
-    prefixes = []
+    patterns = []
 
     if unstable:
-        prefixes.append("unstable")
+        unstable_prefix = CLIENT_API_PREFIX + "/unstable"
+        patterns.append(re.compile("^" + unstable_prefix + path_regex))
     if v1:
-        prefixes.append("api/v1")
-    prefixes.extend(releases)
+        v1_prefix = CLIENT_API_PREFIX + "/api/v1"
+        patterns.append(re.compile("^" + v1_prefix + path_regex))
+    for release in releases:
+        new_prefix = CLIENT_API_PREFIX + f"/{release}"
+        patterns.append(re.compile("^" + new_prefix + path_regex))
 
-    return [re.compile("^" + CLIENT_API_PREFIX + "/(" + "|".join(prefixes) + ")" + path_regex)]
+    return patterns
 
 
 def set_timeline_upper_limit(filter_json: JsonDict, filter_timeline_limit: int) -> None:
