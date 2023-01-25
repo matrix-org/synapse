@@ -250,8 +250,8 @@ class AdminHandler:
 
         # Get the user profile
         profile = await self.get_user(UserID.from_string(user_id))
-        assert profile
-        writer.write_profile(profile)
+        if profile is not None:
+            writer.write_profile(profile)
 
         # Get all devices the user has
         devices = await self._device_handler.get_devices_by_user(user_id)
