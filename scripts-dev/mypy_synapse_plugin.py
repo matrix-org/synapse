@@ -16,12 +16,22 @@
 can crop up, e.g the cache descriptors.
 """
 
-from typing import Callable, Optional, Type
+from typing import Callable, Optional, Tuple, Type
 
+import mypy.types
+from mypy.errorcodes import ErrorCode
 from mypy.nodes import ARG_NAMED_OPT
 from mypy.plugin import MethodSigContext, Plugin
 from mypy.typeops import bind_self
-from mypy.types import CallableType, NoneType, UnionType
+from mypy.types import (
+    AnyType,
+    CallableType,
+    Instance,
+    NoneType,
+    TupleType,
+    TypeAliasType,
+    UnionType,
+)
 
 
 class SynapsePlugin(Plugin):
@@ -48,7 +58,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     """
 
     # First we mark this as a bound function signature.
-    signature = bind_self(ctx.default_signature)
+    signature: CallableType = bind_self(ctx.default_signature)
 
     # Secondly, we remove any "cache_context" args.
     #
@@ -98,7 +108,130 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         arg_kinds=arg_kinds,
     )
 
+    # 4. Complain loudly if we are returning something mutable
+    check_is_cacheable(signature, ctx)
+
     return signature
+
+
+def clean_message(value: str) -> str:
+    return value.replace("builtins.", "").replace("typing.", "")
+
+
+def unwrap_awaitable_types(t: mypy.types.Type) -> mypy.types.Type:
+    if isinstance(t, Instance):
+        if t.type.fullname == "typing.Coroutine":
+            # We're assuming this is Awaitable[R]m aka Coroutine[None, None, R].
+            # TODO: assert yield type and send type are None
+            # Extract the `R` type from `Coroutine[Y, S, R]`, and reinspect
+            t = t.args[2]
+        elif t.type.fullname == "twisted.internet.defer.Deferred":
+            t = t.args[0]
+
+    return mypy.types.get_proper_type(t)
+
+
+def check_is_cacheable(signature: CallableType, ctx: MethodSigContext) -> None:
+    return_type = unwrap_awaitable_types(signature.ret_type)
+    verbose = ctx.api.options.verbosity >= 1
+    ok, note = is_cacheable(return_type, signature, verbose)
+
+    if ok:
+        message = f"function {signature.name} is @cached, returning {return_type}"
+    else:
+        message = f"function {signature.name} is @cached, but has mutable return value {return_type}"
+
+    if note:
+        message += f" ({note})"
+    message = clean_message(message)
+
+    if ok and note:
+        ctx.api.note(message, ctx.context)  # type: ignore[attr-defined]
+    elif not ok:
+        ctx.api.fail(message, ctx.context, code=AT_CACHED_MUTABLE_RETURN)
+
+
+IMMUTABLE_BUILTIN_VALUE_TYPES = {
+    "builtins.bool",
+    "builtins.int",
+    "builtins.float",
+    "builtins.str",
+    "builtins.bytes",
+}
+
+IMMUTABLE_BUILTIN_CONTAINER_TYPES = {
+    "builtins.frozenset",
+    "typing.AbstractSet",
+}
+
+MUTABLE_BUILTIN_CONTAINER_TYPES = {
+    "builtins.set",
+    "builtins.list",
+    "builtins.dict",
+    "typing.Sequence",
+}
+
+AT_CACHED_MUTABLE_RETURN = ErrorCode(
+    "synapse-@cached-mutable",
+    "@cached() should have an immutable return type",
+    "General",
+)
+
+
+def is_cacheable(
+    rt: mypy.types.Type, signature: CallableType, verbose: bool
+) -> Tuple[bool, Optional[str]]:
+    """
+    Returns: a 2-tuple (cacheable, message).
+        - cachable: False means the type is definitely not cacheable;
+            true means anything else.
+        - Optional message.
+    """
+
+    # This should probably be done via a TypeVisitor. Apologies to the reader!
+    if isinstance(rt, AnyType):
+        return True, ("may be mutable" if verbose else None)
+
+    elif isinstance(rt, Instance):
+        if rt.type.fullname in IMMUTABLE_BUILTIN_VALUE_TYPES:
+            return True, None
+
+        elif rt.type.fullname == "typing.Mapping":
+            return is_cacheable(rt.args[1], signature, verbose)
+
+        elif rt.type.fullname in IMMUTABLE_BUILTIN_CONTAINER_TYPES:
+            return is_cacheable(rt.args[0], signature, verbose)
+
+        elif rt.type.fullname in MUTABLE_BUILTIN_CONTAINER_TYPES:
+            return False, None
+
+        elif "attrs" in rt.type.metadata:
+            frozen = rt.type.metadata["attrs"].get("frozen", False)
+            if frozen:
+                # TODO: should really check that all of the fields are also cacheable
+                return True, None
+            else:
+                return False, "non-frozen attrs class"
+
+        else:
+            return False, f"Don't know how to handle {rt.type.fullname}"
+
+    elif isinstance(rt, NoneType):
+        return True, None
+
+    elif isinstance(rt, (TupleType, UnionType)):
+        for item in rt.items:
+            ok, note = is_cacheable(item, signature, verbose)
+            if not ok:
+                return False, note
+        # This discards notes but that's probably fine
+        return True, None
+
+    elif isinstance(rt, TypeAliasType):
+        return is_cacheable(mypy.types.get_proper_type(rt), signature, verbose)
+
+    else:
+        return False, f"Don't know how to handle {type(rt).__qualname__} return type"
 
 
 def plugin(version: str) -> Type[SynapsePlugin]:
