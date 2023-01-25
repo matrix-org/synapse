@@ -1274,7 +1274,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         return entry is not None
 
-    @cachedList(cached_method_name="is_partial_State_room", list_name="room_ids")
+    @cachedList(cached_method_name="is_partial_state_room", list_name="room_ids")
     async def is_partial_state_rooms(
         self, room_ids: StrCollection
     ) -> Mapping[str, bool]:
