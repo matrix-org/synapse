@@ -52,6 +52,7 @@ class StreamIdGeneratorTestCase(HomeserverTestCase):
         def _create(conn: LoggingDatabaseConnection) -> StreamIdGenerator:
             return StreamIdGenerator(
                 db_conn=conn,
+                notifier=self.hs.get_replication_notifier(),
                 table="foobar",
                 column="stream_id",
             )
@@ -196,6 +197,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
+                notifier=self.hs.get_replication_notifier(),
                 stream_name="test_stream",
                 instance_name=instance_name,
                 tables=[("foobar", "instance_name", "stream_id")],
@@ -630,6 +632,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
+                notifier=self.hs.get_replication_notifier(),
                 stream_name="test_stream",
                 instance_name=instance_name,
                 tables=[("foobar", "instance_name", "stream_id")],
@@ -766,6 +769,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
             return MultiWriterIdGenerator(
                 conn,
                 self.db_pool,
+                notifier=self.hs.get_replication_notifier(),
                 stream_name="test_stream",
                 instance_name=instance_name,
                 tables=[
