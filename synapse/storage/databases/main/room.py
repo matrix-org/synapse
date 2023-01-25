@@ -1275,7 +1275,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         return entry is not None
 
     @cachedList(cached_method_name="is_partial_State_room", list_name="room_ids")
-    async def is_partial_state_rooms(self, room_ids: StrCollection) -> Mapping[str, bool]:
+    async def is_partial_state_rooms(
+        self, room_ids: StrCollection
+    ) -> Mapping[str, bool]:
         """Checks if this room has partial state.
 
         Returns true if this is a "partial-state" room, which means that the state
@@ -1283,13 +1285,15 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         complete.
         """
 
-        entries = set(await self.db_pool.simple_select_many_batch(
-            table="partial_state_rooms",
-            column="room_id",
-            iterable=room_ids,
-            retcols=("room_id",),
-            desc="is_partial_state_room",
-        ))
+        entries = set(
+            await self.db_pool.simple_select_many_batch(
+                table="partial_state_rooms",
+                column="room_id",
+                iterable=room_ids,
+                retcols=("room_id",),
+                desc="is_partial_state_room",
+            )
+        )
 
         return {room_id: room_id in entries for room_id in room_ids}
 

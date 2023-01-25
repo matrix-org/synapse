@@ -1384,15 +1384,18 @@ class SyncHandler:
             # Non-lazy syncs should never include partially stated rooms.
             # Exclude all partially stated rooms from this sync.
             results = await self.store.is_partial_state_rooms(mutable_joined_room_ids)
-            for room_id, result in results.items():
-                mutable_rooms_to_exclude.add(room_id)
+            mutable_rooms_to_exclude.update(
+                room_id
+                for room_id, is_partial_state in results.items()
+                if is_partial_state
+            )
 
         # Incremental eager syncs should additionally include rooms that
         # - we are joined to
         # - are full-stated
         # - became fully-stated at some point during the sync period
         #   (These rooms will have been omitted during a previous eager sync.)
-        forced_newly_joined_room_ids = set()
+        forced_newly_joined_room_ids: Set[str] = set()
         if since_token and not sync_config.filter_collection.lazy_load_members():
             un_partial_stated_rooms = (
                 await self.store.get_un_partial_stated_rooms_between(
@@ -1402,8 +1405,11 @@ class SyncHandler:
                 )
             )
             results = await self.store.is_partial_state_rooms(un_partial_stated_rooms)
-            for room_id, result in results.items():
-                forced_newly_joined_room_ids.add(room_id)
+            forced_newly_joined_room_ids.update(
+                room_id
+                for room_id, is_partial_state in results.items()
+                if is_partial_state
+            )
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
