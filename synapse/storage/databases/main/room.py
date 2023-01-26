@@ -23,7 +23,6 @@ from typing import (
     Collection,
     Dict,
     List,
-    Literal,
     Mapping,
     Optional,
     Sequence,
@@ -1286,14 +1285,16 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         complete.
         """
 
-        rows: List[Dict[str, Literal[1]]] = await self.db_pool.simple_select_many_batch(
+        rows: List[Dict[str, str]] = await self.db_pool.simple_select_many_batch(
             table="partial_state_rooms",
-            column="1",
+            column="room_id",
             iterable=room_ids,
             retcols=("room_id",),
             desc="is_partial_state_room",
         )
-        partial_state_rooms = {room_id for row_dict in rows for room_id in row_dict}
+        partial_state_rooms = {
+            room_id for row_dict in rows for room_id in row_dict.values()
+        }
         return {room_id: room_id in partial_state_rooms for room_id in room_ids}
 
     async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
