@@ -1293,7 +1293,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             desc="is_partial_state_room_batched",
         )
         partial_state_rooms = {
-            room_id for row_dict in rows for room_id in row_dict.values()
+            row_dict["room_id"] for row_dict in rows
         }
         return {room_id: room_id in partial_state_rooms for room_id in room_ids}
 
