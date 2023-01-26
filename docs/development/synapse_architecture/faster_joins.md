@@ -75,6 +75,9 @@ Additionally, check 6 is deleted: no soft-failures are enforced.
 While partially joined, the current partial state of the room is defined as the
 resolution across the partial states after all forward extremities in the room.
 
+_Remark._ Events with partial state are _not_ considered
+[outliers](../room-dag-concepts.md#outliers).
+
 ### Approximation error
 
 Using partial state means the auth checks can fail in a few different ways[^2].
@@ -124,24 +127,50 @@ proceed as normal.
 
 ### Fixing the approximation with a resync
 
-**TODO:** needs prose fleshing out. Needs a discussion of what happens if the
-full state and partial state disagree---point out that we already have this
-problem when resolution changes state but not because of a new event, requiring
-clients to clear caches. Assert that sliding sync will fix this.
+The partial-state approximation is only a temporary affair. In the background,
+synapse beings a "resync" process. This is a continuous loop, starting at the
+partial join event and proceeding downwards through the event graph. For each 
+`E` seen in the room since partial join, Synapse will fetch 
 
-- /state_ids before J. Result persisted to DB?
-- Continuous loop to fetch events and auth chains of any missing state events in the state before J
-- Once they're all available, persist a state group(?) for the state before/after J.
-- Recompute the full state of all events seen since J until there are none left.
-  - (Does this use new state groups or replace old ones?)
-  - (Are state groups marked as partially stated?)
-- Remove events from `partial_state_events` as you go.
+- the event ids in the state of the room before `E`, via 
+  [`/state_ids`](https://spec.matrix.org/v1.5/server-server-api/#get_matrixfederationv1state_idsroomid);
+- the event ids in the full auth chain of `E`, included in the `/state_ids` 
+  response; and
+- any events from the previous two bullets that Synapse hasn't persisted, via
+  [`/state](https://spec.matrix.org/v1.5/server-server-api/#get_matrixfederationv1stateroomid).
 
-- Once all events have been un-partial-stated, remove the room from `partial_state_rooms`.
+This means Synapse has (or can compute) the full state before `E`, which allows
+Synapse to properly authorise or reject `E`. At this point ,the event
+is considered to have "full state" rather than "partial state". We record this
+by removing `E` from the `partial_state_events` table.
 
-- Then what happens from the client-side; how are changes between partial and full state sent to clients?? Suspect not at all.
+\[**TODO:** Does Synapse persist a new state group for the full state
+before `E`, or do we alter the (partial-)state group in-place? Are state groups
+ever marked as partially-stated? \]
+
+This scheme means it is possible for us to have accepted and sent an event to 
+clients, only to reject it during the resync. From a client's perspective, the 
+effect is similar to a retroactive 
+state change due to state resolution---i.e. a "state reset".[^3]
+
+[^3] Clients should refresh caches to detect such a change. Rumour has it that 
+sliding sync will fix this.
+
+When all events since the join `J` have been fully-stated, the room resync
+process is complete. We record this by removing the room from
+`partial_state_rooms`.
+
+## Faster joins on workers
+
+For the time being, the resync process happens on the master worker.
+A new replication stream `un_partial_stated_room` is added. Whenever a resync
+completes and a partial-state room becomes fully stated, a new message is sent
+into that stream containing the room ID.
 
 ## Specific cases
+
+> **NB.** The notes below are rough. Some of them are hidden under `<details>`
+disclosures because they have yet to be implemented in mainline Synapse.
 
 ### Creating events during a partial join
 
@@ -174,11 +203,15 @@ What about if we didn't send them an event but shouldn't've?
 E.g. what if someone joined from a new HS shortly after you did? We wouldn't talk to them.
 Could imagine sending out the "Missed" events after the resync but... painful to work out what they shuld have seen if they joined/left.
 Instead, just send them the latest event (if they're still in the room after resync) and let them backfill.(?)
- - Don't do this currently.
- - If anyone who has received our messages sends a message to a HS we missed, they can backfill our messages
- - Gap: rooms which are infrequently used and take a long time to resync.
+- Don't do this currently.
+- If anyone who has received our messages sends a message to a HS we missed, they can backfill our messages
+- Gap: rooms which are infrequently used and take a long time to resync.
 
 ### Joining after a partial join
+
+**NB.** Not yet implemented.
+
+<details>
 
 **TODO:** needs prose fleshing out. Liase with Matthieu. Explain why /send_join
 (Rich was surprised we didn't just create it locally. Answer: to try and avoid
@@ -189,11 +222,17 @@ E.g. the joined user might have been banned; the join rules might have changed i
 Instead, do another partial make-join/send-join handshake to confirm that the join works.
 - Probably going to get a bunch of duplicate state events and auth events.... but the point of partial joins is that these should be small. Many are already persisted = good.
 - What if the second send_join response includes a different list of reisdent HSes? Could ignore it.
-    - Could even have a special flag that says "just make me a join", i.e. don't bother giving me state or servers in room. Deffo want the auth chain tho.
+  - Could even have a special flag that says "just make me a join", i.e. don't bother giving me state or servers in room. Deffo want the auth chain tho.
 - SQ: wrt device lists it's a lot safer to ignore it!!!!!
 - What if the state at the second join is inconsistent with what we have? Ignore it?
 
+</details>
+
 ### Leaving (and kicks and bans) after a partial join
+
+**NB.** Not yet implemented.
+
+<details>
 
 When you're fully joined to a room, to have `U` leave a room their homeserver
 needs to
@@ -206,10 +245,10 @@ When is a leave event accepted? See
 [v10 auth rules](https://spec.matrix.org/v1.5/rooms/v10/#authorization-rules):
 
 > 4. If type is m.room.member: [...]
->   
->    5. If membership is leave:
->     
->       1. If the sender matches state_key, allow if and only if that user’s current membership state is invite, join, or knock.
+     >
+     >    5. If membership is leave:
+             >
+             >       1. If the sender matches state_key, allow if and only if that user’s current membership state is invite, join, or knock.
 >       2. [...]
 
 I think this means that (well-formed!) self-leaves are governed entirely by
@@ -218,16 +257,16 @@ invited, joined or knocked and include it in the leave's auth events, our event
 is accepted by checks 4 and 5 on incoming events.
 
 > 4. Passes authorization rules based on the event’s auth events, otherwise
->    it is rejected.
+     >    it is rejected.
 > 5. Passes authorization rules based on the state before the event, otherwise
->    it is rejected.
+     >    it is rejected.
 
 The only way to fail check 6 is if the receiving server's current state of the
 room says that `U` is banned, has left, or has no membership event. But this is
 fine: the receiving server already thinks that `U` isn't in the room.
 
 > 6. Passes authorization rules based on the current state of the room,
->    otherwise it is “soft failed”.
+     >    otherwise it is “soft failed”.
 
 For the second point (publishing the leave event), the best thing we can do is
 to is publish to all HSes we know to be currently in the room. If they miss that
@@ -270,7 +309,4 @@ so this is probably good enough as-is.
 
 **TODO**: what cleanup is necessary? Is it all just nice-to-have to save unused
 work?
-
-## Faster joins on workers
-
-**TODO**: What is Olivier's plan? :)
+</details>
