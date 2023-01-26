@@ -137,6 +137,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         sentinel = object()
 
         def create_and_process(mentions: Any = sentinel) -> bool:
+            """Returns true iff the `mentions` trigger an event push action."""
             content = {}
             if mentions is not sentinel:
                 content[EventContentFields.MSC3952_MENTIONS] = mentions
