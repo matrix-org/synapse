@@ -631,15 +631,18 @@ async def filter_events_for_server(
     # otherwise a room could be fully joined after we retrieve those, which would then bypass
     # this check but would base the filtering on an outdated view of the membership events.
 
-    partial_state_invisible_events = set()
+    partial_stated_room_ids = set()
     if not check_history_visibility_only:
+        room_ids_to_check: List[str] = []
         for e in events:
             sender_domain = get_domain_from_id(e.sender)
-            if (
-                sender_domain != local_server_name
-                and await storage.main.is_partial_state_room(e.room_id)
-            ):
-                partial_state_invisible_events.add(e)
+            if sender_domain != local_server_name:
+                room_ids_to_check.append(e.room_id)
+
+        results = await storage.main.is_partial_state_room_batched(room_ids_to_check)
+        for room_id, is_partial_state in results.items():
+            if is_partial_state:
+                partial_stated_room_ids.add(room_id)
 
     # Let's check to see if all the events have a history visibility
     # of "shared" or "world_readable". If that's the case then we don't
@@ -665,7 +668,7 @@ async def filter_events_for_server(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
         )
 
-        if e in partial_state_invisible_events:
+        if e.room_id in partial_stated_room_ids:
             visible = False
 
         if visible and not erased:
