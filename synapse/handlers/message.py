@@ -721,7 +721,6 @@ class EventCreationHandler:
             current_state_group=current_state_group,
         )
 
-
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
         # behaviour. Another reason is that this code is also evaluated each time a new

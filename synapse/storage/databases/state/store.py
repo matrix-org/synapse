@@ -460,12 +460,16 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 # The first prev_group will be the last persisted state group, which is passed in
                 # else it will be the group most recently assigned
                 if index > 0:
-                    context.prev_group_for_state_group_after_event = state_groups[index - 1]
+                    context.prev_group_for_state_group_after_event = state_groups[
+                        index - 1
+                    ]
                     context.state_group_before_event = state_groups[index - 1]
                 else:
                     context.prev_group_for_state_group_after_event = prev_group
                     context.state_group_before_event = prev_group
-                context.delta_ids_to_state_group_after_event = {(event.type, event.state_key): event.event_id}
+                context.delta_ids_to_state_group_after_event = {
+                    (event.type, event.state_key): event.event_id
+                }
                 context.state_delta_due_to_event = {
                     (event.type, event.state_key): event.event_id
                 }
@@ -486,7 +490,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 table="state_group_edges",
                 keys=("state_group", "prev_state_group"),
                 values=[
-                    (context.state_group_after_event, context.prev_group_for_state_group_after_event)
+                    (
+                        context.state_group_after_event,
+                        context.prev_group_for_state_group_after_event,
+                    )
                     for _, context in events_and_context
                 ],
             )
@@ -498,7 +505,13 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     table="state_groups_state",
                     keys=("state_group", "room_id", "type", "state_key", "event_id"),
                     values=[
-                        (context.state_group_after_event, room_id, key[0], key[1], state_id)
+                        (
+                            context.state_group_after_event,
+                            room_id,
+                            key[0],
+                            key[1],
+                            state_id,
+                        )
                         for key, state_id in context.delta_ids_to_state_group_after_event.items()
                     ],
                 )
