@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # How long we allow callers to wait for replication updates before timing out.
-_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 30
+_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 5
 
 
 class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
@@ -133,9 +133,9 @@ class ReplicationDataHandler:
         if hs.should_send_federation():
             self.send_handler = FederationSenderHandler(hs)
 
-        # Map from stream to list of deferreds waiting for the stream to
+        # Map from stream and instance to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters: Dict[str, List[Tuple[int, Deferred]]] = {}
+        self._streams_to_waiters: Dict[Tuple[str, str], List[Tuple[int, Deferred]]] = {}
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
@@ -207,6 +207,12 @@ class ReplicationDataHandler:
             # we don't need to optimise this for multiple rows.
             for row in rows:
                 if row.type != EventsStreamEventRow.TypeId:
+                    # The row's data is an `EventsStreamCurrentStateRow`.
+                    # When we recompute the current state of a room based on forward
+                    # extremities (see `update_current_state`), no new events are
+                    # persisted, so we must poke the replication callbacks ourselves.
+                    # This functionality is used when finishing up a partial state join.
+                    self.notifier.notify_replication()
                     continue
                 assert isinstance(row, EventsStreamRow)
                 assert isinstance(row.data, EventsStreamEventRow)
@@ -254,6 +260,7 @@ class ReplicationDataHandler:
                 self._state_storage_controller.notify_room_un_partial_stated(
                     row.room_id
                 )
+                await self.notifier.on_un_partial_stated_room(row.room_id, token)
         elif stream_name == UnPartialStatedEventStream.NAME:
             for row in rows:
                 assert isinstance(row, UnPartialStatedEventStreamRow)
@@ -270,7 +277,7 @@ class ReplicationDataHandler:
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
         # greater than the received row position.
-        waiting_list = self._streams_to_waiters.get(stream_name, [])
+        waiting_list = self._streams_to_waiters.get((stream_name, instance_name), [])
 
         # Index of first item with a position after the current token, i.e we
         # have called all deferreds before this index. If not overwritten by
@@ -279,14 +286,13 @@ class ReplicationDataHandler:
         # `len(list)` works for both cases.
         index_of_first_deferred_not_called = len(waiting_list)
 
+        # We don't fire the deferreds until after we finish iterating over the
+        # list, to avoid the list changing when we fire the deferreds.
+        deferreds_to_callback = []
+
         for idx, (position, deferred) in enumerate(waiting_list):
             if position <= token:
-                try:
-                    with PreserveLoggingContext():
-                        deferred.callback(None)
-                except Exception:
-                    # The deferred has been cancelled or timed out.
-                    pass
+                deferreds_to_callback.append(deferred)
             else:
                 # The list is sorted by position so we don't need to continue
                 # checking any further entries in the list.
@@ -296,6 +302,14 @@ class ReplicationDataHandler:
         # Drop all entries in the waiting list that were called in the above
         # loop. (This maintains the order so no need to resort)
         waiting_list[:] = waiting_list[index_of_first_deferred_not_called:]
+
+        for deferred in deferreds_to_callback:
+            try:
+                with PreserveLoggingContext():
+                    deferred.callback(None)
+            except Exception:
+                # The deferred has been cancelled or timed out.
+                pass
 
     async def on_position(
         self, stream_name: str, instance_name: str, token: int
@@ -319,7 +333,6 @@ class ReplicationDataHandler:
         instance_name: str,
         stream_name: str,
         position: int,
-        raise_on_timeout: bool = True,
     ) -> None:
         """Wait until this instance has received updates up to and including
         the given stream position.
@@ -328,8 +341,6 @@ class ReplicationDataHandler:
             instance_name
             stream_name
             position
-            raise_on_timeout: Whether to raise an exception if we time out
-                waiting for the updates, or if we log an error and return.
         """
 
         if instance_name == self._instance_name:
@@ -349,26 +360,32 @@ class ReplicationDataHandler:
             deferred, _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS, self._reactor
         )
 
-        waiting_list = self._streams_to_waiters.setdefault(stream_name, [])
+        waiting_list = self._streams_to_waiters.setdefault(
+            (stream_name, instance_name), []
+        )
 
         waiting_list.append((position, deferred))
         waiting_list.sort(key=lambda t: t[0])
 
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
-            logger.info("Waiting for repl stream %r to reach %s", stream_name, position)
+            logger.info(
+                "Waiting for repl stream %r to reach %s (%s)",
+                stream_name,
+                position,
+                instance_name,
+            )
             try:
                 await make_deferred_yieldable(deferred)
             except defer.TimeoutError:
                 logger.error("Timed out waiting for stream %s", stream_name)
-
-                if raise_on_timeout:
-                    raise
-
                 return
 
             logger.info(
-                "Finished waiting for repl stream %r to reach %s", stream_name, position
+                "Finished waiting for repl stream %r to reach %s (%s)",
+                stream_name,
+                position,
+                instance_name,
             )
 
     def stop_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:

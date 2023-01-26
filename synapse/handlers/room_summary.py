@@ -36,7 +36,7 @@ from synapse.api.errors import (
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, StrCollection
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -870,7 +870,7 @@ class _RoomQueueEntry:
     # The room ID of this entry.
     room_id: str
     # The server to query if the room is not known locally.
-    via: Sequence[str]
+    via: StrCollection
     # The minimum number of hops necessary to get to this room (compared to the
     # originally requested room).
     depth: int = 0

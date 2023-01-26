@@ -77,6 +77,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             self._presence_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="presence_stream",
                 instance_name=self._instance_name,
                 tables=[("presence_stream", "instance_name", "stream_id")],
@@ -85,7 +86,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             )
         else:
             self._presence_id_gen = StreamIdGenerator(
-                db_conn, "presence_stream", "stream_id"
+                db_conn, hs.get_replication_notifier(), "presence_stream", "stream_id"
             )
 
         self.hs = hs

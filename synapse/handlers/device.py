@@ -18,7 +18,6 @@ from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    Collection,
     Dict,
     Iterable,
     List,
@@ -45,6 +44,7 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.types import (
     JsonDict,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -146,7 +146,7 @@ class DeviceWorkerHandler:
 
     @cancellable
     async def get_device_changes_in_shared_rooms(
-        self, user_id: str, room_ids: Collection[str], from_token: StreamToken
+        self, user_id: str, room_ids: StrCollection, from_token: StreamToken
     ) -> Set[str]:
         """Get the set of users whose devices have changed who share a room with
         the given user.
@@ -551,7 +551,7 @@ class DeviceHandler(DeviceWorkerHandler):
     @trace
     @measure_func("notify_device_update")
     async def notify_device_update(
-        self, user_id: str, device_ids: Collection[str]
+        self, user_id: str, device_ids: StrCollection
     ) -> None:
         """Notify that a user's device(s) has changed. Pokes the notifier, and
         remote servers if the user is local.
@@ -974,6 +974,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.device_handler = device_handler
+        self._notifier = hs.get_notifier()
 
         self._remote_edu_linearizer = Linearizer(name="remote_device_list")
 
@@ -1054,6 +1055,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
                 user_id,
                 device_id,
             )
+            self._notifier.notify_replication()
 
         room_ids = await self.store.get_rooms_for_user(user_id)
         if not room_ids:
