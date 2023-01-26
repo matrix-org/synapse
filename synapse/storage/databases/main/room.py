@@ -1292,9 +1292,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             retcols=("room_id",),
             desc="is_partial_state_room_batched",
         )
-        partial_state_rooms = {
-            row_dict["room_id"] for row_dict in rows
-        }
+        partial_state_rooms = {row_dict["room_id"] for row_dict in rows}
         return {room_id: room_id in partial_state_rooms for room_id in room_ids}
 
     async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
