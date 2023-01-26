@@ -14,7 +14,6 @@
 
 import logging
 import math
-import traceback
 from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 import attr
@@ -104,11 +103,10 @@ class StreamChangeCache:
         if current_pos and current_pos > self.max_stream_pos:
             logger.warning(
                 "Checking entity in %s stream cache cache with current position %s "
-                "ahead of the max stream cache position %s:\n%s",
+                "ahead of the max stream cache position %s",
                 self.name,
                 current_pos,
                 self.max_stream_pos,
-                "".join(traceback.format_stack()),
             )
 
     def set_cache_factor(self, factor: float) -> bool:
