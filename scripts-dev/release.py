@@ -438,7 +438,7 @@ def _upload(gh_token: Optional[str]) -> None:
     repo = get_repo_and_check_clean_checkout()
     tag = repo.tag(f"refs/tags/{tag_name}")
     if repo.head.commit != tag.commit:
-        click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
+        click.echo(f"Tag {tag_name} ({tag.commit}) is not currently checked out!")
         click.get_current_context().abort()
 
     # Query all the assets corresponding to this release.
