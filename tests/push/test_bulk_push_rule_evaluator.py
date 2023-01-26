@@ -131,7 +131,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
         # Create a new message event, and try to evaluate it under the dodgy
         # power level event.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -146,6 +146,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 prev_event_ids=[pl_event_id],
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # should not raise
@@ -171,7 +172,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         """Ensure that push rules are not calculated when disabled in the config"""
 
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -185,6 +186,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # Mock the method which calculates push rules -- we do this instead of
