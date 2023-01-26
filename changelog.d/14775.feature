@@ -1,1 +1,0 @@
-Implement support for MSC3890: Remotely silence local notifications.
