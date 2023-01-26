@@ -151,6 +151,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         if stream_name == EventsStream.NAME:
             for row in rows:
                 self._process_event_stream_row(token, row)
+            # Check for baches that only contain state rows, this should *not* happen as the event
+            # and state rows (for the same event) should always be in a batch.
+            row_types = {row.type for row in rows}
+            if row_types == {EventsStreamCurrentStateRow.TypeId}:
+                logger.warning("Saw state-only event replication row batch:\n%r", rows)
         elif stream_name == BackfillStream.NAME:
             for row in rows:
                 self._invalidate_caches_for_event(
