@@ -20,7 +20,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Collection,
     Dict,
     Iterable,
     List,
@@ -47,6 +46,7 @@ from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
 from synapse.types import (
     JsonDict,
+    StrCollection,
     UserID,
     contains_invalid_mxid_characters,
     create_requester,
@@ -141,7 +141,8 @@ class UserAttributes:
     confirm_localpart: bool = False
     display_name: Optional[str] = None
     picture: Optional[str] = None
-    emails: Collection[str] = attr.Factory(list)
+    # mypy thinks these are incompatible for some reason.
+    emails: StrCollection = attr.Factory(list)  # type: ignore[assignment]
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -159,7 +160,7 @@ class UsernameMappingSession:
 
     # attributes returned by the ID mapper
     display_name: Optional[str]
-    emails: Collection[str]
+    emails: StrCollection
 
     # An optional dictionary of extra attributes to be provided to the client in the
     # login response.
@@ -174,7 +175,7 @@ class UsernameMappingSession:
     # choices made by the user
     chosen_localpart: Optional[str] = None
     use_display_name: bool = True
-    emails_to_use: Collection[str] = ()
+    emails_to_use: StrCollection = ()
     terms_accepted_version: Optional[str] = None
 
 
