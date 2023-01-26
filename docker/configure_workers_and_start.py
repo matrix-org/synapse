@@ -616,7 +616,7 @@ def generate_worker_files(
 
     # Similar to above, but for worker name's. This is used to check that worker names
     # for different worker types or combinations of types is not used, as it will error
-    # with 'Address in use'(e.g. "to_device, to_device=typing" would error.
+    # with 'Address in use'(e.g. "to_device, to_device=typing" would error).
     worker_name_type_counter: Dict[str, str] = {}
 
     # A list of internal endpoints to healthcheck, starting with the main process
