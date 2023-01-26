@@ -951,7 +951,7 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             # We expect the following query to use the per-thread receipt index and take
             # less than a minute.
             sql = f"""
-                SELECT MAX(stream_id), {ROW_ID_NAME}, room_id, receipt_type, user_id
+                SELECT MAX(stream_id), MAX({ROW_ID_NAME}), room_id, receipt_type, user_id
                 FROM receipts_linearized
                 WHERE thread_id IS NULL
                 GROUP BY room_id, receipt_type, user_id
