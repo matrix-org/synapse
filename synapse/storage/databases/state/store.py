@@ -19,7 +19,7 @@ import attr
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import UnpersistedEventContext, UnpersistedEventContextBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -408,10 +408,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
     async def store_state_deltas_for_batched(
         self,
-        events_and_context: List[Tuple[EventBase, EventContext]],
+        events_and_context: List[Tuple[EventBase, UnpersistedEventContextBase]],
         room_id: str,
         prev_group: int,
-    ) -> List[int]:
+    ) -> List[Tuple[EventBase, UnpersistedEventContext]]:
         """Generate and store state deltas for a group of events and contexts created to be
         batch persisted.
 
@@ -425,9 +425,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         def insert_deltas_group_txn(
             txn: LoggingTransaction,
-            events_and_context: List[Tuple[EventBase, EventContext]],
+            events_and_context: List[Tuple[EventBase, UnpersistedEventContext]],
             prev_group: int,
-        ) -> List[int]:
+        ) -> List[Tuple[EventBase, UnpersistedEventContext]]:
             """Generate and store state groups for the provided events and contexts.
 
             Requires that we have the state as a delta from the last persisted state group.
@@ -456,17 +456,17 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             index = 0
             for event, context in events_and_context:
-                context._state_group = state_groups[index]
+                context.state_group_after_event = state_groups[index]
                 # The first prev_group will be the last persisted state group, which is passed in
                 # else it will be the group most recently assigned
                 if index > 0:
-                    context.prev_group = state_groups[index - 1]
+                    context.prev_group_for_state_group_after_event = state_groups[index - 1]
                     context.state_group_before_event = state_groups[index - 1]
                 else:
-                    context.prev_group = prev_group
+                    context.prev_group_for_state_group_after_event = prev_group
                     context.state_group_before_event = prev_group
-                context.delta_ids = {(event.type, event.state_key): event.event_id}
-                context._state_delta_due_to_event = {
+                context.delta_ids_to_state_group_after_event = {(event.type, event.state_key): event.event_id}
+                context.state_delta_due_to_event = {
                     (event.type, event.state_key): event.event_id
                 }
                 index += 1
@@ -476,7 +476,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 table="state_groups",
                 keys=("id", "room_id", "event_id"),
                 values=[
-                    (context._state_group, room_id, event.event_id)
+                    (context.state_group_after_event, room_id, event.event_id)
                     for event, context in events_and_context
                 ],
             )
@@ -486,23 +486,23 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 table="state_group_edges",
                 keys=("state_group", "prev_state_group"),
                 values=[
-                    (context._state_group, context.prev_group)
+                    (context.state_group_after_event, context.prev_group_for_state_group_after_event)
                     for _, context in events_and_context
                 ],
             )
 
             for _, context in events_and_context:
-                assert context.delta_ids is not None
+                assert context.delta_ids_to_state_group_after_event is not None
                 self.db_pool.simple_insert_many_txn(
                     txn,
                     table="state_groups_state",
                     keys=("state_group", "room_id", "type", "state_key", "event_id"),
                     values=[
-                        (context._state_group, room_id, key[0], key[1], state_id)
-                        for key, state_id in context.delta_ids.items()
+                        (context.state_group_after_event, room_id, key[0], key[1], state_id)
+                        for key, state_id in context.delta_ids_to_state_group_after_event.items()
                     ],
                 )
-            return state_groups
+            return events_and_context
 
         return await self.db_pool.runInteraction(
             "store_state_deltas_for_batched.insert_deltas_group",
