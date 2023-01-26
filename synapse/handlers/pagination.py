@@ -19,7 +19,7 @@ import attr
 
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import SerializeEventConfig
@@ -448,7 +448,7 @@ class PaginationHandler:
 
         if pagin_config.from_token:
             from_token = pagin_config.from_token
-        elif pagin_config.direction == "f":
+        elif pagin_config.direction == Direction.FORWARDS:
             from_token = (
                 await self.hs.get_event_sources().get_start_token_for_pagination(
                     room_id
@@ -476,7 +476,7 @@ class PaginationHandler:
                     room_id, requester, allow_departed_users=True
                 )
 
-            if pagin_config.direction == "b":
+            if pagin_config.direction == Direction.BACKWARDS:
                 # if we're going backwards, we might need to backfill. This
                 # requires that we have a topo token.
                 if room_token.topological:

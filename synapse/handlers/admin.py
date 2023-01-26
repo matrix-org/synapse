@@ -16,7 +16,7 @@ import abc
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
 from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
 from synapse.visibility import filter_events_for_client
@@ -197,7 +197,7 @@ class AdminHandler:
             # efficient method perhaps but it does guarantee we get everything.
             while True:
                 events, _ = await self.store.paginate_room_events(
-                    room_id, from_key, to_key, limit=100, direction="f"
+                    room_id, from_key, to_key, limit=100, direction=Direction.FORWARDS
                 )
                 if not events:
                     break
