@@ -99,6 +99,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
                 ("user_signature_stream", "stream_id"),
                 ("device_lists_outbound_pokes", "stream_id"),
                 ("device_lists_changes_in_room", "stream_id"),
+                ("device_lists_remote_pending", "stream_id"),
             ],
             is_writer=hs.config.worker.worker_app is None,
         )
