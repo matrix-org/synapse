@@ -1290,7 +1290,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             column="room_id",
             iterable=room_ids,
             retcols=("room_id",),
-            desc="is_partial_state_room",
+            desc="is_partial_state_room_batched",
         )
         partial_state_rooms = {
             room_id for row_dict in rows for room_id in row_dict.values()
