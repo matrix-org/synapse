@@ -1255,7 +1255,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         return room_servers
 
-    @cached()
+    @cached(max_entries=10000)
     async def is_partial_state_room(self, room_id: str) -> bool:
         """Checks if this room has partial state.
 
