@@ -46,6 +46,7 @@ from synapse.types import (
     JsonDict,
     PersistedEventPosition,
     RoomStreamToken,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -226,8 +227,7 @@ class Notifier:
         self.store = hs.get_datastores().main
         self.pending_new_room_events: List[_PendingRoomEventEntry] = []
 
-        # Called when there are new things to stream over replication
-        self.replication_callbacks: List[Callable[[], None]] = []
+        self._replication_notifier = hs.get_replication_notifier()
         self._new_join_in_room_callbacks: List[Callable[[str, str], None]] = []
 
         self._federation_client = hs.get_federation_http_client()
@@ -279,7 +279,7 @@ class Notifier:
         it needs to do any asynchronous work, a background thread should be started and
         wrapped with run_as_background_process.
         """
-        self.replication_callbacks.append(cb)
+        self._replication_notifier.add_replication_callback(cb)
 
     def add_new_join_in_room_callback(self, cb: Callable[[str, str], None]) -> None:
         """Add a callback that will be called when a user joins a room.
@@ -314,6 +314,32 @@ class Notifier:
             )
             event_entries.append((entry, event.event_id))
         await self.notify_new_room_events(event_entries, max_room_stream_token)
+
+    async def on_un_partial_stated_room(
+        self,
+        room_id: str,
+        new_token: int,
+    ) -> None:
+        """Used by the resync background processes to wake up all listeners
+        of this room when it is un-partial-stated.
+
+        It will also notify replication listeners of the change in stream.
+        """
+
+        # Wake up all related user stream notifiers
+        user_streams = self.room_to_user_streams.get(room_id, set())
+        time_now_ms = self.clock.time_msec()
+        for user_stream in user_streams:
+            try:
+                user_stream.notify(
+                    StreamKeyType.UN_PARTIAL_STATED_ROOMS, new_token, time_now_ms
+                )
+            except Exception:
+                logger.exception("Failed to notify listener")
+
+        # Poke the replication so that other workers also see the write to
+        # the un-partial-stated rooms stream.
+        self.notify_replication()
 
     async def notify_new_room_events(
         self,
@@ -691,7 +717,7 @@ class Notifier:
 
     async def _get_room_ids(
         self, user: UserID, explicit_room_id: Optional[str]
-    ) -> Tuple[Collection[str], bool]:
+    ) -> Tuple[StrCollection, bool]:
         joined_room_ids = await self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
@@ -741,8 +767,7 @@ class Notifier:
 
     def notify_replication(self) -> None:
         """Notify the any replication listeners that there's a new event"""
-        for cb in self.replication_callbacks:
-            cb()
+        self._replication_notifier.notify_replication()
 
     def notify_user_joined_room(self, event_id: str, room_id: str) -> None:
         for cb in self._new_join_in_room_callbacks:
@@ -759,3 +784,26 @@ class Notifier:
         # Tell the federation client about the fact the server is back up, so
         # that any in flight requests can be immediately retried.
         self._federation_client.wake_destination(server)
+
+
+@attr.s(auto_attribs=True)
+class ReplicationNotifier:
+    """Tracks callbacks for things that need to know about stream changes.
+
+    This is separate from the notifier to avoid circular dependencies.
+    """
+
+    _replication_callbacks: List[Callable[[], None]] = attr.Factory(list)
+
+    def add_replication_callback(self, cb: Callable[[], None]) -> None:
+        """Add a callback that will be called when some new data is available.
+        Callback is not given any arguments. It should *not* return a Deferred - if
+        it needs to do any asynchronous work, a background thread should be started and
+        wrapped with run_as_background_process.
+        """
+        self._replication_callbacks.append(cb)
+
+    def notify_replication(self) -> None:
+        """Notify the any replication listeners that there's a new event"""
+        for cb in self._replication_callbacks:
+            cb()

@@ -1,1 +1,0 @@
-Include `x_forwarded` entry in the HTTP listener example configs and remove the remaining `worker_main_http_uri` entries.

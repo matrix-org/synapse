@@ -51,6 +51,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.notifier import ReplicationNotifier
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
 from synapse.storage.databases.main import PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
@@ -259,6 +260,9 @@ class MockHomeserver:
 
     def should_send_federation(self) -> bool:
         return False
+
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
 
 class Porter:

@@ -69,7 +69,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._store.user_last_seen_monthly_active = Mock(
             return_value=make_awaitable(1000)
         )
-        self._rlsn._server_notices_manager.send_notice = Mock(
+        self._rlsn._server_notices_manager.send_notice = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(Mock())
         )
         self._send_notice = self._rlsn._server_notices_manager.send_notice
@@ -82,8 +82,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = Mock(
             return_value=make_awaitable("!something:localhost")
         )
-        self._rlsn._store.add_tag_to_room = Mock(return_value=make_awaitable(None))
-        self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))
+        self._rlsn._store.add_tag_to_room = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
+        self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))  # type: ignore[assignment]
 
     @override_config({"hs_disabled": True})
     def test_maybe_send_server_notice_disabled_hs(self):
@@ -361,9 +361,10 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
                 tok: The access token of the user that joined the room.
                 room_id: The ID of the room that's been joined.
         """
-        user_id = None
-        tok = None
-        invites = []
+        # We need at least one user to process
+        self.assertGreater(self.hs.config.server.max_mau_value, 0)
+
+        invites = {}
 
         # Register as many users as the MAU limit allows.
         for i in range(self.hs.config.server.max_mau_value):
