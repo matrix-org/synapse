@@ -1383,7 +1383,7 @@ class SyncHandler:
         if not sync_config.filter_collection.lazy_load_members():
             # Non-lazy syncs should never include partially stated rooms.
             # Exclude all partially stated rooms from this sync.
-            results = await self.store.is_partial_state_rooms(mutable_joined_room_ids)
+            results = await self.store.is_partial_state_room_batched(mutable_joined_room_ids)
             mutable_rooms_to_exclude.update(
                 room_id
                 for room_id, is_partial_state in results.items()
@@ -1404,7 +1404,7 @@ class SyncHandler:
                     mutable_joined_room_ids,
                 )
             )
-            results = await self.store.is_partial_state_rooms(un_partial_stated_rooms)
+            results = await self.store.is_partial_state_room_batched(un_partial_stated_rooms)
             forced_newly_joined_room_ids.update(
                 room_id
                 for room_id, is_partial_state in results.items()
