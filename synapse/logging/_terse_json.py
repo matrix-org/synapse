@@ -84,3 +84,15 @@ class TerseJsonFormatter(JsonFormatter):
         }
 
         return self._format(record, event)
+
+
+class BeeperTerseJsonFormatter(JsonFormatter):
+    def format(self, record: logging.LogRecord) -> str:
+        event = {
+            "message": record.getMessage(),
+            "namespace": record.name,
+            "level": record.levelname.lower(),
+            "time": round(record.created, 2),
+        }
+
+        return self._format(record, event)
