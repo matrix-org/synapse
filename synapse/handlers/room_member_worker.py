@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import NoKnownServersError, RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
