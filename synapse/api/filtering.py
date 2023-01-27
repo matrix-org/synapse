@@ -283,9 +283,6 @@ class FilterCollection:
             await self._room_filter.filter(events)
         )
 
-    def blocks_all_rooms(self) -> bool:
-        return self._room_filter.filters_all_rooms()
-
     def blocks_all_presence(self) -> bool:
         return (
             self._presence_filter.filters_all_types()

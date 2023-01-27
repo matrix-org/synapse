@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
+from synapse.replication.tcp.commands import PositionCommand
+
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 
 
@@ -71,3 +75,68 @@ class ChannelsTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(
             len(self._redis_server._subscribers_by_channel[b"test/USER_IP"]), 1
         )
+
+    def test_wait_for_stream_position(self) -> None:
+        """Check that wait for stream position correctly waits for an update from the
+        correct instance.
+        """
+        store = self.hs.get_datastores().main
+        cmd_handler = self.hs.get_replication_command_handler()
+        data_handler = self.hs.get_replication_data_handler()
+
+        worker1 = self.make_worker_hs(
+            "synapse.app.generic_worker",
+            extra_config={
+                "worker_name": "worker1",
+                "run_background_tasks_on": "worker1",
+                "redis": {"enabled": True},
+            },
+        )
+
+        cache_id_gen = worker1.get_datastores().main._cache_id_gen
+        assert cache_id_gen is not None
+
+        self.replicate()
+
+        # First, make sure the master knows that `worker1` exists.
+        initial_token = cache_id_gen.get_current_token()
+        cmd_handler.send_command(
+            PositionCommand("caches", "worker1", initial_token, initial_token)
+        )
+        self.replicate()
+
+        # Next send out a normal RDATA, and check that waiting for that stream
+        # ID returns immediately.
+        ctx = cache_id_gen.get_next()
+        next_token = self.get_success(ctx.__aenter__())
+        self.get_success(ctx.__aexit__(None, None, None))
+
+        self.get_success(
+            data_handler.wait_for_stream_position("worker1", "caches", next_token)
+        )
+
+        # `wait_for_stream_position` should only return once master receives a
+        # notification that `next_token` has persisted.
+        ctx_worker1 = cache_id_gen.get_next()
+        next_token = self.get_success(ctx_worker1.__aenter__())
+
+        d = defer.ensureDeferred(
+            data_handler.wait_for_stream_position("worker1", "caches", next_token)
+        )
+        self.assertFalse(d.called)
+
+        # ... updating the cache ID gen on the master still shouldn't cause the
+        # deferred to wake up.
+        ctx = store._cache_id_gen.get_next()
+        self.get_success(ctx.__aenter__())
+        self.get_success(ctx.__aexit__(None, None, None))
+
+        d = defer.ensureDeferred(
+            data_handler.wait_for_stream_position("worker1", "caches", next_token)
+        )
+        self.assertFalse(d.called)
+
+        # ... but worker1 finishing (and so sending an update) should.
+        self.get_success(ctx_worker1.__aexit__(None, None, None))
+
+        self.assertTrue(d.called)

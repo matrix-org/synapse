@@ -411,8 +411,9 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
-    msc3664_enabled: bool,
     msc1767_enabled: bool,
+    msc3381_polls_enabled: bool,
+    msc3664_enabled: bool,
 }
 
 #[pymethods]
@@ -421,14 +422,16 @@ impl FilteredPushRules {
     pub fn py_new(
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
-        msc3664_enabled: bool,
         msc1767_enabled: bool,
+        msc3381_polls_enabled: bool,
+        msc3664_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3664_enabled,
             msc1767_enabled,
+            msc3381_polls_enabled,
+            msc3664_enabled,
         }
     }
 
@@ -447,13 +450,18 @@ impl FilteredPushRules {
             .iter()
             .filter(|rule| {
                 // Ignore disabled experimental push rules
+
+                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                    return false;
+                }
+
                 if !self.msc3664_enabled
                     && rule.rule_id == "global/override/.im.nheko.msc3664.reply"
                 {
                     return false;
                 }
 
-                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                if !self.msc3381_polls_enabled && rule.rule_id.contains("org.matrix.msc3930") {
                     return false;
                 }
 

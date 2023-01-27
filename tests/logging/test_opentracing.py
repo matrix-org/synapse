@@ -153,7 +153,7 @@ class LogContextScopeManagerTestCase(TestCase):
 
         scopes = []
 
-        async def task(i: int):
+        async def task(i: int) -> None:
             scope = start_active_span(
                 f"task{i}",
                 tracer=self._tracer,
@@ -165,7 +165,7 @@ class LogContextScopeManagerTestCase(TestCase):
             self.assertEqual(self._tracer.active_span, scope.span)
             scope.close()
 
-        async def root():
+        async def root() -> None:
             with start_active_span("root span", tracer=self._tracer) as root_scope:
                 self.assertEqual(self._tracer.active_span, root_scope.span)
                 scopes.append(root_scope)

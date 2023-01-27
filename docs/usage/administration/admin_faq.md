@@ -32,6 +32,14 @@ What users are registered on my server?
 SELECT NAME from users;
 ```
 
+How can I export user data?
+---
+Synapse includes a Python command to export data for a specific user. It takes the homeserver
+configuration file and the full Matrix ID of the user to export:
+```console
+python -m synapse.app.admin_cmd -c <config_file> export-data <user_id>
+```
+
 Manually resetting passwords
 ---
 Users can reset their password through their client. Alternatively, a server admin

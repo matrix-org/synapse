@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Tuple
 from twisted.web.server import Request
 
 from synapse.http.server import HttpServer
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict
 
@@ -61,10 +60,8 @@ class ReplicationAddUserAccountDataRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str, account_data_type: str
+        self, request: Request, content: JsonDict, user_id: str, account_data_type: str
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         max_stream_id = await self.handler.add_account_data_for_user(
             user_id, account_data_type, content["content"]
         )
@@ -101,7 +98,7 @@ class ReplicationRemoveUserAccountDataRestServlet(ReplicationEndpoint):
         return {}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str, account_data_type: str
+        self, request: Request, content: JsonDict, user_id: str, account_data_type: str
     ) -> Tuple[int, JsonDict]:
         max_stream_id = await self.handler.remove_account_data_for_user(
             user_id, account_data_type
@@ -143,10 +140,13 @@ class ReplicationAddRoomAccountDataRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str, room_id: str, account_data_type: str
+        self,
+        request: Request,
+        content: JsonDict,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         max_stream_id = await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, content["content"]
         )
@@ -183,7 +183,12 @@ class ReplicationRemoveRoomAccountDataRestServlet(ReplicationEndpoint):
         return {}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str, room_id: str, account_data_type: str
+        self,
+        request: Request,
+        content: JsonDict,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
     ) -> Tuple[int, JsonDict]:
         max_stream_id = await self.handler.remove_account_data_for_room(
             user_id, room_id, account_data_type
@@ -225,10 +230,8 @@ class ReplicationAddTagRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str, room_id: str, tag: str
+        self, request: Request, content: JsonDict, user_id: str, room_id: str, tag: str
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         max_stream_id = await self.handler.add_tag_to_room(
             user_id, room_id, tag, content["content"]
         )
@@ -266,7 +269,7 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
         return {}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str, room_id: str, tag: str
+        self, request: Request, content: JsonDict, user_id: str, room_id: str, tag: str
     ) -> Tuple[int, JsonDict]:
         max_stream_id = await self.handler.remove_tag_from_room(
             user_id,

@@ -107,7 +107,7 @@ from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpC
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
-from synapse.notifier import Notifier
+from synapse.notifier import Notifier, ReplicationNotifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -388,6 +388,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_notifier(self) -> Notifier:
         return Notifier(self)
+
+    @cache_in_self
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
     @cache_in_self
     def get_auth(self) -> Auth:
@@ -743,7 +747,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self.config.experimental.msc3925_inhibit_edit)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:

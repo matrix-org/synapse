@@ -132,6 +132,9 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
         """Execute a chunk of SQL containing multiple semicolon-delimited statements.
 
         This is not provided by DBAPI2, and so needs engine-specific support.
+
+        Some database engines may automatically COMMIT the ongoing transaction both
+        before and after executing the script.
         """
         ...
 

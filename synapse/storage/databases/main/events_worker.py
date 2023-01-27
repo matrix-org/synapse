@@ -110,6 +110,10 @@ event_fetch_ongoing_gauge = Gauge(
 )
 
 
+class InvalidEventError(Exception):
+    """The event retrieved from the database is invalid and cannot be used."""
+
+
 @attr.s(slots=True, auto_attribs=True)
 class EventCacheEntry:
     event: EventBase
@@ -191,6 +195,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="events",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -200,6 +205,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._backfill_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="backfill",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -217,12 +223,14 @@ class EventsWorkerStore(SQLBaseStore):
             # SQLite).
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "events",
                 "stream_ordering",
                 is_writer=hs.get_instance_name() in hs.config.worker.writers.events,
             )
             self._backfill_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "events",
                 "stream_ordering",
                 step=-1,
@@ -300,6 +308,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._un_partial_stated_events_stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="un_partial_stated_event_stream",
                 instance_name=hs.get_instance_name(),
                 tables=[
@@ -311,14 +320,18 @@ class EventsWorkerStore(SQLBaseStore):
             )
         else:
             self._un_partial_stated_events_stream_id_gen = StreamIdGenerator(
-                db_conn, "un_partial_stated_event_stream", "stream_id"
+                db_conn,
+                hs.get_replication_notifier(),
+                "un_partial_stated_event_stream",
+                "stream_id",
             )
 
-    def get_un_partial_stated_events_token(self) -> int:
-        # TODO(faster_joins, multiple writers): This is inappropriate if there are multiple
-        #     writers because workers that don't write often will hold all
-        #     readers up.
-        return self._un_partial_stated_events_stream_id_gen.get_current_token()
+    def get_un_partial_stated_events_token(self, instance_name: str) -> int:
+        return (
+            self._un_partial_stated_events_stream_id_gen.get_current_token_for_writer(
+                instance_name
+            )
+        )
 
     async def get_un_partial_stated_events_from_stream(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -408,6 +421,8 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen.advance(instance_name, token)
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
+        elif stream_name == UnPartialStatedEventStream.NAME:
+            self._un_partial_stated_events_stream_id_gen.advance(instance_name, token)
         super().process_replication_position(stream_name, instance_name, token)
 
     async def have_censored_event(self, event_id: str) -> bool:
@@ -1299,7 +1314,7 @@ class EventsWorkerStore(SQLBaseStore):
                 # invites, so just accept it for all membership events.
                 #
                 if d["type"] != EventTypes.Member:
-                    raise Exception(
+                    raise InvalidEventError(
                         "Room %s for event %s is unknown" % (d["room_id"], event_id)
                     )
 

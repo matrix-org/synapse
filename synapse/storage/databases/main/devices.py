@@ -38,7 +38,7 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatureStream
+from synapse.replication.tcp.streams._base import DeviceListsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -54,7 +54,7 @@ from synapse.storage.util.id_generators import (
     AbstractStreamIdTracker,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, get_verify_key_from_cross_signing_key
+from synapse.types import JsonDict, StrCollection, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
@@ -92,6 +92,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         # class below that is used on the main process.
         self._device_list_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
             db_conn,
+            hs.get_replication_notifier(),
             "device_lists_stream",
             "stream_id",
             extra_tables=[
@@ -163,9 +164,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     ) -> None:
         if stream_name == DeviceListsStream.NAME:
             self._invalidate_caches_for_devices(token, rows)
-        elif stream_name == UserSignatureStream.NAME:
-            for row in rows:
-                self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
+
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def process_replication_position(
@@ -173,14 +172,17 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     ) -> None:
         if stream_name == DeviceListsStream.NAME:
             self._device_list_id_gen.advance(instance_name, token)
-        elif stream_name == UserSignatureStream.NAME:
-            self._device_list_id_gen.advance(instance_name, token)
+
         super().process_replication_position(stream_name, instance_name, token)
 
     def _invalidate_caches_for_devices(
         self, token: int, rows: Iterable[DeviceListsStream.DeviceListsStreamRow]
     ) -> None:
         for row in rows:
+            if row.is_signature:
+                self._user_signature_stream_cache.entity_has_changed(row.entity, token)
+                continue
+
             # The entities are either user IDs (starting with '@') whose devices
             # have changed, or remote servers that we need to tell about
             # changes.
@@ -1069,16 +1071,30 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
 
         return {row["user_id"] for row in rows}
 
-    async def mark_remote_user_device_cache_as_stale(self, user_id: str) -> None:
+    async def mark_remote_users_device_caches_as_stale(
+        self, user_ids: StrCollection
+    ) -> None:
         """Records that the server has reason to believe the cache of the devices
         for the remote users is out of date.
         """
-        await self.db_pool.simple_upsert(
-            table="device_lists_remote_resync",
-            keyvalues={"user_id": user_id},
-            values={},
-            insertion_values={"added_ts": self._clock.time_msec()},
-            desc="mark_remote_user_device_cache_as_stale",
+
+        def _mark_remote_users_device_caches_as_stale_txn(
+            txn: LoggingTransaction,
+        ) -> None:
+            # TODO add insertion_values support to simple_upsert_many and use
+            #      that!
+            for user_id in user_ids:
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="device_lists_remote_resync",
+                    keyvalues={"user_id": user_id},
+                    values={},
+                    insertion_values={"added_ts": self._clock.time_msec()},
+                )
+
+        await self.db_pool.runInteraction(
+            "mark_remote_users_device_caches_as_stale",
+            _mark_remote_users_device_caches_as_stale_txn,
         )
 
     async def mark_remote_user_device_cache_as_valid(self, user_id: str) -> None:

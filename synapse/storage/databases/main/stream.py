@@ -67,7 +67,7 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.types import PersistedEventPosition, RoomStreamToken
 from synapse.util.caches.descriptors import cached
@@ -168,6 +168,104 @@ def generate_pagination_where_clause(
         )
 
     return " AND ".join(where_clause)
+
+
+def generate_pagination_bounds(
+    direction: str,
+    from_token: Optional[RoomStreamToken],
+    to_token: Optional[RoomStreamToken],
+) -> Tuple[
+    str, Optional[Tuple[Optional[int], int]], Optional[Tuple[Optional[int], int]]
+]:
+    """
+    Generate a start and end point for this page of events.
+
+    Args:
+        direction: Whether pagination is going forwards or backwards. One of "f" or "b".
+        from_token: The token to start pagination at, or None to start at the first value.
+        to_token: The token to end pagination at, or None to not limit the end point.
+
+    Returns:
+        A three tuple of:
+
+            ASC or DESC for sorting of the query.
+
+            The starting position as a tuple of ints representing
+            (topological position, stream position) or None if no from_token was
+            provided. The topological position may be None for live tokens.
+
+            The end position in the same format as the starting position, or None
+            if no to_token was provided.
+    """
+
+    # Tokens really represent positions between elements, but we use
+    # the convention of pointing to the event before the gap. Hence
+    # we have a bit of asymmetry when it comes to equalities.
+    if direction == "b":
+        order = "DESC"
+    else:
+        order = "ASC"
+
+    # The bounds for the stream tokens are complicated by the fact
+    # that we need to handle the instance_map part of the tokens. We do this
+    # by fetching all events between the min stream token and the maximum
+    # stream token (as returned by `RoomStreamToken.get_max_stream_pos`) and
+    # then filtering the results.
+    from_bound: Optional[Tuple[Optional[int], int]] = None
+    if from_token:
+        if from_token.topological is not None:
+            from_bound = from_token.as_historical_tuple()
+        elif direction == "b":
+            from_bound = (
+                None,
+                from_token.get_max_stream_pos(),
+            )
+        else:
+            from_bound = (
+                None,
+                from_token.stream,
+            )
+
+    to_bound: Optional[Tuple[Optional[int], int]] = None
+    if to_token:
+        if to_token.topological is not None:
+            to_bound = to_token.as_historical_tuple()
+        elif direction == "b":
+            to_bound = (
+                None,
+                to_token.stream,
+            )
+        else:
+            to_bound = (
+                None,
+                to_token.get_max_stream_pos(),
+            )
+
+    return order, from_bound, to_bound
+
+
+def generate_next_token(
+    direction: str, last_topo_ordering: int, last_stream_ordering: int
+) -> RoomStreamToken:
+    """
+    Generate the next room stream token based on the currently returned data.
+
+    Args:
+        direction: Whether pagination is going forwards or backwards. One of "f" or "b".
+        last_topo_ordering: The last topological ordering being returned.
+        last_stream_ordering: The last stream ordering being returned.
+
+    Returns:
+        A new RoomStreamToken to return to the client.
+    """
+    if direction == "b":
+        # Tokens are positions between events.
+        # This token points *after* the last event in the chunk.
+        # We need it to point to the event before it in the chunk
+        # when we are going backwards so we subtract one from the
+        # stream part.
+        last_stream_ordering -= 1
+    return RoomStreamToken(last_topo_ordering, last_stream_ordering)
 
 
 def _make_generic_sql_bound(
@@ -801,13 +899,66 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             before this stream ordering.
         """
 
-        last_row = await self.get_room_event_before_stream_ordering(
-            room_id=room_id,
-            stream_ordering=end_token.stream,
+        def get_last_event_in_room_before_stream_ordering_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[str]:
+            # We need to handle the fact that the stream tokens can be vector
+            # clocks. We do this by getting all rows between the minimum and
+            # maximum stream ordering in the token, plus one row less than the
+            # minimum stream ordering. We then filter the results against the
+            # token and return the first row that matches.
+
+            sql = """
+                SELECT * FROM (
+                    SELECT instance_name, stream_ordering, topological_ordering, event_id
+                    FROM events
+                    LEFT JOIN rejections USING (event_id)
+                    WHERE room_id = ?
+                        AND ? < stream_ordering AND stream_ordering <= ?
+                        AND NOT outlier
+                        AND rejections.event_id IS NULL
+                    ORDER BY stream_ordering DESC
+                ) AS a
+                UNION
+                SELECT * FROM (
+                    SELECT instance_name, stream_ordering, topological_ordering, event_id
+                    FROM events
+                    LEFT JOIN rejections USING (event_id)
+                    WHERE room_id = ?
+                        AND stream_ordering <= ?
+                        AND NOT outlier
+                        AND rejections.event_id IS NULL
+                    ORDER BY stream_ordering DESC
+                    LIMIT 1
+                ) AS b
+            """
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    end_token.stream,
+                    end_token.get_max_stream_pos(),
+                    room_id,
+                    end_token.stream,
+                ),
+            )
+
+            for instance_name, stream_ordering, topological_ordering, event_id in txn:
+                if _filter_results(
+                    lower_token=None,
+                    upper_token=end_token,
+                    instance_name=instance_name,
+                    topological_ordering=topological_ordering,
+                    stream_ordering=stream_ordering,
+                ):
+                    return event_id
+
+            return None
+
+        return await self.db_pool.runInteraction(
+            "get_last_event_in_room_before_stream_ordering",
+            get_last_event_in_room_before_stream_ordering_txn,
         )
-        if last_row:
-            return last_row[2]
-        return None
 
     async def get_current_room_stream_token_for_room_id(
         self, room_id: str
@@ -891,12 +1042,40 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id
             stream_key
         """
-        sql = (
-            "SELECT coalesce(MIN(topological_ordering), 0) FROM events"
-            " WHERE room_id = ? AND stream_ordering >= ?"
-        )
+        if isinstance(self.database_engine, PostgresEngine):
+            min_function = "LEAST"
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            min_function = "MIN"
+        else:
+            raise RuntimeError(f"Unknown database engine {self.database_engine}")
+
+        # This query used to be
+        #    SELECT COALESCE(MIN(topological_ordering), 0) FROM events
+        #    WHERE room_id = ? and events.stream_ordering >= {stream_key}
+        # which returns 0 if the stream_key is newer than any event in
+        # the room. That's not wrong, but it seems to interact oddly with backfill,
+        # requiring a second call to /messages to actually backfill from a remote
+        # homeserver.
+        #
+        # Instead, rollback the stream ordering to that after the most recent event in
+        # this room.
+        sql = f"""
+            WITH fallback(max_stream_ordering) AS (
+                SELECT MAX(stream_ordering)
+                FROM events
+                WHERE room_id = ?
+            )
+            SELECT COALESCE(MIN(topological_ordering), 0) FROM events
+            WHERE
+                room_id = ?
+                AND events.stream_ordering >= {min_function}(
+                    ?,
+                    (SELECT max_stream_ordering FROM fallback)
+                )
+        """
+
         row = await self.db_pool.execute(
-            "get_current_topological_token", None, sql, room_id, stream_key
+            "get_current_topological_token", None, sql, room_id, room_id, stream_key
         )
         return row[0][0] if row else 0
 
@@ -1219,47 +1398,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             `to_token`), or `limit` is zero.
         """
 
-        # Tokens really represent positions between elements, but we use
-        # the convention of pointing to the event before the gap. Hence
-        # we have a bit of asymmetry when it comes to equalities.
         args = [False, room_id]
-        if direction == "b":
-            order = "DESC"
-        else:
-            order = "ASC"
 
-        # The bounds for the stream tokens are complicated by the fact
-        # that we need to handle the instance_map part of the tokens. We do this
-        # by fetching all events between the min stream token and the maximum
-        # stream token (as returned by `RoomStreamToken.get_max_stream_pos`) and
-        # then filtering the results.
-        if from_token.topological is not None:
-            from_bound: Tuple[Optional[int], int] = from_token.as_historical_tuple()
-        elif direction == "b":
-            from_bound = (
-                None,
-                from_token.get_max_stream_pos(),
-            )
-        else:
-            from_bound = (
-                None,
-                from_token.stream,
-            )
-
-        to_bound: Optional[Tuple[Optional[int], int]] = None
-        if to_token:
-            if to_token.topological is not None:
-                to_bound = to_token.as_historical_tuple()
-            elif direction == "b":
-                to_bound = (
-                    None,
-                    to_token.stream,
-                )
-            else:
-                to_bound = (
-                    None,
-                    to_token.get_max_stream_pos(),
-                )
+        order, from_bound, to_bound = generate_pagination_bounds(
+            direction, from_token, to_token
+        )
 
         bounds = generate_pagination_where_clause(
             direction=direction,
@@ -1355,16 +1498,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         ][:limit]
 
         if rows:
-            topo = rows[-1].topological_ordering
-            token = rows[-1].stream_ordering
-            if direction == "b":
-                # Tokens are positions between events.
-                # This token points *after* the last event in the chunk.
-                # We need it to point to the event before it in the chunk
-                # when we are going backwards so we subtract one from the
-                # stream part.
-                token -= 1
-            next_token = RoomStreamToken(topo, token)
+            assert rows[-1].topological_ordering is not None
+            next_token = generate_next_token(
+                direction, rows[-1].topological_ordering, rows[-1].stream_ordering
+            )
         else:
             # TODO (erikj): We should work out what to do here instead.
             next_token = to_token if to_token else from_token

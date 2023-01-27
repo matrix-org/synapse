@@ -67,7 +67,7 @@ pipx install poetry
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
 for other installation methods.
 
-Synapse requires Poetry version 1.2.0 or later.
+Developing Synapse requires Poetry version 1.3.2 or later.
 
 Next, open a terminal and install dependencies as follows:
 
@@ -382,7 +382,7 @@ To prepare a Pull Request, please:
 ## Changelog
 
 All changes, even minor ones, need a corresponding changelog / newsfragment
-entry. These are managed by [Towncrier](https://github.com/hawkowl/towncrier).
+entry. These are managed by [Towncrier](https://github.com/twisted/towncrier).
 
 To create a changelog entry, make a new file in the `changelog.d` directory named
 in the format of `PRnumber.type`. The type can be one of the following:

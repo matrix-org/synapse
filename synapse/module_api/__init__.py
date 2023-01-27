@@ -1158,7 +1158,7 @@ class ModuleApi:
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
             presence_handler.get_federation_queue().send_presence_to_destinations(
-                presence_events, destination
+                presence_events, [destination]
             )
 
     def looping_background_call(
@@ -1584,6 +1584,33 @@ class ModuleApi:
         )
 
         return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
+
+    async def set_displayname(
+        self,
+        user_id: UserID,
+        new_displayname: str,
+        deactivation: bool = False,
+    ) -> None:
+        """Sets a user's display name.
+
+        Added in Synapse v1.76.0.
+
+        Args:
+            user_id:
+                The user whose display name is to be changed.
+            new_displayname:
+                The new display name to give the user.
+            deactivation:
+                Whether this change was made while deactivating the user.
+        """
+        requester = create_requester(user_id)
+        await self._hs.get_profile_handler().set_displayname(
+            target_user=user_id,
+            requester=requester,
+            new_displayname=new_displayname,
+            by_admin=True,
+            deactivation=deactivation,
+        )
 
 
 class PublicRoomListManager:

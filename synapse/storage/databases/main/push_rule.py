@@ -86,8 +86,9 @@ def _load_rules(
     filtered_rules = FilteredPushRules(
         push_rules,
         enabled_map,
-        msc3664_enabled=experimental_config.msc3664_enabled,
         msc1767_enabled=experimental_config.msc1767_enabled,
+        msc3664_enabled=experimental_config.msc3664_enabled,
+        msc3381_polls_enabled=experimental_config.msc3381_polls_enabled,
     )
 
     return filtered_rules
@@ -117,6 +118,7 @@ class PushRulesWorkerStore(
         # class below that is used on the main process.
         self._push_rules_stream_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
             db_conn,
+            hs.get_replication_notifier(),
             "push_rules_stream",
             "stream_id",
             is_writer=hs.config.worker.worker_app is None,
