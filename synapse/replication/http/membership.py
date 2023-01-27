@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.web.server import Request
 
-from synapse.api.errors import PartialStateConflictError
 from synapse.http.server import HttpServer
 from synapse.http.site import SynapseRequest
 from synapse.replication.http._base import ReplicationEndpoint
@@ -90,12 +88,9 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
 
         logger.info("remote_join: %s into room: %s", user_id, room_id)
 
-        try:
-            event_id, stream_id = await self.federation_handler.do_invite_join(
-                remote_room_hosts, room_id, user_id, event_content
-            )
-        except PartialStateConflictError:
-            return HTTPStatus.CONFLICT, {"error": PartialStateConflictError.message()}
+        event_id, stream_id = await self.federation_handler.do_invite_join(
+            remote_room_hosts, room_id, user_id, event_content
+        )
 
         return 200, {"event_id": event_id, "stream_id": stream_id}
 
