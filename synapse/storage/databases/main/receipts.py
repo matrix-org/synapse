@@ -948,8 +948,7 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
 
             # Identify any duplicate receipts arising from
             # https://github.com/matrix-org/synapse/issues/14406.
-            # We expect the following query to use the per-thread receipt index and take
-            # less than a minute.
+            # The following query takes less than a minute on matrix.org.
             sql = f"""
                 SELECT MAX(stream_id), MAX({ROW_ID_NAME}), room_id, receipt_type, user_id
                 FROM receipts_linearized
