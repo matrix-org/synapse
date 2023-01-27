@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
 from unittest.mock import patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.rest import admin
@@ -126,3 +128,89 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Ensure no actions are generated!
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
         bulk_evaluator._action_for_event_by_user.assert_not_called()
+
+    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
+    def test_mentions(self) -> None:
+        """Test the behavior of an event which includes invalid mentions."""
+        bulk_evaluator = BulkPushRuleEvaluator(self.hs)
+
+        sentinel = object()
+
+        def create_and_process(mentions: Any = sentinel) -> bool:
+            """Returns true iff the `mentions` trigger an event push action."""
+            content = {}
+            if mentions is not sentinel:
+                content[EventContentFields.MSC3952_MENTIONS] = mentions
+
+            # Create a new message event which should cause a notification.
+            event, context = self.get_success(
+                self.event_creation_handler.create_event(
+                    self.requester,
+                    {
+                        "type": "test",
+                        "room_id": self.room_id,
+                        "content": content,
+                        "sender": f"@bob:{self.hs.hostname}",
+                    },
+                )
+            )
+
+            # Ensure no actions are generated!
+            self.get_success(
+                bulk_evaluator.action_for_events_by_user([(event, context)])
+            )
+
+            # If any actions are generated for this event, return true.
+            result = self.get_success(
+                self.hs.get_datastores().main.db_pool.simple_select_list(
+                    table="event_push_actions_staging",
+                    keyvalues={"event_id": event.event_id},
+                    retcols=("*",),
+                    desc="get_event_push_actions_staging",
+                )
+            )
+            return len(result) > 0
+
+        # Not including the mentions field should not notify.
+        self.assertFalse(create_and_process())
+        # An empty mentions field should not notify.
+        self.assertFalse(create_and_process({}))
+
+        # Non-dict mentions should be ignored.
+        mentions: Any
+        for mentions in (None, True, False, 1, "foo", []):
+            self.assertFalse(create_and_process(mentions))
+
+        # A non-list should be ignored.
+        for mentions in (None, True, False, 1, "foo", {}):
+            self.assertFalse(create_and_process({"user_ids": mentions}))
+
+        # The Matrix ID appearing anywhere in the list should notify.
+        self.assertTrue(create_and_process({"user_ids": [self.alice]}))
+        self.assertTrue(create_and_process({"user_ids": ["@another:test", self.alice]}))
+
+        # Duplicate user IDs should notify.
+        self.assertTrue(create_and_process({"user_ids": [self.alice, self.alice]}))
+
+        # Invalid entries in the list are ignored.
+        self.assertFalse(create_and_process({"user_ids": [None, True, False, {}, []]}))
+        self.assertTrue(
+            create_and_process({"user_ids": [None, True, False, {}, [], self.alice]})
+        )
+
+        # Room mentions from those without power should not notify.
+        self.assertFalse(create_and_process({"room": True}))
+
+        # Room mentions from those with power should notify.
+        self.helper.send_state(
+            self.room_id,
+            "m.room.power_levels",
+            {"notifications": {"room": 0}},
+            self.token,
+            state_key="",
+        )
+        self.assertTrue(create_and_process({"room": True}))
+
+        # Invalid data should not notify.
+        for mentions in (None, False, 1, "foo", [], {}):
+            self.assertFalse(create_and_process({"room": mentions}))

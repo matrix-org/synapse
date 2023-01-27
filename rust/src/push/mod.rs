@@ -269,6 +269,10 @@ pub enum KnownCondition {
     EventMatch(EventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
+    #[serde(rename = "org.matrix.msc3952.is_user_mention")]
+    IsUserMention,
+    #[serde(rename = "org.matrix.msc3952.is_room_mention")]
+    IsRoomMention,
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -414,6 +418,7 @@ pub struct FilteredPushRules {
     msc1767_enabled: bool,
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
+    msc3952_intentional_mentions: bool,
 }
 
 #[pymethods]
@@ -425,6 +430,7 @@ impl FilteredPushRules {
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
+        msc3952_intentional_mentions: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -432,6 +438,7 @@ impl FilteredPushRules {
             msc1767_enabled,
             msc3381_polls_enabled,
             msc3664_enabled,
+            msc3952_intentional_mentions,
         }
     }
 
@@ -462,6 +469,11 @@ impl FilteredPushRules {
                 }
 
                 if !self.msc3381_polls_enabled && rule.rule_id.contains("org.matrix.msc3930") {
+                    return false;
+                }
+
+                if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
+                {
                     return false;
                 }
 
@@ -519,6 +531,28 @@ fn test_deserialize_unstable_msc3931_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RoomVersionSupports { feature: _ })
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3952_user_condition() {
+    let json = r#"{"kind":"org.matrix.msc3952.is_user_mention"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::IsUserMention)
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3952_room_condition() {
+    let json = r#"{"kind":"org.matrix.msc3952.is_room_mention"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::IsRoomMention)
     ));
 }
 

@@ -89,6 +89,7 @@ def _load_rules(
         msc1767_enabled=experimental_config.msc1767_enabled,
         msc3664_enabled=experimental_config.msc3664_enabled,
         msc3381_polls_enabled=experimental_config.msc3381_polls_enabled,
+        msc3952_intentional_mentions=experimental_config.msc3952_intentional_mentions,
     )
 
     return filtered_rules

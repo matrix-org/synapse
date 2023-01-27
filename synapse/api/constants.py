@@ -233,6 +233,9 @@ class EventContentFields:
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
+    # Use for mentioning users.
+    MSC3952_MENTIONS: Final = "org.matrix.msc3952.mentions"
+
     # an unspecced field added to to-device messages to identify them uniquely-ish
     TO_DEVICE_MSGID: Final = "org.matrix.msgid"
 

@@ -22,13 +22,20 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Set,
     Tuple,
     Union,
 )
 
 from prometheus_client import Counter
 
-from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
+from synapse.api.constants import (
+    MAIN_TIMELINE,
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+)
 from synapse.api.room_versions import PushRuleRoomFlag, RoomVersion
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
@@ -342,8 +349,24 @@ class BulkPushRuleEvaluator:
             for user_id, level in notification_levels.items():
                 notification_levels[user_id] = int(level)
 
+        # Pull out any user and room mentions.
+        mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
+        user_mentions: Set[str] = set()
+        room_mention = False
+        if isinstance(mentions, dict):
+            # Remove out any non-string items and convert to a set.
+            user_mentions_raw = mentions.get("user_ids")
+            if isinstance(user_mentions_raw, list):
+                user_mentions = set(
+                    filter(lambda item: isinstance(item, str), user_mentions_raw)
+                )
+            # Room mention is only true if the value is exactly true.
+            room_mention = mentions.get("room") is True
+
         evaluator = PushRuleEvaluator(
             _flatten_dict(event, room_version=event.room_version),
+            user_mentions,
+            room_mention,
             room_member_count,
             sender_power_level,
             notification_levels,
