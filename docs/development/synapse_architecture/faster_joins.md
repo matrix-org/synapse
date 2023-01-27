@@ -24,7 +24,35 @@ Synapse marks the room as partially joined by adding a row to
 meaning that we have neither received nor computed the full state before/after
 `J`. This is done by adding a row to `partial_state_events`.
 
-[**TODO**: include a DDL definition of the partial joins tables.]
+<details><summary>DB schema</summary>
+
+```
+matrix=> \d partial_state_events
+Table "matrix.partial_state_events"
+  Column  │ Type │ Collation │ Nullable │ Default
+══════════╪══════╪═══════════╪══════════╪═════════
+ room_id  │ text │           │ not null │
+ event_id │ text │           │ not null │
+ 
+matrix=> \d partial_state_rooms
+                Table "matrix.partial_state_rooms"
+         Column         │  Type  │ Collation │ Nullable │ Default 
+════════════════════════╪════════╪═══════════╪══════════╪═════════
+ room_id                │ text   │           │ not null │ 
+ device_lists_stream_id │ bigint │           │ not null │ 0
+ join_event_id          │ text   │           │          │ 
+ joined_via             │ text   │           │          │ 
+
+matrix=> \d partial_state_rooms_servers
+     Table "matrix.partial_state_rooms_servers"
+   Column    │ Type │ Collation │ Nullable │ Default 
+═════════════╪══════╪═══════════╪══════════╪═════════
+ room_id     │ text │           │ not null │ 
+ server_name │ text │           │ not null │ 
+```
+
+Indices, foreign-keys and check constraints are omitted for brevity.
+</details>
 
 While partially joined to a room, Synapse receives events `E` from remote
 homeservers as normal, and can create events at the request of its local users.
