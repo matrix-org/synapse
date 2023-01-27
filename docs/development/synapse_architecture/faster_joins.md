@@ -6,6 +6,11 @@ This is a work-in-progress set of notes with two goals:
 
 See also [MSC3902](https://github.com/matrix-org/matrix-spec-proposals/pull/3902).
 
+The key idea is described by [MSC706](https://github.com/matrix-org/matrix-spec-proposals/pull/3902). This allows servers to
+request a lightweight response to the federation `/send_join` endpoint.
+This is called a **faster join**, also known as a **partial join**. In these
+notes we'll usually use the word "partial" as it matches the database schema.
+
 ## Overview: processing events in a partially-joined room
 
 The response to a partial join consists of
