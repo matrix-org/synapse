@@ -26,13 +26,7 @@ from synapse.api.constants import (
     GuestAccess,
     Membership,
 )
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    PartialStateConflictError,
-    ShadowBanError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, ShadowBanError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
@@ -201,8 +195,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             NoKnownServersError: if remote_room_hosts does not contain a server joined to
                 the room.
-            PartialStateConflictError: if the room was un-partial stated in the meantime,
-                a local room join should be done instead.
         """
         raise NotImplementedError()
 
@@ -990,16 +982,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if requester.is_guest:
                     content["kind"] = "guest"
 
-                try:
-                    remote_join_response = await self._remote_join(
-                        requester, remote_room_hosts, room_id, target, content
-                    )
+                remote_join_response = await self._remote_join(
+                    requester, remote_room_hosts, room_id, target, content
+                )
 
-                    return remote_join_response
-                except PartialStateConflictError:
-                    # Room has been un-partial stated in the meantime, let's continue
-                    # the code flow to trigger a local join through _local_membership_update.
-                    pass
+                return remote_join_response
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:

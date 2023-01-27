@@ -2016,12 +2016,7 @@ class EventFederationStore(EventFederationWorkerStore):
         )
 
     def _clean_room_for_join_txn(self, txn: LoggingTransaction, room_id: str) -> None:
-        query = """
-                DELETE FROM event_forward_extremities
-                    WHERE room_id = ? AND room_id NOT IN (
-                        SELECT room_id FROM partial_state_rooms
-                    )
-                """
+        query = "DELETE FROM event_forward_extremities WHERE room_id = ?"
 
         txn.execute(query, (room_id,))
         txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
