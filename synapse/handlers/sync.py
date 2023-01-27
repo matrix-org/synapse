@@ -1349,6 +1349,16 @@ class SyncHandler:
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = self.event_sources.get_current_token()
 
+        # Beeper change: remove any per-instance stream token positions, this
+        # happens when one or more event persisters fall behind the others, in
+        # practice this is very rare and usually only ~1-2 events. By removing
+        # this we dramatically simplify debugging issues, checking caches and
+        # generating room previews.
+        now_token = now_token.copy_and_replace(
+            StreamKeyType.ROOM,
+            RoomStreamToken(None, now_token.room_key.stream),
+        )
+
         if debug_current_token:
             logger.info(
                 "Overriding sync current token for debugging to: %r",
