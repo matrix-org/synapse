@@ -200,16 +200,26 @@ A new replication stream `un_partial_stated_room` is added. Whenever a resync
 completes and a partial-state room becomes fully stated, a new message is sent
 into that stream containing the room ID.
 
-## Specific cases
+## Notes on specific cases
 
 > **NB.** The notes below are rough. Some of them are hidden under `<details>`
 disclosures because they have yet to be implemented in mainline Synapse.
 
 ### Creating events during a partial join
 
-**TODO:** needs prose fleshing out.
+When sending out messages during a partial join, we assume our partial state is 
+accurate and proceed as normal. There are two problems that this might cause:
 
-Exactly the same. Pick <= 10 fwd extremities as prev events.
+- We might create an event that is valid under our partial state, only to later
+  find out that is actually invalid according to the full state.
+- Or: we might refuse to create an event that is invalid under our partial
+  state, even though it would be perfectly valid under the full state.
+
+To avoid these we want to our partial state to the necessary auth events,
+ideally as close as possible to those of the full state.
+
+TODO: flesh out the bullets below. Link to the bit of the spec which says which
+auth events you need to provide.
 
 Can you select auth events in the current (partial) state?
 - got power levels/create/join rules from the partial join.
