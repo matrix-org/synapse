@@ -569,10 +569,6 @@ class FederationHandler:
             joinee: The User ID of the joining user.
 
             content: The event content to use for the join event.
-
-        Raises:
-            PartialStateConflictError if homeserver was already in the room and it is
-                no longer partial stated.
         """
         # TODO: We should be able to call this on workers, but the upgrading of
         # room stuff after join currently doesn't work on workers.
