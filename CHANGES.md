@@ -8,6 +8,23 @@ The upgrade from 1.75 to 1.76 changes the account data replication streams in a 
 Those who are `poetry install`ing from source using our lockfile should ensure their poetry version is 1.3.2 or higher; [see upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.76/docs/upgrade.md#minimum-version-of-poetry-is-now-132).
 
 
+Notes on faster joins
+---------------------
+
+The faster joins project sees the most benefit when joining a room with a large number of members (joined or historical). We expect it to be particularly useful for joining large public rooms like the [Matrix HQ](https://matrix.to/#/#matrix:matrix.org) or [Synapse Admins](https://matrix.to/#/#synapse:matrix.org) rooms. 
+
+After a faster join, Synapse considers that room "partially joined". In this state, you should be able to
+
+- read incoming messages;
+- see incoming state changes, e.g. room topic changes; and
+- send messages, if the room is unencrypted.
+
+Synapse has to spend more effort to complete the join in the background. Once this finishes, you will be able to
+
+- send messages, if the room is in encrypted;
+- retrieve room history from before your join, if permitted by the room settings; and
+- access the full list of room members.
+
 Bugfixes
 --------
 
