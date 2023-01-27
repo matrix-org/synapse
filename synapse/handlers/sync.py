@@ -2496,6 +2496,9 @@ class SyncHandler:
                                 preview_event_id,
                                 allow_none=True,
                             )
+                    else:
+                        # This should never happen!
+                        logger.warning("Beeper preview is missing! roomID=%s", room_id)
 
                 if room_sync or always_include:
                     notifs = await self.unread_notifs_for_room_id(room_id, sync_config)
