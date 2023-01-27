@@ -198,8 +198,19 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             create_and_process({"user_ids": [None, True, False, {}, [], self.alice]})
         )
 
-        # Room mentions should notify.
+        # Room mentions from those without power should not notify.
+        self.assertFalse(create_and_process({"room": True}))
+
+        # Room mentions from those with power should notify.
+        self.helper.send_state(
+            self.room_id,
+            "m.room.power_levels",
+            {"notifications": {"room": 0}},
+            self.token,
+            state_key="",
+        )
         self.assertTrue(create_and_process({"room": True}))
-        # A non-True should not notify.
+
+        # Invalid data should not notify.
         for mentions in (None, False, 1, "foo", [], {}):
             self.assertFalse(create_and_process({"room": mentions}))

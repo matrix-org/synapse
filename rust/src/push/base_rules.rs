@@ -150,7 +150,12 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed(".org.matrix.msc3952.is_room_mentioned"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::IsRoomMention)]),
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::IsRoomMention),
+            Condition::Known(KnownCondition::SenderNotificationPermission {
+                key: Cow::Borrowed("room"),
+            }),
+        ]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
         default: true,
         default_enabled: true,
