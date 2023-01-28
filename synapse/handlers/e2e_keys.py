@@ -118,7 +118,8 @@ class E2eKeysHandler:
         Args:
             from_user_id: the user making the query.  This is used when
                 adding cross-signing signatures to limit what signatures users
-                can see.
+                can see, and to prevent leaking the displayname of devices of
+                one user to another when experimental MSC3480 support is enabled.
             from_device_id: the device making the query. This is used to limit
                 the number of in-flight queries at a time.
         """
@@ -145,7 +146,7 @@ class E2eKeysHandler:
             failures: Dict[str, JsonDict] = {}
             results = {}
             if local_query:
-                local_result = await self.query_local_devices(local_query)
+                local_result = await self.query_local_devices(local_query, from_user_id)
                 for user_id, keys in local_result.items():
                     if user_id in local_query:
                         results[user_id] = keys
@@ -453,15 +454,15 @@ class E2eKeysHandler:
     async def query_local_devices(
         self,
         query: Mapping[str, Optional[List[str]]],
-        include_displaynames: bool = True,
+        from_local_user_id: Optional[str],
     ) -> Dict[str, Dict[str, dict]]:
         """Get E2E device keys for local users
 
         Args:
             query: map from user_id to a list
                  of devices to query (None for all devices)
-            include_displaynames: Whether to include device displaynames in the returned
-                device details.
+            from_local_user_id: If the request originates from a local user, their
+                User ID should be specified here. Otherwise, this should be None.
 
         Returns:
             A map from user_id -> device_id -> device details
@@ -494,7 +495,7 @@ class E2eKeysHandler:
             result_dict[user_id] = {}
 
         results = await self.store.get_e2e_device_keys_for_cs_api(
-            local_query, include_displaynames
+            local_query, from_local_user_id
         )
 
         # Build the result structure
@@ -531,9 +532,8 @@ class E2eKeysHandler:
         )
         res = await self.query_local_devices(
             device_keys_query,
-            include_displaynames=(
-                self.config.federation.allow_device_name_lookup_over_federation
-            ),
+            # This is a request originating from a remote user.
+            from_local_user_id=None,
         )
         ret = {"device_keys": res}
 
@@ -935,7 +935,9 @@ class E2eKeysHandler:
             # fetch our stored devices.  This is used to 1. verify
             # signatures on the master key, and 2. to compare with what
             # was sent if the device was signed
-            devices = await self.store.get_e2e_device_keys_for_cs_api([(user_id, None)])
+            devices = await self.store.get_e2e_device_keys_for_cs_api(
+                [(user_id, None)], user_id
+            )
 
             if user_id not in devices:
                 raise NotFoundError("No device keys found")

@@ -1086,7 +1086,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
 
     @measure_func("_incoming_device_list_update")
     async def _handle_device_updates(self, user_id: str) -> None:
-        "Actually handle pending updates."
+        """Actually handle pending updates."""
 
         async with self._remote_edu_linearizer.queue(user_id):
             pending_updates = self._pending_updates.pop(user_id, [])

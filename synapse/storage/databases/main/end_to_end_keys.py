@@ -141,13 +141,15 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     async def get_e2e_device_keys_for_cs_api(
         self,
         query_list: Collection[Tuple[str, Optional[str]]],
-        include_displaynames: bool = True,
+        from_local_user_id: Optional[str],
     ) -> Dict[str, Dict[str, JsonDict]]:
         """Fetch a list of device keys, formatted suitably for the C/S API.
+
         Args:
             query_list: List of pairs of user_ids and device_ids.
-            include_displaynames: Whether to include the displayname of returned devices
-                (if one exists).
+            from_local_user_id: If the request originates from a local user, their
+                User ID should be specified here. Otherwise, this should be None.
+
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             key data.  The key data will be a dict in the same format as the
@@ -168,6 +170,25 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 r = device_info.keys
                 if r is None:
                     continue
+
+                # Determine whether the displayname of this device should be shared with
+                # the user making the request.
+                include_displaynames = True
+
+                if (
+                    from_local_user_id is not None
+                    and user_id != from_local_user_id
+                    and self.hs.config.experimental.msc3480_enabled is True
+                ):
+                    include_displaynames = False
+
+                # If this is a request from a remote user, and we've disallowed sharing
+                # local user device names over federation, strip the device's displayname.
+                elif (
+                    from_local_user_id is None
+                    and not self._allow_device_name_lookup_over_federation
+                ):
+                    include_displaynames = False
 
                 r["unsigned"] = {}
                 if include_displaynames:
