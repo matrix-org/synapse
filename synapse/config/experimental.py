@@ -168,6 +168,15 @@ class ExperimentalConfig(Config):
 
         # MSC3480: Make device names private.
         self.msc3480_enabled = experimental.get("msc3480_enabled", False)
+        if (
+            self.msc3480_enabled
+            and config.get("allow_device_name_lookup_over_federation") is not False
+        ):
+            raise ConfigError(
+                "Option 'allow_device_name_lookup_over_federation' must be "
+                "'false' if experimental MSC3480 support is enabled (option "
+                "'experimental_features.msc3480_enabled' is 'true')"
+            )
 
         # MSC3925: do not replace events with their edits
         self.msc3925_inhibit_edit = experimental.get("msc3925_inhibit_edit", False)
