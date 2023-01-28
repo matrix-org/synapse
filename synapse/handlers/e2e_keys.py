@@ -204,8 +204,15 @@ class E2eKeysHandler:
                 for user_id, devices in remote_results.items():
                     user_devices = results.setdefault(user_id, {})
                     for device_id, device in devices.items():
-                        keys = device.get("keys", None)
-                        device_display_name = device.get("device_display_name", None)
+                        keys = device.get("keys")
+
+                        # Extract the displayname of the remote device
+                        device_display_name = None
+                        if self.config.experimental.msc3480_enabled is not True:
+                            # Ignore remote device names if experimental MSC3480 support
+                            # is enabled.
+                            device_display_name = device.get("device_display_name")
+
                         if keys:
                             result = dict(keys)
                             unsigned = result.setdefault("unsigned", {})
