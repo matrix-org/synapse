@@ -166,6 +166,9 @@ class ExperimentalConfig(Config):
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
+        # MSC3480: Make device names private.
+        self.msc3480_enabled = experimental.get("msc3480_enabled", False)
+
         # MSC3925: do not replace events with their edits
         self.msc3925_inhibit_edit = experimental.get("msc3925_inhibit_edit", False)
 
