@@ -25,7 +25,7 @@ from synapse.logging.opentracing import (
     log_kv,
     set_tag,
 )
-from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
+from synapse.replication.http.devices import ReplicationMultiUserDevicesResyncRestServlet
 from synapse.types import JsonDict, Requester, StreamKeyType, UserID, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.stringutils import random_string
@@ -71,12 +71,12 @@ class DeviceMessageHandler:
         # sync. We do all device list resyncing on the master instance, so if
         # we're on a worker we hit the device resync replication API.
         if hs.config.worker.worker_app is None:
-            self._user_device_resync = (
-                hs.get_device_handler().device_list_updater.user_device_resync
+            self._multi_user_device_resync = (
+                hs.get_device_handler().device_list_updater.multi_user_device_resync
             )
         else:
-            self._user_device_resync = (
-                ReplicationUserDevicesResyncRestServlet.make_client(hs)
+            self._multi_user_device_resync = (
+               ReplicationMultiUserDevicesResyncRestServlet.make_client(hs)
             )
 
         # a rate limiter for room key requests.  The keys are
@@ -198,7 +198,7 @@ class DeviceMessageHandler:
             await self.store.mark_remote_users_device_caches_as_stale((sender_user_id,))
 
             # Immediately attempt a resync in the background
-            run_in_background(self._user_device_resync, user_id=sender_user_id)
+            run_in_background(self._multi_user_device_resync, user_id=sender_user_id)
 
     async def send_device_message(
         self,

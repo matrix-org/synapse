@@ -254,7 +254,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # Resync the device list.
         device_handler = self.homeserver.get_device_handler()
         self.get_success(
-            device_handler.device_list_updater.user_device_resync(remote_user_id),
+            device_handler.device_list_updater.multi_user_device_resync(remote_user_id),
         )
 
         # Retrieve the cross-signing keys for this user.
