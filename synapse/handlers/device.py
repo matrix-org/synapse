@@ -1167,8 +1167,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
                 try:
                     # Try to resync the current user's devices list.
                     result = await self.multi_user_device_resync(
-                        user_id=user_id,
-                        mark_failed_as_stale=False,
+                        user_id, mark_failed_as_stale=False
                     )
 
                     # user_device_resync only returns a result if it managed to
