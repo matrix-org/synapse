@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest
-from typing import Collection, Dict, Iterable, List, Optional
+from typing import Any, Collection, Dict, Iterable, List, Optional
 
 from parameterized import parameterized
 
@@ -727,6 +727,36 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth._check_power_levels(
                 pl_event.room_version, pl_event2, {("fake_type", "fake_key"): pl_event}
             )
+
+    def test_room_v10_rejects_other_non_integer_power_levels(self) -> None:
+        """We should reject PLs that are non-integer, non-string JSON values.
+
+        test_room_v10_rejects_string_power_levels above handles the string case.
+        """
+
+        def create_event(pl_event_content: Dict[str, Any]) -> EventBase:
+            return make_event_from_dict(
+                {
+                    "room_id": TEST_ROOM_ID,
+                    **_maybe_get_event_id_dict_for_room_version(RoomVersions.V10),
+                    "type": "m.room.power_levels",
+                    "sender": "@test:test.com",
+                    "state_key": "",
+                    "content": pl_event_content,
+                    "signatures": {"test.com": {"ed25519:0": "some9signature"}},
+                },
+                room_version=RoomVersions.V10,
+            )
+
+        contents: Iterable[Dict[str, Any]] = [
+            {"notifications": {"room": None}},
+            {"users": {"@alice:wonderland": []}},
+            {"users_default": {}},
+        ]
+        for content in contents:
+            event = create_event(content)
+            with self.assertRaises(SynapseError):
+                event_auth._check_power_levels(event.room_version, event, {})
 
 
 # helpers for making events
