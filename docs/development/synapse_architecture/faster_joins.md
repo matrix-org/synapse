@@ -208,27 +208,47 @@ disclosures because they have yet to be implemented in mainline Synapse.
 ### Creating events during a partial join
 
 When sending out messages during a partial join, we assume our partial state is 
-accurate and proceed as normal. There are two problems that this might cause:
+accurate and proceed as normal. For this to have any hope of succeeding at all,
+our partial state must contain an entry for each of the (type, state key) pairs
+[specified by the auth rules](https://spec.matrix.org/v1.3/rooms/v10/#authorization-rules):
+
+- `m.room.create`
+- `m.room.join_rules`
+- `m.room.power_levels`
+- `m.room.third_party_invite`
+- `m.room.member`
+
+The first four of these should be present in the state before `J` that is given
+to us in the partial join response; only membership events are omitted. In order
+for us to consider the user joined, we must have their membership event. That
+means the only possible omission is the target's membership in an invite, kick
+or ban.
+
+The worst possibility is that we locally invite someone who is banned according to
+the full state, because we lack their ban in our current partial state. The rest 
+of the federation---at least, those who are fully joined---should correctly 
+enforce the [membership transition constraints](
+    https://spec.matrix.org/v1.3/client-server-api/#room-membership
+). So any the erroneous invite should be ignored by fully-joined
+homeservers and resolved by the resync for partially-joined homeservers.
+
+
+
+In more generality, there are two problems we're worrying about here:
 
 - We might create an event that is valid under our partial state, only to later
   find out that is actually invalid according to the full state.
 - Or: we might refuse to create an event that is invalid under our partial
   state, even though it would be perfectly valid under the full state.
 
-To avoid these we want to our partial state to the necessary auth events,
-ideally as close as possible to those of the full state.
+However we expect such problems to be unlikely in practise, because
 
-TODO: flesh out the bullets below. Link to the bit of the spec which says which
-auth events you need to provide.
-
-Can you select auth events in the current (partial) state?
-- got power levels/create/join rules from the partial join.
-- Will have the sender's membership: comes from a make_join handshake.
-- Target's membership? E.g. kick or ban someone.
-  - May not have received the target's membership in the partial join response.
-  - Probably only going to kickban someone you've seen a msg from
-  - If you've seen their message, they'll have cited (some previous version of) their membership...
-  - Could create a reasonable looking ban event... but not a huge prioity; okay to block
+- We trust that the room has sensible power levels, e.g. that bad actors with
+  high power levels are demoted before their ban.
+- We trust that the resident server provides us up-to-date power levels, join
+  rules, etc.
+- State changes in rooms are relatively infrequent, and the resync period is
+  relatively quick.
 
 #### Sending out the event over federation
 
