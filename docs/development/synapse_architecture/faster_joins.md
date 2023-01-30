@@ -19,7 +19,7 @@ The response to a partial join consists of
 - a subset of the state of the room before `J`,
 - the full auth chain of that state subset.
 
-Synapse marks the room as partially joined by adding a row to
+Synapse marks the room as partially joined by adding a row to the database table
 `partial_state_rooms`. It also marks the join event `J` as "partially stated",
 meaning that we have neither received nor computed the full state before/after
 `J`. This is done by adding a row to `partial_state_events`.
