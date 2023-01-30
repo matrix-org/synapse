@@ -68,6 +68,14 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             (12.34, True),
             (60.0, True),
             (67.89, False),
+            # Values that int(...) would not successfully cast should be ignored.
+            # The room notification level should then default to 50, per the spec, so
+            # Alice's notification is allowed.
+            (None, True),
+            # We haven't seen `"room": []` or `"room": {}` in the wild (yet), but
+            # let's check them for paranoia's sake.
+            ([], True),
+            ({}, True),
         ]
     )
     def test_action_for_event_by_user_handles_noninteger_room_power_levels(
@@ -98,12 +106,18 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
         # Alter the power levels in that room to include the bad @room notification
         # level. We need to suppress
-        # - canonicaljson validation, because canonicaljson forbids floats, and
-        # - the event jsonschema validation, because it will forbid bad values.
-        # (Presumably this validation was not always present.)
+        #
+        # - canonicaljson validation, because canonicaljson forbids floats;
+        # - the event jsonschema validation, because it will forbid bad values; and
+        # - the auth rules checks, because they stop us from creating power levels
+        #   with `"room": null`. (We want to test this case, because we have seen it
+        #   in the wild.)
+        #
+        # We have seen stringy and null values for "room" in the wild, so presumably
+        # some of this validation was missing in the past.
         with patch("synapse.events.validator.validate_canonicaljson"), patch(
             "synapse.events.validator.jsonschema.validate"
-        ):
+        ), patch("synapse.handlers.event_auth.check_state_dependent_auth_rules"):
             pl_event_id = self.helper.send_state(
                 self.room_id,
                 "m.room.power_levels",
