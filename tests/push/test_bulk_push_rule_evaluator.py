@@ -72,10 +72,12 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             # The room notification level should then default to 50, per the spec, so
             # Alice's notification is allowed.
             (None, True),
-            # We haven't seen `"room": []` or `"room": {}` in the wild (yet), but
+            # We haven't seen array, object or boolean values in the wild (yet), but
             # let's check them for paranoia's sake.
             ([], True),
             ({}, True),
+            (True, True),
+            (False, True),
         ]
     )
     def test_action_for_event_by_user_handles_noninteger_room_power_levels(

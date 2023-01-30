@@ -752,6 +752,8 @@ class EventAuthTestCase(unittest.TestCase):
             {"notifications": {"room": None}},
             {"users": {"@alice:wonderland": []}},
             {"users_default": {}},
+            {"ban": False},
+            {"users": {"@george:boole.me.uk": True}},
         ]
         for content in contents:
             event = create_event(content)
