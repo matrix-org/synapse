@@ -566,7 +566,8 @@ jobs:
 
       - run: cargo test
 
-  # We want to ensure that the cargo benchmarks still compile appropriately.
+  # We want to ensure that the cargo benchmarks still compile, which requires a
+  # nightly compiler.
   cargo-bench:
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
@@ -583,7 +584,7 @@ jobs:
         # We pin to a specific commit for paranoia's sake.
         uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
         with:
-            toolchain: 1.58.1
+            toolchain: nightly-2022-12-01
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo bench --no-run
