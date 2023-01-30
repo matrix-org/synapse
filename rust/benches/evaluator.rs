@@ -32,6 +32,7 @@ fn bench_match_exact(b: &mut Bencher) {
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        BTreeSet::new(),
         10,
         Some(0),
         Default::default(),
