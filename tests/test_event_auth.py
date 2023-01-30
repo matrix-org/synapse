@@ -729,6 +729,10 @@ class EventAuthTestCase(unittest.TestCase):
             )
 
     def test_room_v10_rejects_other_non_integer_power_levels(self) -> None:
+        """We should reject PLs that are non-integer, non-string JSON values.
+
+        test_room_v10_rejects_string_power_levels above handles the string case.
+        """
         def create_event(pl_event_content: Dict[str, Any]) -> EventBase:
             return make_event_from_dict(
                 {
