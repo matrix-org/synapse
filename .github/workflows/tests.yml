@@ -566,6 +566,28 @@ jobs:
 
       - run: cargo test
 
+  # We want to ensure that the cargo benchmarks still compile appropriately.
+  cargo-bench:
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    needs:
+      - linting-done
+      - changes
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@e645b0cf01249a964ec099494d38d2da0f0b349f
+        with:
+            toolchain: 1.58.1
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo bench --no-run
+
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
     if: ${{ always() }}
@@ -577,6 +599,7 @@ jobs:
       - portdb
       - complement
       - cargo-test
+      - cargo-bench
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
@@ -588,3 +611,4 @@ jobs:
           skippable: |
             lint-newsfile
             cargo-test
+            cargo-bench
