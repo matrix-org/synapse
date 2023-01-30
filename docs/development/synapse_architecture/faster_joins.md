@@ -186,7 +186,7 @@ clients, only to reject it during the resync. From a client's perspective, the
 effect is similar to a retroactive 
 state change due to state resolution---i.e. a "state reset".[^3]
 
-[^3] Clients should refresh caches to detect such a change. Rumour has it that 
+[^3]: Clients should refresh caches to detect such a change. Rumour has it that 
 sliding sync will fix this.
 
 When all events since the join `J` have been fully-stated, the room resync
