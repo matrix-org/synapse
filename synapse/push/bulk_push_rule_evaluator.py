@@ -69,6 +69,9 @@ STATE_EVENT_TYPES_TO_MARK_UNREAD = {
 }
 
 
+SENTINEL = object()
+
+
 def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
@@ -343,11 +346,21 @@ class BulkPushRuleEvaluator:
         related_events = await self._related_events(event)
 
         # It's possible that old room versions have non-integer power levels (floats or
-        # strings). Workaround this by explicitly converting to int.
+        # strings; even the occasional `null`). For old rooms, we interpret these as if
+        # they were integers. Do this here for the `@room` power level threshold.
+        # Note that this is done automatically for the sender's power level by
+        # _get_power_levels_and_sender_level in its call to get_user_power_level
+        # (even for room V10.)
         notification_levels = power_levels.get("notifications", {})
         if not event.room_version.msc3667_int_only_power_levels:
-            for user_id, level in notification_levels.items():
-                notification_levels[user_id] = int(level)
+            keys = list(notification_levels.keys())
+            for key in keys:
+                level = notification_levels.get(key, SENTINEL)
+                if level is not SENTINEL and type(level) is not int:
+                    try:
+                        notification_levels[key] = int(level)
+                    except (TypeError, ValueError):
+                        del notification_levels[key]
 
         # Pull out any user and room mentions.
         mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
