@@ -15,6 +15,8 @@
 from typing import Any
 from unittest.mock import patch
 
+from parameterized import parameterized
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventContentFields
@@ -48,35 +50,70 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.requester = create_requester(self.alice)
 
         self.room_id = self.helper.create_room_as(
-            self.alice, room_version=RoomVersions.V9.identifier, tok=self.token
+            # This is deliberately set to V9, because we want to test the logic which
+            # handles stringy power levels. Stringy power levels were outlawed in V10.
+            self.alice,
+            room_version=RoomVersions.V9.identifier,
+            tok=self.token,
         )
 
         self.event_creation_handler = self.hs.get_event_creation_handler()
 
-    def test_action_for_event_by_user_handles_noninteger_power_levels(self) -> None:
-        """We should convert floats and strings to integers before passing to Rust.
+    @parameterized.expand(
+        [
+            # The historically-permitted bad values. Alice's notification should be
+            # allowed if this threshold is at or below her power level (60)
+            ("100", False),
+            ("0", True),
+            (12.34, True),
+            (60.0, True),
+            (67.89, False),
+        ]
+    )
+    def test_action_for_event_by_user_handles_noninteger_room_power_levels(
+        self, bad_room_level: object, should_permit: bool
+    ) -> None:
+        """We should convert strings in `room` to integers before passing to Rust.
+
+        Test this as follows:
+        - Create a room as Alice and invite two other users Bob and Charlie.
+        - Set PLs so that Alice has PL 60 and `notifications.room` is set to a bad value.
+        - Have Alice create a message notifying @room.
+        - Evaluate notification actions for that message. This should not raise.
+        - Look in the DB to see if that message triggered a highlight for Bob.
+
+        The test is parameterised with two arguments:
+        - the bad power level value for "room", before JSON serisalistion
+        - whether Bob should expect the message to be highlighted
 
         Reproduces #14060.
 
         A lack of validation: the gift that keeps on giving.
         """
+        # Join another user to the room, so that there is someone to see Alice's
+        # @room notification.
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+        self.helper.join(self.room_id, bob, tok=bob_token)
 
-        # Alter the power levels in that room to include stringy and floaty levels.
-        # We need to suppress the validation logic or else it will reject these dodgy
-        # values. (Presumably this validation was not always present.)
+        # Alter the power levels in that room to include the bad @room notification
+        # level. We need to suppress
+        # - canonicaljson validation, because canonicaljson forbids floats, and
+        # - the event jsonschema validation, because it will forbid bad values.
+        # (Presumably this validation was not always present.)
         with patch("synapse.events.validator.validate_canonicaljson"), patch(
             "synapse.events.validator.jsonschema.validate"
         ):
-            self.helper.send_state(
+            pl_event_id = self.helper.send_state(
                 self.room_id,
                 "m.room.power_levels",
                 {
-                    "users": {self.alice: "100"},  # stringy
-                    "notifications": {"room": 100.0},  # float
+                    "users": {self.alice: 60},
+                    "notifications": {"room": bad_room_level},
                 },
                 self.token,
                 state_key="",
-            )
+            )["event_id"]
 
         # Create a new message event, and try to evaluate it under the dodgy
         # power level event.
@@ -88,16 +125,32 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                     "room_id": self.room_id,
                     "content": {
                         "msgtype": "m.text",
-                        "body": "helo",
+                        "body": "helo @room",
                     },
                     "sender": self.alice,
                 },
+                prev_event_ids=[pl_event_id],
             )
         )
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # should not raise
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
+
+        # Did Bob see Alice's @room notification?
+        highlighted_actions = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                table="event_push_actions_staging",
+                keyvalues={
+                    "event_id": event.event_id,
+                    "user_id": bob,
+                    "highlight": 1,
+                },
+                retcols=("*",),
+                desc="get_event_push_actions_staging",
+            )
+        )
+        self.assertEqual(len(highlighted_actions), int(should_permit))
 
     @override_config({"push": {"enabled": False}})
     def test_action_for_event_by_user_disabled_by_config(self) -> None:
