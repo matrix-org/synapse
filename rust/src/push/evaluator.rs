@@ -158,17 +158,19 @@ impl PushRuleEvaluator {
                 continue;
             }
 
+            let rule_id = &push_rule.rule_id().to_string();
+
             // For backwards-compatibility the legacy mention rules are disabled
-            // only if the event contains the 'm.mentions' property.
+            // only if the event contains the 'm.mentions' property (and if the
+            // experimental feature is enabled, we check that in the Python code).
             if self.has_mentions
-                && (push_rule.rule_id == ".m.rule.contains_display_name"
-                    || push_rule.rule_id == ".m.rule.contains_user_name"
-                    || push_rule.rule_id == ".m.rule.roomnotif")
+                && (rule_id == ".m.rule.contains_display_name"
+                    || rule_id == ".m.rule.contains_user_name"
+                    || rule_id == ".m.rule.roomnotif")
             {
                 continue;
             }
 
-            let rule_id = &push_rule.rule_id().to_string();
             let extev_flag = &RoomVersionFeatures::ExtensibleEvents.as_str().to_string();
             let supports_extensible_events = self.room_version_feature_flags.contains(extev_flag);
             let safe_from_rver_condition = SAFE_EXTENSIBLE_EVENTS_RULE_IDS.contains(rule_id);
