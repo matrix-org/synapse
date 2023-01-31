@@ -69,6 +69,7 @@ class UsersRestServletV2(RestServlet):
         self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
@@ -95,6 +96,13 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
+        # If support for MSC3866 is not enabled, apply no filtering based on the
+        # `approved` column.
+        if self._msc3866_enabled:
+            approved = parse_boolean(request, "approved", default=True)
+        else:
+            approved = True
+
         order_by = parse_string(
             request,
             "order_by",
@@ -115,8 +123,22 @@ class UsersRestServletV2(RestServlet):
         direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
 
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, name, guests, deactivated, order_by, direction
+            start,
+            limit,
+            user_id,
+            name,
+            guests,
+            deactivated,
+            order_by,
+            direction,
+            approved,
         )
+
+        # If support for MSC3866 is not enabled, don't show the approval flag.
+        if not self._msc3866_enabled:
+            for user in users:
+                del user["approved"]
+
         ret = {"users": users, "total": total}
         if (start + limit) < total:
             ret["next_token"] = str(start + len(users))
@@ -163,6 +185,7 @@ class UserRestServletV2(RestServlet):
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
         self.registration_handler = hs.get_registration_handler()
         self.pusher_pool = hs.get_pusherpool()
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -238,6 +261,15 @@ class UserRestServletV2(RestServlet):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "'deactivated' parameter is not of type boolean"
             )
+
+        approved: Optional[bool] = None
+        if "approved" in body and self._msc3866_enabled:
+            approved = body["approved"]
+            if not isinstance(approved, bool):
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "'approved' parameter is not of type boolean",
+                )
 
         # convert List[Dict[str, str]] into List[Tuple[str, str]]
         if external_ids is not None:
@@ -343,6 +375,9 @@ class UserRestServletV2(RestServlet):
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)
 
+            if approved is not None:
+                await self.store.update_user_approval_status(target_user, approved)
+
             user = await self.admin_handler.get_user(target_user)
             assert user is not None
 
@@ -355,6 +390,10 @@ class UserRestServletV2(RestServlet):
             if password is not None:
                 password_hash = await self.auth_handler.hash(password)
 
+            new_user_approved = True
+            if self._msc3866_enabled and approved is not None:
+                new_user_approved = approved
+
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
                 password_hash=password_hash,
@@ -362,6 +401,7 @@ class UserRestServletV2(RestServlet):
                 default_display_name=displayname,
                 user_type=user_type,
                 by_admin=True,
+                approved=new_user_approved,
             )
 
             if threepids is not None:
@@ -375,7 +415,7 @@ class UserRestServletV2(RestServlet):
                         and self.hs.config.email.email_notif_for_new_users
                         and medium == "email"
                     ):
-                        await self.pusher_pool.add_pusher(
+                        await self.pusher_pool.add_or_update_pusher(
                             user_id=user_id,
                             access_token=None,
                             kind="email",
@@ -383,7 +423,7 @@ class UserRestServletV2(RestServlet):
                             app_display_name="Email Notifications",
                             device_display_name=address,
                             pushkey=address,
-                            lang=None,  # We don't know a user's language here
+                            lang=None,
                             data={},
                         )
 
@@ -550,6 +590,7 @@ class UserRegisterServlet(RestServlet):
             user_type=user_type,
             default_display_name=displayname,
             by_admin=True,
+            approved=True,
         )
 
         result = await register._create_registration_details(user_id, body)
@@ -862,8 +903,9 @@ class PushersRestServlet(RestServlet):
         @user:server/pushers
 
     Returns:
-        pushers: Dictionary containing pushers information.
-        total: Number of pushers in dictionary `pushers`.
+        A dictionary with keys:
+            pushers: Dictionary containing pushers information.
+            total: Number of pushers in dictionary `pushers`.
     """
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
@@ -931,7 +973,7 @@ class UserTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
         valid_until_ms = body.get("valid_until_ms")
-        if valid_until_ms and not isinstance(valid_until_ms, int):
+        if type(valid_until_ms) not in (int, type(None)):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "'valid_until_ms' parameter must be an int"
             )
@@ -1083,14 +1125,14 @@ class RateLimitRestServlet(RestServlet):
         messages_per_second = body.get("messages_per_second", 0)
         burst_count = body.get("burst_count", 0)
 
-        if not isinstance(messages_per_second, int) or messages_per_second < 0:
+        if type(messages_per_second) is not int or messages_per_second < 0:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (messages_per_second,),
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if not isinstance(burst_count, int) or burst_count < 0:
+        if type(burst_count) is not int or burst_count < 0:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (burst_count,),
@@ -1156,3 +1198,55 @@ class AccountDataRestServlet(RestServlet):
                 "rooms": by_room_data,
             },
         }
+
+
+class UserByExternalId(RestServlet):
+    """Find a user based on an external ID from an auth provider"""
+
+    PATTERNS = admin_patterns(
+        "/auth_providers/(?P<provider>[^/]*)/users/(?P<external_id>[^/]*)"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self,
+        request: SynapseRequest,
+        provider: str,
+        external_id: str,
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        user_id = await self._store.get_user_by_external_id(provider, external_id)
+
+        if user_id is None:
+            raise NotFoundError("User not found")
+
+        return HTTPStatus.OK, {"user_id": user_id}
+
+
+class UserByThreePid(RestServlet):
+    """Find a user based on 3PID of a particular medium"""
+
+    PATTERNS = admin_patterns("/threepid/(?P<medium>[^/]*)/users/(?P<address>[^/]*)")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self,
+        request: SynapseRequest,
+        medium: str,
+        address: str,
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        user_id = await self._store.get_user_id_by_threepid(medium, address)
+
+        if user_id is None:
+            raise NotFoundError("User not found")
+
+        return HTTPStatus.OK, {"user_id": user_id}

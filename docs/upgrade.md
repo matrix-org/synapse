@@ -15,9 +15,8 @@ this document.
     The website <https://endoflife.date> also offers convenient
     summaries.
 
--   If Synapse was installed using [prebuilt
-    packages](setup/installation.md#prebuilt-packages), you will need to follow the
-    normal process for upgrading those packages.
+-   If Synapse was installed using [prebuilt packages](setup/installation.md#prebuilt-packages),
+    you will need to follow the normal process for upgrading those packages.
 
 -   If Synapse was installed using pip then upgrade to the latest
     version by running:
@@ -89,6 +88,235 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.76.0
+
+## Faster joins are enabled by default
+
+When joining a room for the first time, Synapse 1.76.0rc1 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.
+
+Server admins can opt out of this feature for the time being by setting
+
+```yaml
+experimental:
+    faster_joins: false
+```
+
+in their server config.
+
+## Changes to the account data replication streams
+
+Synapse has changed the format of the account data and devices replication
+streams (between workers). This is a forwards- and backwards-incompatible
+change: v1.75 workers cannot process account data replicated by v1.76 workers,
+and vice versa.
+
+Once all workers are upgraded to v1.76 (or downgraded to v1.75), account data
+and device replication will resume as normal.
+
+## Minimum version of Poetry is now 1.3.2
+
+The minimum supported version of Poetry is now 1.3.2 (previously 1.2.0, [since 
+Synapse 1.67](#upgrading-to-v1670)). If you have used `poetry install` to 
+install Synapse from a source checkout, you should upgrade poetry: see its
+[installation instructions](https://python-poetry.org/docs/#installation).
+For all other installation methods, no acction is required.
+
+# Upgrading to v1.74.0
+
+## Unicode support in user search
+
+This version introduces optional support for an [improved user search dealing with Unicode characters](https://github.com/matrix-org/synapse/pull/14464).
+
+If you want to take advantage of this feature you need to install PyICU,
+the ICU native dependency and its development headers
+so that PyICU can build since no prebuilt wheels are available.
+
+You can follow [the PyICU documentation](https://pypi.org/project/PyICU/) to do so,
+and then do `pip install matrix-synapse[user-search]` for a PyPI install.
+
+Docker images and Debian packages need nothing specific as they already
+include or specify ICU as an explicit dependency.
+
+# Upgrading to v1.73.0
+
+## Legacy Prometheus metric names have now been removed
+
+Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.
+
+This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the `enable_legacy_metrics` configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.
+
+If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names)
+for more context.
+
+
+# Upgrading to v1.72.0
+
+## Dropping support for PostgreSQL 10
+
+In line with our [deprecation policy](deprecation_policy.md), we've dropped
+support for PostgreSQL 10, as it is no longer supported upstream.
+
+This release of Synapse requires PostgreSQL 11+.
+
+
+# Upgrading to v1.71.0
+
+## Removal of the `generate_short_term_login_token` module API method
+
+As announced with the release of [Synapse 1.69.0](#deprecation-of-the-generate_short_term_login_token-module-api-method), the deprecated `generate_short_term_login_token` module method has been removed.
+
+Modules relying on it can instead use the `create_login_token` method.
+
+
+## Changes to the events received by application services (interest)
+
+To align with spec (changed in
+[MSC3905](https://github.com/matrix-org/matrix-spec-proposals/pull/3905)), Synapse now
+only considers local users to be interesting. In other words, the `users` namespace
+regex is only be applied against local users of the homeserver.
+
+Please note, this probably doesn't affect the expected behavior of your application
+service, since an interesting local user in a room still means all messages in the room
+(from local or remote users) will still be considered interesting. And matching a room
+with the `rooms` or `aliases` namespace regex will still consider all events sent in the
+room to be interesting to the application service.
+
+If one of your application service's `users` regex was intending to match a remote user,
+this will no longer match as you expect. The behavioral mismatch between matching all
+local users and some remote users is why the spec was changed/clarified and this
+caveat is no longer supported.
+
+
+## Legacy Prometheus metric names are now disabled by default
+
+Synapse v1.71.0 disables legacy Prometheus metric names by default.
+For administrators that still rely on them and have not yet had chance to update their
+uses of the metrics, it's still possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and at that point,
+it will no longer be possible to re-enable them.
+
+If you do not use metrics or you have already updated your Grafana dashboard(s),
+Prometheus console(s) and alerting rule(s), there is no action needed.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names).
+
+
+# Upgrading to v1.69.0
+
+## Changes to the receipts replication streams
+
+Synapse now includes information indicating if a receipt applies to a thread when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.68 and workers cannot process receipts replicated by v1.69 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.69 (or downgraded to v1.68), receipts
+replication will resume as normal.
+
+
+## Deprecation of legacy Prometheus metric names
+
+In current versions of Synapse, some Prometheus metrics are emitted under two different names,
+with one of the names being older but non-compliant with OpenMetrics and Prometheus conventions
+and one of the names being newer but compliant.
+
+Synapse v1.71.0 will turn the old metric names off *by default*.
+For administrators that still rely on them and have not had chance to update their
+uses of the metrics, it's possible to specify `enable_legacy_metrics: true` in
+the configuration to re-enable them temporarily.
+
+Synapse v1.73.0 will **remove legacy metric names altogether** and it will no longer
+be possible to re-enable them.
+
+The Grafana dashboard, Prometheus recording rules and Prometheus Consoles included
+in the `contrib` directory in the Synapse repository have been updated to no longer
+rely on the legacy names. These can be used on a current version of Synapse
+because current versions of Synapse emit both old and new names.
+
+You may need to update your alerting rules or any other rules that depend on
+the names of Prometheus metrics.
+If you want to test your changes before legacy names are disabled by default,
+you may specify `enable_legacy_metrics: false` in your homeserver configuration.
+
+A list of affected metrics is available on the [Metrics How-to page](https://matrix-org.github.io/synapse/v1.69/metrics-howto.html?highlight=metrics%20deprecated#renaming-of-metrics--deprecation-of-old-names-in-12).
+
+
+## Deprecation of the `generate_short_term_login_token` module API method
+
+The following method of the module API has been deprecated, and is scheduled to
+be remove in v1.71.0:
+
+```python
+def generate_short_term_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: str = "",
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+It has been replaced by an asynchronous equivalent:
+
+```python
+async def create_login_token(
+    self,
+    user_id: str,
+    duration_in_ms: int = (2 * 60 * 1000),
+    auth_provider_id: Optional[str] = None,
+    auth_provider_session_id: Optional[str] = None,
+) -> str:
+    ...
+```
+
+Synapse will log a warning when a module uses the deprecated method, to help
+administrators find modules using it.
+
+
+# Upgrading to v1.68.0
+
+Two changes announced in the upgrade notes for v1.67.0 have now landed in v1.68.0.
+
+## SQLite version requirement
+
+Synapse now requires a SQLite version of 3.27.0 or higher if SQLite is configured as
+Synapse's database.
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- a PostgreSQL database
+
+are not affected.
+
+## Rust requirement when building from source.
+
+Building from a source checkout of Synapse now requires a recent Rust compiler
+(currently Rust 1.58.1, but see also the
+[Platform Dependency Policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html)).
+
+Installations using
+
+- Docker images [from `matrixdotorg`](https://hub.docker.com/r/matrixdotorg/synapse),
+- Debian packages [from Matrix.org](https://packages.matrix.org/), or
+- PyPI wheels via `pip install matrix-synapse` (on supported platforms and architectures)
+
+will not be affected.
+
 # Upgrading to v1.67.0
 
 ## Direct TCP replication is no longer supported: migrate to Redis
@@ -110,6 +338,31 @@ and remove the TCP `replication` listener from config of the master and
 
 The minimum supported version of poetry is now 1.2. This should only affect
 those installing from a source checkout.
+
+## Rust requirement in the next release
+
+From the next major release (v1.68.0) installing Synapse from a source checkout
+will require a recent Rust compiler. Those using packages or
+`pip install matrix-synapse` will not be affected.
+
+The simplest way of installing Rust is via [rustup.rs](https://rustup.rs/)
+
+## SQLite version requirement in the next release
+
+From the next major release (v1.68.0) Synapse will require SQLite 3.27.0 or
+higher. Synapse v1.67.0 will be the last major release supporting SQLite
+versions 3.22 to 3.26.
+
+Those using Docker images or Debian packages from Matrix.org will not be
+affected. If you have installed from source, you should check the version of
+SQLite used by Python with:
+
+```shell
+python -c "import sqlite3; print(sqlite3.sqlite_version)"
+```
+
+If this is too old, refer to your distribution for advice on upgrading.
+
 
 # Upgrading to v1.66.0
 
@@ -669,8 +922,8 @@ Any scripts still using the above APIs should be converted to use the
 ## User-interactive authentication fallback templates can now display errors
 
 This may affect you if you make use of custom HTML templates for the
-[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
-[terms](../synapse/res/templates/terms.html) fallback pages.
+[reCAPTCHA (`synapse/res/templates/recaptcha.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/recaptcha.html) or
+[terms (`synapse/res/templates/terms.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/terms.html) fallback pages.
 
 The template is now provided an `error` variable if the authentication
 process failed. See the default templates linked above for an example.
@@ -1268,7 +1521,7 @@ New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
 is configured to use SSO and a custom
 `sso_redirect_confirm_template_dir` configuration then these templates
 will need to be copied from
-[synapse/res/templates](synapse/res/templates) into that directory.
+[`synapse/res/templates`](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates) into that directory.
 
 ## Synapse SSO Plugins Method Deprecation
 

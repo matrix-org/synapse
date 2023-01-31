@@ -218,14 +218,13 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
     `dir` can be `f` or `b` to indicate forwards and backwards in time from the
     given timestamp.
 
-    GET /_matrix/federation/unstable/org.matrix.msc3030/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
+    GET /_matrix/federation/v1/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
     {
         "event_id": ...
     }
     """
 
     PATH = "/timestamp_to_event/(?P<room_id>[^/]*)/?"
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3030"
 
     async def on_GET(
         self,
@@ -423,7 +422,7 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self._msc3706_enabled = hs.config.experimental.msc3706_enabled
+        self._read_msc3706_query_param = hs.config.experimental.msc3706_enabled
 
     async def on_PUT(
         self,
@@ -437,10 +436,16 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         #   match those given in content
 
         partial_state = False
-        if self._msc3706_enabled:
+        # The stable query parameter wins, if it disagrees with the unstable
+        # parameter for some reason.
+        stable_param = parse_boolean_from_args(query, "omit_members", default=None)
+        if stable_param is not None:
+            partial_state = stable_param
+        elif self._read_msc3706_query_param:
             partial_state = parse_boolean_from_args(
                 query, "org.matrix.msc3706.partial_state", default=False
             )
+
         result = await self.handler.on_send_join_request(
             origin, content, room_id, caller_supports_partial_state=partial_state
         )
@@ -489,7 +494,7 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
         room_version = content["room_version"]
         event = content["event"]
-        invite_room_state = content["invite_room_state"]
+        invite_room_state = content.get("invite_room_state", [])
 
         # Synapse expects invite_room_state to be in unsigned, as it is in v1
         # API
@@ -499,6 +504,11 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
         result = await self.handler.on_invite_request(
             origin, event, room_version_id=room_version
         )
+
+        # We only store invite_room_state for internal use, so remove it before
+        # returning the event to the remote homeserver.
+        result["event"].get("unsigned", {}).pop("invite_room_state", None)
+
         return 200, result
 
 
@@ -549,8 +559,7 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
 
 
 class FederationGetMissingEventsServlet(BaseFederationServerServlet):
-    # TODO(paul): Why does this path alone end with "/?" optional?
-    PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
+    PATH = "/get_missing_events/(?P<room_id>[^/]*)"
 
     async def on_POST(
         self,

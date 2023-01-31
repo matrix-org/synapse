@@ -34,7 +34,7 @@ from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.logging import opentracing
 from synapse.module_api import NOT_SPAM
-from synapse.storage.state import StateFilter
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.types import (
     JsonDict,
     Requester,
@@ -45,6 +45,7 @@ from synapse.types import (
     create_requester,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
@@ -322,6 +323,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -361,6 +363,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -389,60 +393,81 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 event_pos = await self.store.get_position_for_event(existing_event_id)
                 return existing_event_id, event_pos.stream
 
-        event, context = await self.event_creation_handler.create_event(
-            requester,
-            {
-                "type": EventTypes.Member,
-                "content": content,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "state_key": user_id,
-                # For backwards compatibility:
-                "membership": membership,
-            },
-            txn_id=txn_id,
-            allow_no_prev_events=allow_no_prev_events,
-            prev_event_ids=prev_event_ids,
-            state_event_ids=state_event_ids,
-            depth=depth,
-            require_consent=require_consent,
-            outlier=outlier,
-            historical=historical,
-        )
-
-        prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.Member, None)])
-        )
-
-        prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
-
-        if event.membership == Membership.JOIN:
-            newly_joined = True
-            if prev_member_event_id:
-                prev_member_event = await self.store.get_event(prev_member_event_id)
-                newly_joined = prev_member_event.membership != Membership.JOIN
-
-            # Only rate-limit if the user actually joined the room, otherwise we'll end
-            # up blocking profile updates.
-            if newly_joined and ratelimit:
-                await self._join_rate_limiter_local.ratelimit(requester)
-                await self._join_rate_per_room_limiter.ratelimit(
-                    requester, key=room_id, update=False
+        # Try several times, it could fail with PartialStateConflictError,
+        # in handle_new_client_event, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                event, context = await self.event_creation_handler.create_event(
+                    requester,
+                    {
+                        "type": EventTypes.Member,
+                        "content": content,
+                        "room_id": room_id,
+                        "sender": requester.user.to_string(),
+                        "state_key": user_id,
+                        # For backwards compatibility:
+                        "membership": membership,
+                        "origin_server_ts": origin_server_ts,
+                    },
+                    txn_id=txn_id,
+                    allow_no_prev_events=allow_no_prev_events,
+                    prev_event_ids=prev_event_ids,
+                    state_event_ids=state_event_ids,
+                    depth=depth,
+                    require_consent=require_consent,
+                    outlier=outlier,
+                    historical=historical,
                 )
-        with opentracing.start_active_span("handle_new_client_event"):
-            result_event = await self.event_creation_handler.handle_new_client_event(
-                requester,
-                event,
-                context,
-                extra_users=[target],
-                ratelimit=ratelimit,
-            )
 
-        if event.membership == Membership.LEAVE:
-            if prev_member_event_id:
-                prev_member_event = await self.store.get_event(prev_member_event_id)
-                if prev_member_event.membership == Membership.JOIN:
-                    await self._user_left_room(target, room_id)
+                prev_state_ids = await context.get_prev_state_ids(
+                    StateFilter.from_types([(EventTypes.Member, None)])
+                )
+
+                prev_member_event_id = prev_state_ids.get(
+                    (EventTypes.Member, user_id), None
+                )
+
+                if event.membership == Membership.JOIN:
+                    newly_joined = True
+                    if prev_member_event_id:
+                        prev_member_event = await self.store.get_event(
+                            prev_member_event_id
+                        )
+                        newly_joined = prev_member_event.membership != Membership.JOIN
+
+                    # Only rate-limit if the user actually joined the room, otherwise we'll end
+                    # up blocking profile updates.
+                    if newly_joined and ratelimit:
+                        await self._join_rate_limiter_local.ratelimit(requester)
+                        await self._join_rate_per_room_limiter.ratelimit(
+                            requester, key=room_id, update=False
+                        )
+                with opentracing.start_active_span("handle_new_client_event"):
+                    result_event = (
+                        await self.event_creation_handler.handle_new_client_event(
+                            requester,
+                            events_and_context=[(event, context)],
+                            extra_users=[target],
+                            ratelimit=ratelimit,
+                        )
+                    )
+
+                if event.membership == Membership.LEAVE:
+                    if prev_member_event_id:
+                        prev_member_event = await self.store.get_event(
+                            prev_member_event_id
+                        )
+                        if prev_member_event.membership == Membership.JOIN:
+                            await self._user_left_room(target, room_id)
+
+                break
+            except PartialStateConflictError as e:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
 
         # we know it was persisted, so should have a stream ordering
         assert result_event.internal_metadata.stream_ordering
@@ -505,6 +530,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -543,6 +569,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -584,6 +612,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         prev_event_ids=prev_event_ids,
                         state_event_ids=state_event_ids,
                         depth=depth,
+                        origin_server_ts=origin_server_ts,
                     )
 
         return result
@@ -607,6 +636,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -647,6 +677,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -786,6 +818,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 require_consent=require_consent,
                 outlier=outlier,
                 historical=historical,
+                origin_server_ts=origin_server_ts,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
@@ -837,7 +870,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 old_membership == Membership.INVITE
                 and effective_membership_state == Membership.LEAVE
             ):
-                is_blocked = await self._is_server_notice_room(room_id)
+                is_blocked = await self.store.is_server_notice_room(room_id)
                 if is_blocked:
                     raise SynapseError(
                         HTTPStatus.FORBIDDEN,
@@ -1031,6 +1064,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             content=content,
             require_consent=require_consent,
             outlier=outlier,
+            origin_server_ts=origin_server_ts,
         )
 
     async def _should_perform_remote_join(
@@ -1151,8 +1185,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         logger.info("Transferring room state from %s to %s", old_room_id, room_id)
 
         # Find all local users that were in the old room and copy over each user's state
-        users = await self.store.get_users_in_room(old_room_id)
-        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
+        local_users = await self.store.get_local_users_in_room(old_room_id)
+        await self.copy_user_state_on_room_upgrade(old_room_id, room_id, local_users)
 
         # Add new room to the room directory if the old room was there
         # Remove old room from the room directory
@@ -1222,6 +1256,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ratelimit: Whether to rate limit this request.
         Raises:
             SynapseError if there was a problem changing the membership.
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         target_user = UserID.from_string(event.state_key)
         room_id = event.room_id
@@ -1252,7 +1288,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 raise SynapseError(403, "This room has been blocked on this server")
 
         event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[target_user], ratelimit=ratelimit
+            requester,
+            events_and_context=[(event, context)],
+            extra_users=[target_user],
+            ratelimit=ratelimit,
         )
 
         prev_member_event_id = prev_state_ids.get(
@@ -1617,14 +1656,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         return False
 
-    async def _is_server_notice_room(self, room_id: str) -> bool:
-        if self._server_notices_mxid is None:
-            return False
-        is_server_notices_room = await self.store.check_local_user_in_room(
-            user_id=self._server_notices_mxid, room_id=room_id
-        )
-        return is_server_notices_room
-
 
 class RoomMemberMasterHandler(RoomMemberHandler):
     def __init__(self, hs: "HomeServer"):
@@ -1856,22 +1887,37 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             list(previous_membership_event.auth_event_ids()) + prev_event_ids
         )
 
-        event, context = await self.event_creation_handler.create_event(
-            requester,
-            event_dict,
-            txn_id=txn_id,
-            prev_event_ids=prev_event_ids,
-            auth_event_ids=auth_event_ids,
-            outlier=True,
-        )
-        event.internal_metadata.out_of_band_membership = True
+        # Try several times, it could fail with PartialStateConflictError
+        # in handle_new_client_event, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                event, context = await self.event_creation_handler.create_event(
+                    requester,
+                    event_dict,
+                    txn_id=txn_id,
+                    prev_event_ids=prev_event_ids,
+                    auth_event_ids=auth_event_ids,
+                    outlier=True,
+                )
+                event.internal_metadata.out_of_band_membership = True
 
-        result_event = await self.event_creation_handler.handle_new_client_event(
-            requester,
-            event,
-            context,
-            extra_users=[UserID.from_string(target_user)],
-        )
+                result_event = (
+                    await self.event_creation_handler.handle_new_client_event(
+                        requester,
+                        events_and_context=[(event, context)],
+                        extra_users=[UserID.from_string(target_user)],
+                    )
+                )
+
+                break
+            except PartialStateConflictError as e:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
+
         # we know it was persisted, so must have a stream ordering
         assert result_event.internal_metadata.stream_ordering
 

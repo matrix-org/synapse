@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from pydantic import StrictBool, StrictStr, constr
+from typing_extensions import Literal
 
 from twisted.web.server import Request
 
@@ -43,6 +44,7 @@ from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.rest.client.models import (
     AuthenticationData,
+    ClientSecretStr,
     EmailRequestTokenBody,
     MsisdnRequestTokenBody,
 )
@@ -336,6 +338,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if not self.hs.config.registration.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         if not self.config.email.can_verify_email:
             logger.warning(
                 "Adding emails have been disabled due to lack of an email config"
@@ -532,6 +539,11 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         "/add_threepid/msisdn/submit_token$", releases=(), unstable=True
     )
 
+    class PostBody(RequestBodyModel):
+        client_secret: ClientSecretStr
+        sid: StrictStr
+        token: StrictStr
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.config = hs.config
@@ -547,16 +559,14 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
                 "instead.",
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["client_secret", "sid", "token"])
-        assert_valid_client_secret(body["client_secret"])
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # Proxy submit_token request to msisdn threepid delegate
         response = await self.identity_handler.proxy_msisdn_submit_token(
             self.config.registration.account_threepid_delegate_msisdn,
-            body["client_secret"],
-            body["sid"],
-            body["token"],
+            body.client_secret,
+            body.sid,
+            body.token,
         )
         return 200, response
 
@@ -579,6 +589,10 @@ class ThreepidRestServlet(RestServlet):
 
         return 200, {"threepids": threepids}
 
+    # NOTE(dmr): I have chosen not to use Pydantic to parse this request's body, because
+    # the endpoint is deprecated. (If you really want to, you could do this by reusing
+    # ThreePidBindRestServelet.PostBody with an `alias_generator` to handle
+    # `threePidCreds` versus `three_pid_creds`.
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
@@ -627,6 +641,11 @@ class ThreepidAddRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    class PostBody(RequestBodyModel):
+        auth: Optional[AuthenticationData] = None
+        client_secret: ClientSecretStr
+        sid: StrictStr
+
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
@@ -636,22 +655,17 @@ class ThreepidAddRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_dict(body, ["client_secret", "sid"])
-        sid = body["sid"]
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body,
+            body.dict(exclude_unset=True),
             "add a third-party identifier to your account",
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(
-            client_secret, sid
+            body.client_secret, body.sid
         )
         if validation_session:
             await self.auth_handler.add_threepid(
@@ -676,23 +690,20 @@ class ThreepidBindRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_json_object_from_request(request)
+    class PostBody(RequestBodyModel):
+        client_secret: ClientSecretStr
+        id_access_token: StrictStr
+        id_server: StrictStr
+        sid: StrictStr
 
-        assert_params_in_dict(
-            body, ["id_server", "sid", "id_access_token", "client_secret"]
-        )
-        id_server = body["id_server"]
-        sid = body["sid"]
-        id_access_token = body["id_access_token"]
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         await self.identity_handler.bind_threepid(
-            client_secret, sid, user_id, id_server, id_access_token
+            body.client_secret, body.sid, user_id, body.id_server, body.id_access_token
         )
 
         return 200, {}
@@ -708,23 +719,27 @@ class ThreepidUnbindRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.datastore = self.hs.get_datastores().main
 
+    class PostBody(RequestBodyModel):
+        address: StrictStr
+        id_server: Optional[StrictStr] = None
+        medium: Literal["email", "msisdn"]
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Unbind the given 3pid from a specific identity server, or identity servers that are
         known to have this 3pid bound
         """
         requester = await self.auth.get_user_by_req(request)
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["medium", "address"])
-
-        medium = body.get("medium")
-        address = body.get("address")
-        id_server = body.get("id_server")
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # Attempt to unbind the threepid from an identity server. If id_server is None, try to
         # unbind from all identity servers this threepid has been added to in the past
         result = await self.identity_handler.try_unbind_threepid(
             requester.user.to_string(),
-            {"address": address, "medium": medium, "id_server": id_server},
+            {
+                "address": body.address,
+                "medium": body.medium,
+                "id_server": body.id_server,
+            },
         )
         return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
@@ -738,21 +753,25 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    class PostBody(RequestBodyModel):
+        address: StrictStr
+        id_server: Optional[StrictStr] = None
+        medium: Literal["email", "msisdn"]
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["medium", "address"])
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         try:
             ret = await self.auth_handler.delete_threepid(
-                user_id, body["medium"], body["address"], body.get("id_server")
+                user_id, body.medium, body.address, body.id_server
             )
         except Exception:
             # NB. This endpoint should succeed if there is nothing to
@@ -861,19 +880,21 @@ class AccountStatusRestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    PasswordRestServlet(hs).register(http_server)
-    DeactivateAccountRestServlet(hs).register(http_server)
-    EmailThreepidRequestTokenRestServlet(hs).register(http_server)
-    MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
-    AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
-    AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        EmailPasswordRequestTokenRestServlet(hs).register(http_server)
+        PasswordRestServlet(hs).register(http_server)
+        DeactivateAccountRestServlet(hs).register(http_server)
+        EmailThreepidRequestTokenRestServlet(hs).register(http_server)
+        MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
+        AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
+        AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
-    ThreepidAddRestServlet(hs).register(http_server)
-    ThreepidBindRestServlet(hs).register(http_server)
-    ThreepidUnbindRestServlet(hs).register(http_server)
-    ThreepidDeleteRestServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        ThreepidAddRestServlet(hs).register(http_server)
+        ThreepidBindRestServlet(hs).register(http_server)
+        ThreepidUnbindRestServlet(hs).register(http_server)
+        ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
 
-    if hs.config.experimental.msc3720_enabled:
+    if hs.config.worker.worker_app is None and hs.config.experimental.msc3720_enabled:
         AccountStatusRestServlet(hs).register(http_server)

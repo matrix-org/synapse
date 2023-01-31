@@ -22,20 +22,20 @@ logger = logging.getLogger(__name__)
 
 
 class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
-    """Test using one or more client readers for registration."""
+    """Test using one or more generic workers for registration."""
 
     servlets = [register.register_servlets]
 
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
-        config["worker_app"] = "synapse.app.client_reader"
+        config["worker_app"] = "synapse.app.generic_worker"
         config["worker_replication_host"] = "testserv"
         config["worker_replication_http_port"] = "8765"
         return config
 
     def test_register_single_worker(self):
-        """Test that registration works when using a single client reader worker."""
-        worker_hs = self.make_worker_hs("synapse.app.client_reader")
+        """Test that registration works when using a single generic worker."""
+        worker_hs = self.make_worker_hs("synapse.app.generic_worker")
         site = self._hs_to_site[worker_hs]
 
         channel_1 = make_request(
@@ -64,9 +64,9 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(channel_2.json_body["user_id"], "@user:test")
 
     def test_register_multi_worker(self):
-        """Test that registration works when using multiple client reader workers."""
-        worker_hs_1 = self.make_worker_hs("synapse.app.client_reader")
-        worker_hs_2 = self.make_worker_hs("synapse.app.client_reader")
+        """Test that registration works when using multiple generic workers."""
+        worker_hs_1 = self.make_worker_hs("synapse.app.generic_worker")
+        worker_hs_2 = self.make_worker_hs("synapse.app.generic_worker")
 
         site_1 = self._hs_to_site[worker_hs_1]
         channel_1 = make_request(

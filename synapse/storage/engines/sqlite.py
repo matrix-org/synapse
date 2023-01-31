@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
 
 
-class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
+class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(sqlite3, database_config)
 
@@ -49,14 +49,6 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         return True
 
     @property
-    def can_native_upsert(self) -> bool:
-        """
-        Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
-        more work we haven't done yet to tell what was inserted vs updated.
-        """
-        return sqlite3.sqlite_version_info >= (3, 24, 0)
-
-    @property
     def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return False
@@ -70,12 +62,11 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         self, db_conn: sqlite3.Connection, allow_outdated_version: bool = False
     ) -> None:
         if not allow_outdated_version:
-            version = sqlite3.sqlite_version_info
             # Synapse is untested against older SQLite versions, and we don't want
             # to let users upgrade to a version of Synapse with broken support for their
             # sqlite version, because it risks leaving them with a half-upgraded db.
-            if version < (3, 22, 0):
-                raise RuntimeError("Synapse requires sqlite 3.22 or above.")
+            if sqlite3.sqlite_version_info < (3, 27, 0):
+                raise RuntimeError("Synapse requires sqlite 3.27 or above.")
 
     def check_new_database(self, txn: Cursor) -> None:
         """Gets called when setting up a brand new database. This allows us to
@@ -97,6 +88,10 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
 
         db_conn.create_function("rank", 1, _rank)
         db_conn.execute("PRAGMA foreign_keys = ON;")
+
+        # Enable WAL.
+        # see https://www.sqlite.org/wal.html
+        db_conn.execute("PRAGMA journal_mode = WAL;")
         db_conn.commit()
 
     def is_deadlock(self, error: Exception) -> bool:
@@ -128,6 +123,28 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
     ) -> None:
         # All transactions are SERIALIZABLE by default in sqlite
         pass
+
+    @staticmethod
+    def executescript(cursor: sqlite3.Cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Python's built-in SQLite driver does not allow you to do this with DBAPI2's
+        `execute`:
+
+        > execute() will only execute a single SQL statement. If you try to execute more
+        > than one statement with it, it will raise a Warning. Use executescript() if
+        > you want to execute multiple SQL statements with one call.
+
+        The script is prefixed with a `BEGIN TRANSACTION`, since the docs for
+        `executescript` warn:
+
+        > If there is a pending transaction, an implicit COMMIT statement is executed
+        > first. No other implicit transaction control is performed; any transaction
+        > control must be added to sql_script.
+        """
+        # The implementation of `executescript` can be found at
+        # https://github.com/python/cpython/blob/3.11/Modules/_sqlite/cursor.c#L1035.
+        cursor.executescript(f"BEGIN TRANSACTION; {script}")
 
 
 # Following functions taken from: https://github.com/coleifer/peewee

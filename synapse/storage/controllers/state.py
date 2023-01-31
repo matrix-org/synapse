@@ -23,7 +23,7 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Sequence,
+    Set,
     Tuple,
 )
 
@@ -31,12 +31,12 @@ from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
 from synapse.storage.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
 from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
@@ -407,6 +407,7 @@ class StateStorageController:
         self,
         room_id: str,
         state_filter: Optional[StateFilter] = None,
+        await_full_state: bool = True,
         on_invalidate: Optional[Callable[[], None]] = None,
     ) -> StateMap[str]:
         """Get the current state event ids for a room based on the
@@ -419,13 +420,17 @@ class StateStorageController:
             room_id: The room to get the state IDs of. state_filter: The state
             filter used to fetch state from the
                 database.
+            await_full_state: if true, will block if we do not yet have complete
+               state for the room.
             on_invalidate: Callback for when the `get_current_state_ids` cache
                 for the room gets invalidated.
 
         Returns:
             The current state of the room.
         """
-        if not state_filter or state_filter.must_await_full_state(self._is_mine_id):
+        if await_full_state and (
+            not state_filter or state_filter.must_await_full_state(self._is_mine_id)
+        ):
             await self._partial_state_room_tracker.await_full_state(room_id)
 
         if state_filter and not state_filter.is_full():
@@ -488,8 +493,6 @@ class StateStorageController:
                  up to date.
         """
         # FIXME(faster_joins): what do we do here?
-        #   https://github.com/matrix-org/synapse/issues/12814
-        #   https://github.com/matrix-org/synapse/issues/12815
         #   https://github.com/matrix-org/synapse/issues/13008
 
         return await self.stores.main.get_partial_current_state_deltas(
@@ -524,12 +527,60 @@ class StateStorageController:
         )
         return state_map.get(key)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> Sequence[str]:
-        """Get current hosts in room based on current state."""
+    async def get_current_hosts_in_room(self, room_id: str) -> AbstractSet[str]:
+        """Get current hosts in room based on current state.
+
+        Blocks until we have full state for the given room. This only happens for rooms
+        with partial state.
+        """
 
         await self._partial_state_room_tracker.await_full_state(room_id)
 
         return await self.stores.main.get_current_hosts_in_room(room_id)
+
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
+>>>>>>> 3dfc4a08dc2e77178f2c2af68dc14b32da2d8b8f
+        """Get current hosts in room based on current state.
+
+        Blocks until we have full state for the given room. This only happens for rooms
+        with partial state.
+
+        Returns:
+            A list of hosts in the room, sorted by longest in the room first. (aka.
+            sorted by join with the lowest depth first).
+        """
+
+        await self._partial_state_room_tracker.await_full_state(room_id)
+
+        return await self.stores.main.get_current_hosts_in_room_ordered(room_id)
+
+    async def get_current_hosts_in_room_or_partial_state_approximation(
+        self, room_id: str
+    ) -> Collection[str]:
+        """Get approximation of current hosts in room based on current state.
+
+        For rooms with full state, this is equivalent to `get_current_hosts_in_room`,
+        with the same order of results.
+
+        For rooms with partial state, no blocking occurs. Instead, the list of hosts
+        in the room at the time of joining is combined with the list of hosts which
+        joined the room afterwards. The returned list may include hosts that are not
+        actually in the room and exclude hosts that are in the room, since we may
+        calculate state incorrectly during the partial state phase. The order of results
+        is arbitrary for rooms with partial state.
+        """
+        # We have to read this list first to mitigate races with un-partial stating.
+        # This will be empty for rooms with full state.
+        hosts_at_join = await self.stores.main.get_partial_state_servers_at_join(
+            room_id
+        )
+
+        hosts_from_state = await self.stores.main.get_current_hosts_in_room(room_id)
+
+        hosts = set(hosts_at_join)
+        hosts.update(hosts_from_state)
+
+        return hosts
 
     async def get_users_in_room_with_profiles(
         self, room_id: str

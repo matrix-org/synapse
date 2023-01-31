@@ -1,7 +1,7 @@
 # User Admin API
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## Query User Account
 
@@ -37,11 +37,13 @@ It returns a JSON body like the following:
     "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
+    "erased": false,
     "shadow_banned": 0,
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,
     "consent_version": null,
+    "consent_ts": null,
     "external_ids": [
         {
             "auth_provider": "<provider1>",
@@ -166,6 +168,7 @@ A response body like the following is returned:
             "admin": 0,
             "user_type": null,
             "deactivated": 0,
+            "erased": false,
             "shadow_banned": 0,
             "displayname": "<User One>",
             "avatar_url": null,
@@ -176,6 +179,7 @@ A response body like the following is returned:
             "admin": 1,
             "user_type": null,
             "deactivated": 0,
+            "erased": false,
             "shadow_banned": 0,
             "displayname": "<User Two>",
             "avatar_url": "<avatar_url>",
@@ -246,6 +250,7 @@ The following fields are returned in the JSON response body:
   - `user_type` - string - Type of the user. Normal users are type `None`.
     This allows user type specific behaviour. There are also types `support` and `bot`. 
   - `deactivated` - bool - Status if that user has been marked as deactivated.
+  - `erased` - bool - Status if that user has been marked as erased.
   - `shadow_banned` - bool - Status if that user has been marked as shadow banned.
   - `displayname` - string - The user's display name if they have set one.
   - `avatar_url` - string -  The user's avatar URL if they have set one.
@@ -364,6 +369,7 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
 - Remove from monthly active users
+- Remove user's consent information (consent version and timestamp)
 
 ## Reset password
 
@@ -1153,3 +1159,80 @@ GET /_synapse/admin/v1/username_available?username=$localpart
 
 The request and response format is the same as the
 [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
+
+### Find a user based on their ID in an auth provider
+
+The API is:
+
+```
+GET /_synapse/admin/v1/auth_providers/$provider/users/$external_id
+```
+
+When a user matched the given ID for the given provider, an HTTP code `200` with a response body like the following is returned:
+
+```json
+{
+    "user_id": "@hello:example.org"
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `provider` - The ID of the authentication provider, as advertised by the [`GET /_matrix/client/v3/login`](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login) API in the `m.login.sso` authentication method.
+- `external_id` - The user ID from the authentication provider. Usually corresponds to the `sub` claim for OIDC providers, or to the `uid` attestation for SAML2 providers.
+
+The `external_id` may have characters that are not URL-safe (typically `/`, `:` or `@`), so it is advised to URL-encode those parameters.
+
+**Errors**
+
+Returns a `404` HTTP status code if no user was found, with a response body like this:
+
+```json
+{
+    "errcode":"M_NOT_FOUND",
+    "error":"User not found"
+}
+```
+
+_Added in Synapse 1.68.0._
+
+
+### Find a user based on their Third Party ID (ThreePID or 3PID)
+
+The API is:
+
+```
+GET /_synapse/admin/v1/threepid/$medium/users/$address
+```
+
+When a user matched the given address for the given medium, an HTTP code `200` with a response body like the following is returned:
+
+```json
+{
+    "user_id": "@hello:example.org"
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `medium` - Kind of third-party ID, either `email` or `msisdn`.
+- `address` - Value of the third-party ID.
+
+The `address` may have characters that are not URL-safe, so it is advised to URL-encode those parameters.
+
+**Errors**
+
+Returns a `404` HTTP status code if no user was found, with a response body like this:
+
+```json
+{
+    "errcode":"M_NOT_FOUND",
+    "error":"User not found"
+}
+```
+
+_Added in Synapse 1.72.0._

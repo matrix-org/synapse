@@ -25,6 +25,8 @@ class ServerNameTestCase(unittest.TestCase):
             "[0abc:1def::1234]": ("[0abc:1def::1234]", None),
             "1.2.3.4:1": ("1.2.3.4", 1),
             "[0abc:1def::1234]:8080": ("[0abc:1def::1234]", 8080),
+            ":80": ("", 80),
+            "": ("", None),
         }
 
         for i, o in test_data.items():
@@ -42,6 +44,7 @@ class ServerNameTestCase(unittest.TestCase):
             "newline.com\n",
             ".empty-label.com",
             "1234:5678:80",  # too many colons
+            ":80",
         ]
         for i in test_data:
             try:

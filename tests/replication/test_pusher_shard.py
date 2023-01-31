@@ -38,11 +38,6 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
 
-    def default_config(self):
-        conf = super().default_config()
-        conf["start_pushers"] = False
-        return conf
-
     def _create_pusher_and_send_msg(self, localpart):
         # Create a user that will get push notifications
         user_id = self.register_user(localpart, "pass")
@@ -55,7 +50,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         token_id = user_dict.token_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
                 access_token=token_id,
                 kind="http",
@@ -92,8 +87,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         self.make_worker_hs(
-            "synapse.app.pusher",
-            {"start_pushers": False},
+            "synapse.app.generic_worker",
+            {"worker_name": "pusher1", "pusher_instances": ["pusher1"]},
             proxied_blacklisted_http_client=http_client_mock,
         )
 
@@ -122,9 +117,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         self.make_worker_hs(
-            "synapse.app.pusher",
+            "synapse.app.generic_worker",
             {
-                "start_pushers": True,
                 "worker_name": "pusher1",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
@@ -137,9 +131,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         self.make_worker_hs(
-            "synapse.app.pusher",
+            "synapse.app.generic_worker",
             {
-                "start_pushers": True,
                 "worker_name": "pusher2",
                 "pusher_instances": ["pusher1", "pusher2"],
             },

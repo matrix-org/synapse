@@ -19,6 +19,7 @@ import logging
 import types
 import urllib
 from http import HTTPStatus
+from http.client import FOUND
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
@@ -266,7 +267,7 @@ class HttpServer(Protocol):
                 request. The first argument will be the request object and
                 subsequent arguments will be any matched groups from the regex.
                 This should return either tuple of (code, response), or None.
-            servlet_classname (str): The name of the handler to be used in prometheus
+            servlet_classname: The name of the handler to be used in prometheus
                 and opentracing logs.
         """
 
@@ -339,7 +340,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
             return callback_return
 
-        _unrecognised_request_handler(request)
+        return _unrecognised_request_handler(request)
 
     @abc.abstractmethod
     def _send_response(
@@ -576,7 +577,24 @@ def _unrecognised_request_handler(request: Request) -> NoReturn:
     Args:
         request: Unused, but passed in to match the signature of ServletCallback.
     """
-    raise UnrecognizedRequestError()
+    raise UnrecognizedRequestError(code=404)
+
+
+class UnrecognizedRequestResource(resource.Resource):
+    """
+    Similar to twisted.web.resource.NoResource, but returns a JSON 404 with an
+    errcode of M_UNRECOGNIZED.
+    """
+
+    def render(self, request: SynapseRequest) -> int:
+        f = failure.Failure(UnrecognizedRequestError(code=404))
+        return_json_error(f, request, None)
+        # A response has already been sent but Twisted requires either NOT_DONE_YET
+        # or the response bytes as a return value.
+        return NOT_DONE_YET
+
+    def getChild(self, name: str, request: Request) -> resource.Resource:
+        return self
 
 
 class RootRedirect(resource.Resource):
@@ -598,7 +616,7 @@ class RootRedirect(resource.Resource):
 class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
-    def render_OPTIONS(self, request: Request) -> bytes:
+    def render_OPTIONS(self, request: SynapseRequest) -> bytes:
         request.setResponseCode(204)
         request.setHeader(b"Content-Length", b"0")
 
@@ -705,7 +723,7 @@ class _ByteProducer:
         self._request = None
 
 
-def _encode_json_bytes(json_object: Any) -> bytes:
+def _encode_json_bytes(json_object: object) -> bytes:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
@@ -746,7 +764,7 @@ def respond_with_json(
         return None
 
     if canonical_json:
-        encoder = encode_canonical_json
+        encoder: Callable[[object], bytes] = encode_canonical_json
     else:
         encoder = _encode_json_bytes
 
@@ -763,7 +781,7 @@ def respond_with_json(
 
 
 def respond_with_json_bytes(
-    request: Request,
+    request: SynapseRequest,
     code: int,
     json_bytes: bytes,
     send_cors: bool = False,
@@ -859,7 +877,7 @@ def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
     _ByteProducer(request, bytes_generator)
 
 
-def set_cors_headers(request: Request) -> None:
+def set_cors_headers(request: SynapseRequest) -> None:
     """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
@@ -870,10 +888,20 @@ def set_cors_headers(request: Request) -> None:
     request.setHeader(
         b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
-    request.setHeader(
-        b"Access-Control-Allow-Headers",
-        b"X-Requested-With, Content-Type, Authorization, Date",
-    )
+    if request.experimental_cors_msc3886:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"ETag, Location, X-Max-Bytes",
+        )
+    else:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date",
+        )
 
 
 def set_corp_headers(request: Request) -> None:
@@ -942,10 +970,25 @@ def set_clickjacking_protection_headers(request: Request) -> None:
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def respond_with_redirect(request: Request, url: bytes) -> None:
-    """Write a 302 response to the request, if it is still alive."""
+def respond_with_redirect(
+    request: SynapseRequest, url: bytes, statusCode: int = FOUND, cors: bool = False
+) -> None:
+    """
+    Write a 302 (or other specified status code) response to the request, if it is still alive.
+
+    Args:
+        request: The http request to respond to.
+        url: The URL to redirect to.
+        statusCode: The HTTP status code to use for the redirect (defaults to 302).
+        cors: Whether to set CORS headers on the response.
+    """
     logger.debug("Redirect to %s", url.decode("utf-8"))
-    request.redirect(url)
+
+    if cors:
+        set_cors_headers(request)
+
+    request.setResponseCode(statusCode)
+    request.setHeader(b"location", url)
     finish_request(request)
 
 

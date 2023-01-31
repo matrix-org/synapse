@@ -1,1 +1,0 @@
-Refactor `get_users_in_room(room_id)` mis-use with dedicated `get_current_hosts_in_room(room_id)` function.

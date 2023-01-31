@@ -197,7 +197,7 @@ def register_cache(
         resize_callback: A function which can be called to resize the cache.
 
     Returns:
-        CacheMetric: an object which provides inc_{hits,misses,evictions} methods
+        an object which provides inc_{hits,misses,evictions} methods
     """
     if resizable:
         if not resize_callback:
@@ -205,8 +205,9 @@ def register_cache(
         add_resizable_cache(cache_name, resize_callback)
 
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
+    metric_name = "cache_%s_%s" % (cache_type, cache_name)
     caches_by_name[cache_name] = cache
-    CACHE_METRIC_REGISTRY.register_hook(metric.collect)
+    CACHE_METRIC_REGISTRY.register_hook(metric_name, metric.collect)
     return metric
 
 

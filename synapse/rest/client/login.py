@@ -28,7 +28,14 @@ from typing import (
 
 from typing_extensions import TypedDict
 
-from synapse.api.errors import Codes, InvalidClientTokenError, LoginError, SynapseError
+from synapse.api.constants import ApprovalNoticeMedium
+from synapse.api.errors import (
+    Codes,
+    InvalidClientTokenError,
+    LoginError,
+    NotApprovedError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
@@ -55,11 +62,11 @@ logger = logging.getLogger(__name__)
 
 class LoginResponse(TypedDict, total=False):
     user_id: str
-    access_token: str
+    access_token: Optional[str]
     home_server: str
     expires_in_ms: Optional[int]
     refresh_token: Optional[str]
-    device_id: str
+    device_id: Optional[str]
     well_known: Optional[Dict[str, Any]]
 
 
@@ -90,6 +97,12 @@ class LoginRestServlet(RestServlet):
         self.oidc_enabled = hs.config.oidc.oidc_enabled
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
+        )
+
+        # Whether we need to check if the user has been approved or not.
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
         self.auth = hs.get_auth()
@@ -220,6 +233,14 @@ class LoginRestServlet(RestServlet):
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
 
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(result["user_id"])
+            if not approved:
+                raise NotApprovedError(
+                    msg="This account is pending approval by a server administrator.",
+                    approval_notice_medium=ApprovalNoticeMedium.NONE,
+                )
+
         well_known_data = self._well_known_builder.get_well_known()
         if well_known_data:
             result["well_known"] = well_known_data
@@ -329,7 +350,7 @@ class LoginRestServlet(RestServlet):
             auth_provider_session_id: The session ID got during login from the SSO IdP.
 
         Returns:
-            result: Dictionary of account information after successful login.
+            Dictionary of account information after successful login.
         """
 
         # Before we actually log them in we check if they've already logged in
@@ -355,6 +376,16 @@ class LoginRestServlet(RestServlet):
                 "device_id cannot be longer than 512 characters.",
                 errcode=Codes.INVALID_PARAM,
             )
+
+        if self._require_approval:
+            approved = await self.auth_handler.is_user_approved(user_id)
+            if not approved:
+                # If the user isn't approved (and needs to be) we won't allow them to
+                # actually log in, so we don't want to create a device/access token.
+                return LoginResponse(
+                    user_id=user_id,
+                    home_server=self.hs.hostname,
+                )
 
         initial_display_name = login_submission.get("initial_device_display_name")
         (
@@ -405,8 +436,7 @@ class LoginRestServlet(RestServlet):
             The body of the JSON response.
         """
         token = login_submission["token"]
-        auth_handler = self.auth_handler
-        res = await auth_handler.validate_short_term_login_token(token)
+        res = await self.auth_handler.consume_login_token(token)
 
         return await self._complete_login(
             res.user_id,
@@ -506,7 +536,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 
 class RefreshTokenServlet(RestServlet):
-    PATTERNS = (re.compile("^/_matrix/client/v1/refresh$"),)
+    PATTERNS = client_patterns("/refresh$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()

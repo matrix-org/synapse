@@ -36,18 +36,20 @@ class AuthenticationData(RequestBodyModel):
     type: Optional[StrictStr] = None
 
 
-class ThreePidRequestTokenBody(RequestBodyModel):
-    if TYPE_CHECKING:
-        client_secret: StrictStr
-    else:
-        # See also assert_valid_client_secret()
-        client_secret: constr(
-            regex="[0-9a-zA-Z.=_-]",  # noqa: F722
-            min_length=0,
-            max_length=255,
-            strict=True,
-        )
+if TYPE_CHECKING:
+    ClientSecretStr = StrictStr
+else:
+    # See also assert_valid_client_secret()
+    ClientSecretStr = constr(
+        regex="[0-9a-zA-Z.=_-]",  # noqa: F722
+        min_length=1,
+        max_length=255,
+        strict=True,
+    )
 
+
+class ThreepidRequestTokenBody(RequestBodyModel):
+    client_secret: ClientSecretStr
     id_server: Optional[StrictStr]
     id_access_token: Optional[StrictStr]
     next_link: Optional[StrictStr]
@@ -62,7 +64,7 @@ class ThreePidRequestTokenBody(RequestBodyModel):
         return token
 
 
-class EmailRequestTokenBody(ThreePidRequestTokenBody):
+class EmailRequestTokenBody(ThreepidRequestTokenBody):
     email: StrictStr
 
     # Canonicalise the email address. The addresses are all stored canonicalised
@@ -80,6 +82,6 @@ else:
     ISO3116_1_Alpha_2 = constr(regex="[A-Z]{2}", strict=True)
 
 
-class MsisdnRequestTokenBody(ThreePidRequestTokenBody):
+class MsisdnRequestTokenBody(ThreepidRequestTokenBody):
     country: ISO3116_1_Alpha_2
     phone_number: StrictStr

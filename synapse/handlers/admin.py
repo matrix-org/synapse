@@ -16,7 +16,7 @@ import abc
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
 from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
 from synapse.visibility import filter_events_for_client
@@ -32,6 +32,7 @@ class AdminHandler:
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
     async def get_whois(self, user: UserID) -> JsonDict:
         connections = []
@@ -70,9 +71,14 @@ class AdminHandler:
             "appservice_id",
             "consent_server_notice_sent",
             "consent_version",
+            "consent_ts",
             "user_type",
             "is_guest",
         }
+
+        if self._msc3866_enabled:
+            # Only include the approved flag if support for MSC3866 is enabled.
+            user_info_to_return.add("approved")
 
         # Restrict returned keys to a known set.
         user_info_dict = {
@@ -94,6 +100,7 @@ class AdminHandler:
         user_info_dict["avatar_url"] = profile.avatar_url
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
+        user_info_dict["erased"] = await self.store.is_user_erased(user.to_string())
 
         return user_info_dict
 
@@ -190,7 +197,7 @@ class AdminHandler:
             # efficient method perhaps but it does guarantee we get everything.
             while True:
                 events, _ = await self.store.paginate_room_events(
-                    room_id, from_key, to_key, limit=100, direction="f"
+                    room_id, from_key, to_key, limit=100, direction=Direction.FORWARDS
                 )
                 if not events:
                     break

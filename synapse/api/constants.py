@@ -17,6 +17,8 @@
 
 """Contains constants from the specification."""
 
+import enum
+
 from typing_extensions import Final
 
 # the max size of a (canonical-json-encoded) event
@@ -30,6 +32,9 @@ MAX_ALIAS_LENGTH = 255
 
 # the maximum length for a user id is 255 characters
 MAX_USERID_LENGTH = 255
+
+# Constant value used for the pseudo-thread which is the main timeline.
+MAIN_TIMELINE: Final = "main"
 
 
 class Membership:
@@ -122,6 +127,8 @@ class EventTypes:
     MSC2716_BATCH: Final = "org.matrix.msc2716.batch"
     MSC2716_MARKER: Final = "org.matrix.msc2716.marker"
 
+    Reaction: Final = "m.reaction"
+
 
 class ToDeviceEventTypes:
     RoomKeyRequest: Final = "m.room_key_request"
@@ -147,6 +154,7 @@ class EduTypes:
 
 class RejectedReason:
     AUTH_ERROR: Final = "auth_error"
+    OVERSIZED_EVENT: Final = "oversized_event"
 
 
 class RoomCreationPreset:
@@ -225,6 +233,12 @@ class EventContentFields:
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
+    # Use for mentioning users.
+    MSC3952_MENTIONS: Final = "org.matrix.msc3952.mentions"
+
+    # an unspecced field added to to-device messages to identify them uniquely-ish
+    TO_DEVICE_MSGID: Final = "org.matrix.msgid"
+
 
 class RoomTypes:
     """Understood values of the room_type field of m.room.create events."""
@@ -240,6 +254,7 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
+    TAG: Final = "m.tag"
 
 
 class HistoryVisibility:
@@ -269,3 +284,19 @@ class PublicRoomsFilterFields:
 
     GENERIC_SEARCH_TERM: Final = "generic_search_term"
     ROOM_TYPES: Final = "room_types"
+
+
+class ApprovalNoticeMedium:
+    """Identifier for the medium this server will use to serve notice of approval for a
+    specific user's registration.
+
+    As defined in https://github.com/matrix-org/matrix-spec-proposals/blob/babolivier/m_not_approved/proposals/3866-user-not-approved-error.md
+    """
+
+    NONE = "org.matrix.msc3866.none"
+    EMAIL = "org.matrix.msc3866.email"
+
+
+class Direction(enum.Enum):
+    BACKWARDS = "b"
+    FORWARDS = "f"

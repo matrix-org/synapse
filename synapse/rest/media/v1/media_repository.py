@@ -19,10 +19,11 @@ import shutil
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
+from matrix_common.types.mxc_uri import MXCUri
+
 import twisted.internet.error
 import twisted.web.http
 from twisted.internet.defer import Deferred
-from twisted.web.resource import Resource
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -33,6 +34,7 @@ from synapse.api.errors import (
 )
 from synapse.config._base import ConfigError
 from synapse.config.repository import ThumbnailRequirement
+from synapse.http.server import UnrecognizedRequestResource
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -186,7 +188,7 @@ class MediaRepository:
         content: IO,
         content_length: int,
         auth_user: UserID,
-    ) -> str:
+    ) -> MXCUri:
         """Store uploaded content for a local user and return the mxc URL
 
         Args:
@@ -219,7 +221,7 @@ class MediaRepository:
 
         await self._generate_thumbnails(None, media_id, media_id, media_type)
 
-        return "mxc://%s/%s" % (self.server_name, media_id)
+        return MXCUri(self.server_name, media_id)
 
     async def get_local_media(
         self, request: SynapseRequest, media_id: str, name: Optional[str]
@@ -342,8 +344,8 @@ class MediaRepository:
         download from remote server.
 
         Args:
-            server_name (str): Remote server_name where the media originated.
-            media_id (str): The media ID of the content (as defined by the
+            server_name: Remote server_name where the media originated.
+            media_id: The media ID of the content (as defined by the
                 remote server).
 
         Returns:
@@ -1044,7 +1046,7 @@ class MediaRepository:
         return removed_media, len(removed_media)
 
 
-class MediaRepositoryResource(Resource):
+class MediaRepositoryResource(UnrecognizedRequestResource):
     """File uploading and downloading.
 
     Uploads are POSTed to a resource which returns a token which is used to GET

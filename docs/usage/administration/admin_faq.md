@@ -2,7 +2,7 @@
 
 How do I become a server admin?
 ---
-If your server already has an admin account you should use the [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not) to promote other accounts to become admins.
+If your server already has an admin account you should use the [User Admin API](../../admin_api/user_admin_api.md#change-whether-a-user-is-a-server-administrator-or-not) to promote other accounts to become admins.
 
 If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.
 
@@ -30,6 +30,14 @@ What users are registered on my server?
 ---
 ```sql
 SELECT NAME from users;
+```
+
+How can I export user data?
+---
+Synapse includes a Python command to export data for a specific user. It takes the homeserver
+configuration file and the full Matrix ID of the user to export:
+```console
+python -m synapse.app.admin_cmd -c <config_file> export-data <user_id>
 ```
 
 Manually resetting passwords
@@ -79,7 +87,7 @@ Here we can see that the request has been tagged with `GET-37`. (The tag depends
 grep 'GET-37' homeserver.log
 ```
 
-If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code).
+If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see [quoting code](https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code)).
 
 
 What do all those fields in the 'Processed' line mean?
@@ -115,7 +123,7 @@ something like the following in their logs:
 
     2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
 
-This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](docs/reverse_proxy.md) and double-check that your settings are correct.
+This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](../../reverse_proxy.md) and double-check that your settings are correct.
 
 
 Help!! Synapse is slow and eats all my RAM/CPU!
