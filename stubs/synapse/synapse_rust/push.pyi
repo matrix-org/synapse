@@ -14,7 +14,7 @@
 
 from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
 
-from synapse.types import JsonDict
+from synapse.types import JsonDict, SimpleJsonValue
 
 class PushRule:
     @property
@@ -56,7 +56,7 @@ def get_base_rule_ids() -> Collection[str]: ...
 class PushRuleEvaluator:
     def __init__(
         self,
-        flattened_keys: Mapping[str, str],
+        flattened_keys: Mapping[str, SimpleJsonValue],
         has_mentions: bool,
         user_mentions: Set[str],
         room_mention: bool,

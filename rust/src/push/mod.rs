@@ -56,7 +56,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::{Context, Error};
 use log::warn;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
+use pyo3::types::{PyBool, PyLong, PyString};
 use pythonize::{depythonize, pythonize};
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
@@ -248,6 +250,36 @@ impl<'de> Deserialize<'de> for Action {
     }
 }
 
+/// A simple JSON values (string, int, boolean, or null).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum SimpleJsonValue {
+    Str(String),
+    Int(i64),
+    Bool(bool),
+    Null,
+}
+
+impl<'source> FromPyObject<'source> for SimpleJsonValue {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        if let Ok(s) = <PyString as pyo3::PyTryFrom>::try_from(ob) {
+            Ok(SimpleJsonValue::Str(s.to_string()))
+        // A bool *is* an int, ensure we try bool first.
+        } else if let Ok(b) = <PyBool as pyo3::PyTryFrom>::try_from(ob) {
+            Ok(SimpleJsonValue::Bool(b.extract()?))
+        } else if let Ok(i) = <PyLong as pyo3::PyTryFrom>::try_from(ob) {
+            Ok(SimpleJsonValue::Int(i.extract()?))
+        } else if ob.is_none() {
+            Ok(SimpleJsonValue::Null)
+        } else {
+            Err(PyTypeError::new_err(format!(
+                "Can't convert from {} to SimpleJsonValue",
+                ob.get_type().name()?
+            )))
+        }
+    }
+}
+
 /// A condition used in push rules to match against an event.
 ///
 /// We need this split as `serde` doesn't give us the ability to have a
@@ -315,8 +347,7 @@ pub struct EventMatchCondition {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExactEventMatchCondition {
     pub key: Cow<'static, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<Cow<'static, str>>,
+    pub value: Cow<'static, SimpleJsonValue>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]
@@ -554,8 +585,38 @@ fn test_deserialize_unstable_msc3931_condition() {
 
 #[test]
 fn test_deserialize_unstable_msc3758_condition() {
+    // A string condition should work.
+    let json =
+        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":"foo"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
+    ));
+
+    // A boolean condition should work.
     let json =
         r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":true}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
+    ));
+
+    // An integer condition should work.
+    let json = r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":1}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
+    ));
+
+    // A null condition should work
+    let json =
+        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":null}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(

@@ -14,9 +14,6 @@
 
 from typing import Any, Dict, List, Optional, Set, Union, cast
 
-# If this is named skip then trial skips the whole module.
-from unittest import skip as _skip
-
 import frozendict
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -60,7 +57,7 @@ class FlattenDictTestCase(unittest.TestCase):
         )
 
     def test_non_string(self) -> None:
-        """Non-string items are dropped."""
+        """Booleans, ints, and nulls should be kept while other items are dropped."""
         input: Dict[str, Any] = {
             "woo": "woo",
             "foo": True,
@@ -69,7 +66,9 @@ class FlattenDictTestCase(unittest.TestCase):
             "fuzz": [],
             "boo": {},
         }
-        self.assertEqual({"woo": "woo"}, _flatten_dict(input))
+        self.assertEqual(
+            {"woo": "woo", "foo": True, "bar": 1, "baz": None}, _flatten_dict(input)
+        )
 
     def test_event(self) -> None:
         """Events can also be flattened."""
@@ -454,7 +453,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "values should match on frozendicts",
         )
 
-    @_skip("Not yet working")
     def test_exact_event_match_boolean(self) -> None:
         """Check that exact_event_match conditions work as expected for booleans."""
 
@@ -505,7 +503,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "incorrect types should not match",
             )
 
-    @_skip("Not yet working")
     def test_exact_event_match_null(self) -> None:
         """Check that exact_event_match conditions work as expected for null."""
 
@@ -526,8 +523,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "incorrect types should not match",
             )
 
-    @_skip("Not yet working")
-    def test_exact_event_match_numbers(self) -> None:
+    def test_exact_event_match_integer(self) -> None:
         """Check that exact_event_match conditions work as expected for integers."""
 
         condition = {

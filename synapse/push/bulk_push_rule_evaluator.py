@@ -43,6 +43,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
+from synapse.types import SimpleJsonValue
 from synapse.types.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
@@ -502,15 +503,15 @@ StateGroup = Union[object, int]
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
-    result: Optional[Dict[str, str]] = None,
+    result: Optional[Dict[str, SimpleJsonValue]] = None,
     *,
     msc3783_escape_event_match_key: bool = False,
-) -> Dict[str, str]:
+) -> Dict[str, SimpleJsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
     flatten it into a single layer dictionary by combining the keys & sub-keys.
 
-    Any (non-dictionary), non-string value is dropped.
+    String, integer, boolean, and null values are kept. All others are dropped.
 
     Transforms:
 
@@ -541,6 +542,8 @@ def _flatten_dict(
 
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
+        elif isinstance(value, bool) or type(value) is int or value is None:
+            result[".".join(prefix + [key])] = value
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
             _flatten_dict(
