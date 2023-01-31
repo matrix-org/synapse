@@ -904,7 +904,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
         raise ConfigError(DIRECT_TCP_ERROR, ("listeners", str(num), "type"))
 
     port = listener.get("port")
-    if not isinstance(port, int):
+    if type(port) is not int:
         raise ConfigError("Listener configuration is lacking a valid 'port' option")
 
     tls = listener.get("tls", False)

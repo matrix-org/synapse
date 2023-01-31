@@ -143,7 +143,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
         else:
             # Get length of token to generate (default is 16)
             length = body.get("length", 16)
-            if not isinstance(length, int):
+            if type(length) is not int:
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "length must be an integer",
@@ -163,8 +163,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
 
         uses_allowed = body.get("uses_allowed", None)
         if not (
-            uses_allowed is None
-            or (isinstance(uses_allowed, int) and uses_allowed >= 0)
+            uses_allowed is None or (type(uses_allowed) is int and uses_allowed >= 0)
         ):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
@@ -173,13 +172,13 @@ class NewRegistrationTokenRestServlet(RestServlet):
             )
 
         expiry_time = body.get("expiry_time", None)
-        if not isinstance(expiry_time, (int, type(None))):
+        if type(expiry_time) not in (int, type(None)):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "expiry_time must be an integer or null",
                 Codes.INVALID_PARAM,
             )
-        if isinstance(expiry_time, int) and expiry_time < self.clock.time_msec():
+        if type(expiry_time) is int and expiry_time < self.clock.time_msec():
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "expiry_time must not be in the past",
@@ -284,7 +283,7 @@ class RegistrationTokenRestServlet(RestServlet):
             uses_allowed = body["uses_allowed"]
             if not (
                 uses_allowed is None
-                or (isinstance(uses_allowed, int) and uses_allowed >= 0)
+                or (type(uses_allowed) is int and uses_allowed >= 0)
             ):
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
@@ -295,13 +294,13 @@ class RegistrationTokenRestServlet(RestServlet):
 
         if "expiry_time" in body:
             expiry_time = body["expiry_time"]
-            if not isinstance(expiry_time, (int, type(None))):
+            if type(expiry_time) not in (int, type(None)):
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "expiry_time must be an integer or null",
                     Codes.INVALID_PARAM,
                 )
-            if isinstance(expiry_time, int) and expiry_time < self.clock.time_msec():
+            if type(expiry_time) is int and expiry_time < self.clock.time_msec():
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "expiry_time must not be in the past",
