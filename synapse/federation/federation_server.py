@@ -62,12 +62,12 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import (
+    SynapseTags,
     log_kv,
     set_tag,
     start_active_span_from_edu,
     tag_args,
     trace,
-    SynapseTags,
 )
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
