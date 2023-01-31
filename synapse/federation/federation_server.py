@@ -63,7 +63,6 @@ from synapse.logging.context import (
 )
 from synapse.logging.opentracing import (
     log_kv,
-    set_tag,
     start_active_span_from_edu,
     tag_args,
     trace,
@@ -679,7 +678,6 @@ class FederationServer(FederationBase):
         room_id: str,
         caller_supports_partial_state: bool = False,
     ) -> Dict[str, Any]:
-        set_tag("partial_state", caller_supports_partial_state)
         await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
             requester=None,
             key=room_id,
