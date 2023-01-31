@@ -162,13 +162,13 @@ IMMUTABLE_BUILTIN_VALUE_TYPES = {
 IMMUTABLE_BUILTIN_CONTAINER_TYPES = {
     "builtins.frozenset",
     "typing.AbstractSet",
+    "typing.Sequence",
 }
 
 MUTABLE_BUILTIN_CONTAINER_TYPES = {
     "builtins.set",
     "builtins.list",
     "builtins.dict",
-    "typing.Sequence",
 }
 
 AT_CACHED_MUTABLE_RETURN = ErrorCode(
