@@ -26,7 +26,7 @@ from typing import (
 
 from typing_extensions import Literal
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import Direction, EduTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -234,9 +234,10 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
         room_id: str,
     ) -> Tuple[int, JsonDict]:
         timestamp = parse_integer_from_args(query, "ts", required=True)
-        direction = parse_string_from_args(
-            query, "dir", default="f", allowed_values=["f", "b"], required=True
+        direction_str = parse_string_from_args(
+            query, "dir", allowed_values=["f", "b"], required=True
         )
+        direction = Direction(direction_str)
 
         return await self.handler.on_timestamp_to_event_request(
             origin, room_id, timestamp, direction

@@ -16,13 +16,14 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from urllib import parse as urlparse
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import Direction, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
     assert_params_in_dict,
+    parse_enum,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -942,7 +943,7 @@ class RoomTimestampToEventRestServlet(RestServlet):
         await assert_user_is_admin(self._auth, requester)
 
         timestamp = parse_integer(request, "ts", required=True)
-        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
         (
             event_id,
