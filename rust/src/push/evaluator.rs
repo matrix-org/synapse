@@ -22,8 +22,8 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, EventMatchCondition, FilteredPushRules, KnownCondition,
-    RelatedEventMatchCondition,
+    Action, Condition, EventMatchCondition, ExactEventMatchCondition, FilteredPushRules,
+    KnownCondition, RelatedEventMatchCondition,
 };
 
 lazy_static! {
@@ -98,6 +98,9 @@ pub struct PushRuleEvaluator {
     /// If MSC3931 (room version feature flags) is enabled. Usually controlled by the same
     /// flag as MSC1767 (extensible events core).
     msc3931_enabled: bool,
+
+    /// If MSC3758 (exact_event_match push rule condition) is enabled.
+    msc3758_exact_event_match: bool,
 }
 
 #[pymethods]
@@ -117,6 +120,7 @@ impl PushRuleEvaluator {
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
+        msc3758_exact_event_match: bool,
     ) -> Result<Self, Error> {
         let body = flattened_keys
             .get("content.body")
@@ -136,6 +140,7 @@ impl PushRuleEvaluator {
             related_event_match_enabled,
             room_version_feature_flags,
             msc3931_enabled,
+            msc3758_exact_event_match,
         })
     }
 
@@ -252,6 +257,9 @@ impl PushRuleEvaluator {
             KnownCondition::EventMatch(event_match) => {
                 self.match_event_match(event_match, user_id)?
             }
+            KnownCondition::ExactEventMatch(exact_event_match) => {
+                self.match_exact_event_match(exact_event_match)?
+            }
             KnownCondition::RelatedEventMatch(event_match) => {
                 self.match_related_event_match(event_match, user_id)?
             }
@@ -353,6 +361,31 @@ impl PushRuleEvaluator {
 
         let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
         compiled_pattern.is_match(haystack)
+    }
+
+    /// Evaluates a `exact_event_match` condition. (MSC3758)
+    fn match_exact_event_match(
+        &self,
+        exact_event_match: &ExactEventMatchCondition,
+    ) -> Result<bool, Error> {
+        // First check if the feature is enabled.
+        if !self.msc3758_exact_event_match {
+            return Ok(false);
+        }
+
+        let value = if let Some(value) = &exact_event_match.value {
+            value
+        } else {
+            return Ok(false);
+        };
+
+        let haystack = if let Some(haystack) = self.flattened_keys.get(&*exact_event_match.key) {
+            haystack
+        } else {
+            return Ok(false);
+        };
+
+        Ok(haystack == value)
     }
 
     /// Evaluates a `related_event_match` condition. (MSC3664)
@@ -468,6 +501,7 @@ fn push_rule_evaluator() {
         true,
         vec![],
         true,
+        true,
     )
     .unwrap();
 
@@ -495,6 +529,7 @@ fn test_requires_room_version_supports_condition() {
         BTreeMap::new(),
         false,
         flags,
+        true,
         true,
     )
     .unwrap();

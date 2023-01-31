@@ -425,6 +425,7 @@ class BulkPushRuleEvaluator:
             self._related_event_match_enabled,
             event.room_version.msc3931_push_features,
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
+            self.hs.config.experimental.msc3758_exact_event_match,
         )
 
         users = rules_by_user.keys()

@@ -67,6 +67,7 @@ class PushRuleEvaluator:
         related_event_match_enabled: bool,
         room_version_feature_flags: Tuple[str, ...],
         msc3931_enabled: bool,
+        msc3758_exact_event_match: bool,
     ): ...
     def run(
         self,

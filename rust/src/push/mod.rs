@@ -267,6 +267,8 @@ pub enum Condition {
 #[serde(tag = "kind")]
 pub enum KnownCondition {
     EventMatch(EventMatchCondition),
+    #[serde(rename = "com.beeper.msc3758.exact_event_match")]
+    ExactEventMatch(ExactEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
@@ -307,6 +309,14 @@ pub struct EventMatchCondition {
     pub pattern: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_type: Option<Cow<'static, str>>,
+}
+
+/// The body of a [`Condition::ExactEventMatch`]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExactEventMatchCondition {
+    pub key: Cow<'static, str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Cow<'static, str>>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]
@@ -539,6 +549,18 @@ fn test_deserialize_unstable_msc3931_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RoomVersionSupports { feature: _ })
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3758_condition() {
+    let json =
+        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":true}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
     ));
 }
 
