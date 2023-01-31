@@ -1956,11 +1956,13 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
 
         Args:
             room_id: the ID of the room
-            servers: other servers known to be in the room
+            servers: other servers known to be in the room. must include `joined_via`.
             device_lists_stream_id: the device_lists stream ID at the time when we first
                 joined the room.
             joined_via: the server name we requested a partial join from.
         """
+        assert joined_via in servers
+
         await self.db_pool.runInteraction(
             "store_partial_state_room",
             self._store_partial_state_room_txn,

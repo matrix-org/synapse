@@ -110,7 +110,8 @@ class SendJoinResult:
     # True if 'state' elides non-critical membership events
     partial_state: bool
 
-    # if 'partial_state' is set, a list of the servers in the room (otherwise empty)
+    # If 'partial_state' is set, a list of the servers in the room (otherwise empty).
+    # Always contains the server we joined off.
     servers_in_room: List[str]
 
 
@@ -1152,15 +1153,22 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
-            if response.members_omitted and not response.servers_in_room:
-                raise InvalidResponseError(
-                    "members_omitted was set, but no servers were listed in the room"
-                )
+            servers_in_room = response.servers_in_room
+            if response.members_omitted:
+                if not servers_in_room:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but no servers were listed in the room"
+                    )
 
-            if response.members_omitted and not partial_state:
-                raise InvalidResponseError(
-                    "members_omitted was set, but we asked for full state"
-                )
+                if destination not in servers_in_room:
+                    # `servers_in_room` is supposed to be a complete list.
+                    # Fix things up if the remote homeserver is badly behaved.
+                    servers_in_room = [destination] + servers_in_room
+
+                if not partial_state:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but we asked for full state"
+                    )
 
             return SendJoinResult(
                 event=event,
@@ -1168,7 +1176,7 @@ class FederationClient(FederationBase):
                 auth_chain=signed_auth,
                 origin=destination,
                 partial_state=response.members_omitted,
-                servers_in_room=response.servers_in_room or [],
+                servers_in_room=servers_in_room or [],
             )
 
         # MSC3083 defines additional error codes for room joins.
