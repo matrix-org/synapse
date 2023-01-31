@@ -133,8 +133,9 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
 
         This is not provided by DBAPI2, and so needs engine-specific support.
 
-        Some database engines may automatically COMMIT the ongoing transaction both
-        before and after executing the script.
+        Any ongoing transaction is committed before executing the script in its own
+        transaction. The script transaction is left open and it is the responsibility of
+        the caller to commit it.
         """
         ...
 
