@@ -233,7 +233,7 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </ul>
 <h1 id="upgrading-to-v1760"><a class="header" href="#upgrading-to-v1760">Upgrading to v1.76.0</a></h1>
 <h2 id="faster-joins-are-enabled-by-default"><a class="header" href="#faster-joins-are-enabled-by-default">Faster joins are enabled by default</a></h2>
-<p>When joining a room for the first time, Synapse 1.76.0rc1 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.</p>
+<p>When joining a room for the first time, Synapse 1.76.0 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.</p>
 <p>Server admins can opt out of this feature for the time being by setting</p>
 <pre><code class="language-yaml">experimental:
     faster_joins: false
