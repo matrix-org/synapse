@@ -224,15 +224,8 @@ class ListRoomRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        direction = parse_string(request, "dir", default="f")
-        if direction not in ("f", "b"):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        reverse_order = True if direction == "b" else False
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
+        reverse_order = True if direction == Direction.BACKWARDS else False
 
         # Return list of rooms according to parameters
         rooms, total_rooms = await self.store.get_rooms_paginate(
