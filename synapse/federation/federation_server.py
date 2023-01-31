@@ -63,6 +63,7 @@ from synapse.logging.context import (
 )
 from synapse.logging.opentracing import (
     SynapseTags,
+    force_tracing,
     log_kv,
     set_tag,
     start_active_span_from_edu,
@@ -684,6 +685,10 @@ class FederationServer(FederationBase):
             SynapseTags.SEND_JOIN_RESPONSE_IS_PARTIAL_STATE,
             caller_supports_partial_state,
         )
+        # TEMPORARY HACK: always gather partial join traces, to see if we can find low-
+        # hanging fruit for making them faster.
+        if caller_supports_partial_state:
+            force_tracing()
         await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
             requester=None,
             key=room_id,
