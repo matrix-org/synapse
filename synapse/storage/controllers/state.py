@@ -14,6 +14,7 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
     Awaitable,
     Callable,
@@ -23,7 +24,6 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
 )
 
@@ -539,7 +539,6 @@ class StateStorageController:
         return await self.stores.main.get_current_hosts_in_room(room_id)
 
     async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
->>>>>>> 3dfc4a08dc2e77178f2c2af68dc14b32da2d8b8f
         """Get current hosts in room based on current state.
 
         Blocks until we have full state for the given room. This only happens for rooms

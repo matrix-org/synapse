@@ -15,7 +15,6 @@
 import logging
 from typing import (
     TYPE_CHECKING,
-    AbstractSet,
     Collection,
     Dict,
     FrozenSet,
@@ -399,7 +398,9 @@ class RelationsWorkerStore(SQLBaseStore):
         return result is not None
 
     @cached()
-    async def get_aggregation_groups_for_event(self, event_id: str) -> Sequence[JsonDict]:
+    async def get_aggregation_groups_for_event(
+        self, event_id: str
+    ) -> Sequence[JsonDict]:
         raise NotImplementedError()
 
     @cachedList(
@@ -409,7 +410,6 @@ class RelationsWorkerStore(SQLBaseStore):
         self, event_ids: Collection[str]
     ) -> Mapping[str, Optional[List[JsonDict]]]:
         """Get a list of annotations on the given events, grouped by event type and
->>>>>>> 1799a54a545618782840a60950ef4b64da9ee24d
         aggregation key, sorted by count.
 
         This is used e.g. to get the what and how many reactions have happend

@@ -1818,7 +1818,6 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         account_data_by_room: Mapping[str, Mapping[str, JsonDict]],
-        account_data_by_room: Dict[str, Dict[str, JsonDict]],
     ) -> Tuple[AbstractSet[str], AbstractSet[str], AbstractSet[str], AbstractSet[str]]:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.

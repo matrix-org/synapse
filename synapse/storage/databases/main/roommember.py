@@ -16,7 +16,6 @@ import logging
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
-    Callable,
     Collection,
     Dict,
     FrozenSet,
@@ -997,7 +996,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(iterable=True, max_entries=10000)
     async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
->>>>>>> 3dfc4a08dc2e77178f2c2af68dc14b32da2d8b8f
         """
         Get current hosts in room based on current state.
 
