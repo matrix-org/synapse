@@ -1192,16 +1192,26 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
-    @cached(iterable=True)
-    async def get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
+    async def get_partial_state_servers_at_join(
+        self, room_id: str
+    ) -> Optional[Sequence[str]]:
         """Gets the list of servers in a partial state room at the time we joined it.
 
         Returns:
             The `servers_in_room` list from the `/send_join` response for partial state
             rooms. May not be accurate or complete, as it comes from a remote
             homeserver.
-            An empty list for full state rooms.
+            `None` for full state rooms.
         """
+        servers_in_room = await self._get_partial_state_servers_at_join(room_id)
+
+        if len(servers_in_room) == 0:
+            return None
+
+        return servers_in_room
+
+    @cached(iterable=True)
+    async def _get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
         return await self.db_pool.simple_select_onecol(
             "partial_state_rooms_servers",
             keyvalues={"room_id": room_id},
@@ -1999,7 +2009,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
         self._invalidate_cache_and_stream(
-            txn, self.get_partial_state_servers_at_join, (room_id,)
+            txn, self._get_partial_state_servers_at_join, (room_id,)
         )
 
     async def write_partial_state_rooms_join_event_id(
@@ -2410,7 +2420,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
         self._invalidate_cache_and_stream(
-            txn, self.get_partial_state_servers_at_join, (room_id,)
+            txn, self._get_partial_state_servers_at_join, (room_id,)
         )
 
         DatabasePool.simple_insert_txn(
