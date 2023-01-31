@@ -457,6 +457,7 @@ fn push_rule_evaluator() {
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
         BTreeSet::new(),
         false,
         10,
@@ -484,6 +485,7 @@ fn test_requires_room_version_supports_condition() {
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
         BTreeSet::new(),
         false,
         10,

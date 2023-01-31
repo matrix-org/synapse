@@ -112,7 +112,9 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions={"@user:test"})
+        evaluator = self._get_evaluator(
+            {}, has_mentions=True, user_mentions={"@user:test"}
+        )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
         evaluator = self._get_evaluator(
