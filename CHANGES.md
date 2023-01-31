@@ -1,3 +1,12 @@
+Synapse 1.76.0 (2023-01-31)
+===========================
+
+Improved Documentation
+----------------------
+
+- Describe the ideas and the internal machinery behind faster joins. ([\#14677](https://github.com/matrix-org/synapse/issues/14677))
+
+
 Synapse 1.76.0rc2 (2023-01-27)
 ==============================
 
