@@ -15,11 +15,16 @@ emitted by Synapse with the default [logging configuration](
 This should allow lnav:
 
 - to interpret timestamps, allowing log interleaving;
-- to interpret log severity levels, allowing colouring by log level(!!!); and
-- to interpret request IDs, allowing you to skip through a specific request.
+- to interpret log severity levels, allowing colouring by log level(!!!);
+- to interpret request IDs, allowing you to skip through a specific request; and
+- to highlight room, event and user IDs in logs.
 
 See also https://gist.github.com/benje/e2ab750b0a81d11920d83af637d289f7 for a
  similar example.
+
+## Example
+
+![](lnav_format_example.png)
 
 ## Tips
 
