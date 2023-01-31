@@ -575,26 +575,6 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
         fed_client = fed_handler.federation_client
 
         room_id = "!room:example.com"
-        membership_event = make_event_from_dict(
-            {
-                "room_id": room_id,
-                "type": "m.room.member",
-                "sender": "@alice:test",
-                "state_key": "@alice:test",
-                "content": {"membership": "join"},
-            },
-            RoomVersions.V10,
-        )
-
-        mock_make_membership_event = Mock(
-            return_value=make_awaitable(
-                (
-                    "example.com",
-                    membership_event,
-                    RoomVersions.V10,
-                )
-            )
-        )
 
         EVENT_CREATE = make_event_from_dict(
             {
@@ -639,6 +619,26 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
                 "origin_server_ts": 1,
             },
             room_version=RoomVersions.V10,
+        )
+        membership_event = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "type": "m.room.member",
+                "sender": "@alice:test",
+                "state_key": "@alice:test",
+                "content": {"membership": "join"},
+                "prev_events": [EVENT_INVITATION_MEMBERSHIP.event_id],
+            },
+            RoomVersions.V10,
+        )
+        mock_make_membership_event = Mock(
+            return_value=make_awaitable(
+                (
+                    "example.com",
+                    membership_event,
+                    RoomVersions.V10,
+                )
+            )
         )
         mock_send_join = Mock(
             return_value=make_awaitable(
