@@ -151,7 +151,7 @@ def check_is_cacheable(signature: CallableType, ctx: MethodSigContext) -> None:
         ctx.api.fail(message, ctx.context, code=AT_CACHED_MUTABLE_RETURN)
 
 
-IMMUTABLE_BUILTIN_VALUE_TYPES = {
+IMMUTABLE_VALUE_TYPES = {
     "builtins.bool",
     "builtins.int",
     "builtins.float",
@@ -159,13 +159,16 @@ IMMUTABLE_BUILTIN_VALUE_TYPES = {
     "builtins.bytes",
 }
 
-IMMUTABLE_BUILTIN_CONTAINER_TYPES = {
+IMMUTABLE_CONTAINER_TYPES_REQUIRING_HASHABLE_ELEMENTS = {
     "builtins.frozenset",
     "typing.AbstractSet",
-    "typing.Sequence",
 }
 
-MUTABLE_BUILTIN_CONTAINER_TYPES = {
+IMMUTABLE_CONTAINER_TYPES_ALLOWING_MUTABLE_ELEMENTS = {
+    "typing.Sequence"
+}
+
+MUTABLE_CONTAINER_TYPES = {
     "builtins.set",
     "builtins.list",
     "builtins.dict",
@@ -193,16 +196,20 @@ def is_cacheable(
         return True, ("may be mutable" if verbose else None)
 
     elif isinstance(rt, Instance):
-        if rt.type.fullname in IMMUTABLE_BUILTIN_VALUE_TYPES:
+        if (
+            rt.type.fullname in IMMUTABLE_VALUE_TYPES
+            or rt.type.fullname in IMMUTABLE_CONTAINER_TYPES_REQUIRING_HASHABLE_ELEMENTS
+        ):
             return True, None
 
         elif rt.type.fullname == "typing.Mapping":
             return is_cacheable(rt.args[1], signature, verbose)
 
-        elif rt.type.fullname in IMMUTABLE_BUILTIN_CONTAINER_TYPES:
+        elif rt.type.fullname in IMMUTABLE_CONTAINER_TYPES_ALLOWING_MUTABLE_ELEMENTS:
+            # E.g. Collection[T] is cachable iff T is cachable.
             return is_cacheable(rt.args[0], signature, verbose)
 
-        elif rt.type.fullname in MUTABLE_BUILTIN_CONTAINER_TYPES:
+        elif rt.type.fullname in MUTABLE_CONTAINER_TYPES:
             return False, None
 
         elif "attrs" in rt.type.metadata:
