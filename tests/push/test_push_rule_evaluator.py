@@ -42,6 +42,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self,
         content: JsonMapping,
         *,
+        has_mentions: bool = False,
         user_mentions: Optional[Set[str]] = None,
         room_mention: bool = False,
         related_events: Optional[JsonDict] = None,
@@ -62,6 +63,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
+            has_mentions,
             user_mentions or set(),
             room_mention,
             room_member_count,
@@ -102,19 +104,19 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         condition = {"kind": "org.matrix.msc3952.is_user_mention"}
 
         # No mentions shouldn't match.
-        evaluator = self._get_evaluator({})
+        evaluator = self._get_evaluator({}, has_mentions=True)
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, user_mentions=set())
+        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions=set())
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator({}, user_mentions={"@user:test"})
+        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions={"@user:test"})
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
         evaluator = self._get_evaluator(
-            {}, user_mentions={"@another:test", "@user:test"}
+            {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
         )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
@@ -126,16 +128,16 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         condition = {"kind": "org.matrix.msc3952.is_room_mention"}
 
         # No room mention shouldn't match.
-        evaluator = self._get_evaluator({})
+        evaluator = self._get_evaluator({}, has_mentions=True)
         self.assertFalse(evaluator.matches(condition, None, None))
 
         # Room mention should match.
-        evaluator = self._get_evaluator({}, room_mention=True)
+        evaluator = self._get_evaluator({}, has_mentions=True, room_mention=True)
         self.assertTrue(evaluator.matches(condition, None, None))
 
         # A room mention and user mention is valid.
         evaluator = self._get_evaluator(
-            {}, user_mentions={"@another:test"}, room_mention=True
+            {}, has_mentions=True, user_mentions={"@another:test"}, room_mention=True
         )
         self.assertTrue(evaluator.matches(condition, None, None))
 

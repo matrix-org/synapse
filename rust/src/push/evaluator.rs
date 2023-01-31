@@ -68,6 +68,8 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
+    /// True if the event has a messages property and MSC3952 support is enabled.
+    has_mentions: bool,
     /// The user mentions that were part of the message.
     user_mentions: BTreeSet<String>,
     /// True if the message is a room message.
@@ -105,6 +107,7 @@ impl PushRuleEvaluator {
     #[new]
     pub fn py_new(
         flattened_keys: BTreeMap<String, String>,
+        has_mentions: bool,
         user_mentions: BTreeSet<String>,
         room_mention: bool,
         room_member_count: u64,
@@ -123,6 +126,7 @@ impl PushRuleEvaluator {
         Ok(PushRuleEvaluator {
             flattened_keys,
             body,
+            has_mentions,
             user_mentions,
             room_mention,
             room_member_count,
@@ -151,6 +155,16 @@ impl PushRuleEvaluator {
     ) -> Vec<Action> {
         'outer: for (push_rule, enabled) in push_rules.iter() {
             if !enabled {
+                continue;
+            }
+
+            // For backwards-compatibility the legacy mention rules are disabled
+            // only if the event contains the 'm.mentions' property.
+            if self.has_mentions
+                && (push_rule.rule_id == ".m.rule.contains_display_name"
+                    || push_rule.rule_id == ".m.rule.contains_user_name"
+                    || push_rule.rule_id == ".m.rule.roomnotif")
+            {
                 continue;
             }
 
