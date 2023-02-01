@@ -20,17 +20,7 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 from prometheus_client import Histogram
@@ -70,7 +60,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.types import JsonDict, get_domain_from_id
+from synapse.types import JsonDict, StrCollection, get_domain_from_id
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
@@ -179,7 +169,7 @@ class FederationHandler:
         # A dictionary mapping room IDs to (initial destination, other destinations)
         # tuples.
         self._partial_state_syncs_maybe_needing_restart: Dict[
-            str, Tuple[Optional[str], Collection[str]]
+            str, Tuple[Optional[str], StrCollection]
         ] = {}
         # A lock guarding the partial state flag for rooms.
         # When the lock is held for a given room, no other concurrent code may
@@ -437,7 +427,7 @@ class FederationHandler:
             )
         )
 
-        async def try_backfill(domains: Collection[str]) -> bool:
+        async def try_backfill(domains: StrCollection) -> bool:
             # TODO: Should we try multiple of these at a time?
 
             # Number of contacted remote homeservers that have denied our backfill
@@ -1730,7 +1720,7 @@ class FederationHandler:
     def _start_partial_state_room_sync(
         self,
         initial_destination: Optional[str],
-        other_destinations: Collection[str],
+        other_destinations: StrCollection,
         room_id: str,
     ) -> None:
         """Starts the background process to resync the state of a partial state room,
@@ -1812,7 +1802,7 @@ class FederationHandler:
     async def _sync_partial_state_room(
         self,
         initial_destination: Optional[str],
-        other_destinations: Collection[str],
+        other_destinations: StrCollection,
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
@@ -1868,21 +1858,17 @@ class FederationHandler:
 
                 async with self._is_partial_state_room_linearizer.queue(room_id):
                     logger.info("Clearing partial-state flag for %s", room_id)
-                    success = await self.store.clear_partial_state_room(room_id)
+                    new_stream_id = await self.store.clear_partial_state_room(room_id)
 
-                    # Poke the notifier so that other workers see the write to
-                    # the un-partial-stated rooms stream.
-                    self._notifier.notify_replication()
-
-                if success:
+                if new_stream_id is not None:
                     logger.info("State resync complete for %s", room_id)
                     self._storage_controllers.state.notify_room_un_partial_stated(
                         room_id
                     )
 
-                    # TODO(faster_joins) update room stats and user directory?
-                    #   https://github.com/matrix-org/synapse/issues/12814
-                    #   https://github.com/matrix-org/synapse/issues/12815
+                    await self._notifier.on_un_partial_stated_room(
+                        room_id, new_stream_id
+                    )
                     return
 
                 # we raced against more events arriving with partial state. Go round
@@ -1953,9 +1939,9 @@ class FederationHandler:
 
 def _prioritise_destinations_for_partial_state_resync(
     initial_destination: Optional[str],
-    other_destinations: Collection[str],
+    other_destinations: StrCollection,
     room_id: str,
-) -> Collection[str]:
+) -> StrCollection:
     """Work out the order in which we should ask servers to resync events.
 
     If an `initial_destination` is given, it takes top priority. Otherwise

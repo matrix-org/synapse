@@ -132,10 +132,31 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
+        rule_id: Cow::Borrowed(".org.matrix.msc3952.is_user_mention"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::IsUserMention)]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.contains_display_name"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::ContainsDisplayName)]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
+        default: true,
+        default_enabled: true,
+    },
+    PushRule {
+        rule_id: Cow::Borrowed(".org.matrix.msc3952.is_room_mention"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[
+            Condition::Known(KnownCondition::IsRoomMention),
+            Condition::Known(KnownCondition::SenderNotificationPermission {
+                key: Cow::Borrowed("room"),
+            }),
+        ]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION]),
         default: true,
         default_enabled: true,
     },

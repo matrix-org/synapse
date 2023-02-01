@@ -1,1 +1,0 @@
-Faster joins: Fix incompatibility with joins into restricted rooms where no local users have the ability to invite.

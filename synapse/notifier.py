@@ -46,6 +46,7 @@ from synapse.types import (
     JsonDict,
     PersistedEventPosition,
     RoomStreamToken,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -313,6 +314,32 @@ class Notifier:
             )
             event_entries.append((entry, event.event_id))
         await self.notify_new_room_events(event_entries, max_room_stream_token)
+
+    async def on_un_partial_stated_room(
+        self,
+        room_id: str,
+        new_token: int,
+    ) -> None:
+        """Used by the resync background processes to wake up all listeners
+        of this room when it is un-partial-stated.
+
+        It will also notify replication listeners of the change in stream.
+        """
+
+        # Wake up all related user stream notifiers
+        user_streams = self.room_to_user_streams.get(room_id, set())
+        time_now_ms = self.clock.time_msec()
+        for user_stream in user_streams:
+            try:
+                user_stream.notify(
+                    StreamKeyType.UN_PARTIAL_STATED_ROOMS, new_token, time_now_ms
+                )
+            except Exception:
+                logger.exception("Failed to notify listener")
+
+        # Poke the replication so that other workers also see the write to
+        # the un-partial-stated rooms stream.
+        self.notify_replication()
 
     async def notify_new_room_events(
         self,
@@ -690,7 +717,7 @@ class Notifier:
 
     async def _get_room_ids(
         self, user: UserID, explicit_room_id: Optional[str]
-    ) -> Tuple[Collection[str], bool]:
+    ) -> Tuple[StrCollection, bool]:
         joined_room_ids = await self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
