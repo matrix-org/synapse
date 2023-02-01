@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -94,6 +95,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self._joined_host_linearizer = Linearizer("_JoinedHostsCache")
 
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
+        self._storage_controllers = hs.get_storage_controllers()
 
         if (
             self.hs.config.worker.run_background_tasks
@@ -1131,12 +1133,32 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             else:
                 # The cache doesn't match the state group or prev state group,
                 # so we calculate the result from first principles.
+                #
+                # We need to fetch all hosts joined to the room according to `state` by
+                # inspecting all join memberships in `state`. However, if the `state` is
+                # relatively recent then many of its events are likely to be held in
+                # the current state of the room, which is easily available and likely
+                # cached. We therefore compute the set of `state` events not in the
+                # current state and only fetch those.
+                current_state = await self._storage_controllers.state.get_current_state(
+                    room_id
+                )
+                unknown_state_events = {}
+                joined_users_in_current_state = []
+
+                for (type, state_key), event_id in state.items():
+                    current_event = current_state.get((type, state_key))
+                    if current_event is None or current_event.event_id != event_id:
+                        unknown_state_events[type, state_key] = event_id
+                    elif current_event.membership == Membership.JOIN:
+                        joined_users_in_current_state.append(state_key)
+
                 joined_user_ids = await self.get_joined_user_ids_from_state(
-                    room_id, state
+                    room_id, unknown_state_events
                 )
 
                 cache.hosts_to_joined_users = {}
-                for user_id in joined_user_ids:
+                for user_id in chain(joined_user_ids, joined_users_in_current_state):
                     host = intern_string(get_domain_from_id(user_id))
                     cache.hosts_to_joined_users.setdefault(host, set()).add(user_id)
 
