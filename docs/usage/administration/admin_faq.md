@@ -54,10 +54,11 @@ to run Synapse:
 poetry run python -m synapse.app.admin_cmd -c <config_file> export-data <user_id> --output-directory <directory_path>
 ```
 
-The directory to store the exported data must be empty.
-It can be set with the optional parameter `--output-directory`.
-Defaults to creating a temp directory. This is a subfolder that starts with
-`synapse-exfiltrate` in `/tmp`, `/var/tmp`, or `/usr/tmp`, in that order.
+The directory to store the export data in can be customised with the
+`--output-directory` parameter; ensure that the provided directory is
+empty. If this parameter is not provided, Synapse defaults to creating
+a temporary directory (which starts with "synapse-exfiltrate") in `/tmp`,
+`/var/tmp`, or `/usr/tmp`, in that order.
 
 The exported data has the following layout:
 
