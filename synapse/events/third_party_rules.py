@@ -45,6 +45,7 @@ CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 ON_THREEPID_BIND_CALLBACK = Callable[[str, str, str], Awaitable]
+ON_UPDATE_IDENTITY_SERVER_BINDING_CALLBACK = Callable[[str, str, str, Optional[str]], Awaitable[bool]]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -174,6 +175,7 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = []
         self._on_threepid_bind_callbacks: List[ON_THREEPID_BIND_CALLBACK] = []
+        self._on_update_identity_server_binding: List[ON_UPDATE_IDENTITY_SERVER_BINDING_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -193,6 +195,7 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_update_identity_server_binding: Optional[ON_UPDATE_IDENTITY_SERVER_BINDING_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -229,6 +232,9 @@ class ThirdPartyEventRules:
 
         if on_threepid_bind is not None:
             self._on_threepid_bind_callbacks.append(on_threepid_bind)
+
+        if on_update_identity_server_binding is not None:
+            self._on_update_identity_server_binding.append(on_update_identity_server_binding)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -515,6 +521,27 @@ class ThirdPartyEventRules:
             user_id: the user being associated with the threepid.
             medium: the threepid's medium.
             address: the threepid's address.
+        """
+        for callback in self._on_threepid_bind_callbacks:
+            try:
+                await callback(user_id, medium, address)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+    async def on_update_identity_server_binding(self, user_id: str, medium: str, address: str, id_server: Optional[str]) -> bool:
+        """Called before a binding between a third-party ID and a Matrix ID is made
+        against an identity server.
+
+        Note that this callback is not called if a user only requests for an association
+        to be made between a third-party ID and their Matrix on their local homeserver.
+        It is only called if an identity server is to receive the binding as well.
+
+        Args:
+            user_id: the ID of the user to include in the association.
+            medium: the medium of the third-party ID (email, msisdn).
+            address: the address of the third-party ID (i.e. an email address).
+            id_server:
         """
         for callback in self._on_threepid_bind_callbacks:
             try:
