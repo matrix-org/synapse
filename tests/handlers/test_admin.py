@@ -38,6 +38,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_handler = hs.get_admin_handler()
+        self._store = hs.get_datastores().main
 
         self.user1 = self.register_user("user1", "password")
         self.token1 = self.login("user1", "password")
@@ -236,3 +237,62 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(args[0], room_id)
         self.assertEqual(args[1].content["membership"], "knock")
         self.assertTrue(args[2])  # Assert there is at least one bit of state
+
+    def test_profile(self) -> None:
+        """Tests that user profile get exported."""
+        writer = Mock()
+
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
+
+        writer.write_events.assert_not_called()
+        writer.write_profile.assert_called_once()
+
+        # check only a few values, not all available
+        args = writer.write_profile.call_args[0]
+        self.assertEqual(args[0]["name"], self.user2)
+        self.assertIn("displayname", args[0])
+        self.assertIn("avatar_url", args[0])
+        self.assertIn("threepids", args[0])
+        self.assertIn("external_ids", args[0])
+        self.assertIn("creation_ts", args[0])
+
+    def test_devices(self) -> None:
+        """Tests that user devices get exported."""
+        writer = Mock()
+
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
+
+        writer.write_events.assert_not_called()
+        writer.write_devices.assert_called_once()
+
+        args = writer.write_devices.call_args[0]
+        self.assertEqual(len(args[0]), 1)
+        self.assertEqual(args[0][0]["user_id"], self.user2)
+        self.assertIn("device_id", args[0][0])
+        self.assertIsNone(args[0][0]["display_name"])
+        self.assertIsNone(args[0][0]["last_seen_user_agent"])
+        self.assertIsNone(args[0][0]["last_seen_ts"])
+        self.assertIsNone(args[0][0]["last_seen_ip"])
+
+    def test_connections(self) -> None:
+        """Tests that user sessions / connections get exported."""
+        # Insert a user IP
+        self.get_success(
+            self._store.insert_client_ip(
+                self.user2, "access_token", "ip", "user_agent", "MY_DEVICE"
+            )
+        )
+
+        writer = Mock()
+
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
+
+        writer.write_events.assert_not_called()
+        writer.write_connections.assert_called_once()
+
+        args = writer.write_connections.call_args[0]
+        self.assertEqual(len(args[0]), 1)
+        self.assertEqual(args[0][0]["ip"], "ip")
+        self.assertEqual(args[0][0]["user_agent"], "user_agent")
+        self.assertGreater(args[0][0]["last_seen"], 0)
+        self.assertNotIn("access_token", args[0][0])
