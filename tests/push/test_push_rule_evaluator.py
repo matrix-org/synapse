@@ -88,9 +88,9 @@ class FlattenDictTestCase(unittest.TestCase):
         )
         expected = {
             "content.msgtype": "m.text",
-            "content.body": "hello world!",
+            "content.body": "Hello world!",
             "content.format": "org.matrix.custom.html",
-            "content.formatted_body": "<h1>hello world!</h1>",
+            "content.formatted_body": "<h1>Hello world!</h1>",
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
@@ -427,12 +427,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {"value": "foobaz"},
             "exact value should match",
         )
-        # TODO?
-        # self._assert_not_matches(
-        #     condition,
-        #     {"value": "FoobaZ"},
-        #     "values should match and be case-sensitive",
-        # )
+        self._assert_not_matches(
+            condition,
+            {"value": "FoobaZ"},
+            "values should match and be case-sensitive",
+        )
         self._assert_not_matches(
             condition,
             {"value": "test foobaz test"},

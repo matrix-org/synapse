@@ -540,9 +540,7 @@ def _flatten_dict(
             # nested fields.
             key = key.replace("\\", "\\\\").replace(".", "\\.")
 
-        if isinstance(value, str):
-            result[".".join(prefix + [key])] = value.lower()
-        elif isinstance(value, bool) or type(value) is int or value is None:
+        if isinstance(value, (bool, str)) or type(value) is int or value is None:
             result[".".join(prefix + [key])] = value
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
