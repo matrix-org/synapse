@@ -1543,6 +1543,17 @@ class AuthHandler:
     async def add_threepid(
         self, user_id: str, medium: str, address: str, validated_at: int
     ) -> None:
+        """
+        Adds an association between a user's Matrix ID and a third-party ID (email,
+        phone number).
+
+        Args:
+            user_id: The ID of the user to associate.
+            medium: The medium of the third-party ID (email, msisdn).
+            address: The address of the third-party ID (i.e. an email address).
+            validated_at: The timestamp in ms of when the validation that the user owns
+                this third-party ID occurred.
+        """
         # check if medium has a valid value
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
@@ -1563,10 +1574,25 @@ class AuthHandler:
         if medium == "email":
             address = canonicalise_email(address)
 
-        await self.store.user_add_threepid(
-            user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
+        # Inform Synapse modules that a 3PID association is about to be created.
+        await self._third_party_rules.on_add_user_third_party_identifier(
+            user_id, medium, address
         )
 
+        try:
+            await self.store.user_add_threepid(
+                user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
+            )
+        except Exception:
+            # We failed to store the association, but told Synapse modules otherwise.
+            # Tell them that the association was deleted.
+            await self._third_party_rules.on_remove_user_third_party_identifier(
+                user_id, medium, address
+            )
+            raise
+
+        # Deprecated method for informing Synapse modules that a 3PID association
+        # has successfully been created.
         await self._third_party_rules.on_threepid_bind(user_id, medium, address)
 
     async def delete_threepid(
@@ -1597,7 +1623,21 @@ class AuthHandler:
             user_id, medium, address, id_server
         )
 
-        await self.store.user_delete_threepid(user_id, medium, address)
+        # Inform Synapse modules that a 3PID association is about to be deleted.
+        await self._third_party_rules.on_remove_user_third_party_identifier(
+            user_id, medium, address
+        )
+
+        try:
+            await self.store.user_delete_threepid(user_id, medium, address)
+        except Exception:
+            # We failed to store the association, but told Synapse modules otherwise.
+            # Tell them that the association has come back.
+            await self._third_party_rules.on_add_user_third_party_identifier(
+                user_id, medium, address
+            )
+            raise
+
         if medium == "email":
             await self.store.delete_pusher_by_app_id_pushkey_user_id(
                 app_id="m.email", pushkey=address, user_id=user_id
