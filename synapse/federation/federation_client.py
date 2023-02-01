@@ -1864,7 +1864,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if not isinstance(origin_server_ts, int):
+        if type(origin_server_ts) is not int:
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

@@ -17,7 +17,6 @@ from typing import (
     TYPE_CHECKING,
     AbstractSet,
     Any,
-    Collection,
     Dict,
     FrozenSet,
     List,
@@ -62,6 +61,7 @@ from synapse.types import (
     Requester,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -1179,7 +1179,7 @@ class SyncHandler:
     async def _find_missing_partial_state_memberships(
         self,
         room_id: str,
-        members_to_fetch: Collection[str],
+        members_to_fetch: StrCollection,
         events_with_membership_auth: Mapping[str, EventBase],
         found_state_ids: StateMap[str],
     ) -> StateMap[str]:
@@ -1383,16 +1383,21 @@ class SyncHandler:
         if not sync_config.filter_collection.lazy_load_members():
             # Non-lazy syncs should never include partially stated rooms.
             # Exclude all partially stated rooms from this sync.
-            for room_id in mutable_joined_room_ids:
-                if await self.store.is_partial_state_room(room_id):
-                    mutable_rooms_to_exclude.add(room_id)
+            results = await self.store.is_partial_state_room_batched(
+                mutable_joined_room_ids
+            )
+            mutable_rooms_to_exclude.update(
+                room_id
+                for room_id, is_partial_state in results.items()
+                if is_partial_state
+            )
 
         # Incremental eager syncs should additionally include rooms that
         # - we are joined to
         # - are full-stated
         # - became fully-stated at some point during the sync period
         #   (These rooms will have been omitted during a previous eager sync.)
-        forced_newly_joined_room_ids = set()
+        forced_newly_joined_room_ids: Set[str] = set()
         if since_token and not sync_config.filter_collection.lazy_load_members():
             un_partial_stated_rooms = (
                 await self.store.get_un_partial_stated_rooms_between(
@@ -1401,9 +1406,14 @@ class SyncHandler:
                     mutable_joined_room_ids,
                 )
             )
-            for room_id in un_partial_stated_rooms:
-                if not await self.store.is_partial_state_room(room_id):
-                    forced_newly_joined_room_ids.add(room_id)
+            results = await self.store.is_partial_state_room_batched(
+                un_partial_stated_rooms
+            )
+            forced_newly_joined_room_ids.update(
+                room_id
+                for room_id, is_partial_state in results.items()
+                if not is_partial_state
+            )
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(

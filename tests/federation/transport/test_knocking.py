@@ -23,10 +23,10 @@ from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
 from tests.test_utils import event_injection
-from tests.unittest import FederatingHomeserverTestCase, TestCase
+from tests.unittest import FederatingHomeserverTestCase, HomeserverTestCase
 
 
-class KnockingStrippedStateEventHelperMixin(TestCase):
+class KnockingStrippedStateEventHelperMixin(HomeserverTestCase):
     def send_example_state_events_to_room(
         self,
         hs: "HomeServer",
@@ -49,7 +49,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         # To set a canonical alias, we'll need to point an alias at the room first.
         canonical_alias = "#fancy_alias:test"
         self.get_success(
-            self.store.create_room_alias_association(
+            self.hs.get_datastores().main.create_room_alias_association(
                 RoomAlias.from_string(canonical_alias), room_id, ["test"]
             )
         )

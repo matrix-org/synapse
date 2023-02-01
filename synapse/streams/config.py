@@ -16,6 +16,7 @@ from typing import Optional
 
 import attr
 
+from synapse.api.constants import Direction
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
@@ -34,7 +35,7 @@ class PaginationConfig:
 
     from_token: Optional[StreamToken]
     to_token: Optional[StreamToken]
-    direction: str
+    direction: Direction
     limit: int
 
     @classmethod
@@ -45,9 +46,13 @@ class PaginationConfig:
         default_limit: int,
         default_dir: str = "f",
     ) -> "PaginationConfig":
-        direction = parse_string(
-            request, "dir", default=default_dir, allowed_values=["f", "b"]
+        direction_str = parse_string(
+            request,
+            "dir",
+            default=default_dir,
+            allowed_values=[Direction.FORWARDS.value, Direction.BACKWARDS.value],
         )
+        direction = Direction(direction_str)
 
         from_tok_str = parse_string(request, "from")
         to_tok_str = parse_string(request, "to")
