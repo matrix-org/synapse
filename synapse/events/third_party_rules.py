@@ -45,6 +45,8 @@ CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 ON_THREEPID_BIND_CALLBACK = Callable[[str, str, str], Awaitable]
+ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK = Callable[[str, str, str], Awaitable]
+ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK = Callable[[str, str, str], Awaitable]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -174,6 +176,12 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = []
         self._on_threepid_bind_callbacks: List[ON_THREEPID_BIND_CALLBACK] = []
+        self._on_add_user_third_party_identifier_callbacks: List[
+            ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = []
+        self._on_remove_user_third_party_identifier_callbacks: List[
+            ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -193,6 +201,12 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_add_user_third_party_identifier: Optional[
+            ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
+        on_remove_user_third_party_identifier: Optional[
+            ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -229,6 +243,11 @@ class ThirdPartyEventRules:
 
         if on_threepid_bind is not None:
             self._on_threepid_bind_callbacks.append(on_threepid_bind)
+
+        if on_add_user_third_party_identifier is not None:
+            self._on_add_user_third_party_identifier_callbacks.append(
+                on_add_user_third_party_identifier
+            )
 
     async def check_event_allowed(
         self,
@@ -519,6 +538,46 @@ class ThirdPartyEventRules:
             address: the threepid's address.
         """
         for callback in self._on_threepid_bind_callbacks:
+            try:
+                await callback(user_id, medium, address)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def on_add_user_third_party_identifier(
+        self, user_id: str, medium: str, address: str
+    ) -> None:
+        """Called when an association between a user's Matrix ID and a third-party ID
+        (email, phone number) is about to be registered on the homeserver.
+
+        Args:
+            user_id: The User ID to include in the association.
+            medium: The medium of the third-party ID (email, msisdn).
+            address: The address of the third-party ID (i.e. an email address).
+        """
+        for callback in self._on_add_user_third_party_identifier_callbacks:
+            try:
+                await callback(user_id, medium, address)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def on_remove_user_third_party_identifier(
+        self, user_id: str, medium: str, address: str
+    ) -> None:
+        """Called when an association between a user's Matrix ID and a third-party ID
+        (email, phone number) is about to be removed on the homeserver. This is called
+        *after* any known bindings on identity servers for this association have been
+        removed.
+
+        Args:
+            user_id: The User ID including in the association to remove.
+            medium: The medium of the third-party ID (email, msisdn).
+            address: The address of the third-party ID (i.e. an email address).
+        """
+        for callback in self._on_remove_user_third_party_identifier_callbacks:
             try:
                 await callback(user_id, medium, address)
             except Exception as e:
