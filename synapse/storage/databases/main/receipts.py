@@ -949,20 +949,34 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             # Identify any duplicate receipts arising from
             # https://github.com/matrix-org/synapse/issues/14406.
             # The following query takes less than a minute on matrix.org.
-            sql = f"""
-                SELECT MAX(stream_id), MAX({ROW_ID_NAME}), room_id, receipt_type, user_id
+            sql = """
+                SELECT MAX(stream_id), room_id, receipt_type, user_id
                 FROM receipts_linearized
                 WHERE thread_id IS NULL
                 GROUP BY room_id, receipt_type, user_id
                 HAVING COUNT(*) > 1
             """
             txn.execute(sql)
-            duplicate_keys = cast(List[Tuple[int, int, str, str, str]], list(txn))
+            duplicate_keys = cast(List[Tuple[int, str, str, str]], list(txn))
 
             # Then remove duplicate receipts, keeping the one with the highest
             # `stream_id`. Since there might be duplicate rows with the same
-            # `stream_id`, we delete by the rowid instead.
-            for _, row_id, room_id, receipt_type, user_id in duplicate_keys:
+            # `stream_id`, we delete by the ctid instead.
+            for stream_id, room_id, receipt_type, user_id in duplicate_keys:
+                sql = f"""
+                SELECT {ROW_ID_NAME}
+                FROM receipts_linearized
+                WHERE
+                    room_id = ? AND
+                    receipt_type = ? AND
+                    user_id = ? AND
+                    thread_id IS NULL AND
+                    stream_id = ?
+                LIMIT 1
+                """
+                txn.execute(sql, (room_id, receipt_type, user_id, stream_id))
+                row_id = cast(Tuple[str], txn.fetchone())[0]
+
                 sql = f"""
                     DELETE FROM receipts_linearized
                     WHERE
