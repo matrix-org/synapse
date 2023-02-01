@@ -449,6 +449,8 @@ def parse_enum(
     """
     Parse an enum parameter from the request query string.
 
+    Note that the enum *must only have string values*.
+
     Args:
         request: the twisted HTTP request.
         name: the name of the query parameter.
@@ -465,7 +467,10 @@ def parse_enum(
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
-    # TODO Assert the enum values are strings.
+    # Assert the enum values are strings.
+    assert all(
+        isinstance(e.value, str) for e in E
+    ), "parse_enum only works with string values"
     str_value = parse_string(
         request,
         name,
