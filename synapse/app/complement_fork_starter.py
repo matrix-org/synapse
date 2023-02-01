@@ -119,7 +119,10 @@ def _worker_entrypoint(
     for sig, handler in _original_signal_handlers.items():
         signal.signal(sig, handler)
 
-    # Install the asyncio reactor if the SYNAPSE_ASYNC_IO_REACTOR is set to 1.
+    # Install the asyncio reactor if the
+    # SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR is set to 1. The
+    # SYNAPSE_ASYNC_IO_REACTOR variable would be used, but then causes
+    # synapse/__init__.py to also try to install an asyncio reactor.
     if strtobool(
         os.environ.get("SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR", "0")
     ):
