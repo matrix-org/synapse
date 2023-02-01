@@ -1182,19 +1182,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         for fully-joined rooms.
         """
 
-        def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
-            sql = """
-                SELECT event_id, membership
-                FROM current_state_events
-                WHERE room_id = ?;
-            """
-            txn.execute(sql, (room_id,))
-            return txn.fetchall()  # type: ignore[return-value]
-
-        rows = await self.db_pool.runInteraction(
-            "_get_approimate_current_memberships_in_room", f
+        rows = await self.db_pool.simple_select_list(
+            "current_state_events",
+            keyvalues={"room_id": room_id},
+            retcols=("event_id", "membership"),
+            desc="has_completed_background_updates",
         )
-        return {row[0]: row[1] for row in rows}
+        return {row["event_id"]: row["membership"] for row in rows}
 
     @cached(max_entries=10000)
     def _get_joined_hosts_cache(self, room_id: str) -> "_JoinedHostsCache":
