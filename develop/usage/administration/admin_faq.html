@@ -148,8 +148,13 @@
 
                         <h2 id="admin-faq"><a class="header" href="#admin-faq">Admin FAQ</a></h2>
 <h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
-<p>If your server already has an admin account you should use the <a href="../../admin_api/user_admin_api.html#change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a> to promote other accounts to become admins.</p>
-<p>If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.</p>
+<p>If your server already has an admin account you should use the
+<a href="../../admin_api/user_admin_api.html#change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a>
+to promote other accounts to become admins.</p>
+<p>If you don't have any admin accounts yet you won't be able to use the admin API,
+so you'll have to edit the database manually. Manually editing the database is
+generally not recommended so once you have an admin account: use the admin APIs
+to make further changes.</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <h2 id="what-servers-are-my-server-talking-to"><a class="header" href="#what-servers-are-my-server-talking-to">What servers are my server talking to?</a></h2>
@@ -169,37 +174,73 @@
 <h2 id="how-can-i-export-user-data"><a class="header" href="#how-can-i-export-user-data">How can I export user data?</a></h2>
 <p>Synapse includes a Python command to export data for a specific user. It takes the homeserver
 configuration file and the full Matrix ID of the user to export:</p>
-<pre><code class="language-console">python -m synapse.app.admin_cmd -c &lt;config_file&gt; export-data &lt;user_id&gt;
+<pre><code class="language-console">python -m synapse.app.admin_cmd -c &lt;config_file&gt; export-data &lt;user_id&gt; --output-directory &lt;directory_path&gt;
+</code></pre>
+<p>If you uses <a href="../../development/dependencies.html#managing-dependencies-with-poetry">Poetry</a>
+to run Synapse:</p>
+<pre><code class="language-console">poetry run python -m synapse.app.admin_cmd -c &lt;config_file&gt; export-data &lt;user_id&gt; --output-directory &lt;directory_path&gt;
+</code></pre>
+<p>The directory to store the export data in can be customised with the
+<code>--output-directory</code> parameter; ensure that the provided directory is
+empty. If this parameter is not provided, Synapse defaults to creating
+a temporary directory (which starts with &quot;synapse-exfiltrate&quot;) in <code>/tmp</code>,
+<code>/var/tmp</code>, or <code>/usr/tmp</code>, in that order.</p>
+<p>The exported data has the following layout:</p>
+<pre><code>output-directory
+├───rooms
+│   └───&lt;room_id&gt;
+│       ├───events
+│       ├───state
+│       ├───invite_state
+│       └───knock_state
+└───user_data
+    ├───connections
+    ├───devices
+    └───profile
 </code></pre>
 <h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords</a></h2>
 <p>Users can reset their password through their client. Alternatively, a server admin
 can reset a user's password using the <a href="../../admin_api/user_admin_api.html#reset-password">admin API</a>.</p>
 <h2 id="i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again"><a class="header" href="#i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again">I have a problem with my server. Can I just delete my database and start again?</a></h2>
 <p>Deleting your database is unlikely to make anything better. </p>
-<p>It's easy to make the mistake of thinking that you can start again from a clean slate by dropping your database, but things don't work like that in a federated network: lots of other servers have information about your server.</p>
-<p>For example: other servers might think that you are in a room, your server will think that you are not, and you'll probably be unable to interact with that room in a sensible way ever again.</p>
-<p>In general, there are better solutions to any problem than dropping the database. Come and seek help in https://matrix.to/#/#synapse:matrix.org.</p>
+<p>It's easy to make the mistake of thinking that you can start again from a clean
+slate by dropping your database, but things don't work like that in a federated
+network: lots of other servers have information about your server.</p>
+<p>For example: other servers might think that you are in a room, your server will
+think that you are not, and you'll probably be unable to interact with that room
+in a sensible way ever again.</p>
+<p>In general, there are better solutions to any problem than dropping the database.
+Come and seek help in https://matrix.to/#/#synapse:matrix.org.</p>
 <p>There are two exceptions when it might be sensible to delete your database and start again:</p>
 <ul>
-<li>You have <em>never</em> joined any rooms which are federated with other servers. For instance, a local deployment which the outside world can't talk to. </li>
-<li>You are changing the <code>server_name</code> in the homeserver configuration. In effect this makes your server a completely new one from the point of view of the network, so in this case it makes sense to start with a clean database.
+<li>You have <em>never</em> joined any rooms which are federated with other servers. For
+instance, a local deployment which the outside world can't talk to. </li>
+<li>You are changing the <code>server_name</code> in the homeserver configuration. In effect
+this makes your server a completely new one from the point of view of the network,
+so in this case it makes sense to start with a clean database.
 (In both cases you probably also want to clear out the media_store.)</li>
 </ul>
 <h2 id="ive-stuffed-up-access-to-my-room-how-can-i-delete-it-to-free-up-the-alias"><a class="header" href="#ive-stuffed-up-access-to-my-room-how-can-i-delete-it-to-free-up-the-alias">I've stuffed up access to my room, how can I delete it to free up the alias?</a></h2>
 <p>Using the following curl command:</p>
-<pre><code>curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
+<pre><code class="language-console">curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
 </code></pre>
 <p><code>&lt;access-token&gt;</code> - can be obtained in riot by looking in the riot settings, down the bottom is:
 Access Token:&lt;click to reveal&gt; </p>
 <p><code>&lt;room-alias&gt;</code> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
 <h2 id="how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log"><a class="header" href="#how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log">How can I find the lines corresponding to a given HTTP request in my homeserver log?</a></h2>
-<p>Synapse tags each log line according to the HTTP request it is processing. When it finishes processing each request, it logs a line containing the words <code>Processed request: </code>. For example:</p>
+<p>Synapse tags each log line according to the HTTP request it is processing. When
+it finishes processing each request, it logs a line containing the words
+<code>Processed request: </code>. For example:</p>
 <pre><code>2019-02-14 22:35:08,196 - synapse.access.http.8008 - 302 - INFO - GET-37 - ::1 - 8008 - {@richvdh:localhost} Processed request: 0.173sec/0.001sec (0.002sec, 0.000sec) (0.027sec/0.026sec/2) 687B 200 &quot;GET /_matrix/client/r0/sync HTTP/1.1&quot; &quot;Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36&quot; [0 dbevts]&quot;
 </code></pre>
-<p>Here we can see that the request has been tagged with <code>GET-37</code>. (The tag depends on the method of the HTTP request, so might start with <code>GET-</code>, <code>PUT-</code>, <code>POST-</code>, <code>OPTIONS-</code> or <code>DELETE-</code>.) So to find all lines corresponding to this request, we can do:</p>
-<pre><code>grep 'GET-37' homeserver.log
+<p>Here we can see that the request has been tagged with <code>GET-37</code>. (The tag depends
+on the method of the HTTP request, so might start with <code>GET-</code>, <code>PUT-</code>, <code>POST-</code>,
+<code>OPTIONS-</code> or <code>DELETE-</code>.) So to find all lines corresponding to this request, we can do:</p>
+<pre><code class="language-console">grep 'GET-37' homeserver.log
 </code></pre>
-<p>If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see <a href="https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code">quoting code</a>).</p>
+<p>If you want to paste that output into a github issue or matrix room, please
+remember to surround it with triple-backticks (```) to make it legible
+(see <a href="https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code">quoting code</a>).</p>
 <h2 id="what-do-all-those-fields-in-the-processed-line-mean"><a class="header" href="#what-do-all-those-fields-in-the-processed-line-mean">What do all those fields in the 'Processed' line mean?</a></h2>
 <p>See <a href="request_log.html">Request log format</a>.</p>
 <h2 id="what-are-the-biggest-rooms-on-my-server"><a class="header" href="#what-are-the-biggest-rooms-on-my-server">What are the biggest rooms on my server?</a></h2>
