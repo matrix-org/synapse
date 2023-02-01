@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Set, Union, cast
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
 import frozendict
 
@@ -35,6 +35,30 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils.event_injection import create_event, inject_member_event
+
+
+class FlattenDictTestCase(unittest.TestCase):
+    def test_simple(self) -> None:
+        """Test a dictionary that isn't modified."""
+        input = {"foo": "abc"}
+        self.assertEqual(input, _flatten_dict(input))
+
+    def test_nested(self) -> None:
+        """Nested dictionaries become dotted paths."""
+        input = {"foo": {"bar": "abc"}}
+        self.assertEqual({"foo.bar": "abc"}, _flatten_dict(input))
+
+    def test_non_string(self) -> None:
+        """Non-string items are dropped."""
+        input: Dict[str, Any] = {
+            "woo": "woo",
+            "foo": True,
+            "bar": 1,
+            "baz": None,
+            "fuzz": [],
+            "boo": {},
+        }
+        self.assertEqual({"woo": "woo"}, _flatten_dict(input))
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
