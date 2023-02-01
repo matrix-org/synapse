@@ -18,12 +18,13 @@ import secrets
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from synapse.api.constants import UserTypes
+from synapse.api.constants import Direction, UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
+    parse_enum,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -120,7 +121,7 @@ class UsersRestServletV2(RestServlet):
             ),
         )
 
-        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
         users, total = await self.store.get_users_paginate(
             start,
