@@ -87,7 +87,7 @@ pub struct PushRuleEvaluator {
 
     /// The related events, indexed by relation type. Flattened in the same manner as
     /// `flattened_keys`.
-    related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
+    related_events_flattened: BTreeMap<String, BTreeMap<String, SimpleJsonValue>>,
 
     /// If msc3664, push rules for related events, is enabled.
     related_event_match_enabled: bool,
@@ -116,7 +116,7 @@ impl PushRuleEvaluator {
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
-        related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
+        related_events_flattened: BTreeMap<String, BTreeMap<String, SimpleJsonValue>>,
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
@@ -441,7 +441,7 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        let haystack = if let Some(haystack) = event.get(&**key) {
+        let haystack = if let Some(SimpleJsonValue::Str(haystack)) = event.get(&**key) {
             haystack
         } else {
             return Ok(false);
