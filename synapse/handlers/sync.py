@@ -1459,10 +1459,12 @@ class SyncHandler:
             sync_result_builder, account_data_by_room
         )
 
-        block_all_presence_data = (
-            since_token is None and sync_config.filter_collection.blocks_all_presence()
+        # Presence data is included if the server has it enabled and not filtered out.
+        include_presence_data = (
+            self.hs_config.server.use_presence
+            and not sync_config.filter_collection.blocks_all_presence()
         )
-        if self.hs_config.server.use_presence and not block_all_presence_data:
+        if include_presence_data:
             logger.debug("Fetching presence data")
             await self._generate_sync_entry_for_presence(
                 sync_result_builder,
@@ -1841,15 +1843,12 @@ class SyncHandler:
         """
 
         since_token = sync_result_builder.since_token
+        user_id = sync_result_builder.sync_config.user.to_string()
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
-        user_id = sync_result_builder.sync_config.user.to_string()
-        block_all_room_ephemeral = (
-            since_token is None
-            and sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
-        )
-
-        if block_all_room_ephemeral:
+        if (
+            sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
+        ):
             ephemeral_by_room: Dict[str, List[JsonDict]] = {}
         else:
             now_token, ephemeral_by_room = await self.ephemeral_by_room(
