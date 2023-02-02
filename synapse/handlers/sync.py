@@ -1450,8 +1450,10 @@ class SyncHandler:
 
         logger.debug("Fetching room data")
 
-        block_all_presence_data = (
-            since_token is None and sync_config.filter_collection.blocks_all_presence()
+        # Presence data is included if the server has it enabled and not filtered out.
+        include_presence_data = bool(
+            self.hs_config.server.use_presence
+            and not sync_config.filter_collection.blocks_all_presence()
         )
         include_device_list_updates = bool(since_token and since_token.device_list_key)
         (
@@ -1462,11 +1464,11 @@ class SyncHandler:
         ) = await self._generate_sync_entry_for_rooms(
             sync_result_builder,
             account_data_by_room,
-            block_all_presence_data,
+            include_presence_data,
             include_device_list_updates,
         )
 
-        if self.hs_config.server.use_presence and not block_all_presence_data:
+        if include_presence_data:
             logger.debug("Fetching presence data")
             await self._generate_sync_entry_for_presence(
                 sync_result_builder,
@@ -1819,7 +1821,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         account_data_by_room: Dict[str, Dict[str, JsonDict]],
-        block_all_presence_data: bool,
+        include_presence_data: bool,
         include_device_list_updates: bool,
     ) -> Tuple[AbstractSet[str], AbstractSet[str], AbstractSet[str], AbstractSet[str]]:
         """Generates the rooms portion of the sync response. Populates the
@@ -1832,7 +1834,7 @@ class SyncHandler:
         Args:
             sync_result_builder
             account_data_by_room: Dictionary of per room account data
-            block_all_presence_data: True if presence data will not be returned.
+            include_presence_data: True if presence data will be returned.
             include_device_list_updates: True if device list updates will be returned.
 
         Returns:
@@ -1848,6 +1850,7 @@ class SyncHandler:
         """
 
         since_token = sync_result_builder.since_token
+        user_id = sync_result_builder.sync_config.user.to_string()
 
         # If all rooms are blocked, we can skip bits of processing.
         block_all_rooms = (
@@ -1858,19 +1861,16 @@ class SyncHandler:
         # or device list updates, there's nothing to do.
         if (
             block_all_rooms
-            and block_all_presence_data
+            and not include_presence_data
             and not include_device_list_updates
         ):
             return set(), set(), set(), set()
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
-        user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
             block_all_rooms
-            or since_token is None
-            and sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
+            or sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
-
         if block_all_room_ephemeral:
             ephemeral_by_room: Dict[str, List[JsonDict]] = {}
         else:
@@ -1943,7 +1943,7 @@ class SyncHandler:
         # to build the presence and device_list parts of the sync response in
         # `_generate_sync_entry_for_presence` and
         # `_generate_sync_entry_for_device_list` respectively..
-        if not block_all_presence_data or include_device_list_updates:
+        if include_presence_data or include_device_list_updates:
             (
                 newly_joined_or_invited_or_knocked_users,
                 newly_left_users,
