@@ -1857,14 +1857,9 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
         user_id = sync_result_builder.sync_config.user.to_string()
 
-        # If all rooms are blocked, we can skip bits of processing.
-        block_all_rooms = (
-            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
-        )
-
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         block_all_room_ephemeral = (
-            block_all_rooms
+            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
         if block_all_room_ephemeral:
