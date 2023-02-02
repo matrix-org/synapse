@@ -263,7 +263,7 @@ class OptionsResourceTests(unittest.TestCase):
         )
         self.assertEqual(
             channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
-            [b"X-Requested-With, Content-Type, Authorization, Date"],
+            [b"X-Requested-With, Content-Type, Authorization, Date, Synapse-Trace-Id"],
             "has correct CORS Headers header",
         )
 
