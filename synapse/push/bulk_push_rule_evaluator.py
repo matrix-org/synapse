@@ -145,6 +145,7 @@ class BulkPushRuleEvaluator:
         # little, we can skip fetching a huge number of push rules in large rooms.
         # This helps make joins and leaves faster.
         if event.type == EventTypes.Member:
+            local_users = []
             # We never notify a user about their own actions. This is enforced in
             # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
             # do the same check here to avoid unnecessary DB queries.
@@ -156,8 +157,6 @@ class BulkPushRuleEvaluator:
                 )
                 if target_already_in_room:
                     local_users = [event.state_key]
-            else:
-                return {}
         else:
             # We get the users who may need to be notified by first fetching the
             # local users currently in the room, finding those that have push rules,
@@ -183,6 +182,9 @@ class BulkPushRuleEvaluator:
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
                 local_users = list(local_users)
                 local_users.append(invited)
+
+        if not local_users:
+            return {}
 
         rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
