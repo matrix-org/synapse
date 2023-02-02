@@ -18,6 +18,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
     Awaitable,
     Collection,
@@ -25,7 +26,6 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -108,7 +108,7 @@ class RoomSortOrder(Enum):
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class PartialStateResyncInfo:
     joined_via: Optional[str]
-    servers_in_room: List[str] = attr.ib(factory=list)
+    servers_in_room: Set[str] = attr.ib(factory=set)
 
 
 class RoomWorkerStore(CacheInvalidationWorkerStore):
@@ -1194,8 +1194,8 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     async def get_partial_state_servers_at_join(
         self, room_id: str
-    ) -> Optional[Sequence[str]]:
-        """Gets the list of servers in a partial state room at the time we joined it.
+    ) -> Optional[AbstractSet[str]]:
+        """Gets the set of servers in a partial state room at the time we joined it.
 
         Returns:
             The `servers_in_room` list from the `/send_join` response for partial state
@@ -1211,12 +1211,16 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         return servers_in_room
 
     @cached(iterable=True)
-    async def _get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
-        return await self.db_pool.simple_select_onecol(
-            "partial_state_rooms_servers",
-            keyvalues={"room_id": room_id},
-            retcol="server_name",
-            desc="get_partial_state_servers_at_join",
+    async def _get_partial_state_servers_at_join(
+        self, room_id: str
+    ) -> AbstractSet[str]:
+        return frozenset(
+            await self.db_pool.simple_select_onecol(
+                "partial_state_rooms_servers",
+                keyvalues={"room_id": room_id},
+                retcol="server_name",
+                desc="get_partial_state_servers_at_join",
+            )
         )
 
     async def get_partial_state_room_resync_info(
@@ -1261,7 +1265,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 # partial-joined between the two SELECTs, but this is unlikely to happen
                 # in practice.)
                 continue
-            entry.servers_in_room.append(server_name)
+            entry.servers_in_room.add(server_name)
 
         return room_servers
 
@@ -1951,7 +1955,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
     async def store_partial_state_room(
         self,
         room_id: str,
-        servers: Collection[str],
+        servers: AbstractSet[str],
         device_lists_stream_id: int,
         joined_via: str,
     ) -> None:
@@ -1986,7 +1990,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         txn: LoggingTransaction,
         room_id: str,
-        servers: Collection[str],
+        servers: AbstractSet[str],
         device_lists_stream_id: int,
         joined_via: str,
     ) -> None:

@@ -573,7 +573,7 @@ class StateStorageController:
             room_id
         )
         if hosts_at_join is None:
-            hosts_at_join = ()
+            hosts_at_join = frozenset()
 
         hosts_from_state = await self.stores.main.get_current_hosts_in_room(room_id)
 
