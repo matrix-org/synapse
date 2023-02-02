@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Collection, Dict, FrozenSet, Iterable, List, O
 
 import attr
 
-from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.constants import Direction, EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -413,7 +413,11 @@ class RelationsHandler:
 
                 # Attempt to find another event to use as the latest event.
                 potential_events, _ = await self._main_store.get_relations_for_event(
-                    event_id, event, room_id, RelationTypes.THREAD, direction="f"
+                    event_id,
+                    event,
+                    room_id,
+                    RelationTypes.THREAD,
+                    direction=Direction.FORWARDS,
                 )
 
                 # Filter out ignored users.

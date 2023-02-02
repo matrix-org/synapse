@@ -20,22 +20,14 @@ import random
 import string
 from collections import OrderedDict
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Collection,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 import attr
 from typing_extensions import TypedDict
 
 import synapse.events.snapshot
 from synapse.api.constants import (
+    Direction,
     EventContentFields,
     EventTypes,
     GuestAccess,
@@ -72,6 +64,7 @@ from synapse.types import (
     RoomID,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -1495,7 +1488,7 @@ class TimestampLookupHandler:
         requester: Requester,
         room_id: str,
         timestamp: int,
-        direction: str,
+        direction: Direction,
     ) -> Tuple[str, int]:
         """Find the closest event to the given timestamp in the given direction.
         If we can't find an event locally or the event we have locally is next to a gap,
@@ -1506,7 +1499,7 @@ class TimestampLookupHandler:
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1541,13 +1534,13 @@ class TimestampLookupHandler:
                 local_event_id, allow_none=False, allow_rejected=False
             )
 
-            if direction == "f":
+            if direction == Direction.FORWARDS:
                 # We only need to check for a backward gap if we're looking forwards
                 # to ensure there is nothing in between.
                 is_event_next_to_backward_gap = (
                     await self.store.is_event_next_to_backward_gap(local_event)
                 )
-            elif direction == "b":
+            elif direction == Direction.BACKWARDS:
                 # We only need to check for a forward gap if we're looking backwards
                 # to ensure there is nothing in between
                 is_event_next_to_forward_gap = (
@@ -1644,7 +1637,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         user: UserID,
         from_key: RoomStreamToken,
         limit: int,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:

@@ -322,6 +322,11 @@ class SynapseTags:
     # The name of the external cache
     CACHE_NAME = "cache.name"
 
+    # Boolean. Present on /v2/send_join requests, omitted from all others.
+    # True iff partial state was requested and we provided (or intended to provide)
+    # partial state in the response.
+    SEND_JOIN_RESPONSE_IS_PARTIAL_STATE = "send_join.partial_state_response"
+
     # Used to tag function arguments
     #
     # Tag a named arg. The name of the argument should be appended to this prefix.

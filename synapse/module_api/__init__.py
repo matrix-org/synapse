@@ -1158,7 +1158,7 @@ class ModuleApi:
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
             presence_handler.get_federation_queue().send_presence_to_destinations(
-                presence_events, destination
+                presence_events, [destination]
             )
 
     def looping_background_call(

@@ -605,10 +605,11 @@ class EventClientSerializer:
 
 
 _PowerLevel = Union[str, int]
+PowerLevelsContent = Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
 
 
 def copy_and_fixup_power_levels_contents(
-    old_power_levels: Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
+    old_power_levels: PowerLevelsContent,
 ) -> Dict[str, Union[int, Dict[str, int]]]:
     """Copy the content of a power_levels event, unfreezing frozendicts along the way.
 
@@ -647,10 +648,10 @@ def _copy_power_level_value_as_integer(
 ) -> None:
     """Set `power_levels[key]` to the integer represented by `old_value`.
 
-    :raises TypeError: if `old_value` is not an integer, nor a base-10 string
+    :raises TypeError: if `old_value` is neither an integer nor a base-10 string
         representation of an integer.
     """
-    if isinstance(old_value, int):
+    if type(old_value) is int:
         power_levels[key] = old_value
         return
 
@@ -678,7 +679,7 @@ def validate_canonicaljson(value: Any) -> None:
     * Floats
     * NaN, Infinity, -Infinity
     """
-    if isinstance(value, int):
+    if type(value) is int:
         if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 

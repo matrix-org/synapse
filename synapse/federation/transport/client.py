@@ -32,7 +32,7 @@ from typing import (
 import attr
 import ijson
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Direction, Membership
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.api.urls import (
@@ -102,6 +102,10 @@ class TransportLayerClient:
             destination,
             path=path,
             args={"event_id": event_id},
+            # This can take a looooooong time for large rooms. Give this a generous
+            # timeout of 10 minutes to avoid the partial state resync timing out early
+            # and trying a bunch of servers who haven't seen our join yet.
+            timeout=600_000,
             parser=_StateParser(room_version),
         )
 
@@ -165,7 +169,7 @@ class TransportLayerClient:
         )
 
     async def timestamp_to_event(
-        self, destination: str, room_id: str, timestamp: int, direction: str
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
     ) -> Union[JsonDict, List]:
         """
         Calls a remote federating server at `destination` asking for their
@@ -176,7 +180,7 @@ class TransportLayerClient:
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -190,7 +194,7 @@ class TransportLayerClient:
             room_id,
         )
 
-        args = {"ts": [str(timestamp)], "dir": [direction]}
+        args = {"ts": [str(timestamp)], "dir": [direction.value]}
 
         remote_response = await self.client.get_json(
             destination, path=path, args=args, try_trailing_slash_on_400=True
