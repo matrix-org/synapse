@@ -1462,8 +1462,12 @@ class SyncHandler:
             self.hs_config.server.use_presence
             and not sync_config.filter_collection.blocks_all_presence()
         )
-        # Device list updates are sent if a since token is provided.
-        include_device_list_updates = bool(since_token and since_token.device_list_key)
+        # Device list updates are sent if a since token is provided and are requested.
+        include_device_list_updates = bool(
+            since_token
+            and since_token.device_list_key
+            and sync_config.filter_collection.include_device_list_updates
+        )
 
         # Work out which users have joined or left rooms we're in. We use this
         # to build the presence and device_list parts of the sync response in

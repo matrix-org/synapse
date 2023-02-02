@@ -142,6 +142,7 @@ USER_FILTER_SCHEMA = {
                 "pattern": r"^((?!\\\\).)*$",
             },
         },
+        "org.matrix.include_device_list_updates": {"type": "boolean"},
     },
     "additionalProperties": True,  # Allow new fields for forward compatibility
 }
@@ -226,6 +227,9 @@ class FilterCollection:
         self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
         self.event_format = filter_json.get("event_format", "client")
+        self.include_device_list_updates = filter_json.get(
+            "org.matrix.include_device_list_updates", True
+        )
 
     def __repr__(self) -> str:
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
