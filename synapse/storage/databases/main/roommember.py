@@ -1169,7 +1169,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return frozenset(cache.hosts_to_joined_users)
 
-    # TODO: this _might_ turn out to need caching, let's see
     async def _get_approximate_current_memberships_in_room(
         self, room_id: str
     ) -> Mapping[str, Optional[str]]:
