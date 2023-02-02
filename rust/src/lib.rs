@@ -25,6 +25,7 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 
 /// Reset the cached logging configuration of pyo3-log to pick up any changes
 /// in the Python logging configuration.
+///
 #[pyfunction]
 fn reset_logging_config() {
     LOGGING_HANDLE.reset();

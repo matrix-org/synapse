@@ -34,8 +34,8 @@ from twisted.logger import (
 
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
-from synapse.types import JsonDict
 from synapse.synapse_rust import reset_logging_config
+from synapse.types import JsonDict
 
 from ..util import SYNAPSE_VERSION
 from ._base import Config, ConfigError
