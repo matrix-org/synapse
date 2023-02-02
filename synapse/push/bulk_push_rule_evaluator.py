@@ -139,15 +139,26 @@ class BulkPushRuleEvaluator:
         Returns:
             Mapping of user ID to their push rules.
         """
-        # We get the users who may need to be notified by first fetching the
-        # local users currently in the room, finding those that have push rules,
-        # and *then* checking which users are actually allowed to see the event.
-        #
-        # The alternative is to first fetch all users that were joined at the
-        # event, but that requires fetching the full state at the event, which
-        # may be expensive for large rooms with few local users.
+        # If this is a membership event, only calculate push rules for the target.
+        # While it's possible for users to configure push rules to respond to such an
+        # event, in practise nobody does this. At the cost of violating the spec a
+        # little, we can skip fetching a huge number of push rules in large rooms.
+        # This helps make joins and leaves faster.
+        if event.type == EventTypes.Member:
+            if self.hs.is_mine_id(event.state_key):
+                local_users = [event.state_key]
+            else:
+                return {}
+        else:
+            # We get the users who may need to be notified by first fetching the
+            # local users currently in the room, finding those that have push rules,
+            # and *then* checking which users are actually allowed to see the event.
+            #
+            # The alternative is to first fetch all users that were joined at the
+            # event, but that requires fetching the full state at the event, which
+            # may be expensive for large rooms with few local users.
 
-        local_users = await self.store.get_local_users_in_room(event.room_id)
+            local_users = await self.store.get_local_users_in_room(event.room_id)
 
         # Filter out appservice users.
         local_users = [
