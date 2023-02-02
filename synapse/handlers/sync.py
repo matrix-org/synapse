@@ -1450,23 +1450,36 @@ class SyncHandler:
 
         logger.debug("Fetching room data")
 
+        (
+            newly_joined_rooms,
+            newly_left_rooms,
+        ) = await self._generate_sync_entry_for_rooms(
+            sync_result_builder, account_data_by_room
+        )
+
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(
             self.hs_config.server.use_presence
             and not sync_config.filter_collection.blocks_all_presence()
         )
+        # Device list updates are sent if a since token is provided.
         include_device_list_updates = bool(since_token and since_token.device_list_key)
-        (
-            newly_joined_rooms,
-            newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms,
-            newly_left_users,
-        ) = await self._generate_sync_entry_for_rooms(
-            sync_result_builder,
-            account_data_by_room,
-            include_presence_data,
-            include_device_list_updates,
-        )
+
+        # Work out which users have joined or left rooms we're in. We use this
+        # to build the presence and device_list parts of the sync response in
+        # `_generate_sync_entry_for_presence` and
+        # `_generate_sync_entry_for_device_list` respectively.
+        if include_presence_data or include_device_list_updates:
+            # This uses the sync_result_builder.joined which is set in
+            # `_generate_sync_entry_for_rooms`, if that didn't find any joined
+            # rooms for some reason it is a no-op.
+            (
+                newly_joined_or_invited_or_knocked_users,
+                newly_left_users,
+            ) = sync_result_builder.calculate_user_changes()
+        else:
+            newly_joined_or_invited_or_knocked_users = set()
+            newly_left_users = set()
 
         if include_presence_data:
             logger.debug("Fetching presence data")
@@ -1821,9 +1834,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         account_data_by_room: Dict[str, Dict[str, JsonDict]],
-        include_presence_data: bool,
-        include_device_list_updates: bool,
-    ) -> Tuple[AbstractSet[str], AbstractSet[str], AbstractSet[str], AbstractSet[str]]:
+    ) -> Tuple[AbstractSet[str], AbstractSet[str]]:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
@@ -1834,19 +1845,13 @@ class SyncHandler:
         Args:
             sync_result_builder
             account_data_by_room: Dictionary of per room account data
-            include_presence_data: True if presence data will be returned.
-            include_device_list_updates: True if device list updates will be returned.
 
         Returns:
-            Returns a 4-tuple describing rooms the user has joined or left, and users who've
-            joined or left rooms any rooms the user is in. This gets used later in
-            `_generate_sync_entry_for_device_list`.
+            Returns a 2-tuple describing rooms the user has joined or left.
 
             Its entries are:
             - newly_joined_rooms
-            - newly_joined_or_invited_or_knocked_users
             - newly_left_rooms
-            - newly_left_users
         """
 
         since_token = sync_result_builder.since_token
@@ -1856,15 +1861,6 @@ class SyncHandler:
         block_all_rooms = (
             sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
         )
-
-        # 0. If there are no rooms to return *and* we don't care about presence
-        # or device list updates, there's nothing to do.
-        if (
-            block_all_rooms
-            and not include_presence_data
-            and not include_device_list_updates
-        ):
-            return set(), set(), set(), set()
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         block_all_room_ephemeral = (
@@ -1893,7 +1889,7 @@ class SyncHandler:
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        return set(), set(), set(), set()
+                        return set(), set()
 
         # 3. Work out which rooms need reporting in the sync response.
         ignored_users = await self.store.ignored_users(user_id)
@@ -1939,25 +1935,7 @@ class SyncHandler:
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
 
-        # 5. Work out which users have joined or left rooms we're in. We use this
-        # to build the presence and device_list parts of the sync response in
-        # `_generate_sync_entry_for_presence` and
-        # `_generate_sync_entry_for_device_list` respectively..
-        if include_presence_data or include_device_list_updates:
-            (
-                newly_joined_or_invited_or_knocked_users,
-                newly_left_users,
-            ) = sync_result_builder.calculate_user_changes()
-        else:
-            newly_joined_or_invited_or_knocked_users = set()
-            newly_left_users = set()
-
-        return (
-            set(newly_joined_rooms),
-            newly_joined_or_invited_or_knocked_users,
-            set(newly_left_rooms),
-            newly_left_users,
-        )
+        return set(newly_joined_rooms), set(newly_left_rooms)
 
     async def _have_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder"
