@@ -1941,7 +1941,8 @@ class SyncHandler:
 
         # 5. Work out which users have joined or left rooms we're in. We use this
         # to build the presence and device_list parts of the sync response in
-        # `_generate_sync_entry_for_device_list`.
+        # `_generate_sync_entry_for_presence` and
+        # `_generate_sync_entry_for_device_list` respectively..
         if not block_all_presence_data or include_device_list_updates:
             (
                 newly_joined_or_invited_or_knocked_users,
