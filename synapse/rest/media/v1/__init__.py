@@ -27,7 +27,7 @@ if not check_codec("jpg"):
 if not check_codec("zlib"):
     raise Exception(
         "FATAL: zip codec not supported. Install pillow correctly! "
-        " 'sudo apt-get install libjpeg-dev' then 'pip uninstall pillow &&"
+        " 'sudo apt-get install zlib1g-dev' then 'pip uninstall pillow &&"
         " pip install pillow --user'"
     )
 
