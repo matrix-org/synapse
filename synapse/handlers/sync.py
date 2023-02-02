@@ -1444,9 +1444,7 @@ class SyncHandler:
 
         logger.debug("Fetching account data")
 
-        account_data_by_room = await self._generate_sync_entry_for_account_data(
-            sync_result_builder
-        )
+        await self._generate_sync_entry_for_account_data(sync_result_builder)
 
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(
@@ -1472,9 +1470,7 @@ class SyncHandler:
             (
                 newly_joined_rooms,
                 newly_left_rooms,
-            ) = await self._generate_sync_entry_for_rooms(
-                sync_result_builder, account_data_by_room
-            )
+            ) = await self._generate_sync_entry_for_rooms(sync_result_builder)
 
             # Work out which users have joined or left rooms we're in. We use this
             # to build the presence and device_list parts of the sync response in
@@ -1717,7 +1713,7 @@ class SyncHandler:
 
     async def _generate_sync_entry_for_account_data(
         self, sync_result_builder: "SyncResultBuilder"
-    ) -> Dict[str, Dict[str, JsonDict]]:
+    ) -> None:
         """Generates the account data portion of the sync response.
 
         Account data (called "Client Config" in the spec) can be set either globally
@@ -1740,14 +1736,8 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
-            # TODO Do not fetch room account data if it will be unused.
             global_account_data = (
                 await self.store.get_updated_global_account_data_for_user(
-                    user_id, since_token.account_data_key
-                )
-            )
-            account_data_by_room = (
-                await self.store.get_updated_room_account_data_for_user(
                     user_id, since_token.account_data_key
                 )
             )
@@ -1761,12 +1751,8 @@ class SyncHandler:
                     sync_config.user
                 )
         else:
-            # TODO Do not fetch room account data if it will be unused.
             global_account_data = await self.store.get_global_account_data_for_user(
-                sync_config.user.to_string()
-            )
-            account_data_by_room = await self.store.get_room_account_data_for_user(
-                sync_config.user.to_string()
+                user_id
             )
 
             global_account_data["m.push_rules"] = await self.push_rules_for_user(
@@ -1781,8 +1767,6 @@ class SyncHandler:
         )
 
         sync_result_builder.account_data = account_data_for_user
-
-        return account_data_by_room
 
     async def _generate_sync_entry_for_presence(
         self,
@@ -1843,9 +1827,7 @@ class SyncHandler:
         sync_result_builder.presence = presence
 
     async def _generate_sync_entry_for_rooms(
-        self,
-        sync_result_builder: "SyncResultBuilder",
-        account_data_by_room: Dict[str, Dict[str, JsonDict]],
+        self, sync_result_builder: "SyncResultBuilder"
     ) -> Tuple[AbstractSet[str], AbstractSet[str]]:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
@@ -1856,7 +1838,6 @@ class SyncHandler:
 
         Args:
             sync_result_builder
-            account_data_by_room: Dictionary of per room account data
 
         Returns:
             Returns a 2-tuple describing rooms the user has joined or left.
@@ -1868,6 +1849,20 @@ class SyncHandler:
 
         since_token = sync_result_builder.since_token
         user_id = sync_result_builder.sync_config.user.to_string()
+
+        # 0. Start by fetching room account data.
+        #
+        # TODO Do not fetch room account data if it will be unused.
+        if since_token and not sync_result_builder.full_state:
+            account_data_by_room = (
+                await self.store.get_updated_room_account_data_for_user(
+                    user_id, since_token.account_data_key
+                )
+            )
+        else:
+            account_data_by_room = await self.store.get_room_account_data_for_user(
+                user_id
+            )
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         block_all_room_ephemeral = (
