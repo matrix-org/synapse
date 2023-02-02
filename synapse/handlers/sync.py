@@ -1459,6 +1459,9 @@ class SyncHandler:
             sync_result_builder, account_data_by_room
         )
 
+        # Presence data is included if the server has it enabled and:
+        # - There is a sync token, or
+        # - Is not filtered out.
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
         )
