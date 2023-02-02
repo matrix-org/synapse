@@ -1489,9 +1489,6 @@ class SyncHandler:
                 newly_joined_or_invited_or_knocked_users,
             )
 
-        logger.debug("Fetching to-device data")
-        await self._generate_sync_entry_for_to_device(sync_result_builder)
-
         if include_device_list_updates:
             device_lists = await self._generate_sync_entry_for_device_list(
                 sync_result_builder,
@@ -1502,6 +1499,9 @@ class SyncHandler:
             )
         else:
             device_lists = DeviceListUpdates()
+
+        logger.debug("Fetching to-device data")
+        await self._generate_sync_entry_for_to_device(sync_result_builder)
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
