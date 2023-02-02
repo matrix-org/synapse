@@ -900,7 +900,7 @@ def set_cors_headers(request: SynapseRequest) -> None:
     else:
         request.setHeader(
             b"Access-Control-Allow-Headers",
-            b"X-Requested-With, Content-Type, Authorization, Date",
+            b"X-Requested-With, Content-Type, Authorization, Date, Synapse-Trace-Id",
         )
 
 
