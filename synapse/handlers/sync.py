@@ -1448,15 +1448,6 @@ class SyncHandler:
             sync_result_builder
         )
 
-        logger.debug("Fetching room data")
-
-        (
-            newly_joined_rooms,
-            newly_left_rooms,
-        ) = await self._generate_sync_entry_for_rooms(
-            sync_result_builder, account_data_by_room
-        )
-
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(
             self.hs_config.server.use_presence
@@ -1465,40 +1456,55 @@ class SyncHandler:
         # Device list updates are sent if a since token is provided.
         include_device_list_updates = bool(since_token and since_token.device_list_key)
 
-        # Work out which users have joined or left rooms we're in. We use this
-        # to build the presence and device_list parts of the sync response in
-        # `_generate_sync_entry_for_presence` and
-        # `_generate_sync_entry_for_device_list` respectively.
-        if include_presence_data or include_device_list_updates:
-            # This uses the sync_result_builder.joined which is set in
-            # `_generate_sync_entry_for_rooms`, if that didn't find any joined
-            # rooms for some reason it is a no-op.
+        # If we do not care about the rooms or things which depend on the room
+        # data (namely presence and device list updates), then we can skip
+        # this process completely.
+        device_lists = DeviceListUpdates()
+        if (
+            not sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+            or include_presence_data
+            or include_device_list_updates
+        ):
+            logger.debug("Fetching room data")
+
+            # Note that _generate_sync_entry_for_rooms sets sync_result_builder.joined, which
+            # is used in calculate_user_changes below.
             (
-                newly_joined_or_invited_or_knocked_users,
-                newly_left_users,
-            ) = sync_result_builder.calculate_user_changes()
-        else:
-            newly_joined_or_invited_or_knocked_users = set()
-            newly_left_users = set()
-
-        if include_presence_data:
-            logger.debug("Fetching presence data")
-            await self._generate_sync_entry_for_presence(
-                sync_result_builder,
                 newly_joined_rooms,
-                newly_joined_or_invited_or_knocked_users,
+                newly_left_rooms,
+            ) = await self._generate_sync_entry_for_rooms(
+                sync_result_builder, account_data_by_room
             )
 
-        if include_device_list_updates:
-            device_lists = await self._generate_sync_entry_for_device_list(
-                sync_result_builder,
-                newly_joined_rooms=newly_joined_rooms,
-                newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
-                newly_left_rooms=newly_left_rooms,
-                newly_left_users=newly_left_users,
-            )
-        else:
-            device_lists = DeviceListUpdates()
+            # Work out which users have joined or left rooms we're in. We use this
+            # to build the presence and device_list parts of the sync response in
+            # `_generate_sync_entry_for_presence` and
+            # `_generate_sync_entry_for_device_list` respectively.
+            if include_presence_data or include_device_list_updates:
+                # This uses the sync_result_builder.joined which is set in
+                # `_generate_sync_entry_for_rooms`, if that didn't find any joined
+                # rooms for some reason it is a no-op.
+                (
+                    newly_joined_or_invited_or_knocked_users,
+                    newly_left_users,
+                ) = sync_result_builder.calculate_user_changes()
+
+                if include_presence_data:
+                    logger.debug("Fetching presence data")
+                    await self._generate_sync_entry_for_presence(
+                        sync_result_builder,
+                        newly_joined_rooms,
+                        newly_joined_or_invited_or_knocked_users,
+                    )
+
+                if include_device_list_updates:
+                    device_lists = await self._generate_sync_entry_for_device_list(
+                        sync_result_builder,
+                        newly_joined_rooms=newly_joined_rooms,
+                        newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
+                        newly_left_rooms=newly_left_rooms,
+                        newly_left_users=newly_left_users,
+                    )
 
         logger.debug("Fetching to-device data")
         await self._generate_sync_entry_for_to_device(sync_result_builder)
