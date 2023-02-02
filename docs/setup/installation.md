@@ -278,7 +278,8 @@ Installing prerequisites on Ubuntu or Debian:
 ```sh
 sudo apt install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev \
+                     libwebp-dev
 ```
 
 ##### ArchLinux
@@ -287,7 +288,7 @@ Installing prerequisites on ArchLinux:
 
 ```sh
 sudo pacman -S base-devel python python-pip \
-               python-setuptools python-virtualenv sqlite3 icu
+               python-setuptools python-virtualenv sqlite3 icu libwebp
 ```
 
 ##### CentOS/Fedora
@@ -298,7 +299,7 @@ Installing prerequisites on CentOS or Fedora Linux:
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel libxml2-devel libxslt-devel libpq-devel \
                  python3-virtualenv libffi-devel openssl-devel python3-devel \
-                 libicu-devel
+                 libicu-devel libwebp-devel
 sudo dnf groupinstall "Development Tools"
 ```
 
@@ -318,7 +319,7 @@ Please follow [the official instructions of PyICU](https://pypi.org/project/PyIC
 
 On ARM-based Macs you may also need to install libjpeg and libpq:
 ```sh
- brew install jpeg libpq
+ brew install jpeg libpq webp
  ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
@@ -338,7 +339,7 @@ Installing prerequisites on openSUSE:
 sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
                python-devel libffi-devel libopenssl-devel libjpeg62-devel \
-               libicu-devel
+               libicu-devel libwebp-devel
 ```
 
 ##### OpenBSD
