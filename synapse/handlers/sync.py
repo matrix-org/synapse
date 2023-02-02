@@ -1461,7 +1461,7 @@ class SyncHandler:
 
         # Presence data is included if the server has it enabled and:
         # - There is a sync token, or
-        # - Is not filtered out.
+        # - Presence is not filtered out.
         include_presence_data = self.hs_config.server.use_presence and (
             since_token is not None
             or not sync_config.filter_collection.blocks_all_presence()
