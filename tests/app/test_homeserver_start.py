@@ -19,7 +19,7 @@ from tests.config.utils import ConfigFileTestCase
 
 
 class HomeserverAppStartTestCase(ConfigFileTestCase):
-    def test_wrong_start_caught(self):
+    def test_wrong_start_caught(self) -> None:
         # Generate a config with a worker_app
         self.generate_config()
         # Add a blank line as otherwise the next addition ends up on a line with a comment

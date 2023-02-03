@@ -119,6 +119,9 @@ class BulkPushRuleEvaluator:
         self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
+        self._intentional_mentions_enabled = (
+            self.hs.config.experimental.msc3952_intentional_mentions
+        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -364,9 +367,12 @@ class BulkPushRuleEvaluator:
 
         # Pull out any user and room mentions.
         mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
+        has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
         user_mentions: Set[str] = set()
         room_mention = False
-        if isinstance(mentions, dict):
+        if has_mentions:
+            # mypy seems to have lost the type even though it must be a dict here.
+            assert isinstance(mentions, dict)
             # Remove out any non-string items and convert to a set.
             user_mentions_raw = mentions.get("user_ids")
             if isinstance(user_mentions_raw, list):
@@ -378,6 +384,7 @@ class BulkPushRuleEvaluator:
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event, room_version=event.room_version),
+            has_mentions,
             user_mentions,
             room_mention,
             room_member_count,
@@ -466,6 +473,29 @@ def _flatten_dict(
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
+    """
+    Given a JSON dictionary (or event) which might contain sub dictionaries,
+    flatten it into a single layer dictionary by combining the keys & sub-keys.
+
+    Any (non-dictionary), non-string value is dropped.
+
+    Transforms:
+
+        {"foo": {"bar": "test"}}
+
+    To:
+
+        {"foo.bar": "test"}
+
+    Args:
+        d: The event or content to continue flattening.
+        room_version: The room version object.
+        prefix: The key prefix (from outer dictionaries).
+        result: The result to mutate.
+
+    Returns:
+        The resulting dictionary.
+    """
     if prefix is None:
         prefix = []
     if result is None:
