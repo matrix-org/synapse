@@ -280,7 +280,10 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
-        self.assertEqual("Unknown direction: bar", channel.json_body["error"])
+        self.assertEqual(
+            "Query parameter 'dir' must be one of ['b', 'f']",
+            channel.json_body["error"],
+        )
 
     def test_limit_is_negative(self) -> None:
         """
