@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Union
+from typing import List
 from unittest.mock import patch
 
 import jsonschema
@@ -26,7 +26,6 @@ from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.api.presence import UserPresenceState
-from synapse.events import EventBase
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
