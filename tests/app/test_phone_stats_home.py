@@ -1,8 +1,11 @@
 import synapse
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
+from tests.server import ThreadedMemoryReactorClock
 from tests.unittest import HomeserverTestCase
 
 FIVE_MINUTES_IN_SECONDS = 300
@@ -164,12 +167,14 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def _advance_to(self, desired_time_secs: float):
+    def _advance_to(self, desired_time_secs: float) -> None:
         now = self.hs.get_clock().time()
         assert now < desired_time_secs
         self.reactor.advance(desired_time_secs - now)
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(
+        self, reactor: ThreadedMemoryReactorClock, clock: Clock
+    ) -> HomeServer:
         hs = super(PhoneHomeR30V2TestCase, self).make_homeserver(reactor, clock)
 
         # We don't want our tests to actually report statistics, so check
