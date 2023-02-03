@@ -14,10 +14,14 @@
 
 from unittest import mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.app.generic_worker import GenericWorkerServer
 from synapse.replication.tcp.commands import FederationAckCommand
 from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams.federation import FederationStream
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -30,10 +34,8 @@ class FederationAckTestCase(HomeserverTestCase):
         config["federation_sender_instances"] = ["federation_sender1"]
         return config
 
-    def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver(homeserver_to_use=GenericWorkerServer)
-
-        return hs
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        return self.setup_test_homeserver(homeserver_to_use=GenericWorkerServer)
 
     def test_federation_ack_sent(self) -> None:
         """A FEDERATION_ACK should be sent back after each RDATA federation

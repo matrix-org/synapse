@@ -94,8 +94,8 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
             repl_handler,
         )
 
-        self._client_transport = None
-        self._server_transport = None
+        self._client_transport: Optional[FakeTransport] = None
+        self._server_transport: Optional[FakeTransport] = None
 
     def create_resource_dict(self) -> Dict[str, Resource]:
         d = super().create_resource_dict()

@@ -27,7 +27,7 @@ ROOM_ID_2 = "!foo:blue"
 
 
 class TypingStreamTestCase(BaseStreamTestCase):
-    def _build_replication_data_handler(self):
+    def _build_replication_data_handler(self) -> Mock:
         return Mock(wraps=super()._build_replication_data_handler())
 
     def test_typing(self) -> None:

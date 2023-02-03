@@ -215,7 +215,9 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(sent_on_1)
         self.assertTrue(sent_on_2)
 
-    def create_room_with_remote_server(self, user, token, remote_server="other_server"):
+    def create_room_with_remote_server(
+        self, user: str, token: str, remote_server: str = "other_server"
+    ) -> str:
         room = self.helper.create_room_as(user, tok=token)
         store = self.hs.get_datastores().main
         federation = self.hs.get_federation_event_handler()

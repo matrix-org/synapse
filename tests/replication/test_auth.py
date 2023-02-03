@@ -13,7 +13,11 @@
 # limitations under the License.
 import logging
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest.client import register
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeChannel, make_request
@@ -27,7 +31,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
 
     servlets = [register.register_servlets]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         # This isn't a real configuration option but is used to provide the main
         # homeserver and worker homeserver different options.
