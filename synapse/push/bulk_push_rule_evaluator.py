@@ -371,6 +371,7 @@ class BulkPushRuleEvaluator:
         user_mentions: Set[str] = set()
         room_mention = False
         if has_mentions:
+            # mypy seems to have lost the type even though it must be a dict here.
             assert isinstance(mentions, dict)
             # Remove out any non-string items and convert to a set.
             user_mentions_raw = mentions.get("user_ids")

@@ -68,7 +68,7 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
-    /// True if the event has a messages property and MSC3952 support is enabled.
+    /// True if the event has a mentions property and MSC3952 support is enabled.
     has_mentions: bool,
     /// The user mentions that were part of the message.
     user_mentions: BTreeSet<String>,
@@ -161,8 +161,9 @@ impl PushRuleEvaluator {
             let rule_id = &push_rule.rule_id().to_string();
 
             // For backwards-compatibility the legacy mention rules are disabled
-            // only if the event contains the 'm.mentions' property (and if the
-            // experimental feature is enabled, we check that in the Python code).
+            // if the event contains the 'm.mentions' property (and if the
+            // experimental feature is enabled, both of these are represented
+            // by the has_mentions flag).
             if self.has_mentions
                 && (rule_id == ".m.rule.contains_display_name"
                     || rule_id == ".m.rule.contains_user_name"
