@@ -45,7 +45,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.filtering = hs.get_filtering()
         self.datastore = hs.get_datastores().main
 
-    def test_errors_on_invalid_filters(self):
+    def test_errors_on_invalid_filters(self) -> None:
         # See USER_FILTER_SCHEMA for the filter schema.
         invalid_filters = [
             # `account_data` must be a dictionary
@@ -63,7 +63,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             with self.assertRaises(SynapseError):
                 self.filtering.check_valid_filter(filter)
 
-    def test_ignores_unknown_filter_fields(self):
+    def test_ignores_unknown_filter_fields(self) -> None:
         # For forward compatibility, we must ignore unknown filter fields.
         # See USER_FILTER_SCHEMA for the filter schema.
         filters = [
@@ -76,7 +76,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             self.filtering.check_valid_filter(filter)
             # Must not raise.
 
-    def test_valid_filters(self):
+    def test_valid_filters(self) -> None:
         valid_filters = [
             {
                 "room": {
@@ -132,22 +132,22 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             except jsonschema.ValidationError as e:
                 self.fail(e)
 
-    def test_limits_are_applied(self):
+    def test_limits_are_applied(self) -> None:
         # TODO
         pass
 
-    def test_definition_types_works_with_literals(self):
+    def test_definition_types_works_with_literals(self) -> None:
         definition = {"types": ["m.room.message", "org.matrix.foo.bar"]}
         event = MockEvent(sender="@foo:bar", type="m.room.message", room_id="!foo:bar")
 
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_types_works_with_wildcards(self):
+    def test_definition_types_works_with_wildcards(self) -> None:
         definition = {"types": ["m.*", "org.matrix.foo.bar"]}
         event = MockEvent(sender="@foo:bar", type="m.room.message", room_id="!foo:bar")
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_types_works_with_unknowns(self):
+    def test_definition_types_works_with_unknowns(self) -> None:
         definition = {"types": ["m.room.message", "org.matrix.foo.bar"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -156,24 +156,24 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_types_works_with_literals(self):
+    def test_definition_not_types_works_with_literals(self) -> None:
         definition = {"not_types": ["m.room.message", "org.matrix.foo.bar"]}
         event = MockEvent(sender="@foo:bar", type="m.room.message", room_id="!foo:bar")
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_types_works_with_wildcards(self):
+    def test_definition_not_types_works_with_wildcards(self) -> None:
         definition = {"not_types": ["m.room.message", "org.matrix.*"]}
         event = MockEvent(
             sender="@foo:bar", type="org.matrix.custom.event", room_id="!foo:bar"
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_types_works_with_unknowns(self):
+    def test_definition_not_types_works_with_unknowns(self) -> None:
         definition = {"not_types": ["m.*", "org.*"]}
         event = MockEvent(sender="@foo:bar", type="com.nom.nom.nom", room_id="!foo:bar")
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_types_takes_priority_over_types(self):
+    def test_definition_not_types_takes_priority_over_types(self) -> None:
         definition = {
             "not_types": ["m.*", "org.*"],
             "types": ["m.room.message", "m.room.topic"],
@@ -181,35 +181,35 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         event = MockEvent(sender="@foo:bar", type="m.room.topic", room_id="!foo:bar")
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_senders_works_with_literals(self):
+    def test_definition_senders_works_with_literals(self) -> None:
         definition = {"senders": ["@flibble:wibble"]}
         event = MockEvent(
             sender="@flibble:wibble", type="com.nom.nom.nom", room_id="!foo:bar"
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_senders_works_with_unknowns(self):
+    def test_definition_senders_works_with_unknowns(self) -> None:
         definition = {"senders": ["@flibble:wibble"]}
         event = MockEvent(
             sender="@challenger:appears", type="com.nom.nom.nom", room_id="!foo:bar"
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_senders_works_with_literals(self):
+    def test_definition_not_senders_works_with_literals(self) -> None:
         definition = {"not_senders": ["@flibble:wibble"]}
         event = MockEvent(
             sender="@flibble:wibble", type="com.nom.nom.nom", room_id="!foo:bar"
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_senders_works_with_unknowns(self):
+    def test_definition_not_senders_works_with_unknowns(self) -> None:
         definition = {"not_senders": ["@flibble:wibble"]}
         event = MockEvent(
             sender="@challenger:appears", type="com.nom.nom.nom", room_id="!foo:bar"
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_senders_takes_priority_over_senders(self):
+    def test_definition_not_senders_takes_priority_over_senders(self) -> None:
         definition = {
             "not_senders": ["@misspiggy:muppets"],
             "senders": ["@kermit:muppets", "@misspiggy:muppets"],
@@ -219,14 +219,14 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_rooms_works_with_literals(self):
+    def test_definition_rooms_works_with_literals(self) -> None:
         definition = {"rooms": ["!secretbase:unknown"]}
         event = MockEvent(
             sender="@foo:bar", type="m.room.message", room_id="!secretbase:unknown"
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_rooms_works_with_unknowns(self):
+    def test_definition_rooms_works_with_unknowns(self) -> None:
         definition = {"rooms": ["!secretbase:unknown"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -235,7 +235,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_rooms_works_with_literals(self):
+    def test_definition_not_rooms_works_with_literals(self) -> None:
         definition = {"not_rooms": ["!anothersecretbase:unknown"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -244,7 +244,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_rooms_works_with_unknowns(self):
+    def test_definition_not_rooms_works_with_unknowns(self) -> None:
         definition = {"not_rooms": ["!secretbase:unknown"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -253,7 +253,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_not_rooms_takes_priority_over_rooms(self):
+    def test_definition_not_rooms_takes_priority_over_rooms(self) -> None:
         definition = {
             "not_rooms": ["!secretbase:unknown"],
             "rooms": ["!secretbase:unknown"],
@@ -263,7 +263,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_combined_event(self):
+    def test_definition_combined_event(self) -> None:
         definition = {
             "not_senders": ["@misspiggy:muppets"],
             "senders": ["@kermit:muppets"],
@@ -279,7 +279,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_definition_combined_event_bad_sender(self):
+    def test_definition_combined_event_bad_sender(self) -> None:
         definition = {
             "not_senders": ["@misspiggy:muppets"],
             "senders": ["@kermit:muppets"],
@@ -295,7 +295,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_combined_event_bad_room(self):
+    def test_definition_combined_event_bad_room(self) -> None:
         definition = {
             "not_senders": ["@misspiggy:muppets"],
             "senders": ["@kermit:muppets"],
@@ -311,7 +311,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_definition_combined_event_bad_type(self):
+    def test_definition_combined_event_bad_type(self) -> None:
         definition = {
             "not_senders": ["@misspiggy:muppets"],
             "senders": ["@kermit:muppets"],
@@ -327,7 +327,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-    def test_filter_labels(self):
+    def test_filter_labels(self) -> None:
         definition = {"org.matrix.labels": ["#fun"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -356,7 +356,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_filter_not_labels(self):
+    def test_filter_not_labels(self) -> None:
         definition = {"org.matrix.not_labels": ["#fun"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -377,7 +377,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
     @unittest.override_config({"experimental_features": {"msc3874_enabled": True}})
-    def test_filter_rel_type(self):
+    def test_filter_rel_type(self) -> None:
         definition = {"org.matrix.msc3874.rel_types": ["m.thread"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -407,7 +407,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
     @unittest.override_config({"experimental_features": {"msc3874_enabled": True}})
-    def test_filter_not_rel_type(self):
+    def test_filter_not_rel_type(self) -> None:
         definition = {"org.matrix.msc3874.not_rel_types": ["m.thread"]}
         event = MockEvent(
             sender="@foo:bar",
@@ -436,7 +436,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
-    def test_filter_presence_match(self):
+    def test_filter_presence_match(self) -> None:
         user_filter_json = {"presence": {"types": ["m.*"]}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
@@ -455,7 +455,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         results = self.get_success(user_filter.filter_presence(events=events))
         self.assertEqual(events, results)
 
-    def test_filter_presence_no_match(self):
+    def test_filter_presence_no_match(self) -> None:
         user_filter_json = {"presence": {"types": ["m.*"]}}
 
         filter_id = self.get_success(
@@ -479,7 +479,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         results = self.get_success(user_filter.filter_presence(events=events))
         self.assertEqual([], results)
 
-    def test_filter_room_state_match(self):
+    def test_filter_room_state_match(self) -> None:
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
@@ -498,7 +498,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         results = self.get_success(user_filter.filter_room_state(events=events))
         self.assertEqual(events, results)
 
-    def test_filter_room_state_no_match(self):
+    def test_filter_room_state_no_match(self) -> None:
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
@@ -519,7 +519,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         results = self.get_success(user_filter.filter_room_state(events))
         self.assertEqual([], results)
 
-    def test_filter_rooms(self):
+    def test_filter_rooms(self) -> None:
         definition = {
             "rooms": ["!allowed:example.com", "!excluded:example.com"],
             "not_rooms": ["!excluded:example.com"],
@@ -535,7 +535,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(filtered_room_ids, ["!allowed:example.com"])
 
-    def test_filter_relations(self):
+    def test_filter_relations(self) -> None:
         events = [
             # An event without a relation.
             MockEvent(
@@ -574,7 +574,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             )
         self.assertEqual(filtered_events, events[1:])
 
-    def test_add_filter(self):
+    def test_add_filter(self) -> None:
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
 
         filter_id = self.get_success(
@@ -595,7 +595,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             ),
         )
 
-    def test_get_filter(self):
+    def test_get_filter(self) -> None:
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
 
         filter_id = self.get_success(
