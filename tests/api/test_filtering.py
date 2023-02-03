@@ -14,23 +14,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from typing import List, Union
 from unittest.mock import patch
 
 import jsonschema
 from frozendict import frozendict
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
 user_localpart = "test_user"
 
 
-def MockEvent(**kwargs):
+def MockEvent(**kwargs: object) -> EventBase:
     if "event_id" not in kwargs:
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
@@ -41,13 +46,13 @@ def MockEvent(**kwargs):
 
 
 class FilteringTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.filtering = hs.get_filtering()
         self.datastore = hs.get_datastores().main
 
     def test_errors_on_invalid_filters(self) -> None:
         # See USER_FILTER_SCHEMA for the filter schema.
-        invalid_filters = [
+        invalid_filters: List[JsonDict] = [
             # `account_data` must be a dictionary
             {"account_data": "Hello World"},
             # `event_fields` entries must not contain backslashes
@@ -66,7 +71,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
     def test_ignores_unknown_filter_fields(self) -> None:
         # For forward compatibility, we must ignore unknown filter fields.
         # See USER_FILTER_SCHEMA for the filter schema.
-        filters = [
+        filters: List[JsonDict] = [
             {"org.matrix.msc9999.future_option": True},
             {"presence": {"org.matrix.msc9999.future_option": True}},
             {"room": {"org.matrix.msc9999.future_option": True}},
@@ -77,7 +82,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             # Must not raise.
 
     def test_valid_filters(self) -> None:
-        valid_filters = [
+        valid_filters: List[JsonDict] = [
             {
                 "room": {
                     "timeline": {"limit": 20},
@@ -536,7 +541,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.assertEqual(filtered_room_ids, ["!allowed:example.com"])
 
     def test_filter_relations(self) -> None:
-        events = [
+        events: List[Union[EventBase, JsonDict]] = [
             # An event without a relation.
             MockEvent(
                 event_id="$no_relation",
@@ -561,7 +566,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         # Filter for a particular sender.
         definition = {"related_by_senders": ["@foo:bar"]}
 
-        async def events_have_relations(*args, **kwargs):
+        async def events_have_relations(*args: object, **kwargs: object) -> List[str]:
             return ["$with_relation"]
 
         with patch.object(
