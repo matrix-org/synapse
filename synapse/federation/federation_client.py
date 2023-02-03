@@ -37,7 +37,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -1680,7 +1680,12 @@ class FederationClient(FederationBase):
         return result
 
     async def timestamp_to_event(
-        self, *, destinations: List[str], room_id: str, timestamp: int, direction: str
+        self,
+        *,
+        destinations: List[str],
+        room_id: str,
+        timestamp: int,
+        direction: Direction,
     ) -> Optional["TimestampToEventResponse"]:
         """
         Calls each remote federating server from `destinations` asking for their closest
@@ -1693,7 +1698,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1738,7 +1743,7 @@ class FederationClient(FederationBase):
             return None
 
     async def _timestamp_to_event_from_destination(
-        self, destination: str, room_id: str, timestamp: int, direction: str
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
     ) -> "TimestampToEventResponse":
         """
         Calls a remote federating server at `destination` asking for their
@@ -1751,7 +1756,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1864,7 +1869,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if not isinstance(origin_server_ts, int):
+        if type(origin_server_ts) is not int:
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

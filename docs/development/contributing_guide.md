@@ -332,6 +332,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
     A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
     See the [worker documentation](../workers.md) for additional information on workers.
+- Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh

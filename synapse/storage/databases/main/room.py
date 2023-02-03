@@ -35,6 +35,7 @@ from typing import (
 import attr
 
 from synapse.api.constants import (
+    Direction,
     EventContentFields,
     EventTypes,
     JoinRules,
@@ -60,9 +61,9 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, RetentionPolicy, ThirdPartyInstanceID
+from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyInstanceID
 from synapse.util import json_encoder
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
 
 if TYPE_CHECKING:
@@ -1255,7 +1256,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         return room_servers
 
-    @cached()
+    @cached(max_entries=10000)
     async def is_partial_state_room(self, room_id: str) -> bool:
         """Checks if this room has partial state.
 
@@ -1273,6 +1274,27 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
 
         return entry is not None
+
+    @cachedList(cached_method_name="is_partial_state_room", list_name="room_ids")
+    async def is_partial_state_room_batched(
+        self, room_ids: StrCollection
+    ) -> Mapping[str, bool]:
+        """Checks if the given rooms have partial state.
+
+        Returns true for "partial-state" rooms, which means that the state
+        at events in the room, and `current_state_events`, may not yet be
+        complete.
+        """
+
+        rows: List[Dict[str, str]] = await self.db_pool.simple_select_many_batch(
+            table="partial_state_rooms",
+            column="room_id",
+            iterable=room_ids,
+            retcols=("room_id",),
+            desc="is_partial_state_room_batched",
+        )
+        partial_state_rooms = {row_dict["room_id"] for row_dict in rows}
+        return {room_id: room_id in partial_state_rooms for room_id in room_ids}
 
     async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
         self, room_id: str
@@ -2183,7 +2205,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         start: int,
         limit: int,
-        direction: str = "b",
+        direction: Direction = Direction.BACKWARDS,
         user_id: Optional[str] = None,
         room_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
@@ -2192,8 +2214,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         Args:
             start: event offset to begin the query from
             limit: number of rows to retrieve
-            direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`)
+            direction: Whether to fetch the most recent first (backwards) or the
+                oldest first (forwards)
             user_id: search for user_id. Ignored if user_id is None
             room_id: search for room_id. Ignored if room_id is None
         Returns:
@@ -2215,7 +2237,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 filters.append("er.room_id LIKE ?")
                 args.extend(["%" + room_id + "%"])
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
