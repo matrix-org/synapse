@@ -26,7 +26,6 @@ from typing import (
     Mapping,
     Optional,
     Set,
-    TypeVar,
     Union,
 )
 
@@ -202,7 +201,7 @@ class Filtering:
 
 
 # Filters work across events, presence EDUs, and account data.
-FilterEvent = TypeVar("FilterEvent", EventBase, UserPresenceState, JsonDict)
+FilterEvent = Union["FilterEvent", EventBase, UserPresenceState, JsonDict]
 
 
 class FilterCollection:
