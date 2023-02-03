@@ -447,7 +447,7 @@ class FederationSender(AbstractFederationSender):
                             )
                         )
 
-                        if len(partial_state_destinations) > 0:
+                        if partial_state_destinations is not None:
                             destinations = partial_state_destinations
 
                     if destinations is None:

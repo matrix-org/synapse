@@ -17,9 +17,16 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.constants import Direction
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
+from synapse.http.servlet import (
+    RestServlet,
+    parse_boolean,
+    parse_enum,
+    parse_integer,
+    parse_string,
+)
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
     admin_patterns,
@@ -389,7 +396,7 @@ class UserMediaRestServlet(RestServlet):
         # to newest media is on top for backward compatibility.
         if b"order_by" not in request.args and b"dir" not in request.args:
             order_by = MediaSortOrder.CREATED_TS.value
-            direction = "b"
+            direction = Direction.BACKWARDS
         else:
             order_by = parse_string(
                 request,
@@ -397,8 +404,8 @@ class UserMediaRestServlet(RestServlet):
                 default=MediaSortOrder.CREATED_TS.value,
                 allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
-            direction = parse_string(
-                request, "dir", default="f", allowed_values=("f", "b")
+            direction = parse_enum(
+                request, "dir", Direction, default=Direction.FORWARDS
             )
 
         media, total = await self.store.get_local_media_by_user_paginate(
@@ -447,7 +454,7 @@ class UserMediaRestServlet(RestServlet):
         # to newest media is on top for backward compatibility.
         if b"order_by" not in request.args and b"dir" not in request.args:
             order_by = MediaSortOrder.CREATED_TS.value
-            direction = "b"
+            direction = Direction.BACKWARDS
         else:
             order_by = parse_string(
                 request,
@@ -455,8 +462,8 @@ class UserMediaRestServlet(RestServlet):
                 default=MediaSortOrder.CREATED_TS.value,
                 allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
-            direction = parse_string(
-                request, "dir", default="f", allowed_values=("f", "b")
+            direction = parse_enum(
+                request, "dir", Direction, default=Direction.FORWARDS
             )
 
         media, _ = await self.store.get_local_media_by_user_paginate(

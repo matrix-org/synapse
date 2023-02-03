@@ -656,7 +656,7 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
                         EVENT_INVITATION_MEMBERSHIP,
                     ],
                     partial_state=True,
-                    servers_in_room=["example.com"],
+                    servers_in_room={"example.com"},
                 )
             )
         )
