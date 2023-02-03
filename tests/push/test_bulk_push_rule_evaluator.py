@@ -373,7 +373,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
     @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
     def test_suppress_edits(self) -> None:
-        """Event edits should not generate notifications."""
+"""Under the default push rules, event edits should not generate notifications."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
 
         # Create & persist an event to use as the parent of the relation.
