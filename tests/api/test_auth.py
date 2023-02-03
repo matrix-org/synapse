@@ -31,7 +31,7 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.server import HomeServer
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester
+from synapse.types import Requester, UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -44,7 +44,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         self.store = Mock()
 
-        hs.datastores.main = self.store
+        # type-ignore: datastores is None until hs.setup() is called---but it'll
+        # have been called by the HomeserverTestCase machinery.
+        hs.datastores.main = self.store  # type: ignore[union-attr]
         hs.get_auth_handler().store = self.store
         self.auth = Auth(hs)
 
@@ -418,7 +420,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             sender="@appservice:sender",
         )
         requester = Requester(
-            user="@appservice:server",
+            user=UserID.from_string("@appservice:server"),
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
@@ -446,7 +448,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             sender="@appservice:sender",
         )
         requester = Requester(
-            user="@appservice:server",
+            user=UserID.from_string("@appservice:server"),
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
