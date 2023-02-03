@@ -213,7 +213,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-        # Ensure no actions are generated!
+        # Execute the push rule machinery.
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
 
         # If any actions are generated for this event, return true.
