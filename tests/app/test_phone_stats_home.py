@@ -19,7 +19,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
     # Override the retention time for the user_ips table because otherwise it
     # gets pruned too aggressively for our R30 test.
     @unittest.override_config({"user_ips_max_age": "365d"})
-    def test_r30_minimum_usage(self):
+    def test_r30_minimum_usage(self) -> None:
         """
         Tests the minimum amount of interaction necessary for the R30 metric
         to consider a user 'retained'.
@@ -68,7 +68,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
-    def test_r30_minimum_usage_using_default_config(self):
+    def test_r30_minimum_usage_using_default_config(self) -> None:
         """
         Tests the minimum amount of interaction necessary for the R30 metric
         to consider a user 'retained'.
@@ -122,7 +122,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
-    def test_r30_user_must_be_retained_for_at_least_a_month(self):
+    def test_r30_user_must_be_retained_for_at_least_a_month(self) -> None:
         """
         Tests that a newly-registered user must be retained for a whole month
         before appearing in the R30 statistic, even if they post every day
@@ -181,7 +181,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         start_phone_stats_home(hs)
         return hs
 
-    def test_r30v2_minimum_usage(self):
+    def test_r30v2_minimum_usage(self) -> None:
         """
         Tests the minimum amount of interaction necessary for the R30v2 metric
         to consider a user 'retained'.
@@ -250,7 +250,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
 
-    def test_r30v2_user_must_be_retained_for_at_least_a_month(self):
+    def test_r30v2_user_must_be_retained_for_at_least_a_month(self) -> None:
         """
         Tests that a newly-registered user must be retained for a whole month
         before appearing in the R30v2 statistic, even if they post every day
@@ -316,7 +316,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
             r30_results, {"all": 1, "android": 1, "electron": 0, "ios": 0, "web": 0}
         )
 
-    def test_r30v2_returning_dormant_users_not_counted(self):
+    def test_r30v2_returning_dormant_users_not_counted(self) -> None:
         """
         Tests that dormant users (users inactive for a long time) do not
         contribute to R30v2 when they return for just a single day.

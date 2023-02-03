@@ -47,7 +47,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
             (["openid"], "auth_fail"),
         ]
     )
-    def test_openid_listener(self, names, expectation):
+    def test_openid_listener(self, names, expectation) -> None:
         """
         Test different openid listener configurations.
 
@@ -95,7 +95,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
             (["openid"], "auth_fail"),
         ]
     )
-    def test_openid_listener(self, names, expectation):
+    def test_openid_listener(self, names, expectation) -> None:
         """
         Test different openid listener configurations.
 
