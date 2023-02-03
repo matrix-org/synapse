@@ -549,7 +549,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.assertEqual(filtered_room_ids, ["!allowed:example.com"])
 
     def test_filter_relations(self) -> None:
-        events: List[Union[EventBase, JsonDict]] = [
+        events = [
             # An event without a relation.
             MockEvent(
                 event_id="$no_relation",
@@ -564,9 +564,8 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                 type="org.matrix.custom.event",
                 room_id="!foo:bar",
             ),
-            # Non-EventBase objects get passed through.
-            {},
         ]
+        jsondicts: List[JsonDict] = [{}]
 
         # For the following tests we patch the datastore method (intead of injecting
         # events). This is a bit cheeky, but tests the logic of _check_event_relations.
@@ -585,7 +584,15 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                     Filter(self.hs, definition)._check_event_relations(events)
                 )
             )
+            # Non-EventBase objects get passed through.
+            filtered_jsondicts = list(
+                self.get_success(
+                    Filter(self.hs, definition)._check_event_relations(jsondicts)
+                )
+            )
+
         self.assertEqual(filtered_events, events[1:])
+        self.assertEqual(filtered_jsondicts, [{}])
 
     def test_add_filter(self) -> None:
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
