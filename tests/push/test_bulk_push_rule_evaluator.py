@@ -311,6 +311,18 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
+        # The legacy push rule should not mention if the mentions field exists.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": self.alice,
+                    "msgtype": "m.text",
+                    EventContentFields.MSC3952_MENTIONS: {},
+                },
+            )
+        )
+
     @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
     def test_room_mentions(self) -> None:
         """Test the behavior of an event which includes invalid room mentions."""
@@ -346,3 +358,15 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                     {EventContentFields.MSC3952_MENTIONS: {"room": mentions}},
                 )
             )
+
+        # The legacy push rule should not mention if the mentions field exists.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": "@room",
+                    "msgtype": "m.text",
+                    EventContentFields.MSC3952_MENTIONS: {},
+                },
+            )
+        )

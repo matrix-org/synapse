@@ -165,9 +165,9 @@ impl PushRuleEvaluator {
             // experimental feature is enabled, both of these are represented
             // by the has_mentions flag).
             if self.has_mentions
-                && (rule_id == ".m.rule.contains_display_name"
-                    || rule_id == ".m.rule.contains_user_name"
-                    || rule_id == ".m.rule.roomnotif")
+                && (rule_id == "global/override/.m.rule.contains_display_name"
+                    || rule_id == "global/content/.m.rule.contains_user_name"
+                    || rule_id == "global/override/.m.rule.roomnotif")
             {
                 continue;
             }
