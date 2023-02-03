@@ -99,10 +99,10 @@ in a future release.
 
 ## The `on_threepid_bind` module callback method has been deprecated
 
-The [`on_threepid_bind`](modules/third_party_rules_callbacks.md#on_threepid_bind) "third-party rules"
+The [`on_threepid_bind`](modules/third_party_rules_callbacks.md#onthreepidbind) "third-party rules"
 Synapse module callback method has been deprecated
 in favour of a new module method,
-[`on_add_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_add_user_third_party_identifier).
+[`on_add_user_third_party_identifier`](modules/third_party_rules_callbacks.md#onadduserthirdpartyidentifier).
 `on_threepid_bind` will be removed in a future version of Synapse. You should check whether any Synapse
 modules in use in your deployment are making use of `on_threepid_bind`, and update them where possible.
 
@@ -119,7 +119,7 @@ do so via an [identity server](https://spec.matrix.org/latest/identity-service-a
 it was only called when a user added a third-party identifier on the local homeserver.
 
 Module developers may also be interested in the related
-[`on_remove_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_remove_user_third_party_identifier)
+[`on_remove_user_third_party_identifier`](modules/third_party_rules_callbacks.md#onremoveuserthirdpartyidentifier)
 module callback method that was also added in Synapse v1.77.0. This new method is called when a
 user removes a third-party identifier from their account.
 
