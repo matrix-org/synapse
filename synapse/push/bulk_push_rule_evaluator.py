@@ -470,6 +470,8 @@ def _flatten_dict(
     Given a JSON dictionary (or event) which might contain sub dictionaries,
     flatten it into a single layer dictionary by combining the keys & sub-keys.
 
+    Any (non-dictionary), non-string value is dropped.
+
     Transforms:
 
         {"foo": {"bar": "test"}}
