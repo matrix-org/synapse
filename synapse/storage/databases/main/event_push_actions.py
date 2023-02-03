@@ -203,6 +203,10 @@ class RoomNotifCounts:
     # Map of thread ID to the notification counts.
     threads: Dict[str, NotifCounts]
 
+    @staticmethod
+    def empty() -> "RoomNotifCounts":
+        return RoomNotifCounts(NotifCounts(), {})
+
     def __len__(self) -> int:
         # To properly account for the amount of space in any caches.
         return len(self.threads) + 1
