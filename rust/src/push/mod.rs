@@ -368,7 +368,7 @@ impl PushRules {
                 2 => push_rules.sender.push(rule),
                 1 => push_rules.underride.push(rule),
                 _ => {
-                    warn!(target: "synapse.synapse_rust",
+                    warn!(
                         "Unrecognized priority class for rule {}: {}",
                         rule.rule_id, rule.priority_class
                     );

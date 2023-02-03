@@ -171,7 +171,7 @@ impl PushRuleEvaluator {
                     Ok(true) => {}
                     Ok(false) => continue 'outer,
                     Err(err) => {
-                        warn!(target: "synapse.synapse_rust","Condition match failed {err}");
+                        warn!("Condition match failed {err}");
                         continue 'outer;
                     }
                 }
@@ -209,7 +209,7 @@ impl PushRuleEvaluator {
             Ok(true) => true,
             Ok(false) => false,
             Err(err) => {
-                warn!( target: "synapse.synapse_rust","Condition match failed {err}");
+                warn!("Condition match failed {err}");
                 false
             }
         }
