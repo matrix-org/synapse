@@ -25,24 +25,15 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events import EventBase, make_event_from_dict
+from synapse.events import EventBase
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
+from tests.events.test_utils import MockEvent
 
 user_localpart = "test_user"
-
-
-def MockEvent(**kwargs: object) -> EventBase:
-    if "event_id" not in kwargs:
-        kwargs["event_id"] = "fake_event_id"
-    if "type" not in kwargs:
-        kwargs["type"] = "fake_type"
-    if "content" not in kwargs:
-        kwargs["content"] = {}
-    return make_event_from_dict(kwargs)
 
 
 class FilteringTestCase(unittest.HomeserverTestCase):
