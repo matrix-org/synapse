@@ -272,6 +272,44 @@ server_.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `on_add_user_third_party_identifier`
+
+_First introduced in Synapse v1.78.0_
+
+```python
+async def on_add_user_third_party_identifier(user_id: str, medium: str, address: str) -> None:
+```
+
+Called just before creating an association between a user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (`email` or `msisdn`) and address of the
+third-party identifier (i.e. an email address).
+
+Note that this callback is _not_ called if a user attempts to bind their third-party identifier
+to an identity server (via a call to [`POST
+/_matrix/client/v3/account/3pid/bind`](https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3account3pidbind)).
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
+### `on_remove_user_third_party_identifier`
+
+_First introduced in Synapse v1.78.0_
+
+```python
+async def on_remove_user_third_party_identifier(user_id: str, medium: str, address: str) -> None:
+```
+
+Called just before removing an association between a user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (`email` or `msisdn`) and address of the
+third-party identifier (i.e. an email address).
+
+Note that this callback is _not_ called if a user attempts to unbind their third-party
+identifier from an identity server (via a call to [`POST
+/_matrix/client/v3/account/3pid/unbind`](https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3account3pidunbind)).
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
 ## Example
 
 The example below is a module that implements the third-party rules callback
