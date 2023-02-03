@@ -41,7 +41,7 @@ from tests.utils import mock_getRawHeaders
 
 
 class AuthTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = Mock()
 
         # type-ignore: datastores is None until hs.setup() is called---but it'll
