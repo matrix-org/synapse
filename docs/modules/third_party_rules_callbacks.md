@@ -251,6 +251,13 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 _First introduced in Synapse v1.56.0_
 
+**<span style="color:red">
+This callback is deprecated in favour of the `on_add_user_third_party_identifier` callback, which
+features nearly the same functionality. The only difference is that while `on_threepid_bind`
+was called *after* a third-party ID was associated with a user's account on the homeserver,
+`on_add_user_third_party_identifier` is called just *before* a third-party ID is associated.
+</span>**
+
 ```python
 async def on_threepid_bind(user_id: str, medium: str, address: str) -> None:
 ```

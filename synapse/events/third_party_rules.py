@@ -532,6 +532,9 @@ class ThirdPartyEventRules:
         local homeserver, not when it's created on an identity server (and then kept track
         of so that it can be unbound on the same IS later on).
 
+        THIS MODULE CALLBACK METHOD HAS BEEN DEPRECATED. Please use the
+        `on_add_user_third_party_identifier` callback method instead.
+
         Args:
             user_id: the user being associated with the threepid.
             medium: the threepid's medium.

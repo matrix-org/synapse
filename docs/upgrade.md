@@ -97,6 +97,32 @@ admin API with an identical endpoint at `/_synapse/admin/v1/media/delete`. Pleas
 update your tooling to use the new endpoint. The deprecated version will be removed
 in a future release.
 
+## The `on_threepid_bind` module callback method has been deprecated
+
+The [`on_threepid_bind`](modules/third_party_rules_callbacks.md#on_threepid_bind) "third-party rules"
+Synapse module callback method has been deprecated
+in favour of a new module method,
+[`on_add_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_add_user_third_party_identifier).
+`on_threepid_bind` will be removed in a future version of Synapse. You should check whether any Synapse
+modules in use in your deployment are making use of `on_threepid_bind`, and update them where possible.
+
+The arguments and functionality of the new method are nearly the same; `on_threepid_bind` was called
+directly *after* a user adds a third-party identifier (email, phone number) to their account, while
+`on_add_user_third_party_identifier` is called just *before* a user adds a third-party identifier.
+
+The justification behind the swap in logical ordering is that `on_add_user_third_party_identifier`
+may be extended in the future to allow blocking a user from adding a third-party identifier to their
+account. The reason behind the name change is that the old method's name, `on_threepid_bind`, was
+misleading. A user is considered to "bind" their third-party ID to their Matrix ID only if they
+do so via an [identity server](https://spec.matrix.org/latest/identity-service-api/)
+(so that users on other homeservers may find them). But this method was not called in that case -
+it was only called when a user added a third-party identifier on the local homeserver.
+
+Module developers may also be interested in the related
+[`on_remove_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_remove_user_third_party_identifier)
+module callback method that was also added in Synapse v1.77.0. This new method is called when a
+user removes a third-party identifier from their account.
+
 # Upgrading to v1.76.0
 
 ## Faster joins are enabled by default
