@@ -25,6 +25,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
+from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -433,14 +434,24 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
     def test_filter_presence_match(self) -> None:
-        user_filter_json = {"presence": {"types": ["m.*"]}}
+        """Check that filter_presence return events which matches the filter."""
+        user_filter_json = {"presence": {"senders": ["@foo:bar"]}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart, user_filter=user_filter_json
             )
         )
-        event = MockEvent(sender="@foo:bar", type="m.profile")
-        events = [event]
+        presence_states = [
+            UserPresenceState(
+                user_id="@foo:bar",
+                state="unavailable",
+                last_active_ts=0,
+                last_federation_update_ts=0,
+                last_user_sync_ts=0,
+                status_msg=None,
+                currently_active=False,
+            ),
+        ]
 
         user_filter = self.get_success(
             self.filtering.get_user_filter(
@@ -448,23 +459,29 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        results = self.get_success(user_filter.filter_presence(events=events))
-        self.assertEqual(events, results)
+        results = self.get_success(user_filter.filter_presence(presence_states))
+        self.assertEqual(presence_states, results)
 
     def test_filter_presence_no_match(self) -> None:
-        user_filter_json = {"presence": {"types": ["m.*"]}}
+        """Check that filter_presence does not return events rejected by the filter."""
+        user_filter_json = {"presence": {"not_senders": ["@foo:bar"]}}
 
         filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart + "2", user_filter=user_filter_json
             )
         )
-        event = MockEvent(
-            event_id="$asdasd:localhost",
-            sender="@foo:bar",
-            type="custom.avatar.3d.crazy",
-        )
-        events = [event]
+        presence_states = [
+            UserPresenceState(
+                user_id="@foo:bar",
+                state="unavailable",
+                last_active_ts=0,
+                last_federation_update_ts=0,
+                last_user_sync_ts=0,
+                status_msg=None,
+                currently_active=False,
+            ),
+        ]
 
         user_filter = self.get_success(
             self.filtering.get_user_filter(
@@ -472,7 +489,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        results = self.get_success(user_filter.filter_presence(events=events))
+        results = self.get_success(user_filter.filter_presence(presence_states))
         self.assertEqual([], results)
 
     def test_filter_room_state_match(self) -> None:
