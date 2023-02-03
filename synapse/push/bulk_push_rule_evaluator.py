@@ -473,6 +473,29 @@ def _flatten_dict(
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
+    """
+    Given a JSON dictionary (or event) which might contain sub dictionaries,
+    flatten it into a single layer dictionary by combining the keys & sub-keys.
+
+    Any (non-dictionary), non-string value is dropped.
+
+    Transforms:
+
+        {"foo": {"bar": "test"}}
+
+    To:
+
+        {"foo.bar": "test"}
+
+    Args:
+        d: The event or content to continue flattening.
+        room_version: The room version object.
+        prefix: The key prefix (from outer dictionaries).
+        result: The result to mutate.
+
+    Returns:
+        The resulting dictionary.
+    """
     if prefix is None:
         prefix = []
     if result is None:
