@@ -224,6 +224,8 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
+        self._registration_enabled = hs.config.registration.enable_registration
+
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
         assert p_id not in self._identity_providers
@@ -462,8 +464,16 @@ class SsoHandler:
                         auth_provider_id, remote_user_id, user_id
                     )
 
-            # Otherwise, generate a new user.
-            if not user_id:
+            if not user_id and not self._registration_enabled:
+                logger.info(
+                    "User does not exist and registration are disabled for IdP '%s' and remote_user_id '%s'",
+                    auth_provider_id,
+                    remote_user_id,
+                )
+                raise MappingException(
+                    "User does not exist and registrations are disabled"
+                )
+            elif not user_id:  # Otherwise, generate a new user.
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
 
                 next_step_url = self._get_url_for_next_new_user_step(
