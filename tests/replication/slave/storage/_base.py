@@ -25,7 +25,7 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
 
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor, clock, hs) -> None:
         super().prepare(reactor, clock, hs)
 
         self.reconnect()
@@ -34,14 +34,14 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
         self.slaved_store = self.worker_hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
 
-    def replicate(self):
+    def replicate(self) -> None:
         """Tell the master side of replication that something has happened, and then
         wait for the replication to occur.
         """
         self.streamer.on_notifier_poke()
         self.pump(0.1)
 
-    def check(self, method, args, expected_result=None):
+    def check(self, method, args, expected_result=None) -> None:
         master_result = self.get_success(getattr(self.master_store, method)(*args))
         slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
         if expected_result is not None:

@@ -51,7 +51,7 @@ def patch__eq__(cls):
     eq = getattr(cls, "__eq__", None)
     cls.__eq__ = dict_equals
 
-    def unpatch():
+    def unpatch() -> None:
         if eq is not None:
             cls.__eq__ = eq
 
@@ -80,10 +80,10 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
             )
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         [unpatch() for unpatch in self.unpatches]
 
-    def test_get_latest_event_ids_in_room(self):
+    def test_get_latest_event_ids_in_room(self) -> None:
         create = self.persist(type="m.room.create", key="", creator=USER_ID)
         self.replicate()
         self.check("get_latest_event_ids_in_room", (ROOM_ID,), [create.event_id])
@@ -97,7 +97,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         self.replicate()
         self.check("get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id])
 
-    def test_redactions(self):
+    def test_redactions(self) -> None:
         self.persist(type="m.room.create", key="", creator=USER_ID)
         self.persist(type="m.room.member", key=USER_ID, membership="join")
 
@@ -117,7 +117,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         )
         self.check("get_event", [msg.event_id], redacted)
 
-    def test_backfilled_redactions(self):
+    def test_backfilled_redactions(self) -> None:
         self.persist(type="m.room.create", key="", creator=USER_ID)
         self.persist(type="m.room.member", key=USER_ID, membership="join")
 
@@ -139,7 +139,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         )
         self.check("get_event", [msg.event_id], redacted)
 
-    def test_invites(self):
+    def test_invites(self) -> None:
         self.persist(type="m.room.create", key="", creator=USER_ID)
         self.check("get_invited_rooms_for_local_user", [USER_ID_2], [])
         event = self.persist(type="m.room.member", key=USER_ID_2, membership="invite")
@@ -219,7 +219,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
             ),
         )
 
-    def test_get_rooms_for_user_with_stream_ordering(self):
+    def test_get_rooms_for_user_with_stream_ordering(self) -> None:
         """Check that the cache on get_rooms_for_user_with_stream_ordering is invalidated
         by rows in the events stream
         """
@@ -243,7 +243,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
             {GetRoomsForUserWithStreamOrdering(ROOM_ID, expected_pos)},
         )
 
-    def test_get_rooms_for_user_with_stream_ordering_with_multi_event_persist(self):
+    def test_get_rooms_for_user_with_stream_ordering_with_multi_event_persist(self) -> None:
         """Check that current_state invalidation happens correctly with multiple events
         in the persistence batch.
 

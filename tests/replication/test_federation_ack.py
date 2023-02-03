@@ -35,7 +35,7 @@ class FederationAckTestCase(HomeserverTestCase):
 
         return hs
 
-    def test_federation_ack_sent(self):
+    def test_federation_ack_sent(self) -> None:
         """A FEDERATION_ACK should be sent back after each RDATA federation
 
         This test checks that the federation sender is correctly sending back

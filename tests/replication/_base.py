@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from twisted.internet.address import IPv4Address
 from twisted.internet.protocol import Protocol
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 from synapse.app.generic_worker import GenericWorkerServer
@@ -30,6 +31,7 @@ from synapse.replication.tcp.protocol import (
 )
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -51,7 +53,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
     if not hiredis:
         skip = "Requires hiredis"
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # build a replication server
         server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
@@ -110,7 +112,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
     def _build_replication_data_handler(self):
         return TestReplicationDataHandler(self.worker_hs)
 
-    def reconnect(self):
+    def reconnect(self) -> None:
         if self._client_transport:
             self.client.close()
 
@@ -123,7 +125,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self._server_transport = FakeTransport(self.client, self.reactor)
         self.server.makeConnection(self._server_transport)
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         if self._client_transport:
             self._client_transport = None
             self.client.close()
@@ -132,7 +134,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
             self._server_transport = None
             self.server.close()
 
-    def replicate(self):
+    def replicate(self) -> None:
         """Tell the master side of replication that something has happened, and then
         wait for the replication to occur.
         """
@@ -385,7 +387,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         config["worker_replication_http_port"] = "8765"
         return config
 
-    def replicate(self):
+    def replicate(self) -> None:
         """Tell the master side of replication that something has happened, and then
         wait for the replication to occur.
         """
@@ -429,7 +431,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # inside `connecTCP` before the connection has been passed back to the
         # code that requested the TCP connection.
 
-    def connect_any_redis_attempts(self):
+    def connect_any_redis_attempts(self) -> None:
         """If redis is enabled we need to deal with workers connecting to a
         redis server. We don't want to use a real Redis server so we use a
         fake one.
@@ -472,16 +474,16 @@ class TestReplicationDataHandler(ReplicationDataHandler):
 class FakeRedisPubSubServer:
     """A fake Redis server for pub/sub."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._subscribers_by_channel: Dict[
             bytes, Set["FakeRedisPubSubProtocol"]
         ] = defaultdict(set)
 
-    def add_subscriber(self, conn, channel: bytes):
+    def add_subscriber(self, conn, channel: bytes) -> None:
         """A connection has called SUBSCRIBE"""
         self._subscribers_by_channel[channel].add(conn)
 
-    def remove_subscriber(self, conn):
+    def remove_subscriber(self, conn) -> None:
         """A connection has lost connection"""
         for subscribers in self._subscribers_by_channel.values():
             subscribers.discard(conn)
@@ -493,7 +495,7 @@ class FakeRedisPubSubServer:
 
         return len(self._subscribers_by_channel)
 
-    def buildProtocol(self, addr):
+    def buildProtocol(self, addr) -> "FakeRedisPubSubProtocol":
         return FakeRedisPubSubProtocol(self)
 
 
@@ -506,7 +508,7 @@ class FakeRedisPubSubProtocol(Protocol):
         self._server = server
         self._reader = hiredis.Reader()
 
-    def dataReceived(self, data):
+    def dataReceived(self, data) -> None:
         self._reader.feed(data)
 
         # We might get multiple messages in one packet.
@@ -523,7 +525,7 @@ class FakeRedisPubSubProtocol(Protocol):
 
             self.handle_command(msg[0], *msg[1:])
 
-    def handle_command(self, command, *args):
+    def handle_command(self, command, *args) -> None:
         """Received a Redis command from the client."""
 
         # We currently only support pub/sub.
@@ -550,7 +552,7 @@ class FakeRedisPubSubProtocol(Protocol):
         else:
             raise Exception(f"Unknown command: {command}")
 
-    def send(self, msg):
+    def send(self, msg) -> None:
         """Send a message back to the client."""
         assert self.transport is not None
 
@@ -559,7 +561,7 @@ class FakeRedisPubSubProtocol(Protocol):
         self.transport.write(raw)
         self.transport.flush()
 
-    def encode(self, obj):
+    def encode(self, obj: object) -> str:
         """Encode an object to its Redis format.
 
         Supports: strings/bytes, integers and list/tuples.
@@ -581,5 +583,5 @@ class FakeRedisPubSubProtocol(Protocol):
 
         raise Exception("Unrecognized type for encoding redis: %r: %r", type(obj), obj)
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason) -> None:
         self._server.remove_subscriber(self)

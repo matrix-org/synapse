@@ -40,7 +40,7 @@ class RemoteServerUpTestCase(HomeserverTestCase):
 
         return proto, transport
 
-    def test_relay(self):
+    def test_relay(self) -> None:
         """Test that Synapse will relay REMOTE_SERVER_UP commands to all
         other connections, but not the one that sent it.
         """

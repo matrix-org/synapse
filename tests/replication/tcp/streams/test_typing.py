@@ -30,7 +30,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
     def _build_replication_data_handler(self):
         return Mock(wraps=super()._build_replication_data_handler())
 
-    def test_typing(self):
+    def test_typing(self) -> None:
         typing = self.hs.get_typing_handler()
 
         self.reconnect()
@@ -79,7 +79,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([], row.user_ids)
 
-    def test_reset(self):
+    def test_reset(self) -> None:
         """
         Test what happens when a typing stream resets.
 

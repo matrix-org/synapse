@@ -62,7 +62,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             mock.side_effect = lambda: room_id
             self.helper.create_room_as(user_id, tok=tok)
 
-    def test_basic(self):
+    def test_basic(self) -> None:
         """Simple test to ensure that multiple rooms can be created and joined,
         and that different rooms get handled by different instances.
         """
@@ -112,7 +112,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(persisted_on_1)
         self.assertTrue(persisted_on_2)
 
-    def test_vector_clock_token(self):
+    def test_vector_clock_token(self) -> None:
         """Tests that using a stream token with a vector clock component works
         correctly with basic /sync and /messages usage.
         """

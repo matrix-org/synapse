@@ -122,7 +122,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
 
         return channel, request
 
-    def test_basic(self):
+    def test_basic(self) -> None:
         """Test basic fetching of remote media from a single worker."""
         hs1 = self.make_worker_hs("synapse.app.generic_worker")
 
@@ -138,7 +138,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"Hello!")
 
-    def test_download_simple_file_race(self):
+    def test_download_simple_file_race(self) -> None:
         """Test that fetching remote media from two different processes at the
         same time works.
         """
@@ -177,7 +177,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         # We expect only one new file to have been persisted.
         self.assertEqual(start_count + 1, self._count_remote_media())
 
-    def test_download_image_race(self):
+    def test_download_image_race(self) -> None:
         """Test that fetching remote *images* from two different processes at
         the same time works.
 
