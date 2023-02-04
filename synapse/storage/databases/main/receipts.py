@@ -625,6 +625,16 @@ class ReceiptsWorkerStore(StreamWorkerStore, SQLBaseStore):
             allow_none=True,
         )
 
+        # Local user receipts must have an event_stream_ordering so that push action
+        # summarisation works correctly. This should always be the case because any
+        # local user should only receive events from this server. This exception
+        # protects against bad actors sending dodgy receipts.
+        if res is None and self.hs.is_mine_id(user_id):
+            raise ValueError(
+                "Local users cannot send receipts for unknown events, "
+                f"roomID={room_id}, eventID={event_id}",
+            )
+
         stream_ordering = int(res["stream_ordering"]) if res else None
         rx_ts = res["received_ts"] if res else 0
 
