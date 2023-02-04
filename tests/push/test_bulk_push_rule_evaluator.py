@@ -19,7 +19,7 @@ from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EventContentFields, RelationTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.rest import admin
@@ -367,6 +367,46 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                     "body": "@room",
                     "msgtype": "m.text",
                     EventContentFields.MSC3952_MENTIONS: {},
+                },
+            )
+        )
+
+    @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
+    def test_suppress_edits(self) -> None:
+        """Under the default push rules, event edits should not generate notifications."""
+        bulk_evaluator = BulkPushRuleEvaluator(self.hs)
+
+        # Create & persist an event to use as the parent of the relation.
+        event, context = self.get_success(
+            self.event_creation_handler.create_event(
+                self.requester,
+                {
+                    "type": "m.room.message",
+                    "room_id": self.room_id,
+                    "content": {
+                        "msgtype": "m.text",
+                        "body": "helo",
+                    },
+                    "sender": self.alice,
+                },
+            )
+        )
+        self.get_success(
+            self.event_creation_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
+        )
+
+        # Room mentions from those without power should not notify.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": self.alice,
+                    "m.relates_to": {
+                        "rel_type": RelationTypes.REPLACE,
+                        "event_id": event.event_id,
+                    },
                 },
             )
         )
