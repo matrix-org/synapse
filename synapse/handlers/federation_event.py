@@ -526,8 +526,8 @@ class FederationEventHandler:
         )
         with nested_logging_context(suffix=event.event_id):
             if partial_state:
-                # When handling a second partial join into a partial state room, the
-                # returned state will exclude the membership from the first join. To
+                # When handling a second partial state join into a partial state room,
+                # the returned state will exclude the membership from the first join. To
                 # preserve prior memberships, we try to compute the state before the
                 # event ourselves if we know about any of the prev events.
                 #

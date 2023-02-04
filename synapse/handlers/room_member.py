@@ -1116,9 +1116,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             remote_room_hosts: A list of remote room hosts.
             content: The content to use as the event body of the join. This may
                 be modified.
-            is_partial_state_room: True if the server currently doesn't hold the fully
+            is_partial_state_room: `True` if the server currently doesn't hold the full
                 state of the room.
-            is_host_in_room: True if the host is in the room.
+            is_host_in_room: `True` if the host is in the room.
             partial_state_before_join: The state before the join event (i.e. the
                 resolution of the states after its parent events). May be full or
                 partial state, depending on `is_partial_state_room`.
@@ -1143,11 +1143,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             prev_member_event = await self.store.get_event(prev_member_event_id)
             previous_membership = prev_member_event.membership
 
-        # If we are not fully join yet, and the target is not already in the room,
+        # If we are not fully joined yet, and the target is not already in the room,
         # let's do a remote join so another server with the full state can validate
-        # that the user has not been ban for example.
-        # We could just accept the join and wait for state-res to resolve that later on
-        # but we would then leak room history to this person until then, which is pretty bad.
+        # that the user has not been banned for example.
+        # We could just accept the join and wait for state res to resolve that later on
+        # but we would then leak room history to this person until then, which is pretty
+        # bad.
         if is_partial_state_room and previous_membership != Membership.JOIN:
             return True, remote_room_hosts
 
