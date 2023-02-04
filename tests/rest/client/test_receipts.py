@@ -14,7 +14,7 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.rest.client import login, receipts, register
+from synapse.rest.client import login, receipts, register, room
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -26,6 +26,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         register.register_servlets,
         receipts.register_servlets,
+        room.register_servlets,
         synapse.rest.admin.register_servlets,
     ]
 
@@ -34,9 +35,13 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self.owner_tok = self.login("owner", "pass")
 
     def test_send_receipt(self) -> None:
+        room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
+        resp = self.helper.send(room_id, tok=self.owner_tok)
+        event_id = resp["event_id"]
+
         channel = self.make_request(
             "POST",
-            "/rooms/!abc:beep/receipt/m.read/$def",
+            f"/rooms/!abc:beep/receipt/m.read/{event_id}",
             content={},
             access_token=self.owner_tok,
         )
