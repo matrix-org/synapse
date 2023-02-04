@@ -839,12 +839,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
 
-        # There are 2 reasons that mandate to have the full state:
-        # - to calculate `is_host_in_room`, however we now approximate that we consider the server
-        # in the room if we are still in the middle of a fast join.
-        # - to calculate if another user trying to join is allowed to. In this case we now
-        # make another `make/send_join` to a resident server to validate that. We could just
-        # accept it but it would mean that we would potentially leak the history to a banned user.
+        # The full state is needed to calculate if another user trying to join is
+        # allowed to. In this case we now make another `make/send_join` to a resident
+        # server to validate that. We could just accept it but it would mean that we
+        # would potentially leak the history to a banned user.
         state_before_join = await self.state_handler.compute_state_after_events(
             room_id, latest_event_ids, await_full_state=False
         )
@@ -904,9 +902,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 raise AuthError(403, "The target user is not in the room")
 
         is_partial_state_room = await self.store.is_partial_state_room(room_id)
-        is_host_in_room = await self._is_host_in_room(
-            is_partial_state_room, state_before_join
-        )
+        is_host_in_room = await self._is_host_in_room(state_before_join)
 
         if effective_membership_state == Membership.JOIN:
             if requester.is_guest:
@@ -1670,13 +1666,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
         return event, stream_id
 
-    async def _is_host_in_room(
-        self, is_partial_state_room: bool, current_state_ids: StateMap[str]
-    ) -> bool:
-        # When we only have a partial state, let's assume we are still in the room
-        if is_partial_state_room:
-            return True
-
+    async def _is_host_in_room(self, current_state_ids: StateMap[str]) -> bool:
         # Have we just created the room, and is this about to be the very
         # first member event?
         create_event_id = current_state_ids.get(("m.room.create", ""))
