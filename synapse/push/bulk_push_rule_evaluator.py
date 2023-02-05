@@ -22,13 +22,20 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Set,
     Tuple,
     Union,
 )
 
 from prometheus_client import Counter
 
-from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
+from synapse.api.constants import (
+    MAIN_TIMELINE,
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+)
 from synapse.api.room_versions import PushRuleRoomFlag, RoomVersion
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
@@ -60,6 +67,9 @@ STATE_EVENT_TYPES_TO_MARK_UNREAD = {
     EventTypes.RoomAvatar,
     EventTypes.Tombstone,
 }
+
+
+SENTINEL = object()
 
 
 def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
@@ -109,6 +119,9 @@ class BulkPushRuleEvaluator:
         self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
+        self._intentional_mentions_enabled = (
+            self.hs.config.experimental.msc3952_intentional_mentions
+        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -336,14 +349,44 @@ class BulkPushRuleEvaluator:
         related_events = await self._related_events(event)
 
         # It's possible that old room versions have non-integer power levels (floats or
-        # strings). Workaround this by explicitly converting to int.
+        # strings; even the occasional `null`). For old rooms, we interpret these as if
+        # they were integers. Do this here for the `@room` power level threshold.
+        # Note that this is done automatically for the sender's power level by
+        # _get_power_levels_and_sender_level in its call to get_user_power_level
+        # (even for room V10.)
         notification_levels = power_levels.get("notifications", {})
         if not event.room_version.msc3667_int_only_power_levels:
-            for user_id, level in notification_levels.items():
-                notification_levels[user_id] = int(level)
+            keys = list(notification_levels.keys())
+            for key in keys:
+                level = notification_levels.get(key, SENTINEL)
+                if level is not SENTINEL and type(level) is not int:
+                    try:
+                        notification_levels[key] = int(level)
+                    except (TypeError, ValueError):
+                        del notification_levels[key]
+
+        # Pull out any user and room mentions.
+        mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
+        has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
+        user_mentions: Set[str] = set()
+        room_mention = False
+        if has_mentions:
+            # mypy seems to have lost the type even though it must be a dict here.
+            assert isinstance(mentions, dict)
+            # Remove out any non-string items and convert to a set.
+            user_mentions_raw = mentions.get("user_ids")
+            if isinstance(user_mentions_raw, list):
+                user_mentions = set(
+                    filter(lambda item: isinstance(item, str), user_mentions_raw)
+                )
+            # Room mention is only true if the value is exactly true.
+            room_mention = mentions.get("room") is True
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event, room_version=event.room_version),
+            has_mentions,
+            user_mentions,
+            room_mention,
             room_member_count,
             sender_power_level,
             notification_levels,
@@ -430,6 +473,29 @@ def _flatten_dict(
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
+    """
+    Given a JSON dictionary (or event) which might contain sub dictionaries,
+    flatten it into a single layer dictionary by combining the keys & sub-keys.
+
+    Any (non-dictionary), non-string value is dropped.
+
+    Transforms:
+
+        {"foo": {"bar": "test"}}
+
+    To:
+
+        {"foo.bar": "test"}
+
+    Args:
+        d: The event or content to continue flattening.
+        room_version: The room version object.
+        prefix: The key prefix (from outer dictionaries).
+        result: The result to mutate.
+
+    Returns:
+        The resulting dictionary.
+    """
     if prefix is None:
         prefix = []
     if result is None:

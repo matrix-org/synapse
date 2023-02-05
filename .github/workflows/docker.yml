@@ -48,7 +48,7 @@ jobs:
             type=pep440,pattern={{raw}}
 
       - name: Build and push all platforms
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           push: true
           labels: "gitsha1=${{ github.sha }}"

@@ -35,6 +35,8 @@ def MockEvent(**kwargs: Any) -> EventBase:
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
+    if "content" not in kwargs:
+        kwargs["content"] = {}
     return make_event_from_dict(kwargs)
 
 

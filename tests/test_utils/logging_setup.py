@@ -17,6 +17,7 @@ import os
 import twisted.logger
 
 from synapse.logging.context import LoggingContextFilter
+from synapse.synapse_rust import reset_logging_config
 
 
 class ToTwistedHandler(logging.Handler):
@@ -52,3 +53,5 @@ def setup_logging():
 
     log_level = os.environ.get("SYNAPSE_TEST_LOG_LEVEL", "ERROR")
     root_logger.setLevel(log_level)
+
+    reset_logging_config()
