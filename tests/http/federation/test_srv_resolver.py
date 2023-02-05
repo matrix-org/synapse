@@ -49,7 +49,8 @@ class SrvResolverTestCase(unittest.TestCase):
 
             with LoggingContext("one") as ctx:
                 resolve_d = resolver.resolve_service(service_name)
-                result: List[Server] = yield defer.ensureDeferred(resolve_d)  # type: ignore[assignment]
+                result: List[Server]
+                result = yield defer.ensureDeferred(resolve_d)  # type: ignore[assignment]
 
                 # should have restored our context
                 self.assertIs(current_context(), ctx)
@@ -86,7 +87,8 @@ class SrvResolverTestCase(unittest.TestCase):
         cache = {service_name: [cast(Server, entry)]}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        servers: List[Server] = yield defer.ensureDeferred(
+        servers: List[Server]
+        servers = yield defer.ensureDeferred(
             resolver.resolve_service(service_name)
         )  # type: ignore[assignment]
 
@@ -114,7 +116,8 @@ class SrvResolverTestCase(unittest.TestCase):
             dns_client=dns_client_mock, cache=cache, get_time=clock.time
         )
 
-        servers: List[Server] = yield defer.ensureDeferred(
+        servers: List[Server]
+        servers = yield defer.ensureDeferred(
             resolver.resolve_service(service_name)
         )  # type: ignore[assignment]
 
@@ -148,7 +151,8 @@ class SrvResolverTestCase(unittest.TestCase):
         cache: Dict[bytes, List[Server]] = {}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        servers: List[Server] = yield defer.ensureDeferred(
+        servers: List[Server]
+        servers = yield defer.ensureDeferred(
             resolver.resolve_service(service_name)
         )  # type: ignore[assignment]
 
