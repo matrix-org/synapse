@@ -41,11 +41,11 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(
+        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(  # type: ignore[assignment]
             return_value=make_awaitable({"test", "host2"})
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (  # type: ignore[assignment]
             hs.get_storage_controllers().state.get_current_hosts_in_room
         )
 
@@ -473,7 +473,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]
             if stream_id is not None:
-                self.assertEqual(c["prev_id"], [stream_id])
+                # type-ignore: mypy marks the next line as unreachable; it does not seem
+                # to recognise the assignment to stream_id within the body of this loop
+                self.assertEqual(c["prev_id"], [stream_id])  # type: ignore[unreachable]
                 self.assertGreaterEqual(c["stream_id"], stream_id)
             stream_id = c["stream_id"]
         devices = {edu["content"]["device_id"] for edu in self.edus}
@@ -555,7 +557,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # for each device, there should be a single update
         self.assertEqual(len(self.edus), 3)
-        stream_id = None
+        stream_id: Optional[int] = None
         for edu in self.edus:
             self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]

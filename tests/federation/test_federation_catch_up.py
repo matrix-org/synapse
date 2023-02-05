@@ -261,12 +261,11 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             destination_tm: str,
             pending_pdus: List[EventBase],
             _pending_edus: List[Edu],
-        ) -> bool:
+        ) -> None:
             assert destination == destination_tm
             results_list.extend(pending_pdus)
-            return True  # success!
 
-        transaction_manager.send_new_transaction = fake_send
+        transaction_manager.send_new_transaction = fake_send  # type: ignore[assignment]
 
         return per_dest_queue, results_list
 
