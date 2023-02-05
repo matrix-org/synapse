@@ -11,20 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, cast
 from unittest.mock import Mock
+
+from typing_extensions import TypeAlias
 
 from twisted.internet import defer
 
-from synapse.appservice import ApplicationServiceState
+from synapse.appservice import (
+    ApplicationService,
+    ApplicationServiceState,
+    TransactionOneTimeKeysCount,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.appservice.scheduler import (
     ApplicationServiceScheduler,
     _Recoverer,
     _TransactionController,
 )
+from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable
 from synapse.server import HomeServer
-from synapse.types import DeviceListUpdates
+from synapse.types import DeviceListUpdates, JsonDict
 from synapse.util import Clock
 
 from tests import unittest
@@ -44,7 +52,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.recoverer = Mock()
         self.recoverer_fn = Mock(return_value=self.recoverer)
         self.txnctrl = _TransactionController(
-            clock=self.clock, store=self.store, as_api=self.as_api
+            clock=cast(Clock, self.clock), store=self.store, as_api=self.as_api
         )
         self.txnctrl.RECOVERER_CLASS = self.recoverer_fn
 
@@ -146,7 +154,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.service = Mock()
         self.callback = simple_async_mock()
         self.recoverer = _Recoverer(
-            clock=self.clock,
+            clock=cast(Clock, self.clock),
             as_api=self.as_api,
             store=self.store,
             service=self.service,
@@ -214,6 +222,22 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.callback.assert_called_once_with(self.recoverer)
 
 
+# Corresponds to synapse.appservice.scheduler._TransactionController.send
+TxnCtrlArgs: TypeAlias = """
+defer.Deferred[
+    Tuple[
+        ApplicationService,
+        Sequence[EventBase],
+        Optional[List[JsonDict]],
+        Optional[List[JsonDict]],
+        Optional[TransactionOneTimeKeysCount],
+        Optional[TransactionUnusedFallbackKeys],
+        Optional[DeviceListUpdates],
+    ]
+]
+"""
+
+
 class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: "MemoryReactor", clock: Clock, hs: HomeServer):
         self.scheduler = ApplicationServiceScheduler(hs)
@@ -234,7 +258,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         )
 
     def test_send_single_event_with_queue(self):
-        d = defer.Deferred()
+        d: TxnCtrlArgs = defer.Deferred()
         self.txn_ctrl.send = Mock(return_value=make_deferred_yieldable(d))
         service = Mock(id=4)
         event = Mock(event_id="first")
@@ -261,18 +285,18 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         # Tests that each service has its own queue, and that they don't block
         # on each other.
         srv1 = Mock(id=4)
-        srv_1_defer = defer.Deferred()
+        srv_1_defer: "defer.Deferred[EventBase]" = defer.Deferred()
         srv_1_event = Mock(event_id="srv1a")
         srv_1_event2 = Mock(event_id="srv1b")
 
         srv2 = Mock(id=6)
-        srv_2_defer = defer.Deferred()
+        srv_2_defer: "defer.Deferred[EventBase]" = defer.Deferred()
         srv_2_event = Mock(event_id="srv2a")
         srv_2_event2 = Mock(event_id="srv2b")
 
         send_return_list = [srv_1_defer, srv_2_defer]
 
-        def do_send(*args, **kwargs):
+        def do_send(*args: object, **kwargs: object) -> "defer.Deferred[EventBase]":
             return make_deferred_yieldable(send_return_list.pop(0))
 
         self.txn_ctrl.send = Mock(side_effect=do_send)
@@ -298,8 +322,8 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(3, self.txn_ctrl.send.call_count)
 
     def test_send_large_txns(self):
-        srv_1_defer = defer.Deferred()
-        srv_2_defer = defer.Deferred()
+        srv_1_defer: "defer.Deferred[EventBase]" = defer.Deferred()
+        srv_2_defer: "defer.Deferred[EventBase]" = defer.Deferred()
         send_return_list = [srv_1_defer, srv_2_defer]
 
         def do_send(*args, **kwargs):
@@ -347,7 +371,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         )
 
     def test_send_single_ephemeral_with_queue(self):
-        d = defer.Deferred()
+        d: TxnCtrlArgs = defer.Deferred()
         self.txn_ctrl.send = Mock(return_value=make_deferred_yieldable(d))
         service = Mock(id=4)
         event_list_1 = [Mock(event_id="event1"), Mock(event_id="event2")]
@@ -378,7 +402,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(2, self.txn_ctrl.send.call_count)
 
     def test_send_large_txns_ephemeral(self):
-        d = defer.Deferred()
+        d: TxnCtrlArgs = defer.Deferred()
         self.txn_ctrl.send = Mock(return_value=make_deferred_yieldable(d))
         # Expect the event to be sent immediately.
         service = Mock(id=4, name="service")
