@@ -36,7 +36,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         config["limit_remote_rooms"] = {"enabled": True, "complexity": 0.05}
         return config
 
-    def test_complexity_simple(self):
+    def test_complexity_simple(self) -> None:
 
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -66,7 +66,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         complexity = channel.json_body["v1"]
         self.assertEqual(complexity, 1.23)
 
-    def test_join_too_large(self):
+    def test_join_too_large(self) -> None:
 
         u1 = self.register_user("u1", "pass")
 
@@ -95,7 +95,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_admin(self):
+    def test_join_too_large_admin(self) -> None:
         # Check whether an admin can join if option "admins_can_join" is undefined,
         # this option defaults to false, so the join should fail.
 
@@ -126,7 +126,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_once_joined(self):
+    def test_join_too_large_once_joined(self) -> None:
 
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -189,7 +189,7 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         }
         return config
 
-    def test_join_too_large_no_admin(self):
+    def test_join_too_large_no_admin(self) -> None:
         # A user which is not an admin should not be able to join a remote room
         # which is too complex.
 
@@ -220,7 +220,7 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_admin(self):
+    def test_join_too_large_admin(self) -> None:
         # An admin should be able to join rooms where a complexity check fails.
 
         u1 = self.register_user("u1", "pass", admin=True)

@@ -51,7 +51,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         self.creator = f"@creator:{self.OTHER_SERVER_NAME}"
         self.test_room_id = "!room_id"
 
-    def test_get_room_state(self):
+    def test_get_room_state(self) -> None:
         # mock up some events to use in the response.
         # In real life, these would have things in `prev_events` and `auth_events`, but that's
         # a bit annoying to mock up, and the code under test doesn't care, so we don't bother.
@@ -140,7 +140,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
             ["m.room.create", "m.room.member", "m.room.power_levels"],
         )
 
-    def test_get_pdu_returns_nothing_when_event_does_not_exist(self):
+    def test_get_pdu_returns_nothing_when_event_does_not_exist(self) -> None:
         """No event should be returned when the event does not exist"""
         pulled_pdu_info = self.get_success(
             self.hs.get_federation_client().get_pdu(
@@ -151,11 +151,11 @@ class FederationClientTest(FederatingHomeserverTestCase):
         )
         self.assertEqual(pulled_pdu_info, None)
 
-    def test_get_pdu(self):
+    def test_get_pdu(self) -> None:
         """Test to make sure an event is returned by `get_pdu()`"""
         self._get_pdu_once()
 
-    def test_get_pdu_event_from_cache_is_pristine(self):
+    def test_get_pdu_event_from_cache_is_pristine(self) -> None:
         """Test that modifications made to events returned by `get_pdu()`
         do not propagate back to to the internal cache (events returned should
         be a copy).

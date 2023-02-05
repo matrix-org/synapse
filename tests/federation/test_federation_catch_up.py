@@ -92,7 +92,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         )[0]
         return {"event_id": event_id, "stream_ordering": stream_ordering}
 
-    def test_catch_up_destination_rooms_tracking(self):
+    def test_catch_up_destination_rooms_tracking(self) -> None:
         """
         Tests that we populate the `destination_rooms` table as needed.
         """
@@ -117,7 +117,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.assertEqual(row_2["event_id"], event_id_2)
         self.assertEqual(row_1["stream_ordering"], row_2["stream_ordering"] - 1)
 
-    def test_catch_up_last_successful_stream_ordering_tracking(self):
+    def test_catch_up_last_successful_stream_ordering_tracking(self) -> None:
         """
         Tests that we populate the `destination_rooms` table as needed.
         """
@@ -174,7 +174,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             "Send succeeded but not marked as last_successful_stream_ordering",
         )
 
-    def test_catch_up_from_blank_state(self):
+    def test_catch_up_from_blank_state(self) -> None:
         """
         Runs an overall test of federation catch-up from scratch.
         Further tests will focus on more narrow aspects and edge-cases, but I
@@ -269,7 +269,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         return per_dest_queue, results_list
 
-    def test_catch_up_loop(self):
+    def test_catch_up_loop(self) -> None:
         """
         Tests the behaviour of _catch_up_transmission_loop.
         """
@@ -333,7 +333,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             event_5.internal_metadata.stream_ordering,
         )
 
-    def test_catch_up_on_synapse_startup(self):
+    def test_catch_up_on_synapse_startup(self) -> None:
         """
         Tests the behaviour of get_catch_up_outstanding_destinations and
             _wake_destinations_needing_catchup.
@@ -431,7 +431,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # - all destinations are woken exactly once; they appear once in woken.
         self.assertCountEqual(woken, server_names[:-1])
 
-    def test_not_latest_event(self):
+    def test_not_latest_event(self) -> None:
         """Test that we send the latest event in the room even if its not ours."""
 
         per_dest_queue, sent_pdus = self.make_fake_destination_queue()

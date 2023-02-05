@@ -42,7 +42,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
     ]
 
     @parameterized.expand([(b"",), (b"foo",), (b'{"limit": Infinity}',)])
-    def test_bad_request(self, query_content):
+    def test_bad_request(self, query_content) -> None:
         """
         Querying with bad data returns a reasonable error code.
         """
@@ -64,7 +64,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
 
 
 class ServerACLsTestCase(unittest.TestCase):
-    def test_blacklisted_server(self):
+    def test_blacklisted_server(self) -> None:
         e = _create_acl_event({"allow": ["*"], "deny": ["evil.com"]})
         logging.info("ACL event: %s", e.content)
 
@@ -74,7 +74,7 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertTrue(server_matches_acl_event("evil.com.au", e))
         self.assertTrue(server_matches_acl_event("honestly.not.evil.com", e))
 
-    def test_block_ip_literals(self):
+    def test_block_ip_literals(self) -> None:
         e = _create_acl_event({"allow_ip_literals": False, "allow": ["*"]})
         logging.info("ACL event: %s", e.content)
 
@@ -83,7 +83,7 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertFalse(server_matches_acl_event("[1:2::]", e))
         self.assertTrue(server_matches_acl_event("1:2:3:4", e))
 
-    def test_wildcard_matching(self):
+    def test_wildcard_matching(self) -> None:
         e = _create_acl_event({"allow": ["good*.com"]})
         self.assertTrue(
             server_matches_acl_event("good.com", e),
@@ -110,7 +110,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def test_needs_to_be_in_room(self):
+    def test_needs_to_be_in_room(self) -> None:
         """/v1/state/<room_id> requires the server to be in the room"""
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -157,7 +157,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         return channel.json_body
 
-    def test_send_join(self):
+    def test_send_join(self) -> None:
         """happy-path test of send_join"""
         joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
         join_result = self._make_join(joining_user)

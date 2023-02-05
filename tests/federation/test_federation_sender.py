@@ -56,7 +56,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         config["federation_sender_instances"] = None
         return config
 
-    def test_send_receipts(self):
+    def test_send_receipts(self) -> None:
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
         )
@@ -98,7 +98,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             ],
         )
 
-    def test_send_receipts_thread(self):
+    def test_send_receipts_thread(self) -> None:
         mock_send_transaction = (
             self.hs.get_federation_transport_client().send_transaction
         )
@@ -174,7 +174,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             ],
         )
 
-    def test_send_receipts_with_backoff(self):
+    def test_send_receipts_with_backoff(self) -> None:
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""
         mock_send_transaction = (
@@ -316,7 +316,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.edus.extend(data["edus"])
         return defer.succeed({})
 
-    def test_send_device_updates(self):
+    def test_send_device_updates(self) -> None:
         """Basic case: each device update should result in an EDU"""
         # create a device
         u1 = self.register_user("user", "pass")
@@ -340,7 +340,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.assertEqual(len(self.edus), 1)
         self.check_device_update_edu(self.edus.pop(0), u1, "D2", stream_id)
 
-    def test_dont_send_device_updates_for_remote_users(self):
+    def test_dont_send_device_updates_for_remote_users(self) -> None:
         """Check that we don't send device updates for remote users"""
 
         # Send the server a device list EDU for the other user, this will cause
@@ -379,7 +379,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         )
         self.assertIn("D1", devices)
 
-    def test_upload_signatures(self):
+    def test_upload_signatures(self) -> None:
         """Uploading signatures on some devices should produce updates for that user"""
 
         e2e_handler = self.hs.get_e2e_keys_handler()
@@ -481,7 +481,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2"}, devices)
 
-    def test_delete_devices(self):
+    def test_delete_devices(self) -> None:
         """If devices are deleted, that should result in EDUs too"""
 
         # create devices
@@ -523,7 +523,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2", "D3"}, devices)
 
-    def test_unreachable_server(self):
+    def test_unreachable_server(self) -> None:
         """If the destination server is unreachable, all the updates should get sent on
         recovery
         """
@@ -568,7 +568,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2", "D3"}, devices)
 
-    def test_prune_outbound_device_pokes1(self):
+    def test_prune_outbound_device_pokes1(self) -> None:
         """If a destination is unreachable, and the updates are pruned, we should get
         a single update.
 
@@ -617,7 +617,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # synapse uses an empty prev_id list to indicate "needs a full resync".
         self.assertEqual(c["prev_id"], [])
 
-    def test_prune_outbound_device_pokes2(self):
+    def test_prune_outbound_device_pokes2(self) -> None:
         """If a destination is unreachable, and the updates are pruned, we should get
         a single update.
 
