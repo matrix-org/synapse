@@ -11,18 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import Callable, FrozenSet, List, Optional, Set
 from unittest.mock import Mock
 
 from signedjson import key, sign
 from signedjson.types import BaseKey, SigningKey
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EduTypes, RoomEncryptionAlgorithms
+from synapse.federation.units import Transaction
 from synapse.rest import admin
 from synapse.rest.client import login
+from synapse.server import HomeServer
 from synapse.types import JsonDict, ReadReceipt
+from synapse.util import Clock
 
 from tests.test_utils import make_awaitable
 from tests.unittest import HomeserverTestCase
@@ -36,7 +40,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
     re-enabled for the main process.
     """
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
@@ -272,46 +276,50 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(
             federation_transport_client=Mock(
                 spec=["send_transaction", "query_user_devices"]
             ),
         )
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         c = super().default_config()
         # Enable federation sending on the main process.
         c["federation_sender_instances"] = None
         return c
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         test_room_id = "!room:host1"
 
         # stub out `get_rooms_for_user` and `get_current_hosts_in_room` so that the
         # server thinks the user shares a room with `@user2:host2`
-        def get_rooms_for_user(user_id):
-            return defer.succeed({test_room_id})
+        def get_rooms_for_user(user_id: str) -> "defer.Deferred[FrozenSet[str]]":
+            return defer.succeed(frozenset({test_room_id}))
 
-        hs.get_datastores().main.get_rooms_for_user = get_rooms_for_user
+        hs.get_datastores().main.get_rooms_for_user = get_rooms_for_user  # type: ignore[assignment]
 
-        async def get_current_hosts_in_room(room_id):
+        async def get_current_hosts_in_room(room_id: str) -> Set[str]:
             if room_id == test_room_id:
-                return ["host2"]
+                return {"host2"}
+            else:
+                # TODO: We should fail the test when we encounter an unxpected room ID.
+                # We can't just use `self.fail(...)` here because the app code is greedy
+                # with `Exception` and will catch it before the test can see it.
+                return set()
 
-            # TODO: We should fail the test when we encounter an unxpected room ID.
-            # We can't just use `self.fail(...)` here because the app code is greedy
-            # with `Exception` and will catch it before the test can see it.
-
-        hs.get_datastores().main.get_current_hosts_in_room = get_current_hosts_in_room
+        hs.get_datastores().main.get_current_hosts_in_room = get_current_hosts_in_room  # type: ignore[assignment]
 
         # whenever send_transaction is called, record the edu data
-        self.edus = []
+        self.edus: List[JsonDict] = []
         self.hs.get_federation_transport_client().send_transaction.side_effect = (
             self.record_transaction
         )
 
-    def record_transaction(self, txn, json_cb):
+    def record_transaction(
+        self, txn: Transaction, json_cb: Optional[Callable[[], JsonDict]] = None
+    ) -> "defer.Deferred[JsonDict]":
+        assert json_cb is not None
         data = json_cb()
         self.edus.extend(data["edus"])
         return defer.succeed({})
@@ -743,7 +751,7 @@ def encode_pubkey(sk: SigningKey) -> str:
     return key.encode_verify_key_base64(key.get_verify_key(sk))
 
 
-def build_device_dict(user_id: str, device_id: str, sk: SigningKey):
+def build_device_dict(user_id: str, device_id: str, sk: SigningKey) -> JsonDict:
     """Build a dict representing the given device"""
     return {
         "user_id": user_id,

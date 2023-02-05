@@ -1,13 +1,17 @@
-from typing import List, Tuple
+from typing import Callable, List, Optional, Tuple
 from unittest.mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.federation.sender import PerDestinationQueue, TransactionManager
-from synapse.federation.units import Edu
+from synapse.federation.units import Edu, Transaction
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable
@@ -28,23 +32,25 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # stub out get_current_hosts_in_room
-        state_handler = hs.get_state_handler()
+        state_storage_controller = hs.get_storage_controllers().state
 
         # This mock is crucial for destination_rooms to be populated.
-        state_handler.get_current_hosts_in_room = Mock(
-            return_value=make_awaitable(["test", "host2"])
+        # TODO: this seems to no longer be the case---tests pass with this mock
+        # commented out.
+        state_storage_controller.get_current_hosts_in_room = Mock(  # type: ignore[assignment]
+            return_value=make_awaitable({"test", "host2"})
         )
 
         # whenever send_transaction is called, record the pdu data
-        self.pdus = []
-        self.failed_pdus = []
+        self.pdus: List[JsonDict] = []
+        self.failed_pdus: List[JsonDict] = []
         self.is_online = True
         self.hs.get_federation_transport_client().send_transaction.side_effect = (
             self.record_transaction
@@ -55,8 +61,13 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         config["federation_sender_instances"] = None
         return config
 
-    async def record_transaction(self, txn, json_cb):
-        if self.is_online:
+    async def record_transaction(
+        self, txn: Transaction, json_cb: Optional[Callable[[], JsonDict]]
+    ) -> JsonDict:
+        if json_cb is None:
+            # The tests seem to expect that this method raises in this situation.
+            raise Exception("Blank json_cb")
+        elif self.is_online:
             data = json_cb()
             self.pdus.extend(data["pdus"])
             return {}
@@ -411,7 +422,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # patch wake_destination to just count the destinations instead
         woken = []
 
-        def wake_destination_track(destination):
+        def wake_destination_track(destination: str) -> None:
             woken.append(destination)
 
         self.hs.get_federation_sender().wake_destination = wake_destination_track

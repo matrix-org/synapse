@@ -21,7 +21,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -42,7 +42,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
     ]
 
     @parameterized.expand([(b"",), (b"foo",), (b'{"limit": Infinity}',)])
-    def test_bad_request(self, query_content) -> None:
+    def test_bad_request(self, query_content: bytes) -> None:
         """
         Querying with bad data returns a reasonable error code.
         """
@@ -131,7 +131,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         super().prepare(reactor, clock, hs)
 
         self._storage_controllers = hs.get_storage_controllers()
@@ -324,7 +324,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
     #   is probably sufficient to reassure that the bucket is updated.
 
 
-def _create_acl_event(content):
+def _create_acl_event(content: JsonDict) -> EventBase:
     return make_event_from_dict(
         {
             "room_id": "!a:b",

@@ -36,7 +36,9 @@ class FederationClientTest(FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         super().prepare(reactor, clock, homeserver)
 
         # mock out the Agent used by the federation client, which is easier than

@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -31,7 +31,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         config["limit_remote_rooms"] = {"enabled": True, "complexity": 0.05}
         return config
@@ -180,7 +180,7 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         config["limit_remote_rooms"] = {
             "enabled": True,
