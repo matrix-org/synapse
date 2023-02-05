@@ -98,7 +98,7 @@ class SrvResolverTestCase(unittest.TestCase):
         self.assertEqual(servers, cache[service_name])
 
     @defer.inlineCallbacks
-    def test_from_cache(self) -> Generator[Deferred[object], object, None]:
+    def test_from_cache(self) -> Generator["Deferred[object]", object, None]:
         clock = MockClock()
 
         dns_client_mock = Mock(spec_set=["lookupService"])
@@ -127,7 +127,7 @@ class SrvResolverTestCase(unittest.TestCase):
         self.assertEqual(servers, cache[service_name])
 
     @defer.inlineCallbacks
-    def test_empty_cache(self) -> Generator[Deferred[object], object, None]:
+    def test_empty_cache(self) -> Generator["Deferred[object]", object, None]:
         dns_client_mock = Mock()
 
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSServerError())
@@ -141,7 +141,7 @@ class SrvResolverTestCase(unittest.TestCase):
             yield defer.ensureDeferred(resolver.resolve_service(service_name))
 
     @defer.inlineCallbacks
-    def test_name_error(self) -> Generator[Deferred[object], object, None]:
+    def test_name_error(self) -> Generator["Deferred[object]", object, None]:
         dns_client_mock = Mock()
 
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSNameError())
