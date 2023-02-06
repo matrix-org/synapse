@@ -292,12 +292,14 @@ class DescriptorTestCase(unittest.TestCase):
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
         self.assertEqual(current_context(), SENTINEL_CONTEXT)
-        d1.addCallback(check_result)
+        # type-ignore: addCallback returns self, so as long as we await d1 (and d2)
+        # below, this error is a false positive.
+        d1.addCallback(check_result)  # type: ignore[unused-awaitable]
 
         # and another
         d2 = do_lookup()
         self.assertEqual(current_context(), SENTINEL_CONTEXT)
-        d2.addCallback(check_result)
+        d2.addCallback(check_result)  # type: ignore[unused-awaitable]
 
         # let the lookup complete
         complete_lookup.callback(None)

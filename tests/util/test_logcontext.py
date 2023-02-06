@@ -74,7 +74,8 @@ class LoggingContextTestCase(unittest.TestCase):
                 callback_completed = True
                 return res
 
-            d2.addCallback(cb)
+            # type-ignore: this doesn't create a new Deferred: allCallback returns self.
+            d2.addCallback(cb)  # type: ignore[unused-awaitable]
 
             self._check_test_key("one")
 
@@ -195,5 +196,5 @@ def _chained_deferred_function() -> defer.Deferred:
         reactor.callLater(0, d2.callback, res)
         return d2
 
-    d.addCallback(cb)
+    d.addCallback(cb)  # type: ignore[unused-awaitable]
     return d

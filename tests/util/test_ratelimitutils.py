@@ -109,7 +109,7 @@ class FederationRateLimiterTestCase(TestCase):
                     await d
 
             for _ in range(1, 100):
-                defer.ensureDeferred(task())
+                defer.ensureDeferred(task())  # type: ignore[unused-awaitable]
 
             last_task = defer.ensureDeferred(task())
 

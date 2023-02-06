@@ -57,7 +57,7 @@ class ObservableDeferredTest(TestCase):
             self.assertFalse(observer2.called)
             return res
 
-        observer1.addBoth(check_called_first)
+        observer1.addBoth(check_called_first)  # type: ignore[unused-awaitable]
 
         # store the results
         results: List[Optional[ObservableDeferred[int]]] = [None, None]
@@ -68,8 +68,8 @@ class ObservableDeferredTest(TestCase):
             results[idx] = res
             return res
 
-        observer1.addCallback(check_val, 0)
-        observer2.addCallback(check_val, 1)
+        observer1.addCallback(check_val, 0)  # type: ignore[unused-awaitable]
+        observer2.addCallback(check_val, 1)  # type: ignore[unused-awaitable]
 
         origin_d.callback(123)
         self.assertEqual(results[0], 123, "observer 1 callback result")
@@ -90,7 +90,7 @@ class ObservableDeferredTest(TestCase):
             self.assertFalse(observer2.called)
             return res
 
-        observer1.addBoth(check_called_first)
+        observer1.addBoth(check_called_first)  # type: ignore[unused-awaitable]
 
         # store the results
         results: List[Optional[ObservableDeferred[str]]] = [None, None]
@@ -99,8 +99,8 @@ class ObservableDeferredTest(TestCase):
             results[idx] = res
             return None
 
-        observer1.addErrback(check_val, 0)
-        observer2.addErrback(check_val, 1)
+        observer1.addErrback(check_val, 0)  # type: ignore[unused-awaitable]
+        observer2.addErrback(check_val, 1)  # type: ignore[unused-awaitable]
 
         try:
             raise Exception("gah!")
@@ -208,11 +208,11 @@ class TimeoutDeferredTest(TestCase):
                 return res
 
             original_deferred = blocking()
-            original_deferred.addErrback(errback, "orig")
+            original_deferred.addErrback(errback, "orig")  # type: ignore[unused-awaitable]
             timing_out_d = timeout_deferred(original_deferred, 1.0, self.clock)
             self.assertNoResult(timing_out_d)
             self.assertIs(current_context(), SENTINEL_CONTEXT)
-            timing_out_d.addErrback(errback, "timingout")
+            timing_out_d.addErrback(errback, "timingout")  # type: ignore[unused-awaitable]
 
             self.clock.pump((1.0,))
 

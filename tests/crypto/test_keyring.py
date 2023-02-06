@@ -130,7 +130,9 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                     pass
 
                 self.assertFalse(res_deferreds[0].called)
-                res_deferreds[0].addBoth(self.check_context, None)
+                # type-ignore: Deferred.addBoth returns `self`; it doesn't need to be
+                # awaited as long as we use the await the deferred elsewhere
+                res_deferreds[0].addBoth(self.check_context, None)  # type: ignore[unused-awaitable]
 
                 await make_deferred_yieldable(res_deferreds[0])
 
@@ -166,7 +168,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                         )
                     ]
                 )
-                res_deferreds_2[0].addBoth(self.check_context, None)
+                res_deferreds_2[0].addBoth(self.check_context, None)  # type: ignore[unused-awaitable]
                 second_lookup_state[0] = 1
                 await make_deferred_yieldable(res_deferreds_2[0])
                 second_lookup_state[0] = 2

@@ -140,7 +140,7 @@ class LinearizerTestCase(unittest.TestCase):
 
         _, _, unblock = self._start_task(linearizer, key)
         for i in range(1, 100):
-            defer.ensureDeferred(func(i))
+            defer.ensureDeferred(func(i))  # type: ignore[unused-awaitable]
 
         d = defer.ensureDeferred(func(1000))
         unblock()
