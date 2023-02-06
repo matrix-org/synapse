@@ -60,7 +60,7 @@ class ReadBodyWithMaxSizeTests(TestCase):
         assert isinstance(deferred.result, Failure)
         self.assertIsInstance(deferred.result.value, BodyExceededMaxSize)
         assert protocol.transport is not None
-        # type-ignore: presumable abortConnection has been replaced with a Mock.
+        # type-ignore: presumably abortConnection has been replaced with a Mock.
         protocol.transport.abortConnection.assert_called_once()  # type: ignore[attr-defined]
 
     def _cleanup_error(self, deferred: "Deferred[int]") -> None:
