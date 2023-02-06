@@ -22,7 +22,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.appservice import ApplicationService
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, make_event_from_dict
 from synapse.push.bulk_push_rule_evaluator import _flatten_dict
 from synapse.push.httppusher import tweaks_for_actions
 from synapse.rest import admin
@@ -59,6 +59,33 @@ class FlattenDictTestCase(unittest.TestCase):
             "boo": {},
         }
         self.assertEqual({"woo": "woo"}, _flatten_dict(input))
+
+    def test_event(self) -> None:
+        """Events can also be flattened."""
+        event = make_event_from_dict(
+            {
+                "room_id": "!test:test",
+                "type": "m.room.message",
+                "sender": "@alice:test",
+                "content": {
+                    "msgtype": "m.text",
+                    "body": "Hello world!",
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": "<h1>Hello world!</h1>",
+                },
+            },
+            room_version=RoomVersions.V8,
+        )
+        expected = {
+            "content.msgtype": "m.text",
+            "content.body": "hello world!",
+            "content.format": "org.matrix.custom.html",
+            "content.formatted_body": "<h1>hello world!</h1>",
+            "room_id": "!test:test",
+            "sender": "@alice:test",
+            "type": "m.room.message",
+        }
+        self.assertEqual(expected, _flatten_dict(event))
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
