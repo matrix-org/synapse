@@ -311,7 +311,7 @@ class RoomBeeperInboxStateServlet(RestServlet):
             logger.info(f"SetBeeperMarkedUnread marked_unread={body['marked_unread']}")
 
         if "done" in body:
-            delta_ms = body["done"].get("at_delta", 0)
+            delta_ms = body["done"].get("at_delta") or 0
             done = {"updated_ts": ts, "at_ts": ts + delta_ms}
             await self.handler.add_account_data_to_room(
                 user_id, room_id, "com.beeper.inbox.done", done
