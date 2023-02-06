@@ -47,6 +47,7 @@ class FilteredPushRules:
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
         msc3952_intentional_mentions: bool,
+        msc3958_suppress_edits_enabled: bool,
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
