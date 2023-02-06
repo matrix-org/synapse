@@ -276,9 +276,7 @@ class StateTestCase(unittest.TestCase):
         ctx_d = context_store["D"]
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            ctx_d.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(ctx_d.get_prev_state_ids())
         self.assertEqual(2, len(prev_state_ids))
 
         self.assertEqual(ctx_c.state_group, ctx_d.state_group_before_event)
@@ -327,9 +325,7 @@ class StateTestCase(unittest.TestCase):
         ctx_d = context_store["D"]
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            ctx_d.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(ctx_d.get_prev_state_ids())
         self.assertSetEqual({"START", "A", "C"}, set(prev_state_ids.values()))
 
         self.assertEqual(ctx_c.state_group, ctx_d.state_group_before_event)
@@ -391,9 +387,7 @@ class StateTestCase(unittest.TestCase):
         ctx_e = context_store["E"]
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            ctx_e.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(ctx_e.get_prev_state_ids())
         self.assertSetEqual({"START", "A", "B", "C"}, set(prev_state_ids.values()))
         self.assertEqual(ctx_c.state_group, ctx_e.state_group_before_event)
         self.assertEqual(ctx_e.state_group_before_event, ctx_e.state_group)
@@ -471,9 +465,7 @@ class StateTestCase(unittest.TestCase):
         ctx_d = context_store["D"]
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            ctx_d.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(ctx_d.get_prev_state_ids())
         self.assertSetEqual({"A1", "A2", "A3", "A5", "B"}, set(prev_state_ids.values()))
 
         self.assertEqual(ctx_b.state_group, ctx_d.state_group_before_event)
@@ -517,15 +509,11 @@ class StateTestCase(unittest.TestCase):
         )
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            context.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())
         self.assertCountEqual((e.event_id for e in old_state), prev_state_ids.values())
 
         current_state_ids: StateMap[str]
-        current_state_ids = yield defer.ensureDeferred(
-            context.get_current_state_ids()
-        )
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
         self.assertCountEqual(
             (e.event_id for e in old_state), current_state_ids.values()
         )
@@ -557,15 +545,11 @@ class StateTestCase(unittest.TestCase):
         )
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            context.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())
         self.assertCountEqual((e.event_id for e in old_state), prev_state_ids.values())
 
         current_state_ids: StateMap[str]
-        current_state_ids = yield defer.ensureDeferred(
-            context.get_current_state_ids()
-        )
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
         self.assertCountEqual(
             (e.event_id for e in old_state + [event]), current_state_ids.values()
         )
@@ -602,14 +586,10 @@ class StateTestCase(unittest.TestCase):
         self.dummy_store.register_event_id_state_group(prev_event_id, group_name)
 
         context: EventContext
-        context = yield defer.ensureDeferred(
-            self.state.compute_event_context(event)
-        )
+        context = yield defer.ensureDeferred(self.state.compute_event_context(event))
 
         current_state_ids: StateMap[str]
-        current_state_ids = yield defer.ensureDeferred(
-            context.get_current_state_ids()
-        )
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
 
         self.assertEqual(
             {e.event_id for e in old_state}, set(current_state_ids.values())
@@ -644,14 +624,10 @@ class StateTestCase(unittest.TestCase):
         self.dummy_store.register_event_id_state_group(prev_event_id, group_name)
 
         context: EventContext
-        context = yield defer.ensureDeferred(
-            self.state.compute_event_context(event)
-        )
+        context = yield defer.ensureDeferred(self.state.compute_event_context(event))
 
         prev_state_ids: StateMap[str]
-        prev_state_ids = yield defer.ensureDeferred(
-            context.get_prev_state_ids()
-        )
+        prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())
 
         self.assertEqual({e.event_id for e in old_state}, set(prev_state_ids.values()))
 
@@ -694,9 +670,7 @@ class StateTestCase(unittest.TestCase):
         )
 
         current_state_ids: StateMap[str]
-        current_state_ids = yield defer.ensureDeferred(
-            context.get_current_state_ids()
-        )
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
 
         self.assertEqual(len(current_state_ids), 6)
 
@@ -742,9 +716,7 @@ class StateTestCase(unittest.TestCase):
         )
 
         current_state_ids: StateMap[str]
-        current_state_ids = yield defer.ensureDeferred(
-            context.get_current_state_ids()
-        )
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
 
         self.assertEqual(len(current_state_ids), 6)
 
@@ -803,9 +775,7 @@ class StateTestCase(unittest.TestCase):
         )
 
         current_state_ids: StateMap[str]
-        current_state_ids = yield defer.ensureDeferred(
-            context.get_current_state_ids()
-        )
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
 
         self.assertEqual(old_state_2[3].event_id, current_state_ids[("test1", "1")])
 
