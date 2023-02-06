@@ -74,7 +74,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
 class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     """Tests for `ReplicationEndpoint` cancellation."""
 
-    def create_test_resource(self):
+    def create_test_resource(self) -> JsonResource:
         """Overrides `HomeserverTestCase.create_test_resource`."""
         resource = JsonResource(self.hs)
 
