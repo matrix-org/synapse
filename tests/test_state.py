@@ -285,7 +285,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_branch_basic_conflict(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         graph = Graph(
             nodes={
                 "START": DictObj(
@@ -334,7 +334,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_branch_have_banned_conflict(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         graph = Graph(
             nodes={
                 "START": DictObj(
@@ -395,7 +395,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_branch_have_perms_conflict(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         userid1 = "@user_id:example.com"
         userid2 = "@user_id2:example.com"
 
@@ -488,7 +488,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_annotate_with_old_message(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         event = create_event(type="test_message", name="event")
 
         old_state = [
@@ -524,7 +524,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_annotate_with_old_state(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         event = create_event(type="state", state_key="", name="event")
 
         old_state = [
@@ -562,7 +562,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_trivial_annotate_message(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         prev_event_id = "prev_event_id"
         event = create_event(
             type="test_message", name="event2", prev_events=[(prev_event_id, {})]
@@ -600,7 +600,7 @@ class StateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_trivial_annotate_state(
         self,
-    ) -> Generator[defer.Deferred[object], Any, None]:
+    ) -> Generator["defer.Deferred[object]", Any, None]:
         prev_event_id = "prev_event_id"
         event = create_event(
             type="state", state_key="", name="event2", prev_events=[(prev_event_id, {})]
