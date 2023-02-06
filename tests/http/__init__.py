@@ -19,7 +19,8 @@ from zope.interface import implementer
 
 from OpenSSL import SSL
 from OpenSSL.SSL import Connection
-from twisted.internet.interfaces import IAddress, IOpenSSLServerConnectionCreator
+from twisted.internet.address import IPv4Address
+from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
 from twisted.internet.ssl import Certificate, trustRootFromCertificates
 from twisted.protocols.tls import TLSMemoryBIOProtocol
 from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
@@ -152,14 +153,6 @@ class TestServerTLSConnectionFactory:
         return Connection(ctx, None)
 
 
-@implementer(IAddress)
-class DummyAddress:
-    """Dummy stand-in for an IAddress.
-
-    Placates mypy. Useful for tests that don't care about addresses, but
-    about other HTTP machinery."""
-
-    pass
-
-
-dummy_address = DummyAddress()
+# A dummy address, useful for tests that use FakeTransport and don't care about where
+# packets are going to/coming from.
+dummy_address = IPv4Address("TCP", "127.0.0.1", 80)
