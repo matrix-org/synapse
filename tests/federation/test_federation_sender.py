@@ -399,7 +399,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # expect two edus
         self.assertEqual(len(self.edus), 2)
-        stream_id = None
+        stream_id: Optional[int] = None
         stream_id = self.check_device_update_edu(self.edus.pop(0), u1, "D1", stream_id)
         stream_id = self.check_device_update_edu(self.edus.pop(0), u1, "D2", stream_id)
 
@@ -481,8 +481,6 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]
             if stream_id is not None:
-                # type-ignore: mypy marks the next line as unreachable; it does not seem
-                # to recognise the assignment to stream_id within the body of this loop
                 self.assertEqual(c["prev_id"], [stream_id])  # type: ignore[unreachable]
                 self.assertGreaterEqual(c["stream_id"], stream_id)
             stream_id = c["stream_id"]
