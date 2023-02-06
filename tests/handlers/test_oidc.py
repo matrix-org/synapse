@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from typing import Any, Awaitable, ContextManager, Dict, Optional, Tuple
+from typing import Any, ContextManager, Dict, Optional, Tuple
 from unittest.mock import ANY, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -287,7 +287,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         """Provider metadatas are extensively validated."""
         h = self.provider
 
-        def force_load_metadata() -> Awaitable[None]:
+        def force_load_metadata() -> "OpenIDProviderMetadata":
             async def force_load() -> "OpenIDProviderMetadata":
                 return await h.load_metadata(force=True)
 
