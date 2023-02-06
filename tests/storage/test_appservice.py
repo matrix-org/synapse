@@ -151,7 +151,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    def _set_state(self, id: str, state: ApplicationServiceState) -> defer.Deferred:
+    def _set_state(
+        self, id: str, state: ApplicationServiceState
+    ) -> "defer.Deferred[None]":
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
                 "INSERT INTO application_services_state(as_id, state) VALUES(?,?)"
@@ -297,7 +299,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 5
-        self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
+        self.get_success(
+            self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
+        )
         self.get_success(self._insert_txn(service.id, txn_id, events))
         self.get_success(
             self.store.complete_appservice_txn(txn_id=txn_id, service=service)
