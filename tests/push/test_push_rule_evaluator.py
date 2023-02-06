@@ -87,6 +87,40 @@ class FlattenDictTestCase(unittest.TestCase):
         }
         self.assertEqual(expected, _flatten_dict(event))
 
+    def test_extensible_events(self) -> None:
+        """Extensible events has compatibility behaviour."""
+        event_dict = {
+            "room_id": "!test:test",
+            "type": "m.room.message",
+            "sender": "@alice:test",
+            "content": {
+                "org.matrix.msc1767.markup": [
+                    {"mimetype": "text/plain", "body": "Hello world!"},
+                    {"mimetype": "text/html", "body": "<h1>Hello world!</h1>"},
+                ]
+            },
+        }
+
+        # For a current room version, there's no special behavior.
+        event = make_event_from_dict(event_dict, room_version=RoomVersions.V8)
+        expected = {
+            "room_id": "!test:test",
+            "sender": "@alice:test",
+            "type": "m.room.message",
+        }
+        self.assertEqual(expected, _flatten_dict(event))
+
+        # For a room version with extensible events, they arse out the text/plain
+        # to a content.body property.
+        event = make_event_from_dict(event_dict, room_version=RoomVersions.MSC1767v10)
+        expected = {
+            "content.body": "hello world!",
+            "room_id": "!test:test",
+            "sender": "@alice:test",
+            "type": "m.room.message",
+        }
+        self.assertEqual(expected, _flatten_dict(event))
+
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
