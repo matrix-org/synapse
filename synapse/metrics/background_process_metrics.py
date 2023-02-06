@@ -207,6 +207,9 @@ def run_as_background_process(
     clock.looping_call and friends (or for firing-and-forgetting in the middle of a
     normal synapse async function).
 
+    Mypy will flag up this Deferred as unawaited. This is safe to ignore: the background
+    process runs automatically, even if we don't await the returned deferred.
+
     Args:
         desc: a description for this background process type
         func: a function, which may return a Deferred or a coroutine

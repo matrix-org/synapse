@@ -192,7 +192,7 @@ class FederationHandler:
         # any partial-state-resync operations which were in flight when we
         # were shut down.
         if not hs.config.worker.worker_app:
-            run_as_background_process(
+            run_as_background_process(  # type: ignore[unused-awaitable]
                 "resume_sync_partial_state_room", self._resume_partial_state_room_sync
             )
 
@@ -1805,7 +1805,7 @@ class FederationHandler:
                             room_id=room_id,
                         )
 
-        run_as_background_process(
+        run_as_background_process(  # type: ignore[unused-awaitable]
             desc="sync_partial_state_room", func=_sync_partial_state_room_wrapper
         )
 

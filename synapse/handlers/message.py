@@ -1939,7 +1939,7 @@ class EventCreationHandler:
             if event.type == EventTypes.Message:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
-                run_as_background_process(
+                run_as_background_process(  # type: ignore[unused-awaitable]
                     "bump_presence_active_time", self._bump_active_time, requester.user
                 )
 
