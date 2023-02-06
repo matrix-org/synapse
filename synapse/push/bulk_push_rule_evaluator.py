@@ -142,15 +142,34 @@ class BulkPushRuleEvaluator:
         Returns:
             Mapping of user ID to their push rules.
         """
-        # We get the users who may need to be notified by first fetching the
-        # local users currently in the room, finding those that have push rules,
-        # and *then* checking which users are actually allowed to see the event.
-        #
-        # The alternative is to first fetch all users that were joined at the
-        # event, but that requires fetching the full state at the event, which
-        # may be expensive for large rooms with few local users.
+        # If this is a membership event, only calculate push rules for the target.
+        # While it's possible for users to configure push rules to respond to such an
+        # event, in practise nobody does this. At the cost of violating the spec a
+        # little, we can skip fetching a huge number of push rules in large rooms.
+        # This helps make joins and leaves faster.
+        if event.type == EventTypes.Member:
+            local_users = []
+            # We never notify a user about their own actions. This is enforced in
+            # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
+            # do the same check here to avoid unnecessary DB queries.
+            if event.sender != event.state_key and self.hs.is_mine_id(event.state_key):
+                # Check the target is in the room, to avoid notifying them of
+                # e.g. a pre-emptive ban.
+                target_already_in_room = await self.store.check_local_user_in_room(
+                    event.state_key, event.room_id
+                )
+                if target_already_in_room:
+                    local_users = [event.state_key]
+        else:
+            # We get the users who may need to be notified by first fetching the
+            # local users currently in the room, finding those that have push rules,
+            # and *then* checking which users are actually allowed to see the event.
+            #
+            # The alternative is to first fetch all users that were joined at the
+            # event, but that requires fetching the full state at the event, which
+            # may be expensive for large rooms with few local users.
 
-        local_users = await self.store.get_local_users_in_room(event.room_id)
+            local_users = await self.store.get_local_users_in_room(event.room_id)
 
         # Filter out appservice users.
         local_users = [
@@ -166,6 +185,9 @@ class BulkPushRuleEvaluator:
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
                 local_users = list(local_users)
                 local_users.append(invited)
+
+        if not local_users:
+            return {}
 
         rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
