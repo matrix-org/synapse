@@ -321,10 +321,45 @@ class RoomBeeperInboxStateServlet(RestServlet):
         return 200, {}
 
 
+class BeeperInboxBatchArchiveServlet(RestServlet):
+    """
+    PUT /com.beeper.inbox/batch_archive HTTP/1.1
+    """
+
+    PATTERNS = list(
+        client_patterns(
+            "/com.beeper.inbox/batch_archive",
+            releases=(),  # not in the matrix spec, only include under /unstable
+        )
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastores().main
+        self.handler = hs.get_account_data_handler()
+
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        ts = self.clock.time_msec()
+        body = parse_json_object_from_request(request)
+
+        done = {"updated_ts": ts, "at_ts": ts}
+        for room_id in body["room_ids"]:
+            # TODO in transaction
+            await self.handler.add_account_data_to_room(
+                requester.user.to_string(), room_id, "com.beeper.inbox.done", done
+            )
+
+        return 200, {}
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AccountDataServlet(hs).register(http_server)
     RoomAccountDataServlet(hs).register(http_server)
     RoomBeeperInboxStateServlet(hs).register(http_server)
+    BeeperInboxBatchArchiveServlet(hs).register(http_server)
 
     if hs.config.experimental.msc3391_enabled:
         UnstableAccountDataServlet(hs).register(http_server)
