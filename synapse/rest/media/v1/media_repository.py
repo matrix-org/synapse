@@ -24,7 +24,6 @@ from matrix_common.types.mxc_uri import MXCUri
 import twisted.internet.error
 import twisted.web.http
 from twisted.internet.defer import Deferred
-from twisted.web.resource import Resource
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -35,6 +34,7 @@ from synapse.api.errors import (
 )
 from synapse.config._base import ConfigError
 from synapse.config.repository import ThumbnailRequirement
+from synapse.http.server import UnrecognizedRequestResource
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -1046,7 +1046,7 @@ class MediaRepository:
         return removed_media, len(removed_media)
 
 
-class MediaRepositoryResource(Resource):
+class MediaRepositoryResource(UnrecognizedRequestResource):
     """File uploading and downloading.
 
     Uploads are POSTed to a resource which returns a token which is used to GET

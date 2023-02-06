@@ -20,22 +20,14 @@ import random
 import string
 from collections import OrderedDict
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Collection,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 import attr
 from typing_extensions import TypedDict
 
 import synapse.events.snapshot
 from synapse.api.constants import (
+    Direction,
     EventContentFields,
     EventTypes,
     GuestAccess,
@@ -62,7 +54,7 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
-from synapse.storage.state import StateFilter
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -72,11 +64,13 @@ from synapse.types import (
     RoomID,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import stringutils
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -207,46 +201,64 @@ class RoomCreationHandler:
 
         new_room_id = self._generate_room_id()
 
-        # Check whether the user has the power level to carry out the upgrade.
-        # `check_auth_rules_from_context` will check that they are in the room and have
-        # the required power level to send the tombstone event.
-        (
-            tombstone_event,
-            tombstone_context,
-        ) = await self.event_creation_handler.create_event(
-            requester,
-            {
-                "type": EventTypes.Tombstone,
-                "state_key": "",
-                "room_id": old_room_id,
-                "sender": user_id,
-                "content": {
-                    "body": "This room has been replaced",
-                    "replacement_room": new_room_id,
-                },
-            },
-        )
-        validate_event_for_room_version(tombstone_event)
-        await self._event_auth_handler.check_auth_rules_from_context(tombstone_event)
+        # Try several times, it could fail with PartialStateConflictError
+        # in _upgrade_room, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                # Check whether the user has the power level to carry out the upgrade.
+                # `check_auth_rules_from_context` will check that they are in the room and have
+                # the required power level to send the tombstone event.
+                (
+                    tombstone_event,
+                    tombstone_context,
+                ) = await self.event_creation_handler.create_event(
+                    requester,
+                    {
+                        "type": EventTypes.Tombstone,
+                        "state_key": "",
+                        "room_id": old_room_id,
+                        "sender": user_id,
+                        "content": {
+                            "body": "This room has been replaced",
+                            "replacement_room": new_room_id,
+                        },
+                    },
+                )
+                validate_event_for_room_version(tombstone_event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    tombstone_event
+                )
 
-        # Upgrade the room
-        #
-        # If this user has sent multiple upgrade requests for the same room
-        # and one of them is not complete yet, cache the response and
-        # return it to all subsequent requests
-        ret = await self._upgrade_response_cache.wrap(
-            (old_room_id, user_id),
-            self._upgrade_room,
-            requester,
-            old_room_id,
-            old_room,  # args for _upgrade_room
-            new_room_id,
-            new_version,
-            tombstone_event,
-            tombstone_context,
-        )
+                # Upgrade the room
+                #
+                # If this user has sent multiple upgrade requests for the same room
+                # and one of them is not complete yet, cache the response and
+                # return it to all subsequent requests
+                ret = await self._upgrade_response_cache.wrap(
+                    (old_room_id, user_id),
+                    self._upgrade_room,
+                    requester,
+                    old_room_id,
+                    old_room,  # args for _upgrade_room
+                    new_room_id,
+                    new_version,
+                    tombstone_event,
+                    tombstone_context,
+                )
 
-        return ret
+                return ret
+            except PartialStateConflictError as e:
+                # Clean up the cache so we can retry properly
+                self._upgrade_response_cache.unset((old_room_id, user_id))
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
+
+        # This is to satisfy mypy and should never happen
+        raise PartialStateConflictError()
 
     async def _upgrade_room(
         self,
@@ -1476,7 +1488,7 @@ class TimestampLookupHandler:
         requester: Requester,
         room_id: str,
         timestamp: int,
-        direction: str,
+        direction: Direction,
     ) -> Tuple[str, int]:
         """Find the closest event to the given timestamp in the given direction.
         If we can't find an event locally or the event we have locally is next to a gap,
@@ -1487,7 +1499,7 @@ class TimestampLookupHandler:
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1522,13 +1534,13 @@ class TimestampLookupHandler:
                 local_event_id, allow_none=False, allow_rejected=False
             )
 
-            if direction == "f":
+            if direction == Direction.FORWARDS:
                 # We only need to check for a backward gap if we're looking forwards
                 # to ensure there is nothing in between.
                 is_event_next_to_backward_gap = (
                     await self.store.is_event_next_to_backward_gap(local_event)
                 )
-            elif direction == "b":
+            elif direction == Direction.BACKWARDS:
                 # We only need to check for a forward gap if we're looking backwards
                 # to ensure there is nothing in between
                 is_event_next_to_forward_gap = (
@@ -1625,7 +1637,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         user: UserID,
         from_key: RoomStreamToken,
         limit: int,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:

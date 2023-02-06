@@ -157,7 +157,7 @@ Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
 recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
-[Systemd with Workers](systemd-with-workers). To use `synctl`, see
+[Systemd with Workers](systemd-with-workers/). To use `synctl`, see
 [Using synctl with Workers](synctl_workers.md).
 
 
@@ -191,6 +191,7 @@ information.
     ^/_matrix/federation/(v1|v2)/send_leave/
     ^/_matrix/federation/(v1|v2)/invite/
     ^/_matrix/federation/v1/event_auth/
+    ^/_matrix/federation/v1/timestamp_to_event/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/key/v2/query
@@ -218,6 +219,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
+    ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
@@ -384,7 +386,7 @@ so. It will then pass those events over HTTP replication to any configured event
 persisters (or the main process if none are configured).
 
 Note that `event_creator`s and `event_persister`s are implemented using the same
-[`synapse.app.generic_worker`](#synapse.app.generic_worker).
+[`synapse.app.generic_worker`](#synapseappgeneric_worker).
 
 An example [`stream_writers`](usage/configuration/config_documentation.md#stream_writers)
 configuration with multiple writers:
@@ -463,7 +465,8 @@ An example for a dedicated background worker instance:
 
 You can designate one generic worker to update the user directory.
 
-Specify its name in the shared configuration as follows:
+Specify its name in the [shared configuration](usage/configuration/config_documentation.md#update_user_directory_from_worker)
+as follows:
 
 ```yaml
 update_user_directory_from_worker: worker_name
@@ -488,7 +491,8 @@ worker application type.
 
 You can designate one generic worker to send output traffic to Application Services.
 Doesn't handle any REST endpoints itself, but you should specify its name in the
-shared configuration as follows:
+[shared configuration](usage/configuration/config_documentation.md#notify_appservices_from_worker)
+as follows:
 
 ```yaml
 notify_appservices_from_worker: worker_name
@@ -500,8 +504,38 @@ after setting this option in the shared configuration!
 This style of configuration supersedes the legacy `synapse.app.appservice`
 worker application type.
 
+#### Push Notifications
+
+You can designate generic worker to sending push notifications to
+a [push gateway](https://spec.matrix.org/v1.5/push-gateway-api/) such as
+[sygnal](https://github.com/matrix-org/sygnal) and email.
+
+This will stop the main process sending push notifications.
+
+The workers responsible for sending push notifications can be defined using the
+[`pusher_instances`](usage/configuration/config_documentation.md#pusher_instances)
+option. For example:
+
+```yaml
+pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+```
+
+Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.
+
+These workers don't need to accept incoming HTTP requests to send push notifications,
+so no additional reverse proxy configuration is required for pusher workers.
+
+This style of configuration supersedes the legacy `synapse.app.pusher`
+worker application type.
 
 ### `synapse.app.pusher`
+
+It is likely this option will be deprecated in the future and is not recommended for new
+installations. Instead, [use `synapse.app.generic_worker` with the `pusher_instances`](#push-notifications).
 
 Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set
@@ -540,6 +574,9 @@ Note this worker cannot be load-balanced: only one instance should be active.
 
 
 ### `synapse.app.federation_sender`
+
+It is likely this option will be deprecated in the future and not recommended for
+new installations. Instead, [use `synapse.app.generic_worker` with the `federation_sender_instances`](usage/configuration/config_documentation.md#federation_sender_instances).
 
 Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set
@@ -598,7 +635,9 @@ expose the `media` resource. For example:
 ```
 
 Note that if running multiple media repositories they must be on the same server
-and you must configure a single instance to run the background tasks, e.g.:
+and you must specify a single instance to run the background tasks in the
+[shared configuration](usage/configuration/config_documentation.md#media_instance_running_background_jobs),
+e.g.:
 
 ```yaml
 media_instance_running_background_jobs: "media-repository-1"
@@ -637,7 +676,9 @@ equivalent to `synapse.app.generic_worker`:
  * `synapse.app.client_reader`
  * `synapse.app.event_creator`
  * `synapse.app.federation_reader`
+ * `synapse.app.federation_sender`
  * `synapse.app.frontend_proxy`
+ * `synapse.app.pusher`
  * `synapse.app.synchrotron`
 
 

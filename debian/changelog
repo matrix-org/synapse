@@ -1,3 +1,78 @@
+matrix-synapse-py3 (1.76.0) stable; urgency=medium
+
+  * New Synapse release 1.76.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 31 Jan 2023 08:21:47 -0800
+
+matrix-synapse-py3 (1.76.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.76.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 27 Jan 2023 11:17:57 +0000
+
+matrix-synapse-py3 (1.76.0~rc1) stable; urgency=medium
+
+  * Use Poetry 1.3.2 to manage the bundled virtualenv included with this package.
+  * New Synapse release 1.76.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 25 Jan 2023 16:21:16 +0000
+
+matrix-synapse-py3 (1.75.0) stable; urgency=medium
+
+  * New Synapse release 1.75.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 17 Jan 2023 11:36:02 +0000
+
+matrix-synapse-py3 (1.75.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.75.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 12 Jan 2023 10:30:15 -0800
+
+matrix-synapse-py3 (1.75.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.75.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 10 Jan 2023 12:18:27 +0000
+
+matrix-synapse-py3 (1.74.0) stable; urgency=medium
+
+  * New Synapse release 1.74.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 20 Dec 2022 16:07:38 +0000
+
+matrix-synapse-py3 (1.74.0~rc1) stable; urgency=medium
+
+  * New dependency on libicu-dev to provide improved results for user
+    search.
+  * New Synapse release 1.74.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 13 Dec 2022 13:30:01 +0000
+
+matrix-synapse-py3 (1.73.0) stable; urgency=medium
+
+  * New Synapse release 1.73.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 06 Dec 2022 11:48:56 +0000
+
+matrix-synapse-py3 (1.73.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.73.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 01 Dec 2022 10:02:19 +0000
+
+matrix-synapse-py3 (1.73.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.73.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 29 Nov 2022 12:28:13 +0000
+
+matrix-synapse-py3 (1.72.0) stable; urgency=medium
+
+  * New Synapse release 1.72.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 22 Nov 2022 10:57:30 +0000
+
 matrix-synapse-py3 (1.72.0~rc1) stable; urgency=medium
 
   * New Synapse release 1.72.0rc1.

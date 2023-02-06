@@ -31,12 +31,12 @@ from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
 from synapse.storage.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
 from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
@@ -493,8 +493,6 @@ class StateStorageController:
                  up to date.
         """
         # FIXME(faster_joins): what do we do here?
-        #   https://github.com/matrix-org/synapse/issues/12814
-        #   https://github.com/matrix-org/synapse/issues/12815
         #   https://github.com/matrix-org/synapse/issues/13008
 
         return await self.stores.main.get_partial_current_state_deltas(
@@ -571,10 +569,11 @@ class StateStorageController:
         is arbitrary for rooms with partial state.
         """
         # We have to read this list first to mitigate races with un-partial stating.
-        # This will be empty for rooms with full state.
         hosts_at_join = await self.stores.main.get_partial_state_servers_at_join(
             room_id
         )
+        if hosts_at_join is None:
+            hosts_at_join = frozenset()
 
         hosts_from_state = await self.stores.main.get_current_hosts_in_room(room_id)
 

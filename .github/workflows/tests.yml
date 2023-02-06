@@ -27,16 +27,16 @@ jobs:
           rust:
             - 'rust/**'
             - 'Cargo.toml'
+            - 'Cargo.lock'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
       - uses: matrix-org/setup-python-poetry@v1
         with:
+          python-version: "3.x"
+          poetry-version: "1.3.2"
           extras: "all"
       - run: poetry run scripts-dev/generate_sample_config.sh --check
       - run: poetry run scripts-dev/config-lint.sh
@@ -51,8 +51,17 @@ jobs:
       - run: "pip install 'click==8.1.1' 'GitPython>=3.1.20'"
       - run: scripts-dev/check_schema_delta.py --force-colors
 
+  check-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - run: .ci/scripts/check_lockfile.py
+
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2"
     with:
       typechecking-extras: "all"
 
@@ -87,6 +96,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: matrix-org/setup-python-poetry@v1
         with:
+          poetry-version: "1.3.2"
           extras: "all"
       - run: poetry run scripts-dev/check_pydantic_models.py
 
@@ -102,13 +112,35 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
             toolchain: 1.58.1
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo clippy
+      - run: cargo clippy -- -D warnings
+
+  # We also lint against a nightly rustc so that we can lint the benchmark
+  # suite, which requires a nightly compiler.
+  lint-clippy-nightly:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        with:
+            toolchain: nightly-2022-12-01
+            components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo clippy --all-features -- -D warnings
 
   lint-rustfmt:
     runs-on: ubuntu-latest
@@ -122,7 +154,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
           toolchain: 1.58.1
           components: rustfmt
@@ -140,6 +172,7 @@ jobs:
       - lint-pydantic
       - check-sampleconfig
       - check-schema-delta
+      - check-lockfile
       - lint-clippy
       - lint-rustfmt
     runs-on: ubuntu-latest
@@ -174,8 +207,12 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
+        # 1. Mount postgres data files onto a tmpfs in-memory filesystem to reduce overhead of docker's overlayfs layer.
+        # 2. Expose the unix socket for postgres. This removes latency of using docker-proxy for connections.
         run: |
           docker run -d -p 5432:5432 \
+            --tmpfs /var/lib/postgres:rw,size=6144m \
+            --mount 'type=bind,src=/var/run/postgresql,dst=/var/run/postgresql' \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.job.postgres-version }}
@@ -184,7 +221,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -192,15 +229,16 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.job.python-version }}
+          poetry-version: "1.3.2"
           extras: ${{ matrix.job.extras }}
       - name: Await PostgreSQL
         if: ${{ matrix.job.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: poetry run trial --jobs=2 tests
+      - run: poetry run trial --jobs=6 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.job.database == 'postgres' || '' }}
-          SYNAPSE_POSTGRES_HOST: localhost
+          SYNAPSE_POSTGRES_HOST: /var/run/postgresql
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
@@ -228,7 +266,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -267,9 +305,10 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: '3.7'
+          poetry-version: "1.3.2"
           extras: "all test"
 
-      - run: poetry run trial -j2 tests
+      - run: poetry run trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -301,6 +340,7 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
+          poetry-version: "1.3.2"
           extras: ${{ matrix.extras }}
       - run: poetry run trial --jobs=2 tests
       - name: Dump logs
@@ -346,7 +386,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -392,6 +432,7 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
+          poetry-version: "1.3.2"
           extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
         env:
@@ -443,6 +484,7 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
+          poetry-version: "1.3.2"
           extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
         id: run_tester_script
@@ -489,7 +531,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -499,8 +541,11 @@ jobs:
 
       - run: |
           set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | synapse/.ci/scripts/gotestfmt
         shell: bash
+        env:
+          POSTGRES: ${{ (matrix.database == 'Postgres') && 1 || '' }}
+          WORKERS: ${{ (matrix.arrangement == 'workers') && 1 || '' }}
         name: Run Complement Tests
 
   cargo-test:
@@ -517,12 +562,35 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@55c7845fad90d0ae8b2e83715cb900e5e861e8cb
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo test
+
+  # We want to ensure that the cargo benchmarks still compile, which requires a
+  # nightly compiler.
+  cargo-bench:
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    needs:
+      - linting-done
+      - changes
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        with:
+            toolchain: nightly-2022-12-01
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo bench --no-run
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
@@ -535,6 +603,7 @@ jobs:
       - portdb
       - complement
       - cargo-test
+      - cargo-bench
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
@@ -546,3 +615,4 @@ jobs:
           skippable: |
             lint-newsfile
             cargo-test
+            cargo-bench

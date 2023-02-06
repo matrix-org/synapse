@@ -300,10 +300,8 @@ class InteractiveAuthIncompleteError(Exception):
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
-    def __init__(
-        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
-    ):
-        super().__init__(400, msg, errcode)
+    def __init__(self, msg: str = "Unrecognized request", code: int = 400):
+        super().__init__(code, msg, Codes.UNRECOGNIZED)
 
 
 class NotFoundError(SynapseError):
@@ -426,8 +424,17 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, msg: str):
+    def __init__(self, msg: str, unpersistable: bool):
+        """
+        unpersistable:
+            if True, the PDU must not be persisted, not even as a rejected PDU
+            when received over federation.
+            This is notably true when the entire PDU exceeds the size limit for a PDU,
+            (as opposed to an individual key's size limit being exceeded).
+        """
+
         super().__init__(413, msg, Codes.TOO_LARGE)
+        self.unpersistable = unpersistable
 
 
 class LoginError(SynapseError):

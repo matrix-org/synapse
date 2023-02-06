@@ -37,7 +37,6 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    LimitExceededError,
     NotFoundError,
     ShadowBanError,
     SynapseError,
@@ -50,6 +49,7 @@ from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
+from synapse.events.utils import maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
 from synapse.logging import opentracing
@@ -59,7 +59,6 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
 from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     MutableStateMap,
     PersistedEventPosition,
@@ -70,6 +69,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -377,7 +377,7 @@ class MessageHandler:
         """
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if not isinstance(expiry_ts, int) or event.is_state():
+        if type(expiry_ts) is not int or event.is_state():
             return
 
         # _schedule_expiry_for_event won't actually schedule anything if there's already
@@ -998,60 +998,73 @@ class EventCreationHandler:
                         event.internal_metadata.stream_ordering,
                     )
 
-            event, context = await self.create_event(
-                requester,
-                event_dict,
-                txn_id=txn_id,
-                allow_no_prev_events=allow_no_prev_events,
-                prev_event_ids=prev_event_ids,
-                state_event_ids=state_event_ids,
-                outlier=outlier,
-                historical=historical,
-                depth=depth,
-            )
-
-            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
-                event.sender,
-            )
-
-            spam_check_result = await self.spam_checker.check_event_for_spam(event)
-            if spam_check_result != self.spam_checker.NOT_SPAM:
-                if isinstance(spam_check_result, tuple):
-                    try:
-                        [code, dict] = spam_check_result
-                        raise SynapseError(
-                            403,
-                            "This message had been rejected as probable spam",
-                            code,
-                            dict,
-                        )
-                    except ValueError:
-                        logger.error(
-                            "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
-                            spam_check_result,
-                        )
-
-                        raise SynapseError(
-                            403,
-                            "This message has been rejected as probable spam",
-                            Codes.FORBIDDEN,
-                        )
-
-                # Backwards compatibility: if the return value is not an error code, it
-                # means the module returned an error message to be included in the
-                # SynapseError (which is now deprecated).
-                raise SynapseError(
-                    403,
-                    spam_check_result,
-                    Codes.FORBIDDEN,
+        # Try several times, it could fail with PartialStateConflictError
+        # in handle_new_client_event, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                event, context = await self.create_event(
+                    requester,
+                    event_dict,
+                    txn_id=txn_id,
+                    allow_no_prev_events=allow_no_prev_events,
+                    prev_event_ids=prev_event_ids,
+                    state_event_ids=state_event_ids,
+                    outlier=outlier,
+                    historical=historical,
+                    depth=depth,
                 )
 
-            ev = await self.handle_new_client_event(
-                requester=requester,
-                events_and_context=[(event, context)],
-                ratelimit=ratelimit,
-                ignore_shadow_ban=ignore_shadow_ban,
-            )
+                assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+                    event.sender,
+                )
+
+                spam_check_result = await self.spam_checker.check_event_for_spam(event)
+                if spam_check_result != self.spam_checker.NOT_SPAM:
+                    if isinstance(spam_check_result, tuple):
+                        try:
+                            [code, dict] = spam_check_result
+                            raise SynapseError(
+                                403,
+                                "This message had been rejected as probable spam",
+                                code,
+                                dict,
+                            )
+                        except ValueError:
+                            logger.error(
+                                "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
+                                spam_check_result,
+                            )
+
+                            raise SynapseError(
+                                403,
+                                "This message has been rejected as probable spam",
+                                Codes.FORBIDDEN,
+                            )
+
+                    # Backwards compatibility: if the return value is not an error code, it
+                    # means the module returned an error message to be included in the
+                    # SynapseError (which is now deprecated).
+                    raise SynapseError(
+                        403,
+                        spam_check_result,
+                        Codes.FORBIDDEN,
+                    )
+
+                ev = await self.handle_new_client_event(
+                    requester=requester,
+                    events_and_context=[(event, context)],
+                    ratelimit=ratelimit,
+                    ignore_shadow_ban=ignore_shadow_ban,
+                )
+
+                break
+            except PartialStateConflictError as e:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
 
         # we know it was persisted, so must have a stream ordering
         assert ev.internal_metadata.stream_ordering
@@ -1135,11 +1148,13 @@ class EventCreationHandler:
             )
             state_events = await self.store.get_events_as_list(state_event_ids)
             # Create a StateMap[str]
-            state_map = {(e.type, e.state_key): e.event_id for e in state_events}
+            current_state_ids = {
+                (e.type, e.state_key): e.event_id for e in state_events
+            }
             # Actually strip down and only use the necessary auth events
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 event=temp_event,
-                current_state_ids=state_map,
+                current_state_ids=current_state_ids,
                 for_verification=False,
             )
 
@@ -1353,7 +1368,7 @@ class EventCreationHandler:
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
-            SynapseError(503) if attempting to persist a partial state event in
+            PartialStateConflictError if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
         extra_users = extra_users or []
@@ -1415,34 +1430,23 @@ class EventCreationHandler:
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
         event, context = events_and_context[0]
-        try:
-            result, _ = await make_deferred_yieldable(
-                gather_results(
-                    (
-                        run_in_background(
-                            self._persist_events,
-                            requester=requester,
-                            events_and_context=events_and_context,
-                            ratelimit=ratelimit,
-                            extra_users=extra_users,
-                        ),
-                        run_in_background(
-                            self.cache_joined_hosts_for_events, events_and_context
-                        ).addErrback(
-                            log_failure, "cache_joined_hosts_for_event failed"
-                        ),
+        result, _ = await make_deferred_yieldable(
+            gather_results(
+                (
+                    run_in_background(
+                        self._persist_events,
+                        requester=requester,
+                        events_and_context=events_and_context,
+                        ratelimit=ratelimit,
+                        extra_users=extra_users,
                     ),
-                    consumeErrors=True,
-                )
-            ).addErrback(unwrapFirstError)
-        except PartialStateConflictError as e:
-            # The event context needs to be recomputed.
-            # Turn the error into a 429, as a hint to the client to try again.
-            logger.info(
-                "Room %s was un-partial stated while persisting client event.",
-                event.room_id,
+                    run_in_background(
+                        self.cache_joined_hosts_for_events, events_and_context
+                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
+                ),
+                consumeErrors=True,
             )
-            raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
+        ).addErrback(unwrapFirstError)
 
         return result
 
@@ -1527,12 +1531,23 @@ class EventCreationHandler:
         external federation senders don't have to recalculate it themselves.
         """
 
-        for event, _ in events_and_context:
-            if not self._external_cache.is_enabled():
-                return
+        if not self._external_cache.is_enabled():
+            return
 
-            # If external cache is enabled we should always have this.
-            assert self._external_cache_joined_hosts_updates is not None
+        # If external cache is enabled we should always have this.
+        assert self._external_cache_joined_hosts_updates is not None
+
+        for event, event_context in events_and_context:
+            if event_context.partial_state:
+                # To populate the cache for a partial-state event, we either have to
+                # block until full state, which the code below does, or change the
+                # meaning of cache values to be the list of hosts to which we plan to
+                # send events and calculate that instead.
+                #
+                # The federation senders don't use the external cache when sending
+                # events in partial-state rooms anyway, so let's not bother populating
+                # the cache.
+                continue
 
             # We actually store two mappings, event ID -> prev state group,
             # state group -> joined hosts, which is much more space efficient
@@ -1737,12 +1752,15 @@ class EventCreationHandler:
 
             if event.type == EventTypes.Member:
                 if event.content["membership"] == Membership.INVITE:
-                    event.unsigned[
-                        "invite_room_state"
-                    ] = await self.store.get_stripped_room_state_from_event_context(
-                        context,
-                        self.room_prejoin_state_types,
-                        membership_user_id=event.sender,
+                    maybe_upsert_event_field(
+                        event,
+                        event.unsigned,
+                        "invite_room_state",
+                        await self.store.get_stripped_room_state_from_event_context(
+                            context,
+                            self.room_prejoin_state_types,
+                            membership_user_id=event.sender,
+                        ),
                     )
 
                     invitee = UserID.from_string(event.state_key)
@@ -1760,11 +1778,14 @@ class EventCreationHandler:
                         event.signatures.update(returned_invite.signatures)
 
                 if event.content["membership"] == Membership.KNOCK:
-                    event.unsigned[
-                        "knock_room_state"
-                    ] = await self.store.get_stripped_room_state_from_event_context(
-                        context,
-                        self.room_prejoin_state_types,
+                    maybe_upsert_event_field(
+                        event,
+                        event.unsigned,
+                        "knock_room_state",
+                        await self.store.get_stripped_room_state_from_event_context(
+                            context,
+                            self.room_prejoin_state_types,
+                        ),
                     )
 
             if event.type == EventTypes.Redaction:
@@ -1918,7 +1939,9 @@ class EventCreationHandler:
             if event.type == EventTypes.Message:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
-                run_in_background(self._bump_active_time, requester.user)  # type: ignore[unused-awaitable]
+                run_as_background_process(
+                    "bump_presence_active_time", self._bump_active_time, requester.user
+                )
 
         async def _notify() -> None:
             try:
@@ -2003,26 +2026,39 @@ class EventCreationHandler:
         for user_id in members:
             requester = create_requester(user_id, authenticated_entity=self.server_name)
             try:
-                event, context = await self.create_event(
-                    requester,
-                    {
-                        "type": EventTypes.Dummy,
-                        "content": {},
-                        "room_id": room_id,
-                        "sender": user_id,
-                    },
-                )
+                # Try several times, it could fail with PartialStateConflictError
+                # in handle_new_client_event, cf comment in except block.
+                max_retries = 5
+                for i in range(max_retries):
+                    try:
+                        event, context = await self.create_event(
+                            requester,
+                            {
+                                "type": EventTypes.Dummy,
+                                "content": {},
+                                "room_id": room_id,
+                                "sender": user_id,
+                            },
+                        )
 
-                event.internal_metadata.proactively_send = False
+                        event.internal_metadata.proactively_send = False
 
-                # Since this is a dummy-event it is OK if it is sent by a
-                # shadow-banned user.
-                await self.handle_new_client_event(
-                    requester,
-                    events_and_context=[(event, context)],
-                    ratelimit=False,
-                    ignore_shadow_ban=True,
-                )
+                        # Since this is a dummy-event it is OK if it is sent by a
+                        # shadow-banned user.
+                        await self.handle_new_client_event(
+                            requester,
+                            events_and_context=[(event, context)],
+                            ratelimit=False,
+                            ignore_shadow_ban=True,
+                        )
+
+                        break
+                    except PartialStateConflictError as e:
+                        # Persisting couldn't happen because the room got un-partial stated
+                        # in the meantime and context needs to be recomputed, so let's do so.
+                        if i == max_retries - 1:
+                            raise e
+                        pass
                 return True
             except AuthError:
                 logger.info(

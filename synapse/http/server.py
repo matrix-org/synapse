@@ -577,7 +577,24 @@ def _unrecognised_request_handler(request: Request) -> NoReturn:
     Args:
         request: Unused, but passed in to match the signature of ServletCallback.
     """
-    raise UnrecognizedRequestError()
+    raise UnrecognizedRequestError(code=404)
+
+
+class UnrecognizedRequestResource(resource.Resource):
+    """
+    Similar to twisted.web.resource.NoResource, but returns a JSON 404 with an
+    errcode of M_UNRECOGNIZED.
+    """
+
+    def render(self, request: SynapseRequest) -> int:
+        f = failure.Failure(UnrecognizedRequestError(code=404))
+        return_json_error(f, request, None)
+        # A response has already been sent but Twisted requires either NOT_DONE_YET
+        # or the response bytes as a return value.
+        return NOT_DONE_YET
+
+    def getChild(self, name: str, request: Request) -> resource.Resource:
+        return self
 
 
 class RootRedirect(resource.Resource):

@@ -20,6 +20,7 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     AsyncContextManager,
     ContextManager,
     Dict,
@@ -48,6 +49,9 @@ from synapse.storage.database import (
 )
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import PostgresSequenceGenerator
+
+if TYPE_CHECKING:
+    from synapse.notifier import ReplicationNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +186,7 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
     def __init__(
         self,
         db_conn: LoggingDatabaseConnection,
+        notifier: "ReplicationNotifier",
         table: str,
         column: str,
         extra_tables: Iterable[Tuple[str, str]] = (),
@@ -205,6 +210,8 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
         # The key and values are the same, but we never look at the values.
         self._unfinished_ids: OrderedDict[int, int] = OrderedDict()
 
+        self._notifier = notifier
+
     def advance(self, instance_name: str, new_id: int) -> None:
         # Advance should never be called on a writer instance, only over replication
         if self._is_writer:
@@ -226,6 +233,8 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
             finally:
                 with self._lock:
                     self._unfinished_ids.pop(next_id)
+
+                self._notifier.notify_replication()
 
         return _AsyncCtxManagerWrapper(manager())
 
@@ -249,6 +258,8 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
                 with self._lock:
                     for next_id in next_ids:
                         self._unfinished_ids.pop(next_id)
+
+                self._notifier.notify_replication()
 
         return _AsyncCtxManagerWrapper(manager())
 
@@ -296,6 +307,7 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         self,
         db_conn: LoggingDatabaseConnection,
         db: DatabasePool,
+        notifier: "ReplicationNotifier",
         stream_name: str,
         instance_name: str,
         tables: List[Tuple[str, str, str]],
@@ -304,6 +316,7 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         positive: bool = True,
     ) -> None:
         self._db = db
+        self._notifier = notifier
         self._stream_name = stream_name
         self._instance_name = instance_name
         self._positive = positive
@@ -377,6 +390,12 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         self._max_seen_allocated_stream_id = max(
             self._current_positions.values(), default=1
         )
+
+        if not writers:
+            # If there have been no explicit writers given then any instance can
+            # write to the stream. In which case, let's pre-seed our own
+            # position with the current minimum.
+            self._current_positions[self._instance_name] = self._persisted_upto_position
 
     def _load_current_ids(
         self,
@@ -529,7 +548,9 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         # Cast safety: the second argument to _MultiWriterCtxManager, multiple_ids,
         # controls the return type. If `None` or omitted, the context manager yields
         # a single integer stream_id; otherwise it yields a list of stream_ids.
-        return cast(AsyncContextManager[int], _MultiWriterCtxManager(self))
+        return cast(
+            AsyncContextManager[int], _MultiWriterCtxManager(self, self._notifier)
+        )
 
     def get_next_mult(self, n: int) -> AsyncContextManager[List[int]]:
         # If we have a list of instances that are allowed to write to this
@@ -538,7 +559,10 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
             raise Exception("Tried to allocate stream ID on non-writer")
 
         # Cast safety: see get_next.
-        return cast(AsyncContextManager[List[int]], _MultiWriterCtxManager(self, n))
+        return cast(
+            AsyncContextManager[List[int]],
+            _MultiWriterCtxManager(self, self._notifier, n),
+        )
 
     def get_next_txn(self, txn: LoggingTransaction) -> int:
         """
@@ -557,6 +581,7 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         txn.call_after(self._mark_id_as_finished, next_id)
         txn.call_on_exception(self._mark_id_as_finished, next_id)
+        txn.call_after(self._notifier.notify_replication)
 
         # Update the `stream_positions` table with newly updated stream
         # ID (unless self._writers is not set in which case we don't
@@ -695,24 +720,22 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
 
         heapq.heappush(self._known_persisted_positions, new_id)
 
-        # If we're a writer and we don't have any active writes we update our
-        # current position to the latest position seen. This allows the instance
-        # to report a recent position when asked, rather than a potentially old
-        # one (if this instance hasn't written anything for a while).
-        our_current_position = self._current_positions.get(self._instance_name)
-        if (
-            our_current_position
-            and not self._unfinished_ids
-            and not self._in_flight_fetches
-        ):
-            self._current_positions[self._instance_name] = max(
-                our_current_position, new_id
-            )
-
         # We move the current min position up if the minimum current positions
         # of all instances is higher (since by definition all positions less
         # that that have been persisted).
-        min_curr = min(self._current_positions.values(), default=0)
+        our_current_position = self._current_positions.get(self._instance_name, 0)
+        min_curr = min(
+            (
+                token
+                for name, token in self._current_positions.items()
+                if name != self._instance_name
+            ),
+            default=our_current_position,
+        )
+
+        if our_current_position and (self._unfinished_ids or self._in_flight_fetches):
+            min_curr = min(min_curr, our_current_position)
+
         self._persisted_upto_position = max(min_curr, self._persisted_upto_position)
 
         # We now iterate through the seen positions, discarding those that are
@@ -783,6 +806,7 @@ class _MultiWriterCtxManager:
     """Async context manager returned by MultiWriterIdGenerator"""
 
     id_gen: MultiWriterIdGenerator
+    notifier: "ReplicationNotifier"
     multiple_ids: Optional[int] = None
     stream_ids: List[int] = attr.Factory(list)
 
@@ -809,6 +833,8 @@ class _MultiWriterCtxManager:
     ) -> bool:
         for i in self.stream_ids:
             self.id_gen._mark_id_as_finished(i)
+
+        self.notifier.notify_replication()
 
         if exc_type is not None:
             return False

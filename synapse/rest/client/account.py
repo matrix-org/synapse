@@ -338,6 +338,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if not self.hs.config.registration.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         if not self.config.email.can_verify_email:
             logger.warning(
                 "Adding emails have been disabled due to lack of an email config"
@@ -875,19 +880,21 @@ class AccountStatusRestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    PasswordRestServlet(hs).register(http_server)
-    DeactivateAccountRestServlet(hs).register(http_server)
-    EmailThreepidRequestTokenRestServlet(hs).register(http_server)
-    MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
-    AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
-    AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        EmailPasswordRequestTokenRestServlet(hs).register(http_server)
+        PasswordRestServlet(hs).register(http_server)
+        DeactivateAccountRestServlet(hs).register(http_server)
+        EmailThreepidRequestTokenRestServlet(hs).register(http_server)
+        MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
+        AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
+        AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
-    ThreepidAddRestServlet(hs).register(http_server)
-    ThreepidBindRestServlet(hs).register(http_server)
-    ThreepidUnbindRestServlet(hs).register(http_server)
-    ThreepidDeleteRestServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        ThreepidAddRestServlet(hs).register(http_server)
+        ThreepidBindRestServlet(hs).register(http_server)
+        ThreepidUnbindRestServlet(hs).register(http_server)
+        ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
 
-    if hs.config.experimental.msc3720_enabled:
+    if hs.config.worker.worker_app is None and hs.config.experimental.msc3720_enabled:
         AccountStatusRestServlet(hs).register(http_server)

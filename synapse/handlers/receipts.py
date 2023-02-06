@@ -92,7 +92,6 @@ class ReceiptsHandler:
                         continue
 
                     # Check if these receipts apply to a thread.
-                    thread_id = None
                     data = user_values.get("data", {})
                     thread_id = data.get("thread_id")
                     # If the thread ID is invalid, consider it missing.
@@ -316,5 +315,5 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         return events, to_key
 
-    def get_current_key(self, direction: str = "f") -> int:
+    def get_current_key(self) -> int:
         return self.store.get_max_receipt_stream_id()

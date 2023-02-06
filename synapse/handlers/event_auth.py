@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, List, Mapping, Optional, Union
+from typing import TYPE_CHECKING, List, Mapping, Optional, Union
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -29,7 +29,7 @@ from synapse.event_auth import (
 )
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.types import StateMap, get_domain_from_id
+from synapse.types import StateMap, StrCollection, get_domain_from_id
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -45,6 +45,7 @@ class EventAuthHandler:
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
+        self._state_storage_controller = hs.get_storage_controllers().state
         self._server_name = hs.hostname
 
     async def check_auth_rules_from_context(
@@ -179,17 +180,22 @@ class EventAuthHandler:
         this function may return an incorrect result as we are not able to fully
         track server membership in a room without full state.
         """
-        if not allow_partial_state_rooms and await self._store.is_partial_state_room(
-            room_id
-        ):
-            raise AuthError(
-                403,
-                "Unable to authorise you right now; room is partial-stated here.",
-                errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
-            )
-
-        if not await self.is_host_in_room(room_id, host):
-            raise AuthError(403, "Host not in room.")
+        if await self._store.is_partial_state_room(room_id):
+            if allow_partial_state_rooms:
+                current_hosts = await self._state_storage_controller.get_current_hosts_in_room_or_partial_state_approximation(
+                    room_id
+                )
+                if host not in current_hosts:
+                    raise AuthError(403, "Host not in room (partial-state approx).")
+            else:
+                raise AuthError(
+                    403,
+                    "Unable to authorise you right now; room is partial-stated here.",
+                    errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
+                )
+        else:
+            if not await self.is_host_in_room(room_id, host):
+                raise AuthError(403, "Host not in room.")
 
     async def check_restricted_join_rules(
         self,
@@ -284,7 +290,7 @@ class EventAuthHandler:
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]
-    ) -> Collection[str]:
+    ) -> StrCollection:
         """
         Generate a list of rooms in which membership allows access to a room.
 
@@ -325,7 +331,7 @@ class EventAuthHandler:
 
         return result
 
-    async def is_user_in_rooms(self, room_ids: Collection[str], user_id: str) -> bool:
+    async def is_user_in_rooms(self, room_ids: StrCollection, user_id: str) -> bool:
         """
         Check whether a user is a member of any of the provided rooms.
 

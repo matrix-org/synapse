@@ -174,7 +174,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foobar"
         )
 
-        self.assertEqual(channel.code, 400)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 

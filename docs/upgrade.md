@@ -88,6 +88,77 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.76.0
+
+## Faster joins are enabled by default
+
+When joining a room for the first time, Synapse 1.76.0 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.
+
+Server admins can opt out of this feature for the time being by setting
+
+```yaml
+experimental:
+    faster_joins: false
+```
+
+in their server config.
+
+## Changes to the account data replication streams
+
+Synapse has changed the format of the account data and devices replication
+streams (between workers). This is a forwards- and backwards-incompatible
+change: v1.75 workers cannot process account data replicated by v1.76 workers,
+and vice versa.
+
+Once all workers are upgraded to v1.76 (or downgraded to v1.75), account data
+and device replication will resume as normal.
+
+## Minimum version of Poetry is now 1.3.2
+
+The minimum supported version of Poetry is now 1.3.2 (previously 1.2.0, [since 
+Synapse 1.67](#upgrading-to-v1670)). If you have used `poetry install` to 
+install Synapse from a source checkout, you should upgrade poetry: see its
+[installation instructions](https://python-poetry.org/docs/#installation).
+For all other installation methods, no acction is required.
+
+# Upgrading to v1.74.0
+
+## Unicode support in user search
+
+This version introduces optional support for an [improved user search dealing with Unicode characters](https://github.com/matrix-org/synapse/pull/14464).
+
+If you want to take advantage of this feature you need to install PyICU,
+the ICU native dependency and its development headers
+so that PyICU can build since no prebuilt wheels are available.
+
+You can follow [the PyICU documentation](https://pypi.org/project/PyICU/) to do so,
+and then do `pip install matrix-synapse[user-search]` for a PyPI install.
+
+Docker images and Debian packages need nothing specific as they already
+include or specify ICU as an explicit dependency.
+
+# Upgrading to v1.73.0
+
+## Legacy Prometheus metric names have now been removed
+
+Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
+and offered an option to disable them.
+Synapse v1.71.0 disabled legacy Prometheus metric names by default.
+
+This version, v1.73.0, removes those legacy Prometheus metric names entirely.
+This also means that the `enable_legacy_metrics` configuration option has been
+removed; it will no longer be possible to re-enable the legacy metric names.
+
+If you use metrics and have not yet updated your Grafana dashboard(s),
+Prometheus console(s) or alerting rule(s), please consider doing so when upgrading
+to this version.
+Note that the included Grafana dashboard was updated in v1.72.0 to correct some
+metric names which were missed when legacy metrics were disabled by default.
+
+See [v1.69.0: Deprecation of legacy Prometheus metric names](#deprecation-of-legacy-prometheus-metric-names)
+for more context.
+
+
 # Upgrading to v1.72.0
 
 ## Dropping support for PostgreSQL 10
@@ -851,8 +922,8 @@ Any scripts still using the above APIs should be converted to use the
 ## User-interactive authentication fallback templates can now display errors
 
 This may affect you if you make use of custom HTML templates for the
-[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
-[terms](../synapse/res/templates/terms.html) fallback pages.
+[reCAPTCHA (`synapse/res/templates/recaptcha.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/recaptcha.html) or
+[terms (`synapse/res/templates/terms.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/terms.html) fallback pages.
 
 The template is now provided an `error` variable if the authentication
 process failed. See the default templates linked above for an example.
@@ -1450,7 +1521,7 @@ New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
 is configured to use SSO and a custom
 `sso_redirect_confirm_template_dir` configuration then these templates
 will need to be copied from
-[synapse/res/templates](synapse/res/templates) into that directory.
+[`synapse/res/templates`](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates) into that directory.
 
 ## Synapse SSO Plugins Method Deprecation
 

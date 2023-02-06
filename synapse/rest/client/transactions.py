@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Tuple
 
 from typing_extensions import ParamSpec
 
+from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 from twisted.web.server import Request
 
@@ -90,7 +91,7 @@ class HttpTransactionCache:
         fn: Callable[P, Awaitable[Tuple[int, JsonDict]]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Awaitable[Tuple[int, JsonDict]]:
+    ) -> "Deferred[Tuple[int, JsonDict]]":
         """Fetches the response for this transaction, or executes the given function
         to produce a response for this transaction.
 

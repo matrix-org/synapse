@@ -376,5 +376,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     KeyQueryServlet(hs).register(http_server)
     KeyChangesServlet(hs).register(http_server)
     OneTimeKeyServlet(hs).register(http_server)
-    SigningKeyUploadServlet(hs).register(http_server)
-    SignaturesUploadServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        SigningKeyUploadServlet(hs).register(http_server)
+        SignaturesUploadServlet(hs).register(http_server)

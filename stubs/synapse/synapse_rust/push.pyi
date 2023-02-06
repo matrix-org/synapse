@@ -1,4 +1,18 @@
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
+# Copyright 2022 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
 
 from synapse.types import JsonDict
 
@@ -26,7 +40,14 @@ class PushRules:
 
 class FilteredPushRules:
     def __init__(
-        self, push_rules: PushRules, enabled_map: Dict[str, bool], msc3664_enabled: bool
+        self,
+        push_rules: PushRules,
+        enabled_map: Dict[str, bool],
+        msc1767_enabled: bool,
+        msc3381_polls_enabled: bool,
+        msc3664_enabled: bool,
+        msc3952_intentional_mentions: bool,
+        msc3958_suppress_edits_enabled: bool,
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
@@ -36,11 +57,16 @@ class PushRuleEvaluator:
     def __init__(
         self,
         flattened_keys: Mapping[str, str],
+        has_mentions: bool,
+        user_mentions: Set[str],
+        room_mention: bool,
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
         related_events_flattened: Mapping[str, Mapping[str, str]],
         related_event_match_enabled: bool,
+        room_version_feature_flags: Tuple[str, ...],
+        msc3931_enabled: bool,
     ): ...
     def run(
         self,
@@ -48,3 +74,6 @@ class PushRuleEvaluator:
         user_id: Optional[str],
         display_name: Optional[str],
     ) -> Collection[Union[Mapping, str]]: ...
+    def matches(
+        self, condition: JsonDict, user_id: Optional[str], display_name: Optional[str]
+    ) -> bool: ...

@@ -171,7 +171,7 @@ class TestJoinsLimitedByPerRoomRateLimiter(FederatingHomeserverTestCase):
                     state=[create_event],
                     auth_chain=[create_event],
                     partial_state=False,
-                    servers_in_room=[],
+                    servers_in_room=frozenset(),
                 )
             )
         )

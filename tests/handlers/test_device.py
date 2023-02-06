@@ -19,7 +19,7 @@ from typing import Optional
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import NotFoundError, SynapseError
-from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN
+from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN, DeviceHandler
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -32,7 +32,9 @@ user2 = "@theresa:bbb"
 class DeviceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
-        self.handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.handler = handler
         self.store = hs.get_datastores().main
         return hs
 
@@ -61,6 +63,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(res, "fco")
 
         dev = self.get_success(self.handler.store.get_device("@boris:foo", "fco"))
+        assert dev is not None
         self.assertEqual(dev["display_name"], "display name")
 
     def test_device_is_preserved_if_exists(self) -> None:
@@ -83,6 +86,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(res2, "fco")
 
         dev = self.get_success(self.handler.store.get_device("@boris:foo", "fco"))
+        assert dev is not None
         self.assertEqual(dev["display_name"], "display name")
 
     def test_device_id_is_made_up_if_unspecified(self) -> None:
@@ -95,6 +99,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         )
 
         dev = self.get_success(self.handler.store.get_device("@theresa:foo", device_id))
+        assert dev is not None
         self.assertEqual(dev["display_name"], "display")
 
     def test_get_devices_by_user(self) -> None:
@@ -264,7 +269,9 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 class DehydrationTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
-        self.handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.handler = handler
         self.registration = hs.get_registration_handler()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
@@ -284,9 +291,9 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        retrieved_device_id, device_data = self.get_success(
-            self.handler.get_dehydrated_device(user_id=user_id)
-        )
+        result = self.get_success(self.handler.get_dehydrated_device(user_id=user_id))
+        assert result is not None
+        retrieved_device_id, device_data = result
 
         self.assertEqual(retrieved_device_id, stored_dehydrated_device_id)
         self.assertEqual(device_data, {"device_data": {"foo": "bar"}})

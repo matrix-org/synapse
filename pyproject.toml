@@ -40,6 +40,38 @@ target-version = ['py37', 'py38', 'py39', 'py310']
 # https://black.readthedocs.io/en/stable/usage_and_configuration/file_collection_and_discovery.html#gitignore
 # Use `extend-exclude` if you want to exclude something in addition to this.
 
+[tool.ruff]
+line-length = 88
+
+# See https://github.com/charliermarsh/ruff/#pycodestyle
+# for error codes. The ones we ignore are:
+#  E731: do not assign a lambda expression, use a def
+#  E501: Line too long (black enforces this for us)
+#
+# flake8-bugbear compatible checks. Its error codes are described at
+# https://github.com/charliermarsh/ruff/#flake8-bugbear
+#  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
+#  B023: Functions defined inside a loop must not use variables redefined in the loop
+#  B024: Abstract base class with no abstract method.
+ignore = [
+    "B019",
+    "B023",
+    "B024",
+    "E501",
+    "E731",
+]
+select = [
+    # pycodestyle checks.
+    "E",
+    "W",
+    # pyflakes checks.
+    "F",
+    # flake8-bugbear checks.
+    "B0",
+    # flake8-comprehensions checks.
+    "C4",
+]
+
 [tool.isort]
 line_length = 88
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "TWISTED", "FIRSTPARTY", "TESTS", "LOCALFOLDER"]
@@ -57,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.72.0rc1"
+version = "1.76.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -136,12 +168,13 @@ Twisted = {extras = ["tls"], version = ">=18.9.0"}
 treq = ">=15.1"
 # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
 pyOpenSSL = ">=16.0.0"
-PyYAML = ">=3.11"
+PyYAML = ">=3.13"
 pyasn1 = ">=0.1.9"
 pyasn1-modules = ">=0.0.7"
 bcrypt = ">=3.1.7"
 Pillow = ">=5.4.0"
-sortedcontainers = ">=1.4.4"
+# We use SortedDict.peekitem(), which was added in sortedcontainers 1.5.2.
+sortedcontainers = ">=1.5.2"
 pymacaroons = ">=0.13.0"
 msgpack = ">=0.5.2"
 phonenumbers = ">=8.2.0"
@@ -207,6 +240,7 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
+pyicu = { version = ">=2.10.2", optional = true }
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
@@ -229,6 +263,10 @@ redis = ["txredisapi", "hiredis"]
 # Required to use experimental `caches.track_memory_usage` config option.
 cache-memory = ["pympler"]
 test = ["parameterized", "idna"]
+# Allows for better search for international characters in the user directory. This
+# requires libicu's development headers installed on the system (e.g. libicu-dev on
+# Debian-based distributions).
+user-search = ["pyicu"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
 # to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
@@ -260,18 +298,18 @@ all = [
     "txredisapi", "hiredis",
     # cache-memory
     "pympler",
+    # improved user search
+    "pyicu",
     # omitted:
     #   - test: it's useful to have this separate from dev deps in the olddeps job
     #   - systemd: this is a system-based requirement
 ]
 
 [tool.poetry.dev-dependencies]
-## We pin black so that our tests don't start failing on new releases.
+# We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-flake8-comprehensions = "*"
-flake8-bugbear = ">=21.3.2"
-flake8 = "*"
+ruff = "0.0.230"
 
 # Typechecking
 mypy = "*"

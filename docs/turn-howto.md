@@ -38,7 +38,7 @@ As an example, here is the relevant section of the config file for `matrix.org`.
     turn_uris: [ "turn:turn.matrix.org?transport=udp", "turn:turn.matrix.org?transport=tcp" ]
     turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
     turn_user_lifetime: 86400000
-    turn_allow_guests: True
+    turn_allow_guests: true
 
 After updating the homeserver configuration, you must restart synapse:
 

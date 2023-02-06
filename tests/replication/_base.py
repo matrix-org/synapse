@@ -307,7 +307,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         stream to the master HS.
 
         Args:
-            worker_app: Type of worker, e.g. `synapse.app.federation_sender`.
+            worker_app: Type of worker, e.g. `synapse.app.generic_worker`.
             extra_config: Any extra config to use for this instances.
             **kwargs: Options that get passed to `self.setup_test_homeserver`,
                 useful to e.g. pass some mocks for things like `federation_http_client`

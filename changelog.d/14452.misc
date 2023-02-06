@@ -1,1 +1,0 @@
-Enable mypy's [`strict_equality` check](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict-equality) by default.

@@ -53,9 +53,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 class CachedFunction(Generic[F]):
-    invalidate: Any = None
-    invalidate_all: Any = None
-    prefill: Any = None
+    invalidate: Callable[[Tuple[Any, ...]], None]
+    invalidate_all: Callable[[], None]
+    prefill: Callable[[Tuple[Any, ...], Any], None]
     cache: Any = None
     num_args: Any = None
 
@@ -503,7 +503,7 @@ def cachedList(
     is specified as a list that is iterated through to lookup keys in the
     original cache. A new tuple consisting of the (deduplicated) keys that weren't in
     the cache gets passed to the original function, which is expected to results
-    in a map of key to value for each passed value. THe new results are stored in the
+    in a map of key to value for each passed value. The new results are stored in the
     original cache. Note that any missing values are cached as None.
 
     Args:

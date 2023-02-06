@@ -15,7 +15,9 @@
 import logging
 from typing import Dict
 
-from twisted.web.resource import NoResource, Resource
+from twisted.web.resource import Resource
+
+from synapse.http.server import UnrecognizedRequestResource
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ def create_resource_tree(
         for path_seg in full_path.split(b"/")[1:-1]:
             if path_seg not in last_resource.listNames():
                 # resource doesn't exist, so make a "dummy resource"
-                child_resource: Resource = NoResource()
+                child_resource: Resource = UnrecognizedRequestResource()
                 last_resource.putChild(path_seg, child_resource)
                 res_id = _resource_id(last_resource, path_seg)
                 resource_mappings[res_id] = child_resource

@@ -33,7 +33,7 @@ from typing_extensions import Literal
 
 from synapse.api.constants import DeviceKeyAlgorithms
 from synapse.appservice import (
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
@@ -140,7 +140,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cancellable
     async def get_e2e_device_keys_for_cs_api(
         self,
-        query_list: List[Tuple[str, Optional[str]]],
+        query_list: Collection[Tuple[str, Optional[str]]],
         include_displaynames: bool = True,
     ) -> Dict[str, Dict[str, JsonDict]]:
         """Fetch a list of device keys, formatted suitably for the C/S API.
@@ -514,7 +514,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
     async def count_bulk_e2e_one_time_keys_for_as(
         self, user_ids: Collection[str]
-    ) -> TransactionOneTimeKeyCounts:
+    ) -> TransactionOneTimeKeysCount:
         """
         Counts, in bulk, the one-time keys for all the users specified.
         Intended to be used by application services for populating OTK counts in
@@ -528,7 +528,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         def _count_bulk_e2e_one_time_keys_txn(
             txn: LoggingTransaction,
-        ) -> TransactionOneTimeKeyCounts:
+        ) -> TransactionOneTimeKeysCount:
             user_in_where_clause, user_parameters = make_in_list_sql_clause(
                 self.database_engine, "user_id", user_ids
             )
@@ -541,7 +541,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             """
             txn.execute(sql, user_parameters)
 
-            result: TransactionOneTimeKeyCounts = {}
+            result: TransactionOneTimeKeysCount = {}
 
             for user_id, device_id, algorithm, count in txn:
                 # We deliberately construct empty dictionaries for
@@ -1181,7 +1181,10 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         super().__init__(database, db_conn, hs)
 
         self._cross_signing_id_gen = StreamIdGenerator(
-            db_conn, "e2e_cross_signing_keys", "stream_id"
+            db_conn,
+            hs.get_replication_notifier(),
+            "e2e_cross_signing_keys",
+            "stream_id",
         )
 
     async def set_e2e_device_keys(

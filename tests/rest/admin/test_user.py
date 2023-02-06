@@ -3994,7 +3994,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that shadow-banning for a user that is not a local returns a 400
         """
-        url = "/_synapse/admin/v1/whois/@unknown_person:unknown_domain"
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/shadow_ban"
 
         channel = self.make_request(method, url, access_token=self.admin_user_tok)
         self.assertEqual(400, channel.code, msg=channel.json_body)

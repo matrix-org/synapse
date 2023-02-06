@@ -45,7 +45,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.hs = hs
         self.store: EventsWorkerStore = hs.get_datastores().main
 
@@ -68,7 +68,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
 
             self.event_ids.append(event.event_id)
 
-    def test_simple(self):
+    def test_simple(self) -> None:
         with LoggingContext(name="test") as ctx:
             res = self.get_success(
                 self.store.have_seen_events(
@@ -90,7 +90,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(res, {self.event_ids[0]})
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
-    def test_persisting_event_invalidates_cache(self):
+    def test_persisting_event_invalidates_cache(self) -> None:
         """
         Test to make sure that the `have_seen_event` cache
         is invalidated after we persist an event and returns
@@ -138,7 +138,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             # That should result in a single db query to lookup
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
-    def test_invalidate_cache_by_room_id(self):
+    def test_invalidate_cache_by_room_id(self) -> None:
         """
         Test to make sure that all events associated with the given `(room_id,)`
         are invalidated in the `have_seen_event` cache.
@@ -175,7 +175,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store: EventsWorkerStore = hs.get_datastores().main
 
         self.user = self.register_user("user", "pass")
@@ -189,7 +189,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
         # Reset the event cache so the tests start with it empty
         self.get_success(self.store._get_event_cache.clear())
 
-    def test_simple(self):
+    def test_simple(self) -> None:
         """Test that we cache events that we pull from the DB."""
 
         with LoggingContext("test") as ctx:
@@ -198,7 +198,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
             # We should have fetched the event from the DB
             self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)
 
-    def test_event_ref(self):
+    def test_event_ref(self) -> None:
         """Test that we reuse events that are still in memory but have fallen
         out of the cache, rather than requesting them from the DB.
         """
@@ -223,7 +223,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
             # from the DB
             self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 0)
 
-    def test_dedupe(self):
+    def test_dedupe(self) -> None:
         """Test that if we request the same event multiple times we only pull it
         out once.
         """
@@ -241,7 +241,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
 class DatabaseOutageTestCase(unittest.HomeserverTestCase):
     """Test event fetching during a database outage."""
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store: EventsWorkerStore = hs.get_datastores().main
 
         self.room_id = f"!room:{hs.hostname}"
@@ -377,7 +377,7 @@ class GetEventCancellationTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store: EventsWorkerStore = hs.get_datastores().main
 
         self.user = self.register_user("user", "pass")
@@ -412,7 +412,8 @@ class GetEventCancellationTestCase(unittest.HomeserverTestCase):
         unblock: "Deferred[None]" = Deferred()
         original_runWithConnection = self.store.db_pool.runWithConnection
 
-        async def runWithConnection(*args, **kwargs):
+        # Don't bother with the types here, we just pass into the original function.
+        async def runWithConnection(*args, **kwargs):  # type: ignore[no-untyped-def]
             await unblock
             return await original_runWithConnection(*args, **kwargs)
 
@@ -441,7 +442,7 @@ class GetEventCancellationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(ctx1.get_resource_usage().evt_db_fetch_count, 1)
         self.assertEqual(ctx2.get_resource_usage().evt_db_fetch_count, 0)
 
-    def test_first_get_event_cancelled(self):
+    def test_first_get_event_cancelled(self) -> None:
         """Test cancellation of the first `get_event` call sharing a database fetch.
 
         The first `get_event` call is the one which initiates the fetch. We expect the
@@ -467,7 +468,7 @@ class GetEventCancellationTestCase(unittest.HomeserverTestCase):
             # The second `get_event` call should complete successfully.
             self.get_success(get_event2)
 
-    def test_second_get_event_cancelled(self):
+    def test_second_get_event_cancelled(self) -> None:
         """Test cancellation of the second `get_event` call sharing a database fetch."""
         with self.blocking_get_event_calls() as (unblock, get_event1, get_event2):
             # Cancel the second `get_event` call.
