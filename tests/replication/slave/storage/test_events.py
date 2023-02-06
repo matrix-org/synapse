@@ -366,7 +366,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         key: Optional[str] = None,
         internal: Optional[dict] = None,
         depth: Optional[int] = None,
-        prev_events: Optional[list] = None,
+        prev_events: Optional[List[Tuple[str, dict]]] = None,
         auth_events: Optional[List[str]] = None,
         prev_state: Optional[List[str]] = None,
         redacts: Optional[str] = None,
