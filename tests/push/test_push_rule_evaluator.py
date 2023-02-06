@@ -48,6 +48,10 @@ class FlattenDictTestCase(unittest.TestCase):
         input = {"foo": {"bar": "abc"}}
         self.assertEqual({"foo.bar": "abc"}, _flatten_dict(input))
 
+        # If a field has a dot in it, escape it.
+        input = {"m.foo": {"b\\ar": "abc"}}
+        self.assertEqual({"m\\.foo.b\\\\ar": "abc"}, _flatten_dict(input))
+
     def test_non_string(self) -> None:
         """Non-string items are dropped."""
         input: Dict[str, Any] = {

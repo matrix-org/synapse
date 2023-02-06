@@ -521,6 +521,11 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
+        # Escape periods in the key with a backslash (and backslashes with an
+        # extra backslash). This is since a period is used as a separator between
+        # nested fields.
+        key = key.replace("\\", "\\\\").replace(".", "\\.")
+
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, Mapping):
