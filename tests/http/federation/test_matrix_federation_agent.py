@@ -95,7 +95,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.well_known_cache: TTLCache[bytes, Optional[bytes]] = TTLCache(
             "test_cache", timer=self.reactor.seconds
         )
-        self.had_well_known_cache: Optional[TTLCache[bytes, bool]] = TTLCache(
+        self.had_well_known_cache: TTLCache[bytes, bool] = TTLCache(
             "test_cache", timer=self.reactor.seconds
         )
         self.well_known_resolver = WellKnownResolver(
