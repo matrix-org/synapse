@@ -26,7 +26,7 @@ class DeferredCacheTestCase(TestCase):
     def test_empty(self) -> None:
         cache: DeferredCache[str, int] = DeferredCache("test")
         with self.assertRaises(KeyError):
-            cache.get("foo")
+            cache.get("foo")  # type: ignore[unused-awaitable]
 
     def test_hit(self) -> None:
         cache: DeferredCache[str, int] = DeferredCache("test")
@@ -48,7 +48,7 @@ class DeferredCacheTestCase(TestCase):
             self.assertTrue(set_d.called)
             return r
 
-        get_d.addCallback(check1)
+        get_d.addCallback(check1)  # type: ignore[unused-awaitable]
 
         # now fire off all the deferreds
         origin_d.callback(99)
@@ -130,7 +130,7 @@ class DeferredCacheTestCase(TestCase):
     def test_get_immediate(self) -> None:
         cache: DeferredCache[str, int] = DeferredCache("test")
         d1: "defer.Deferred[int]" = defer.Deferred()
-        cache.set("key1", d1)
+        cache.set("key1", d1)  # type: ignore[unused-awaitable]
 
         # get_immediate should return default
         v = cache.get_immediate("key1", 1)
@@ -149,7 +149,7 @@ class DeferredCacheTestCase(TestCase):
         cache.invalidate(("foo",))
 
         with self.assertRaises(KeyError):
-            cache.get(("foo",))
+            cache.get(("foo",))  # type: ignore[unused-awaitable]
 
     def test_invalidate_all(self) -> None:
         cache: DeferredCache[str, str] = DeferredCache("testcache")
@@ -161,10 +161,10 @@ class DeferredCacheTestCase(TestCase):
 
         # add a couple of pending entries
         d1: "defer.Deferred[str]" = defer.Deferred()
-        cache.set("key1", d1, partial(record_callback, 0))
+        cache.set("key1", d1, partial(record_callback, 0))  # type: ignore[unused-awaitable]
 
         d2: "defer.Deferred[str]" = defer.Deferred()
-        cache.set("key2", d2, partial(record_callback, 1))
+        cache.set("key2", d2, partial(record_callback, 1))  # type: ignore[unused-awaitable]
 
         # lookup should return pending deferreds
         self.assertFalse(cache.get("key1").called)
@@ -181,9 +181,9 @@ class DeferredCacheTestCase(TestCase):
 
         # lookup should fail
         with self.assertRaises(KeyError):
-            cache.get("key1")
+            cache.get("key1")  # type: ignore[unused-awaitable]
         with self.assertRaises(KeyError):
-            cache.get("key2")
+            cache.get("key2")  # type: ignore[unused-awaitable]
 
         # both callbacks should have been callbacked
         self.assertTrue(callback_record[0], "Invalidation callback for key1 not called")
@@ -192,7 +192,7 @@ class DeferredCacheTestCase(TestCase):
         # letting the other lookup complete should do nothing
         d1.callback("result1")
         with self.assertRaises(KeyError):
-            cache.get("key1", None)
+            cache.get("key1", None)  # type: ignore[unused-awaitable]
 
     def test_eviction(self) -> None:
         cache: DeferredCache[int, str] = DeferredCache(
@@ -204,10 +204,10 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill(3, "three")  # 1 will be evicted
 
         with self.assertRaises(KeyError):
-            cache.get(1)
+            cache.get(1)  # type: ignore[unused-awaitable]
 
-        cache.get(2)
-        cache.get(3)
+        cache.get(2)  # type: ignore[unused-awaitable]
+        cache.get(3)  # type: ignore[unused-awaitable]
 
     def test_eviction_lru(self) -> None:
         cache: DeferredCache[int, str] = DeferredCache(
@@ -218,15 +218,15 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill(2, "two")
 
         # Now access 1 again, thus causing 2 to be least-recently used
-        cache.get(1)
+        cache.get(1)  # type: ignore[unused-awaitable]
 
         cache.prefill(3, "three")
 
         with self.assertRaises(KeyError):
-            cache.get(2)
+            cache.get(2)  # type: ignore[unused-awaitable]
 
-        cache.get(1)
-        cache.get(3)
+        cache.get(1)  # type: ignore[unused-awaitable]
+        cache.get(3)  # type: ignore[unused-awaitable]
 
     def test_eviction_iterable(self) -> None:
         cache: DeferredCache[int, List[str]] = DeferredCache(
@@ -240,40 +240,40 @@ class DeferredCacheTestCase(TestCase):
         cache.prefill(2, ["three"])
 
         # Now access 1 again, thus causing 2 to be least-recently used
-        cache.get(1)
+        cache.get(1)  # type: ignore[unused-awaitable]
 
         # Now add an item to the cache, which evicts 2.
         cache.prefill(3, ["four"])
         with self.assertRaises(KeyError):
-            cache.get(2)
+            cache.get(2)  # type: ignore[unused-awaitable]
 
         # Ensure 1 & 3 are in the cache.
-        cache.get(1)
-        cache.get(3)
+        cache.get(1)  # type: ignore[unused-awaitable]
+        cache.get(3)  # type: ignore[unused-awaitable]
 
         # Now access 1 again, thus causing 3 to be least-recently used
-        cache.get(1)
+        cache.get(1)  # type: ignore[unused-awaitable]
 
         # Now add an item with multiple elements to the cache
         cache.prefill(4, ["five", "six"])
 
         # Both 1 and 3 are evicted since there's too many elements.
         with self.assertRaises(KeyError):
-            cache.get(1)
+            cache.get(1)  # type: ignore[unused-awaitable]
         with self.assertRaises(KeyError):
-            cache.get(3)
+            cache.get(3)  # type: ignore[unused-awaitable]
 
         # Now add another item to fill the cache again.
         cache.prefill(5, ["seven"])
 
         # Now access 4, thus causing 5 to be least-recently used
-        cache.get(4)
+        cache.get(4)  # type: ignore[unused-awaitable]
 
         # Add an empty item.
         cache.prefill(6, [])
 
         # 5 gets evicted and replaced since an empty element counts as an item.
         with self.assertRaises(KeyError):
-            cache.get(5)
-        cache.get(4)
-        cache.get(6)
+            cache.get(5)  # type: ignore[unused-awaitable]
+        cache.get(4)  # type: ignore[unused-awaitable]
+        cache.get(6)  # type: ignore[unused-awaitable]
