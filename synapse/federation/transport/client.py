@@ -79,6 +79,8 @@ class TransportLayerClient:
             destination,
             path=path,
             args={"event_id": event_id},
+            # This can take a looooooong time for large rooms.
+            timeout=600_000,
             try_trailing_slash_on_400=True,
         )
 
@@ -345,6 +347,8 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             data=content,
+            # This can take a looooooong time for large rooms.
+            timeout=600_000,
             parser=SendJoinParser(room_version, v1_api=True),
         )
 
@@ -371,6 +375,8 @@ class TransportLayerClient:
             path=path,
             args=query_params,
             data=content,
+            # This can take a looooooong time for large rooms.
+            timeout=600_000,
             parser=SendJoinParser(room_version, v1_api=False),
         )
 
