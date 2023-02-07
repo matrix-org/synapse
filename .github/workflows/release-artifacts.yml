@@ -107,9 +107,9 @@ jobs:
           - ${{ startsWith(github.ref, 'refs/pull/') }}
 
         exclude:
-          # Don't build macos wheels on PR CI.
-          - is_pr: true
-            os: "macos-11"
+#          # Don't build macos wheels on PR CI.
+#          - is_pr: true
+#            os: "macos-11"
           # Don't build aarch64 wheels on mac.
           - os: "macos-11"
             arch: aarch64
