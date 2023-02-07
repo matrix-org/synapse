@@ -225,7 +225,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             retry_on_dns_fail: bool = True,
             max_size: Optional[int] = None,
             ignore_backoff: bool = False,
-        ) -> Deferred[Tuple[int, Dict[bytes, List[bytes]]]]:
+        ) -> "Deferred[Tuple[int, Dict[bytes, List[bytes]]]]":
             """A mock for MatrixFederationHttpClient.get_file."""
 
             def write_to(
