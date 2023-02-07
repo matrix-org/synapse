@@ -220,5 +220,9 @@ class PostgresEngine(
         """Execute a chunk of SQL containing multiple semicolon-delimited statements.
 
         Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+
+        For consistency with SQLite, any ongoing transaction is committed before
+        executing the script in its own transaction. The script transaction is
+        left open and it is the responsibility of the caller to commit it.
         """
-        cursor.execute(script)
+        cursor.execute(f"COMMIT; BEGIN TRANSACTION; {script}")

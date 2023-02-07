@@ -70,7 +70,7 @@ from synapse.logging.context import ContextResourceUsage
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import PostgresEngine, create_engine
-from synapse.types import JsonDict
+from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
 
 from tests.utils import (
@@ -401,7 +401,9 @@ def make_request(
     return channel
 
 
-@implementer(IReactorPluggableNameResolver)
+# ISynapseReactor implies IReactorPluggableNameResolver, but explicitly
+# marking this as an implementer of the latter seems to keep mypy-zope happier.
+@implementer(IReactorPluggableNameResolver, ISynapseReactor)
 class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.

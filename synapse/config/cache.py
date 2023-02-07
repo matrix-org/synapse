@@ -126,7 +126,7 @@ class CacheConfig(Config):
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
-        if not isinstance(self.global_factor, (int, float)):
+        if type(self.global_factor) not in (int, float):
             raise ConfigError("caches.global_factor must be a number.")
 
         # Load cache factors from the config
@@ -151,7 +151,7 @@ class CacheConfig(Config):
         )
 
         for cache, factor in individual_factors.items():
-            if not isinstance(factor, (int, float)):
+            if type(factor) not in (int, float):
                 raise ConfigError(
                     "caches.per_cache_factors.%s must be a number" % (cache,)
                 )

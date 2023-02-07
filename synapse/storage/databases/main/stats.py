@@ -22,7 +22,7 @@ from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import (
     DatabasePool,
@@ -663,7 +663,7 @@ class StatsStore(StateDeltasStore):
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
         order_by: Optional[str] = UserSortOrder.USER_ID.value,
-        direction: Optional[str] = "f",
+        direction: Direction = Direction.FORWARDS,
         search_term: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
@@ -714,7 +714,7 @@ class StatsStore(StateDeltasStore):
                     500, "Incorrect value for order_by provided: %s" % order_by
                 )
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"

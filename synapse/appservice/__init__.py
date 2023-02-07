@@ -16,7 +16,7 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern, Sequence
 
 import attr
 from netaddr import IPSet
@@ -377,7 +377,7 @@ class AppServiceTransaction:
         self,
         service: ApplicationService,
         id: int,
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         one_time_keys_count: TransactionOneTimeKeysCount,

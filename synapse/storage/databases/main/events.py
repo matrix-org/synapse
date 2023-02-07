@@ -1147,11 +1147,15 @@ class PersistEventsStore:
                 # been inserted into room_memberships.
                 txn.execute_batch(
                     """INSERT INTO current_state_events
-                        (room_id, type, state_key, event_id, membership)
-                    VALUES (?, ?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
+                        (room_id, type, state_key, event_id, membership, event_stream_ordering)
+                    VALUES (
+                        ?, ?, ?, ?,
+                        (SELECT membership FROM room_memberships WHERE event_id = ?),
+                        (SELECT stream_ordering FROM events WHERE event_id = ?)
+                    )
                     """,
                     [
-                        (room_id, key[0], key[1], ev_id, ev_id)
+                        (room_id, key[0], key[1], ev_id, ev_id, ev_id)
                         for key, ev_id in to_insert.items()
                     ],
                 )
@@ -1178,11 +1182,15 @@ class PersistEventsStore:
             if to_insert:
                 txn.execute_batch(
                     """INSERT INTO local_current_membership
-                        (room_id, user_id, event_id, membership)
-                    VALUES (?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
+                        (room_id, user_id, event_id, membership, event_stream_ordering)
+                    VALUES (
+                        ?, ?, ?,
+                        (SELECT membership FROM room_memberships WHERE event_id = ?),
+                        (SELECT stream_ordering FROM events WHERE event_id = ?)
+                    )
                     """,
                     [
-                        (room_id, key[1], ev_id, ev_id)
+                        (room_id, key[1], ev_id, ev_id, ev_id)
                         for key, ev_id in to_insert.items()
                         if key[0] == EventTypes.Member and self.is_mine_id(key[1])
                     ],
@@ -1651,7 +1659,7 @@ class PersistEventsStore:
             if self._ephemeral_messages_enabled:
                 # If there's an expiry timestamp on the event, store it.
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if isinstance(expiry_ts, int) and not event.is_state():
+                if type(expiry_ts) is int and not event.is_state():
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
@@ -1790,6 +1798,7 @@ class PersistEventsStore:
             table="room_memberships",
             keys=(
                 "event_id",
+                "event_stream_ordering",
                 "user_id",
                 "sender",
                 "room_id",
@@ -1800,6 +1809,7 @@ class PersistEventsStore:
             values=[
                 (
                     event.event_id,
+                    event.internal_metadata.stream_ordering,
                     event.state_key,
                     event.user_id,
                     event.room_id,
@@ -1832,6 +1842,7 @@ class PersistEventsStore:
                     keyvalues={"room_id": event.room_id, "user_id": event.state_key},
                     values={
                         "event_id": event.event_id,
+                        "event_stream_ordering": event.internal_metadata.stream_ordering,
                         "membership": event.membership,
                     },
                 )
@@ -2133,10 +2144,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), int)
+                and type(event.content["min_lifetime"]) is not int
             ) or (
                 "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), int)
+                and type(event.content["max_lifetime"]) is not int
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return
