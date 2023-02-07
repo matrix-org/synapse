@@ -1,1 +1,1 @@
-Workaround packaging pain when making OSX wheels.
+Fix creation of wheels on macOS.

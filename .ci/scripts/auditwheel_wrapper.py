@@ -56,8 +56,8 @@ def cpython(wheel_file: str, name: str, version: Version, tag: Tag) -> str:
     #     https://github.com/pantsbuild/pants/pull/12857
     #     https://github.com/pypa/pip/issues/9138
     #     https://github.com/pypa/packaging/pull/319
-    # Empirically this seems to work.
-    # I hate Python packaging, and you should too. Guido, why have you forsaken me?
+    # Empirically this seems to work, note that macOS 11 and 10.16 are the same,
+    # both versions are valid for backwards compatibility.
     platform = tag.platform.replace("macosx_11_0", "macosx_10_16")
     abi3_tag = Tag(tag.interpreter, "abi3", platform)
 
