@@ -236,12 +236,9 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 return response
 
             d: Deferred[Tuple[bytes, Tuple[int, Dict[bytes, List[bytes]]]]] = Deferred()
-            # Callbacks can _change_ the value held within a resolved Deferred(!!).
-            # The return type of addCallback reflects this...
-            d_after_callback = d.addCallback(write_to)
-            # ... even though d.addCallback returns d!
-            assert d_after_callback is d  # type: ignore[comparison-overlap]
             self.fetches.append((d, destination, path, args))
+            # Note that this callback changes the value held by d.
+            d_after_callback = d.addCallback(write_to)
             return make_deferred_yieldable(d_after_callback)
 
         # Mock out the homeserver's MatrixFederationHttpClient
