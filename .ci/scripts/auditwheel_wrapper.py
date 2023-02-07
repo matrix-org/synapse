@@ -100,6 +100,13 @@ def main(wheel_file: str, dest_dir: str, archs: Optional[str]) -> None:
     else:
         subprocess.run(["auditwheel", "repair", "-w", dest_dir, wheel_file], check=True)
 
+    # DMR: INSPECT THE WHEEL NAUGHTY EVIL DEBUG
+    from pip._internal.models.wheel import Wheel
+    from pip._internal.utils.compatibility_tags import get_supported
+    w = Wheel(wheel_file)
+    tags = get_supported()
+    print(f"{w=} {tags=} {w.supported(tags)=}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tag wheel as abi3 and repair it.")
