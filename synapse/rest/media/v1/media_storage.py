@@ -359,7 +359,7 @@ class ReadableFileWrapper:
     clock: Clock
     path: str
 
-    async def write_chunks_to(self, callback: Callable[[bytes], None]) -> None:
+    async def write_chunks_to(self, callback: Callable[[bytes], object]) -> None:
         """Reads the file in chunks and calls the callback with each chunk."""
 
         with open(self.path, "rb") as file:
