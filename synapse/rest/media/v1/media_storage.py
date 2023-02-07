@@ -46,9 +46,8 @@ from ._base import FileInfo, Responder
 from .filepath import MediaFilePaths
 
 if TYPE_CHECKING:
+    from synapse.rest.media.v1.storage_provider import StorageProvider
     from synapse.server import HomeServer
-
-    from .storage_provider import StorageProviderWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,7 @@ class MediaStorage:
         hs: "HomeServer",
         local_media_directory: str,
         filepaths: MediaFilePaths,
-        storage_providers: Sequence["StorageProviderWrapper"],
+        storage_providers: Sequence["StorageProvider"],
     ):
         self.hs = hs
         self.reactor = hs.get_reactor()
