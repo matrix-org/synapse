@@ -13,25 +13,30 @@
 # limitations under the License.
 
 import unittest as stdlib_unittest
+from typing import Any, List, Mapping, Optional
 
 from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import (
+    PowerLevelsContent,
     SerializeEventConfig,
     copy_and_fixup_power_levels_contents,
     maybe_upsert_event_field,
     prune_event,
     serialize_event,
 )
+from synapse.types import JsonDict
 from synapse.util.frozenutils import freeze
 
 
-def MockEvent(**kwargs):
+def MockEvent(**kwargs: Any) -> EventBase:
     if "event_id" not in kwargs:
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
+    if "content" not in kwargs:
+        kwargs["content"] = {}
     return make_event_from_dict(kwargs)
 
 
@@ -60,7 +65,7 @@ class TestMaybeUpsertEventField(stdlib_unittest.TestCase):
 
 
 class PruneEventTestCase(stdlib_unittest.TestCase):
-    def run_test(self, evdict, matchdict, **kwargs):
+    def run_test(self, evdict: JsonDict, matchdict: JsonDict, **kwargs: Any) -> None:
         """
         Asserts that a new event constructed with `evdict` will look like
         `matchdict` when it is redacted.
@@ -74,7 +79,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             prune_event(make_event_from_dict(evdict, **kwargs)).get_dict(), matchdict
         )
 
-    def test_minimal(self):
+    def test_minimal(self) -> None:
         self.run_test(
             {"type": "A", "event_id": "$test:domain"},
             {
@@ -86,7 +91,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-    def test_basic_keys(self):
+    def test_basic_keys(self) -> None:
         """Ensure that the keys that should be untouched are kept."""
         # Note that some of the values below don't really make sense, but the
         # pruning of events doesn't worry about the values of any fields (with
@@ -138,7 +143,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.MSC2176,
         )
 
-    def test_unsigned(self):
+    def test_unsigned(self) -> None:
         """Ensure that unsigned properties get stripped (except age_ts and replaces_state)."""
         self.run_test(
             {
@@ -159,7 +164,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-    def test_content(self):
+    def test_content(self) -> None:
         """The content dictionary should be stripped in most cases."""
         self.run_test(
             {"type": "C", "event_id": "$test:domain", "content": {"things": "here"}},
@@ -194,7 +199,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 },
             )
 
-    def test_create(self):
+    def test_create(self) -> None:
         """Create events are partially redacted until MSC2176."""
         self.run_test(
             {
@@ -223,7 +228,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.MSC2176,
         )
 
-    def test_power_levels(self):
+    def test_power_levels(self) -> None:
         """Power level events keep a variety of content keys."""
         self.run_test(
             {
@@ -273,7 +278,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.MSC2176,
         )
 
-    def test_alias_event(self):
+    def test_alias_event(self) -> None:
         """Alias events have special behavior up through room version 6."""
         self.run_test(
             {
@@ -302,7 +307,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.V6,
         )
 
-    def test_redacts(self):
+    def test_redacts(self) -> None:
         """Redaction events have no special behaviour until MSC2174/MSC2176."""
 
         self.run_test(
@@ -328,7 +333,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.MSC2176,
         )
 
-    def test_join_rules(self):
+    def test_join_rules(self) -> None:
         """Join rules events have changed behavior starting with MSC3083."""
         self.run_test(
             {
@@ -371,7 +376,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.V8,
         )
 
-    def test_member(self):
+    def test_member(self) -> None:
         """Member events have changed behavior starting with MSC3375."""
         self.run_test(
             {
@@ -417,12 +422,12 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
 
 
 class SerializeEventTestCase(stdlib_unittest.TestCase):
-    def serialize(self, ev, fields):
+    def serialize(self, ev: EventBase, fields: Optional[List[str]]) -> JsonDict:
         return serialize_event(
             ev, 1479807801915, config=SerializeEventConfig(only_event_fields=fields)
         )
 
-    def test_event_fields_works_with_keys(self):
+    def test_event_fields_works_with_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(sender="@alice:localhost", room_id="!foo:bar"), ["room_id"]
@@ -430,7 +435,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {"room_id": "!foo:bar"},
         )
 
-    def test_event_fields_works_with_nested_keys(self):
+    def test_event_fields_works_with_nested_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -443,7 +448,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {"content": {"body": "A message"}},
         )
 
-    def test_event_fields_works_with_dot_keys(self):
+    def test_event_fields_works_with_dot_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -456,7 +461,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {"content": {"key.with.dots": {}}},
         )
 
-    def test_event_fields_works_with_nested_dot_keys(self):
+    def test_event_fields_works_with_nested_dot_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -472,7 +477,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {"content": {"nested.dot.key": {"leaf.key": 42}}},
         )
 
-    def test_event_fields_nops_with_unknown_keys(self):
+    def test_event_fields_nops_with_unknown_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -485,7 +490,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {"content": {"foo": "bar"}},
         )
 
-    def test_event_fields_nops_with_non_dict_keys(self):
+    def test_event_fields_nops_with_non_dict_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -498,7 +503,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {},
         )
 
-    def test_event_fields_nops_with_array_keys(self):
+    def test_event_fields_nops_with_array_keys(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -511,7 +516,7 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             {},
         )
 
-    def test_event_fields_all_fields_if_empty(self):
+    def test_event_fields_all_fields_if_empty(self) -> None:
         self.assertEqual(
             self.serialize(
                 MockEvent(
@@ -531,16 +536,16 @@ class SerializeEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-    def test_event_fields_fail_if_fields_not_str(self):
+    def test_event_fields_fail_if_fields_not_str(self) -> None:
         with self.assertRaises(TypeError):
             self.serialize(
-                MockEvent(room_id="!foo:bar", content={"foo": "bar"}), ["room_id", 4]
+                MockEvent(room_id="!foo:bar", content={"foo": "bar"}), ["room_id", 4]  # type: ignore[list-item]
             )
 
 
 class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
     def setUp(self) -> None:
-        self.test_content = {
+        self.test_content: PowerLevelsContent = {
             "ban": 50,
             "events": {"m.room.name": 100, "m.room.power_levels": 100},
             "events_default": 0,
@@ -553,10 +558,11 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
             "users_default": 0,
         }
 
-    def _test(self, input):
+    def _test(self, input: PowerLevelsContent) -> None:
         a = copy_and_fixup_power_levels_contents(input)
 
         self.assertEqual(a["ban"], 50)
+        assert isinstance(a["events"], Mapping)
         self.assertEqual(a["events"]["m.room.name"], 100)
 
         # make sure that changing the copy changes the copy and not the orig
@@ -564,18 +570,19 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
         a["events"]["m.room.power_levels"] = 20
 
         self.assertEqual(input["ban"], 50)
+        assert isinstance(input["events"], Mapping)
         self.assertEqual(input["events"]["m.room.power_levels"], 100)
 
-    def test_unfrozen(self):
+    def test_unfrozen(self) -> None:
         self._test(self.test_content)
 
-    def test_frozen(self):
+    def test_frozen(self) -> None:
         input = freeze(self.test_content)
         self._test(input)
 
-    def test_stringy_integers(self):
+    def test_stringy_integers(self) -> None:
         """String representations of decimal integers are converted to integers."""
-        input = {
+        input: PowerLevelsContent = {
             "a": "100",
             "b": {
                 "foo": 99,
@@ -603,9 +610,9 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
 
     def test_invalid_types_raise_type_error(self) -> None:
         with self.assertRaises(TypeError):
-            copy_and_fixup_power_levels_contents({"a": ["hello", "grandma"]})  # type: ignore[arg-type]
-            copy_and_fixup_power_levels_contents({"a": None})  # type: ignore[arg-type]
+            copy_and_fixup_power_levels_contents({"a": ["hello", "grandma"]})  # type: ignore[dict-item]
+            copy_and_fixup_power_levels_contents({"a": None})  # type: ignore[dict-item]
 
     def test_invalid_nesting_raises_type_error(self) -> None:
         with self.assertRaises(TypeError):
-            copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})
+            copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})  # type: ignore[dict-item]

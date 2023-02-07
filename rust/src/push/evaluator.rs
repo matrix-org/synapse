@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
@@ -68,6 +68,13 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
+    /// True if the event has a mentions property and MSC3952 support is enabled.
+    has_mentions: bool,
+    /// The user mentions that were part of the message.
+    user_mentions: BTreeSet<String>,
+    /// True if the message is a room message.
+    room_mention: bool,
+
     /// The number of users in the room.
     room_member_count: u64,
 
@@ -100,6 +107,9 @@ impl PushRuleEvaluator {
     #[new]
     pub fn py_new(
         flattened_keys: BTreeMap<String, String>,
+        has_mentions: bool,
+        user_mentions: BTreeSet<String>,
+        room_mention: bool,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
@@ -116,6 +126,9 @@ impl PushRuleEvaluator {
         Ok(PushRuleEvaluator {
             flattened_keys,
             body,
+            has_mentions,
+            user_mentions,
+            room_mention,
             room_member_count,
             notification_power_levels,
             sender_power_level,
@@ -146,6 +159,19 @@ impl PushRuleEvaluator {
             }
 
             let rule_id = &push_rule.rule_id().to_string();
+
+            // For backwards-compatibility the legacy mention rules are disabled
+            // if the event contains the 'm.mentions' property (and if the
+            // experimental feature is enabled, both of these are represented
+            // by the has_mentions flag).
+            if self.has_mentions
+                && (rule_id == "global/override/.m.rule.contains_display_name"
+                    || rule_id == "global/content/.m.rule.contains_user_name"
+                    || rule_id == "global/override/.m.rule.roomnotif")
+            {
+                continue;
+            }
+
             let extev_flag = &RoomVersionFeatures::ExtensibleEvents.as_str().to_string();
             let supports_extensible_events = self.room_version_feature_flags.contains(extev_flag);
             let safe_from_rver_condition = SAFE_EXTENSIBLE_EVENTS_RULE_IDS.contains(rule_id);
@@ -229,6 +255,14 @@ impl PushRuleEvaluator {
             KnownCondition::RelatedEventMatch(event_match) => {
                 self.match_related_event_match(event_match, user_id)?
             }
+            KnownCondition::IsUserMention => {
+                if let Some(uid) = user_id {
+                    self.user_mentions.contains(uid)
+                } else {
+                    false
+                }
+            }
+            KnownCondition::IsRoomMention => self.room_mention,
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
                     if !dn.is_empty() {
@@ -424,6 +458,9 @@ fn push_rule_evaluator() {
     flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         BTreeMap::new(),
@@ -449,6 +486,9 @@ fn test_requires_room_version_supports_condition() {
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         BTreeMap::new(),
@@ -483,7 +523,7 @@ fn test_requires_room_version_supports_condition() {
     };
     let rules = PushRules::new(vec![custom_rule]);
     result = evaluator.run(
-        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true),
+        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true, false, false),
         None,
         None,
     );

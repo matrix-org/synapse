@@ -14,7 +14,7 @@
 import json
 from http import HTTPStatus
 from io import BytesIO
-from typing import Tuple
+from typing import Tuple, Union
 from unittest.mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
@@ -33,7 +33,7 @@ from tests import unittest
 from tests.http.server._base import test_disconnect
 
 
-def make_request(content):
+def make_request(content: Union[bytes, JsonDict]) -> Mock:
     """Make an object that acts enough like a request."""
     request = Mock(spec=["method", "uri", "content"])
 
@@ -47,7 +47,7 @@ def make_request(content):
 
 
 class TestServletUtils(unittest.TestCase):
-    def test_parse_json_value(self):
+    def test_parse_json_value(self) -> None:
         """Basic tests for parse_json_value_from_request."""
         # Test round-tripping.
         obj = {"foo": 1}
@@ -78,7 +78,7 @@ class TestServletUtils(unittest.TestCase):
         with self.assertRaises(SynapseError):
             parse_json_value_from_request(make_request(b'{"foo": Infinity}'))
 
-    def test_parse_json_object(self):
+    def test_parse_json_object(self) -> None:
         """Basic tests for parse_json_object_from_request."""
         # Test empty.
         result = parse_json_object_from_request(
