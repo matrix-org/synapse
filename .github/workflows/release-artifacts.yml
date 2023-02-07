@@ -154,8 +154,8 @@ jobs:
           CIBW_ENVIRONMENT_PASS_LINUX: CARGO_NET_GIT_FETCH_WITH_CLI
 
       - uses: actions/upload-artifact@v3
+        if: always()
         with:
-          if: always()
           name: Wheel
           path: ./wheelhouse/*.whl
 
