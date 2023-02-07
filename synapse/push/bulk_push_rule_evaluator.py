@@ -36,7 +36,7 @@ from synapse.api.constants import (
     Membership,
     RelationTypes,
 )
-from synapse.api.room_versions import PushRuleRoomFlag, RoomVersion
+from synapse.api.room_versions import PushRuleRoomFlag
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -405,7 +405,7 @@ class BulkPushRuleEvaluator:
             room_mention = mentions.get("room") is True
 
         evaluator = PushRuleEvaluator(
-            _flatten_dict(event, room_version=event.room_version),
+            _flatten_dict(event),
             has_mentions,
             user_mentions,
             room_mention,
@@ -491,7 +491,6 @@ StateGroup = Union[object, int]
 
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
-    room_version: Optional[RoomVersion] = None,
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
@@ -511,7 +510,6 @@ def _flatten_dict(
 
     Args:
         d: The event or content to continue flattening.
-        room_version: The room version object.
         prefix: The key prefix (from outer dictionaries).
         result: The result to mutate.
 
@@ -531,14 +529,13 @@ def _flatten_dict(
 
     # `room_version` should only ever be set when looking at the top level of an event
     if (
-        room_version is not None
-        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in room_version.msc3931_push_features
-        and isinstance(d, EventBase)
+        isinstance(d, EventBase)
+        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in d.room_version.msc3931_push_features
     ):
         # Room supports extensible events: replace `content.body` with the plain text
         # representation from `m.markup`, as per MSC1767.
         markup = d.get("content").get("m.markup")
-        if room_version.identifier.startswith("org.matrix.msc1767."):
+        if d.room_version.identifier.startswith("org.matrix.msc1767."):
             markup = d.get("content").get("org.matrix.msc1767.markup")
         if markup is not None and isinstance(markup, list):
             text = ""
