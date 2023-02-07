@@ -110,7 +110,7 @@ class FlattenDictTestCase(unittest.TestCase):
         }
         self.assertEqual(expected, _flatten_dict(event))
 
-        # For a room version with extensible events, they arse out the text/plain
+        # For a room version with extensible events, they parse out the text/plain
         # to a content.body property.
         event = make_event_from_dict(event_dict, room_version=RoomVersions.MSC1767v10)
         expected = {
