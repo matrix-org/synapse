@@ -50,7 +50,9 @@ def cpython(wheel_file: str, name: str, version: Version, tag: Tag) -> str:
 
     check_is_abi3_compatible(wheel_file)
 
-    abi3_tag = Tag(tag.interpreter, "abi3", tag.platform)
+    # DMR: surely this won't make it work?
+    platform = tag.platform.replace("macosx_11_0", "macosx_10_16")
+    abi3_tag = Tag(tag.interpreter, "abi3", platform)
 
     dirname = os.path.dirname(wheel_file)
     new_wheel_file = os.path.join(
