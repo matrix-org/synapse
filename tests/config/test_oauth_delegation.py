@@ -51,6 +51,34 @@ class CustomAuthModule:
         )
 
 
+def _dict_merge(merge_dict: dict, into_dict: dict) -> None:
+    """Do a deep merge of two dicts
+
+    Recursively merges `merge_dict` into `into_dict`:
+      * For keys where both `merge_dict` and `into_dict` have a dict value, the values
+        are recursively merged
+      * For all other keys, the values in `into_dict` (if any) are overwritten with
+        the value from `merge_dict`.
+
+    Args:
+        merge_dict: dict to merge
+        into_dict: target dict to be modified
+    """
+    for k, v in merge_dict.items():
+        if k not in into_dict:
+            into_dict[k] = v
+            continue
+
+        current_val = into_dict[k]
+
+        if isinstance(v, dict) and isinstance(current_val, dict):
+            _dict_merge(v, current_val)
+            continue
+
+        # otherwise we just overwrite
+        into_dict[k] = v
+
+
 @skip_unless(HAS_AUTHLIB, "requires authlib")
 class MSC3861OAuthDelegation(HomeserverTestCase):
     """Test that the Homeserver fails to initialize if the config is invalid."""
@@ -60,18 +88,85 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self._hs_args = {"clock": self.clock, "reactor": self.reactor}
 
     def default_config(self) -> Dict[str, Any]:
-        config = super().default_config()
-        config["public_baseurl"] = BASE_URL
-        if "experimental_features" not in config:
-            config["experimental_features"] = {}
-        config["experimental_features"]["msc3861"] = {
-            "enabled": True,
-            "issuer": ISSUER,
-            "client_id": CLIENT_ID,
-            "client_auth_method": "client_secret_post",
-            "client_secret": CLIENT_SECRET,
+        default_extra_config = {
+            "public_baseurl": BASE_URL,
+            "experimental_features": {
+                "msc3861": {
+                    "enabled": True,
+                    "issuer": ISSUER,
+                    "client_id": CLIENT_ID,
+                    "client_auth_method": "client_secret_post",
+                    "client_secret": CLIENT_SECRET,
+                }
+            },
         }
-        return config
+        _dict_merge(
+            {} if self._extra_config is None else self._extra_config,
+            default_extra_config,
+        )
+        self._extra_config = default_extra_config
+        return super().default_config()
+
+    @override_config(
+        {
+            "enable_registration": False,
+        }
+    )
+    def test_client_secret_post_works(self) -> None:
+        self.setup_test_homeserver()
+
+    @override_config(
+        {
+            "enable_registration": False,
+            "experimental_features": {
+                "msc3861": {
+                    "client_auth_method": "invalid",
+                }
+            },
+        }
+    )
+    def test_invalid_client_auth_method(self) -> None:
+        with self.assertRaises(ValueError):
+            self.setup_test_homeserver()
+
+    @override_config(
+        {
+            "enable_registration": False,
+            "experimental_features": {
+                "msc3861": {
+                    "client_auth_method": "private_key_jwt",
+                }
+            },
+        }
+    )
+    def test_invalid_private_key_jwt(self) -> None:
+        with self.assertRaises(ConfigError):
+            self.setup_test_homeserver()
+
+    @override_config(
+        {
+            "enable_registration": False,
+            "experimental_features": {
+                "msc3861": {
+                    "client_auth_method": "private_key_jwt",
+                    "jwk": {
+                        "p": "-frVdP_tZ-J_nIR6HNMDq1N7aunwm51nAqNnhqIyuA8ikx7LlQED1tt2LD3YEvYyW8nxE2V95HlCRZXQPMiRJBFOsbmYkzl2t-MpavTaObB_fct_JqcRtdXddg4-_ihdjRDwUOreq_dpWh6MIKsC3UyekfkHmeEJg5YpOTL15j8",
+                        "kty": "RSA",
+                        "q": "oFw-Enr_YozQB1ab-kawn4jY3yHi8B1nSmYT0s8oTCflrmps5BFJfCkHL5ij3iY15z0o2m0N-jjB1oSJ98O4RayEEYNQlHnTNTl0kRIWzpoqblHUIxVcahIpP_xTovBJzwi8XXoLGqHOOMA-r40LSyVgP2Ut8D9qBwV6_UfT0LU",
+                        "d": "WFkDPYo4b4LIS64D_QtQfGGuAObPvc3HFfp9VZXyq3SJR58XZRHE0jqtlEMNHhOTgbMYS3w8nxPQ_qVzY-5hs4fIanwvB64mAoOGl0qMHO65DTD_WsGFwzYClJPBVniavkLE2Hmpu8IGe6lGliN8vREC6_4t69liY-XcN_ECboVtC2behKkLOEASOIMuS7YcKAhTJFJwkl1dqDlliEn5A4u4xy7nuWQz3juB1OFdKlwGA5dfhDNglhoLIwNnkLsUPPFO-WB5ZNEW35xxHOToxj4bShvDuanVA6mJPtTKjz0XibjB36bj_nF_j7EtbE2PdGJ2KevAVgElR4lqS4ISgQ",
+                        "e": "AQAB",
+                        "kid": "test",
+                        "qi": "cPfNk8l8W5exVNNea4d7QZZ8Qr8LgHghypYAxz8PQh1fNa8Ya1SNUDVzC2iHHhszxxA0vB9C7jGze8dBrvnzWYF1XvQcqNIVVgHhD57R1Nm3dj2NoHIKe0Cu4bCUtP8xnZQUN4KX7y4IIcgRcBWG1hT6DEYZ4BxqicnBXXNXAUI",
+                        "dp": "dKlMHvslV1sMBQaKWpNb3gPq0B13TZhqr3-E2_8sPlvJ3fD8P4CmwwnOn50JDuhY3h9jY5L06sBwXjspYISVv8hX-ndMLkEeF3lrJeA5S70D8rgakfZcPIkffm3tlf1Ok3v5OzoxSv3-67Df4osMniyYwDUBCB5Oq1tTx77xpU8",
+                        "dq": "S4ooU1xNYYcjl9FcuJEEMqKsRrAXzzSKq6laPTwIp5dDwt2vXeAm1a4eDHXC-6rUSZGt5PbqVqzV4s-cjnJMI8YYkIdjNg4NSE1Ac_YpeDl3M3Colb5CQlU7yUB7xY2bt0NOOFp9UJZYJrOo09mFMGjy5eorsbitoZEbVqS3SuE",
+                        "n": "nJbYKqFwnURKimaviyDFrNLD3gaKR1JW343Qem25VeZxoMq1665RHVoO8n1oBm4ClZdjIiZiVdpyqzD5-Ow12YQgQEf1ZHP3CCcOQQhU57Rh5XvScTe5IxYVkEW32IW2mp_CJ6WfjYpfeL4azarVk8H3Vr59d1rSrKTVVinVdZer9YLQyC_rWAQNtHafPBMrf6RYiNGV9EiYn72wFIXlLlBYQ9Fx7bfe1PaL6qrQSsZP3_rSpuvVdLh1lqGeCLR0pyclA9uo5m2tMyCXuuGQLbA_QJm5xEc7zd-WFdux2eXF045oxnSZ_kgQt-pdN7AxGWOVvwoTf9am6mSkEdv6iw",
+                    },
+                }
+            },
+        }
+    )
+    def test_private_key_jwt_works(self) -> None:
+        self.setup_test_homeserver()
 
     def test_registration_cannot_be_enabled(self) -> None:
         with self.assertRaises(ConfigError):
