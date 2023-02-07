@@ -1,1 +1,0 @@
-Faster joins: tag `v2/send_join/` requests to indicate if they served a partial join response.
