@@ -105,7 +105,7 @@ def main(wheel_file: str, dest_dir: str, archs: Optional[str]) -> None:
     from pip._internal.utils.compatibility_tags import get_supported
     w = Wheel(wheel_file)
     tags = get_supported()
-    print(f"{w=} {tags=} {w.supported(tags)=}")
+    print(f"w={w} tags={tags} supported={w.supported(tags)}")
 
 
 if __name__ == "__main__":
