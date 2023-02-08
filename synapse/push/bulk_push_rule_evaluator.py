@@ -271,7 +271,10 @@ class BulkPushRuleEvaluator:
                     related_event_id, allow_none=True
                 )
                 if related_event is not None:
-                    related_events[relation_type] = _flatten_dict(related_event)
+                    related_events[relation_type] = _flatten_dict(
+                        related_event,
+                        msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                    )
 
             reply_event_id = (
                 event.content.get("m.relates_to", {})
@@ -286,7 +289,10 @@ class BulkPushRuleEvaluator:
                 )
 
                 if related_event is not None:
-                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
+                    related_events["m.in_reply_to"] = _flatten_dict(
+                        related_event,
+                        msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                    )
 
                     # indicate that this is from a fallback relation.
                     if relation_type == "m.thread" and event.content.get(
@@ -405,7 +411,10 @@ class BulkPushRuleEvaluator:
             room_mention = mentions.get("room") is True
 
         evaluator = PushRuleEvaluator(
-            _flatten_dict(event),
+            _flatten_dict(
+                event,
+                msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+            ),
             has_mentions,
             user_mentions,
             room_mention,
@@ -493,6 +502,8 @@ def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
+    *,
+    msc3783_escape_event_match_key: bool = False,
 ) -> Dict[str, str]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
@@ -521,11 +532,22 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
+        if msc3783_escape_event_match_key:
+            # Escape periods in the key with a backslash (and backslashes with an
+            # extra backslash). This is since a period is used as a separator between
+            # nested fields.
+            key = key.replace("\\", "\\\\").replace(".", "\\.")
+
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
-            _flatten_dict(value, prefix=(prefix + [key]), result=result)
+            _flatten_dict(
+                value,
+                prefix=(prefix + [key]),
+                result=result,
+                msc3783_escape_event_match_key=msc3783_escape_event_match_key,
+            )
 
     # `room_version` should only ever be set when looking at the top level of an event
     if (
