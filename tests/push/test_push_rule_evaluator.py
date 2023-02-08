@@ -50,7 +50,11 @@ class FlattenDictTestCase(unittest.TestCase):
 
         # If a field has a dot in it, escape it.
         input = {"m.foo": {"b\\ar": "abc"}}
-        self.assertEqual({"m\\.foo.b\\\\ar": "abc"}, _flatten_dict(input))
+        self.assertEqual({"m.foo.b\\ar": "abc"}, _flatten_dict(input))
+        self.assertEqual(
+            {"m\\.foo.b\\\\ar": "abc"},
+            _flatten_dict(input, msc3783_escape_event_match_key=True),
+        )
 
     def test_non_string(self) -> None:
         """Non-string items are dropped."""
