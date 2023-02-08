@@ -20,7 +20,7 @@ import sys
 import warnings
 from asyncio import Future
 from binascii import unhexlify
-from typing import Any, Awaitable, Callable, List, Optional, Tuple, TypeVar
+from typing import Any, Awaitable, Callable, Optional, Tuple, TypeVar
 from unittest.mock import Mock
 
 import attr
