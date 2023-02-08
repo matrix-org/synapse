@@ -495,7 +495,7 @@ def send_presence_update(
 
 
 def sync_presence(
-    testcase: FederatingHomeserverTestCase,
+    testcase: HomeserverTestCase,
     user_id: str,
     since_token: Optional[StreamToken] = None,
 ) -> Tuple[List[UserPresenceState], StreamToken]:

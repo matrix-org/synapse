@@ -23,6 +23,7 @@ from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
+from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.server import HomeServer
@@ -37,7 +38,15 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 class BaseModuleApiTestCase(HomeserverTestCase):
-    ...
+    """Common properties of the two test case classes."""
+
+    module_api: ModuleApi
+
+    # These are all written by _test_sending_local_online_presence_to_local_user.
+    presence_receiver_id: str
+    presence_receiver_tok: str
+    presence_sender_id: str
+    presence_sender_tok: str
 
 
 class ModuleApiTestCase(BaseModuleApiTestCase):
@@ -863,6 +872,7 @@ def _test_sending_local_online_presence_to_local_user(
         # Replicate the current sync presence token from the main process to the worker process.
         # We need to do this so that the worker process knows the current presence stream ID to
         # insert into the database when we call ModuleApi.send_local_online_presence_to.
+        assert isinstance(test_case, BaseMultiWorkerStreamTestCase)
         test_case.replicate()
 
     # Syncing again should result in no presence updates
@@ -879,6 +889,7 @@ def _test_sending_local_online_presence_to_local_user(
 
     # Determine on which process (main or worker) to call ModuleApi.send_local_online_presence_to on
     if test_with_workers:
+        assert isinstance(test_case, BaseMultiWorkerStreamTestCase)
         module_api_to_use = worker_hs.get_module_api()
     else:
         module_api_to_use = test_case.module_api
@@ -886,12 +897,11 @@ def _test_sending_local_online_presence_to_local_user(
     # Trigger sending local online presence. We expect this information
     # to be saved to the database where all processes can access it.
     # Note that we're syncing via the master.
-    d = module_api_to_use.send_local_online_presence_to(
-        [
-            test_case.presence_receiver_id,
-        ]
+    d = defer.ensureDeferred(
+        module_api_to_use.send_local_online_presence_to(
+            [test_case.presence_receiver_id],
+        )
     )
-    d = defer.ensureDeferred(d)
 
     if test_with_workers:
         # In order for the required presence_set_state replication request to occur between the
@@ -908,7 +918,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update: UserPresenceState = presence_updates[0]
+    presence_update = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 
@@ -919,7 +929,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update: UserPresenceState = presence_updates[0]
+    presence_update = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 
@@ -947,12 +957,13 @@ def _test_sending_local_online_presence_to_local_user(
     test_case.assertEqual(len(presence_updates), 1)
 
     # Now trigger sending local online presence.
-    d = module_api_to_use.send_local_online_presence_to(
-        [
-            test_case.presence_receiver_id,
-        ]
+    d = defer.ensureDeferred(
+        module_api_to_use.send_local_online_presence_to(
+            [
+                test_case.presence_receiver_id,
+            ]
+        )
     )
-    d = defer.ensureDeferred(d)
 
     if test_with_workers:
         # In order for the required presence_set_state replication request to occur between the
