@@ -36,7 +36,11 @@ from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
 
-class ModuleApiTestCase(HomeserverTestCase):
+class BaseModuleApiTestCase(HomeserverTestCase):
+    ...
+
+
+class ModuleApiTestCase(BaseModuleApiTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -763,7 +767,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertIsNone(room_alias)
 
 
-class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
+class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
 
     servlets = [
@@ -791,7 +795,7 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
 
 
 def _test_sending_local_online_presence_to_local_user(
-    test_case: HomeserverTestCase, test_with_workers: bool = False
+    test_case: BaseModuleApiTestCase, test_with_workers: bool = False
 ) -> None:
     """Tests that send_local_presence_to_users sends local online presence to local users.
 
