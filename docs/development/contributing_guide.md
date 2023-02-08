@@ -78,6 +78,17 @@ poetry install --extras all
 
 This will install the runtime and developer dependencies for the project.
 
+Create a config file:
+
+```sh
+cp docs/sample_config.yaml homeserver.yaml
+```
+
+Now edit homeserver.yaml, and run Synapse with:
+
+```sh
+poetry run python synapse/app/homeserver.py -c homeserver.yaml
+```
 
 # 5. Get in touch.
 
