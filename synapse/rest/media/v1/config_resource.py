@@ -30,11 +30,9 @@ class MediaConfigResource(DirectServeJsonResource):
         super().__init__()
         config = hs.config
         self.clock = hs.get_clock()
-        self.auth = hs.get_auth()
         self.limits_dict = {"m.upload.size": config.media.max_upload_size}
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
-        await self.auth.get_user_by_req(request)
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
 
     async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
