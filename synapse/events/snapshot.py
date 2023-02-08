@@ -348,7 +348,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
     state_delta_due_to_event: Optional[dict]
     prev_group_for_state_group_before_event: Optional[int]
     delta_ids_to_state_group_before_event: Optional[StateMap[str]]
-    partial_state: Optional[bool]
+    partial_state: bool
     state_map_before_event: Optional[StateMap[str]] = None
 
     async def get_prev_state_ids(
