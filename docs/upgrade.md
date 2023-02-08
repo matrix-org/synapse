@@ -88,11 +88,11 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.77.0
+# Upgrading to v1.78.0
 
 ## Deprecate the `/_synapse/admin/v1/media/<server_name>/delete` admin API
 
-Synapse 1.77.0 replaces the `/_synapse/admin/v1/media/<server_name>/delete`
+Synapse 1.78.0 replaces the `/_synapse/admin/v1/media/<server_name>/delete`
 admin API with an identical endpoint at `/_synapse/admin/v1/media/delete`. Please
 update your tooling to use the new endpoint. The deprecated version will be removed
 in a future release.
