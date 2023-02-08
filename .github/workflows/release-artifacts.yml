@@ -148,7 +148,8 @@ jobs:
         env:
           # Skip testing for platforms which various libraries don't have wheels
           # for, and so need extra build deps.
-          CIBW_TEST_SKIP: pp3*-* *i686* *musl*
+          # We try to include at least one PyPy wheel here.
+          CIBW_TEST_SKIP: pp3{7,8}-* *i686* *musl*
           # Fix Rust OOM errors on emulated aarch64: https://github.com/rust-lang/cargo/issues/10583
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CIBW_ENVIRONMENT_PASS_LINUX: CARGO_NET_GIT_FETCH_WITH_CLI
