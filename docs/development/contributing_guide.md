@@ -89,7 +89,7 @@ cp docs/sample_config.yaml homeserver.yaml
 Now edit homeserver.yaml, and run Synapse with:
 
 ```sh
-poetry run python synapse/app/homeserver.py -c homeserver.yaml
+poetry run python -m synapse.app.homeserver -c homeserver.yaml
 ```
 
 # 5. Get in touch.
