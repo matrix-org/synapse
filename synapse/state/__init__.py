@@ -381,14 +381,14 @@ class StateHandler:
                 state_group_before_event=state_group_before_event,
                 state_group_after_event=state_group_before_event,
                 state_delta_due_to_event={},
-                prev_group_for_state_group_after_event=state_group_before_event_prev_group,
-                delta_ids_to_state_group_after_event=deltas_to_state_group_before_event,
+                prev_group_for_state_group_before_event=state_group_before_event_prev_group,
+                delta_ids_to_state_group_before_event=deltas_to_state_group_before_event,
                 partial_state=partial_state,
                 state_map_before_event=state_ids_before_event,
             )
 
         #
-        # otherwise, we'll need to create a new state group for after the event
+        # otherwise, we'll need to set up creating a new state group for after the event
         #
 
         key = (event.type, event.state_key)
@@ -411,8 +411,8 @@ class StateHandler:
             state_group_before_event=state_group_before_event,
             state_group_after_event=None,
             state_delta_due_to_event=delta_ids,
-            prev_group_for_state_group_after_event=state_group_before_event,
-            delta_ids_to_state_group_after_event=delta_ids,
+            prev_group_for_state_group_before_event=state_group_before_event_prev_group,
+            delta_ids_to_state_group_before_event=deltas_to_state_group_before_event,
             partial_state=partial_state,
             state_map_before_event=state_ids_before_event,
         )
