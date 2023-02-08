@@ -419,6 +419,7 @@ pub struct FilteredPushRules {
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
     msc3952_intentional_mentions: bool,
+    msc3958_suppress_edits_enabled: bool,
 }
 
 #[pymethods]
@@ -431,6 +432,7 @@ impl FilteredPushRules {
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
         msc3952_intentional_mentions: bool,
+        msc3958_suppress_edits_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -439,6 +441,7 @@ impl FilteredPushRules {
             msc3381_polls_enabled,
             msc3664_enabled,
             msc3952_intentional_mentions,
+            msc3958_suppress_edits_enabled,
         }
     }
 
@@ -473,6 +476,11 @@ impl FilteredPushRules {
                 }
 
                 if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
+                {
+                    return false;
+                }
+                if !self.msc3958_suppress_edits_enabled
+                    && rule.rule_id == "global/override/.com.beeper.suppress_edits"
                 {
                     return false;
                 }

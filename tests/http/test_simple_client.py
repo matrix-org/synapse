@@ -17,22 +17,24 @@ from netaddr import IPSet
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
 from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class SimpleHttpClientTests(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs: "HomeServer"):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: "HomeServer") -> None:
         # Add a DNS entry for a test server
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
         self.cl = hs.get_simple_http_client()
 
-    def test_dns_error(self):
+    def test_dns_error(self) -> None:
         """
         If the DNS lookup returns an error, it will bubble up.
         """
@@ -42,7 +44,7 @@ class SimpleHttpClientTests(HomeserverTestCase):
         f = self.failureResultOf(d)
         self.assertIsInstance(f.value, DNSLookupError)
 
-    def test_client_connection_refused(self):
+    def test_client_connection_refused(self) -> None:
         d = defer.ensureDeferred(self.cl.get_json("http://testserv:8008/foo/bar"))
 
         self.pump()
@@ -63,7 +65,7 @@ class SimpleHttpClientTests(HomeserverTestCase):
 
         self.assertIs(f.value, e)
 
-    def test_client_never_connect(self):
+    def test_client_never_connect(self) -> None:
         """
         If the HTTP request is not connected and is timed out, it'll give a
         ConnectingCancelledError or TimeoutError.
@@ -90,7 +92,7 @@ class SimpleHttpClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestTimedOutError)
 
-    def test_client_connect_no_response(self):
+    def test_client_connect_no_response(self) -> None:
         """
         If the HTTP request is connected, but gets no response before being
         timed out, it'll give a ResponseNeverReceived.
@@ -121,7 +123,7 @@ class SimpleHttpClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestTimedOutError)
 
-    def test_client_ip_range_blacklist(self):
+    def test_client_ip_range_blacklist(self) -> None:
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
 
         # Add some DNS entries we'll blacklist

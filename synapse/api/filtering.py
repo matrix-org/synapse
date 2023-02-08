@@ -252,9 +252,9 @@ class FilterCollection:
         return self._room_timeline_filter.unread_thread_notifications
 
     async def filter_presence(
-        self, events: Iterable[UserPresenceState]
+        self, presence_states: Iterable[UserPresenceState]
     ) -> List[UserPresenceState]:
-        return await self._presence_filter.filter(events)
+        return await self._presence_filter.filter(presence_states)
 
     async def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
         return await self._account_data.filter(events)

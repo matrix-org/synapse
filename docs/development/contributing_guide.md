@@ -78,6 +78,19 @@ poetry install --extras all
 
 This will install the runtime and developer dependencies for the project.
 
+## Running Synapse via poetry
+
+To start a local instance of Synapse in the locked poetry environment, create a config file:
+
+```sh
+cp docs/sample_config.yaml homeserver.yaml
+```
+
+Now edit homeserver.yaml, and run Synapse with:
+
+```sh
+poetry run python -m synapse.app.homeserver -c homeserver.yaml
+```
 
 # 5. Get in touch.
 
