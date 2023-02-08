@@ -8,6 +8,7 @@ Features
 - Adds profile information, devices and connections to the user data export via command line. ([\#14894](https://github.com/matrix-org/synapse/issues/14894))
 - Experimental support to suppress notifications from message edits ([MSC3958](https://github.com/matrix-org/matrix-spec-proposals/pull/3958)). ([\#14960](https://github.com/matrix-org/synapse/issues/14960))
 - Improve performance when joining or sending an event large rooms. ([\#14962](https://github.com/matrix-org/synapse/issues/14962))
+- Experimental support to suppress notifications from message edits ([MSC3958](https://github.com/matrix-org/matrix-spec-proposals/pull/3958)). ([\#15016](https://github.com/matrix-org/synapse/issues/15016))
 
 
 Bugfixes
@@ -56,6 +57,7 @@ Internal Changes
 - Bump serde_json from 1.0.91 to 1.0.92. ([\#14997](https://github.com/matrix-org/synapse/issues/14997))
 - Bump isort from 5.11.4 to 5.11.5. ([\#14998](https://github.com/matrix-org/synapse/issues/14998))
 - Bump phonenumbers from 8.13.4 to 8.13.5. ([\#14999](https://github.com/matrix-org/synapse/issues/14999))
+- Fix creation of wheels on macOS. ([\#15019](https://github.com/matrix-org/synapse/issues/15019))
 
 
 Synapse 1.76.0 (2023-01-31)
