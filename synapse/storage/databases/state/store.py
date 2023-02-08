@@ -413,7 +413,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         prev_group: int,
     ) -> List[Tuple[EventBase, UnpersistedEventContext]]:
         """Generate and store state deltas for a group of events and contexts created to be
-        batch persisted.
+        batch persisted. Note that all the events must be in a linear chain (ie a <- b <- c)
+        and must be state events.
 
         Args:
             events_and_context: the events to generate and store a state groups for
@@ -454,8 +455,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 txn, num_state_groups
             )
 
-            index = 0
-            for event, context in events_and_context:
+            for index, (event, context) in enumerate(events_and_context):
                 context.state_group_after_event = state_groups[index]
                 # The first prev_group will be the last persisted state group, which is passed in
                 # else it will be the group most recently assigned
@@ -533,8 +533,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         current_state_ids: Optional[StateMap[str]],
     ) -> int:
         """Store a new set of state, returning a newly assigned state group.
+
         At least one of `current_state_ids` and `prev_group` must be provided. Whenever
         `prev_group` is not None, `delta_ids` must also not be None.
+
         Args:
             event_id: The event ID for which the state was calculated
             room_id
@@ -544,6 +546,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 `current_state_ids`.
             current_state_ids: The state to store. Map of (type, state_key)
                 to event_id.
+
         Returns:
             The state group ID
         """

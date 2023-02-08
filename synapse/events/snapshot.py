@@ -360,6 +360,8 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         """
         Takes a list of events and their associated unpersisted contexts and persists
         the unpersisted contexts, returning a list of events and persisted contexts.
+        Note that all the events must be in a linear chain (ie a <- b <- c)
+        and must be state events.
 
         Args:
             events_and_context: A list of events and their unpersisted contexts
