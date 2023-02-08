@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.68.0 where logging from the Rust module was not properly logged.
