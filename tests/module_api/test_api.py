@@ -58,7 +58,7 @@ class ModuleApiTestCase(HomeserverTestCase):
             federation_transport_client=fed_transport_client,
         )
 
-    def test_can_register_user(self):
+    def test_can_register_user(self) -> None:
         """Tests that an external module can register a user"""
         # Register a new user
         user_id, access_token = self.get_success(
@@ -88,7 +88,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
 
-    def test_can_register_admin_user(self):
+    def test_can_register_admin_user(self) -> None:
         user_id = self.register_user(
             "bob_module_admin", "1234", displayname="Bobberino Admin", admin=True
         )
@@ -97,7 +97,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
-    def test_can_set_admin(self):
+    def test_can_set_admin(self) -> None:
         user_id = self.register_user(
             "alice_wants_admin",
             "1234",
@@ -110,7 +110,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
-    def test_can_set_displayname(self):
+    def test_can_set_displayname(self) -> None:
         localpart = "alice_wants_a_new_displayname"
         user_id = self.register_user(
             localpart, "1234", displayname="Alice", admin=False
@@ -128,17 +128,17 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertEqual(found_profile.display_name, "Bob")
 
-    def test_get_userinfo_by_id(self):
+    def test_get_userinfo_by_id(self) -> None:
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, False)
 
-    def test_get_userinfo_by_id__no_user_found(self):
+    def test_get_userinfo_by_id__no_user_found(self) -> None:
         found_user = self.get_success(self.module_api.get_userinfo_by_id("@alice:test"))
         self.assertIsNone(found_user)
 
-    def test_get_user_ip_and_agents(self):
+    def test_get_user_ip_and_agents(self) -> None:
         user_id = self.register_user("test_get_user_ip_and_agents_user", "1234")
 
         # Initially, we should have no ip/agent for our user.
@@ -200,7 +200,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
         self.assertEqual(info, [])
 
-    def test_get_user_ip_and_agents__no_user_found(self):
+    def test_get_user_ip_and_agents__no_user_found(self) -> None:
         info = self.get_success(
             self.module_api.get_user_ip_and_agents(
                 "@test_get_user_ip_and_agents_user_nonexistent:example.com"
@@ -208,7 +208,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
         self.assertEqual(info, [])
 
-    def test_sending_events_into_room(self):
+    def test_sending_events_into_room(self) -> None:
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent
         self.event_creation_handler.create_and_send_nonmember_event = Mock(
@@ -303,7 +303,7 @@ class ModuleApiTestCase(HomeserverTestCase):
             self.module_api.create_and_send_event_into_room(event_dict), Exception
         )
 
-    def test_public_rooms(self):
+    def test_public_rooms(self) -> None:
         """Tests that a room can be added and removed from the public rooms list,
         as well as have its public rooms directory state queried.
         """
@@ -350,13 +350,13 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
         self.assertFalse(is_in_public_rooms)
 
-    def test_send_local_online_presence_to(self):
+    def test_send_local_online_presence_to(self) -> None:
         # Test sending local online presence to users from the main process
         _test_sending_local_online_presence_to_local_user(self, test_with_workers=False)
 
     # Enable federation sending on the main process.
     @override_config({"federation_sender_instances": None})
-    def test_send_local_online_presence_to_federation(self):
+    def test_send_local_online_presence_to_federation(self) -> None:
         """Tests that send_local_presence_to_users sends local online presence to remote users."""
         # Create a user who will send presence updates
         self.presence_sender_id = self.register_user("presence_sender1", "monkey")
@@ -431,7 +431,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertTrue(found_update)
 
-    def test_update_membership(self):
+    def test_update_membership(self) -> None:
         """Tests that the module API can update the membership of a user in a room."""
         peter = self.register_user("peter", "hackme")
         lesley = self.register_user("lesley", "hackme")
@@ -554,7 +554,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(res["displayname"], "simone")
         self.assertIsNone(res["avatar_url"])
 
-    def test_update_room_membership_remote_join(self):
+    def test_update_room_membership_remote_join(self) -> None:
         """Test that the module API can join a remote room."""
         # Necessary to fake a remote join.
         fake_stream_id = 1
@@ -582,7 +582,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that a remote join was attempted.
         self.assertEqual(mocked_remote_join.call_count, 1)
 
-    def test_get_room_state(self):
+    def test_get_room_state(self) -> None:
         """Tests that a module can retrieve the state of a room through the module API."""
         user_id = self.register_user("peter", "hackme")
         tok = self.login("peter", "hackme")
@@ -778,7 +778,7 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
         self.module_api = homeserver.get_module_api()
         self.sync_handler = homeserver.get_sync_handler()
 
-    def test_send_local_online_presence_to_workers(self):
+    def test_send_local_online_presence_to_workers(self) -> None:
         # Test sending local online presence to users from a worker process
         _test_sending_local_online_presence_to_local_user(self, test_with_workers=True)
 
