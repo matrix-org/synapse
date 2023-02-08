@@ -200,7 +200,7 @@ class OEmbedProvider:
                 calc_description_and_urls(open_graph_response, oembed["html"])
             for size in ("width", "height"):
                 val = oembed.get(size)
-                if val is not None and isinstance(val, int):
+                if type(val) is int:
                     open_graph_response[f"og:video:{size}"] = val
 
         elif oembed_type == "link":

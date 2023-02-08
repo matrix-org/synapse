@@ -38,7 +38,7 @@ from typing_extensions import Literal
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import Direction, EventTypes
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -1779,7 +1779,7 @@ class EventsWorkerStore(SQLBaseStore):
             txn: LoggingTransaction,
         ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
             sql = (
-                "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
+                "SELECT out.event_stream_ordering, e.event_id, e.room_id, e.type,"
                 " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL,"
                 " e.outlier"
                 " FROM events AS e"
@@ -1791,10 +1791,10 @@ class EventsWorkerStore(SQLBaseStore):
                 " LEFT JOIN event_relations USING (event_id)"
                 " LEFT JOIN room_memberships USING (event_id)"
                 " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < event_stream_ordering"
-                " AND event_stream_ordering <= ?"
+                " WHERE ? < out.event_stream_ordering"
+                " AND out.event_stream_ordering <= ?"
                 " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering ASC"
+                " ORDER BY out.event_stream_ordering ASC"
             )
 
             txn.execute(sql, (last_id, current_id, instance_name))
@@ -2240,7 +2240,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_event_id_for_timestamp(
-        self, room_id: str, timestamp: int, direction: str
+        self, room_id: str, timestamp: int, direction: Direction
     ) -> Optional[str]:
         """Find the closest event to the given timestamp in the given direction.
 
@@ -2248,14 +2248,14 @@ class EventsWorkerStore(SQLBaseStore):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
             The closest event_id otherwise None if we can't find any event in
             the given direction.
         """
-        if direction == "b":
+        if direction == Direction.BACKWARDS:
             # Find closest event *before* a given timestamp. We use descending
             # (which gives values largest to smallest) because we want the
             # largest possible timestamp *before* the given timestamp.
@@ -2306,9 +2306,6 @@ class EventsWorkerStore(SQLBaseStore):
                 return event_id
 
             return None
-
-        if direction not in ("f", "b"):
-            raise ValueError("Unknown direction: %s" % (direction,))
 
         return await self.db_pool.runInteraction(
             "get_event_id_for_timestamp_txn",

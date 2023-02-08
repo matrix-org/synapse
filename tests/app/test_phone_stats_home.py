@@ -1,8 +1,11 @@
 import synapse
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
+from tests.server import ThreadedMemoryReactorClock
 from tests.unittest import HomeserverTestCase
 
 FIVE_MINUTES_IN_SECONDS = 300
@@ -19,7 +22,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
     # Override the retention time for the user_ips table because otherwise it
     # gets pruned too aggressively for our R30 test.
     @unittest.override_config({"user_ips_max_age": "365d"})
-    def test_r30_minimum_usage(self):
+    def test_r30_minimum_usage(self) -> None:
         """
         Tests the minimum amount of interaction necessary for the R30 metric
         to consider a user 'retained'.
@@ -68,7 +71,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
-    def test_r30_minimum_usage_using_default_config(self):
+    def test_r30_minimum_usage_using_default_config(self) -> None:
         """
         Tests the minimum amount of interaction necessary for the R30 metric
         to consider a user 'retained'.
@@ -122,7 +125,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
-    def test_r30_user_must_be_retained_for_at_least_a_month(self):
+    def test_r30_user_must_be_retained_for_at_least_a_month(self) -> None:
         """
         Tests that a newly-registered user must be retained for a whole month
         before appearing in the R30 statistic, even if they post every day
@@ -164,12 +167,14 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def _advance_to(self, desired_time_secs: float):
+    def _advance_to(self, desired_time_secs: float) -> None:
         now = self.hs.get_clock().time()
         assert now < desired_time_secs
         self.reactor.advance(desired_time_secs - now)
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(
+        self, reactor: ThreadedMemoryReactorClock, clock: Clock
+    ) -> HomeServer:
         hs = super(PhoneHomeR30V2TestCase, self).make_homeserver(reactor, clock)
 
         # We don't want our tests to actually report statistics, so check
@@ -181,7 +186,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         start_phone_stats_home(hs)
         return hs
 
-    def test_r30v2_minimum_usage(self):
+    def test_r30v2_minimum_usage(self) -> None:
         """
         Tests the minimum amount of interaction necessary for the R30v2 metric
         to consider a user 'retained'.
@@ -250,7 +255,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
 
-    def test_r30v2_user_must_be_retained_for_at_least_a_month(self):
+    def test_r30v2_user_must_be_retained_for_at_least_a_month(self) -> None:
         """
         Tests that a newly-registered user must be retained for a whole month
         before appearing in the R30v2 statistic, even if they post every day
@@ -316,7 +321,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
             r30_results, {"all": 1, "android": 1, "electron": 0, "ios": 0, "web": 0}
         )
 
-    def test_r30v2_returning_dormant_users_not_counted(self):
+    def test_r30v2_returning_dormant_users_not_counted(self) -> None:
         """
         Tests that dormant users (users inactive for a long time) do not
         contribute to R30v2 when they return for just a single day.

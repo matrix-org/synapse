@@ -16,8 +16,9 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.constants import Direction
 from synapse.api.errors import Codes, NotFoundError, SynapseError
-from synapse.http.servlet import RestServlet, parse_integer, parse_string
+from synapse.http.servlet import RestServlet, parse_enum, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.types import JsonDict
@@ -60,7 +61,7 @@ class EventReportsRestServlet(RestServlet):
 
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
-        direction = parse_string(request, "dir", default="b")
+        direction = parse_enum(request, "dir", Direction, Direction.BACKWARDS)
         user_id = parse_string(request, "user_id")
         room_id = parse_string(request, "room_id")
 
@@ -75,13 +76,6 @@ class EventReportsRestServlet(RestServlet):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "The limit parameter must be a positive integer.",
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        if direction not in ("f", "b"):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
                 errcode=Codes.INVALID_PARAM,
             )
 
