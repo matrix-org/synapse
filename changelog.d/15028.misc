@@ -1,0 +1,1 @@
+Removed the authentication requirement for the GET /_matrix/media/v3/config API endpoint
