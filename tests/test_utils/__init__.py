@@ -20,7 +20,7 @@ import sys
 import warnings
 from asyncio import Future
 from binascii import unhexlify
-from typing import Any, Awaitable, Callable, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, TypeVar
 from unittest.mock import Mock
 
 import attr
@@ -34,6 +34,9 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
 
 from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from sys import UnraisableHookArgs
 
 TV = TypeVar("TV")
 
@@ -79,7 +82,7 @@ def setup_awaitable_errors() -> Callable[[], None]:
     unraisable_exceptions = []
     orig_unraisablehook = sys.unraisablehook
 
-    def unraisablehook(unraisable: sys.UnraisableHookArgs) -> None:
+    def unraisablehook(unraisable: "UnraisableHookArgs") -> None:
         unraisable_exceptions.append(unraisable.exc_value)
 
     def cleanup() -> None:
