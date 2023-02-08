@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Dict
 from unittest.mock import Mock
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import NotFoundError
@@ -23,7 +25,9 @@ from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.rest import admin
 from synapse.rest.client import login, notifications, presence, profile, room
-from synapse.types import create_requester
+from synapse.server import HomeServer
+from synapse.types import JsonDict, create_requester
+from synapse.util import Clock
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
 from tests.replication._base import BaseMultiWorkerStreamTestCase
@@ -42,14 +46,14 @@ class ModuleApiTestCase(HomeserverTestCase):
         notifications.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastores().main
-        self.module_api = homeserver.get_module_api()
-        self.event_creation_handler = homeserver.get_event_creation_handler()
-        self.sync_handler = homeserver.get_sync_handler()
-        self.auth_handler = homeserver.get_auth_handler()
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+        self.module_api = hs.get_module_api()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.sync_handler = hs.get_sync_handler()
+        self.auth_handler = hs.get_auth_handler()
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
         fed_transport_client = Mock(spec=["send_transaction"])
         fed_transport_client.send_transaction = simple_async_mock({})
@@ -94,6 +98,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
 
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        assert found_user is not None
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
@@ -107,6 +112,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.get_success(self.module_api.set_user_admin(user_id, True))
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        assert found_user is not None
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
@@ -116,7 +122,7 @@ class ModuleApiTestCase(HomeserverTestCase):
             localpart, "1234", displayname="Alice", admin=False
         )
         found_userinfo = self.get_success(self.module_api.get_userinfo_by_id(user_id))
-
+        assert found_userinfo is not None
         self.get_success(
             self.module_api.set_displayname(
                 found_userinfo.user_id, "Bob", deactivation=False
@@ -131,6 +137,7 @@ class ModuleApiTestCase(HomeserverTestCase):
     def test_get_userinfo_by_id(self) -> None:
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        assert found_user is not None
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, False)
 
@@ -185,7 +192,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # we should only find the second ip, agent.
         info = self.get_success(
             self.module_api.get_user_ip_and_agents(
-                user_id, (last_seen_1 + last_seen_2) / 2
+                user_id, (last_seen_1 + last_seen_2) // 2
             )
         )
         self.assertEqual(len(info), 1)
@@ -211,7 +218,7 @@ class ModuleApiTestCase(HomeserverTestCase):
     def test_sending_events_into_room(self) -> None:
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent
-        self.event_creation_handler.create_and_send_nonmember_event = Mock(
+        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[assignment]
             spec=[],
             side_effect=self.event_creation_handler.create_and_send_nonmember_event,
         )
@@ -222,7 +229,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         room_id = self.helper.create_room_as(user_id, tok=tok)
 
         # Create and send a non-state event
-        content = {"body": "I am a puppet", "msgtype": "m.text"}
+        content: JsonDict = {"body": "I am a puppet", "msgtype": "m.text"}
         event_dict = {
             "room_id": room_id,
             "type": "m.room.message",
@@ -265,7 +272,7 @@ class ModuleApiTestCase(HomeserverTestCase):
             "sender": user_id,
             "state_key": "",
         }
-        event: EventBase = self.get_success(
+        event = self.get_success(
             self.module_api.create_and_send_event_into_room(event_dict)
         )
         self.assertEqual(event.sender, user_id)
@@ -677,7 +684,7 @@ class ModuleApiTestCase(HomeserverTestCase):
             self.module_api.check_push_rule_actions(["foo"])
 
         with self.assertRaises(InvalidRuleException):
-            self.module_api.check_push_rule_actions({"foo": "bar"})
+            self.module_api.check_push_rule_actions([{"foo": "bar"}])
 
         self.module_api.check_push_rule_actions(["notify"])
 
@@ -766,7 +773,7 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
         presence.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> Dict[str, Any]:
         conf = super().default_config()
         conf["stream_writers"] = {"presence": ["presence_writer"]}
         conf["instance_map"] = {
@@ -774,9 +781,9 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
         }
         return conf
 
-    def prepare(self, reactor, clock, homeserver):
-        self.module_api = homeserver.get_module_api()
-        self.sync_handler = homeserver.get_sync_handler()
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.module_api = hs.get_module_api()
+        self.sync_handler = hs.get_sync_handler()
 
     def test_send_local_online_presence_to_workers(self) -> None:
         # Test sending local online presence to users from a worker process
@@ -785,7 +792,7 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
 
 def _test_sending_local_online_presence_to_local_user(
     test_case: HomeserverTestCase, test_with_workers: bool = False
-):
+) -> None:
     """Tests that send_local_presence_to_users sends local online presence to local users.
 
     This simultaneously tests two different usecases:

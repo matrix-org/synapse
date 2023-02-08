@@ -31,7 +31,11 @@ from synapse.util import Clock
 
 from tests.handlers.test_sync import generate_sync_config
 from tests.test_utils import simple_async_mock
-from tests.unittest import FederatingHomeserverTestCase, override_config
+from tests.unittest import (
+    FederatingHomeserverTestCase,
+    HomeserverTestCase,
+    override_config,
+)
 
 
 @attr.s
@@ -470,7 +474,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
 
 def send_presence_update(
-    testcase: FederatingHomeserverTestCase,
+    testcase: HomeserverTestCase,
     user_id: str,
     access_token: str,
     presence_state: str,
