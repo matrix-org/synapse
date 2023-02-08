@@ -15289,6 +15289,13 @@ for other installation methods.</p>
 poetry install --extras all
 </code></pre>
 <p>This will install the runtime and developer dependencies for the project.</p>
+<h2 id="running-synapse-via-poetry"><a class="header" href="#running-synapse-via-poetry">Running Synapse via poetry</a></h2>
+<p>To start a local instance of Synapse in the locked poetry environment, create a config file:</p>
+<pre><code class="language-sh">cp docs/sample_config.yaml homeserver.yaml
+</code></pre>
+<p>Now edit homeserver.yaml, and run Synapse with:</p>
+<pre><code class="language-sh">poetry run python -m synapse.app.homeserver -c homeserver.yaml
+</code></pre>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
 <p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
