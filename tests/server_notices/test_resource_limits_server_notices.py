@@ -24,6 +24,7 @@ from synapse.server import HomeServer
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
+from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
@@ -33,7 +34,7 @@ from tests.utils import default_config
 
 
 class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = default_config("test")
 
         config.update(
@@ -86,18 +87,18 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))  # type: ignore[assignment]
 
     @override_config({"hs_disabled": True})
-    def test_maybe_send_server_notice_disabled_hs(self):
+    def test_maybe_send_server_notice_disabled_hs(self) -> None:
         """If the HS is disabled, we should not send notices"""
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         self._send_notice.assert_not_called()
 
     @override_config({"limit_usage_by_mau": False})
-    def test_maybe_send_server_notice_to_user_flag_off(self):
+    def test_maybe_send_server_notice_to_user_flag_off(self) -> None:
         """If mau limiting is disabled, we should not send notices"""
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         self._send_notice.assert_not_called()
 
-    def test_maybe_send_server_notice_to_user_remove_blocked_notice(self):
+    def test_maybe_send_server_notice_to_user_remove_blocked_notice(self) -> None:
         """Test when user has blocked notice, but should have it removed"""
 
         self._rlsn._auth_blocking.check_auth_blocking = Mock(
@@ -114,7 +115,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._server_notices_manager.maybe_get_notice_room_for_user.assert_called_once()
         self._send_notice.assert_called_once()
 
-    def test_maybe_send_server_notice_to_user_remove_blocked_notice_noop(self):
+    def test_maybe_send_server_notice_to_user_remove_blocked_notice_noop(self) -> None:
         """
         Test when user has blocked notice, but notice ought to be there (NOOP)
         """
@@ -134,7 +135,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         self._send_notice.assert_not_called()
 
-    def test_maybe_send_server_notice_to_user_add_blocked_notice(self):
+    def test_maybe_send_server_notice_to_user_add_blocked_notice(self) -> None:
         """
         Test when user does not have blocked notice, but should have one
         """
@@ -147,7 +148,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         # Would be better to check contents, but 2 calls == set blocking event
         self.assertEqual(self._send_notice.call_count, 2)
 
-    def test_maybe_send_server_notice_to_user_add_blocked_notice_noop(self):
+    def test_maybe_send_server_notice_to_user_add_blocked_notice_noop(self) -> None:
         """
         Test when user does not have blocked notice, nor should they (NOOP)
         """
@@ -159,7 +160,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         self._send_notice.assert_not_called()
 
-    def test_maybe_send_server_notice_to_user_not_in_mau_cohort(self):
+    def test_maybe_send_server_notice_to_user_not_in_mau_cohort(self) -> None:
         """
         Test when user is not part of the MAU cohort - this should not ever
         happen - but ...
@@ -175,7 +176,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._send_notice.assert_not_called()
 
     @override_config({"mau_limit_alerting": False})
-    def test_maybe_send_server_notice_when_alerting_suppressed_room_unblocked(self):
+    def test_maybe_send_server_notice_when_alerting_suppressed_room_unblocked(
+        self,
+    ) -> None:
         """
         Test that when server is over MAU limit and alerting is suppressed, then
         an alert message is not sent into the room
@@ -191,7 +194,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self.assertEqual(self._send_notice.call_count, 0)
 
     @override_config({"mau_limit_alerting": False})
-    def test_check_hs_disabled_unaffected_by_mau_alert_suppression(self):
+    def test_check_hs_disabled_unaffected_by_mau_alert_suppression(self) -> None:
         """
         Test that when a server is disabled, that MAU limit alerting is ignored.
         """
@@ -207,7 +210,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self.assertEqual(self._send_notice.call_count, 2)
 
     @override_config({"mau_limit_alerting": False})
-    def test_maybe_send_server_notice_when_alerting_suppressed_room_blocked(self):
+    def test_maybe_send_server_notice_when_alerting_suppressed_room_blocked(
+        self,
+    ) -> None:
         """
         When the room is already in a blocked state, test that when alerting
         is suppressed that the room is returned to an unblocked state.
@@ -242,7 +247,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         c = super().default_config()
         c["server_notices"] = {
             "system_mxid_localpart": "server",
@@ -270,7 +275,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         self.user_id = "@user_id:test"
 
-    def test_server_notice_only_sent_once(self):
+    def test_server_notice_only_sent_once(self) -> None:
         self.store.get_monthly_active_count = Mock(return_value=make_awaitable(1000))
 
         self.store.user_last_seen_monthly_active = Mock(
@@ -306,7 +311,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         self.assertEqual(count, 1)
 
-    def test_no_invite_without_notice(self):
+    def test_no_invite_without_notice(self) -> None:
         """Tests that a user doesn't get invited to a server notices room without a
         server notice being sent.
 
@@ -328,7 +333,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         m.assert_called_once_with(user_id)
 
-    def test_invite_with_notice(self):
+    def test_invite_with_notice(self) -> None:
         """Tests that, if the MAU limit is hit, the server notices user invites each user
         to a room in which it has sent a notice.
         """
