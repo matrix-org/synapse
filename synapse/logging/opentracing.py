@@ -188,7 +188,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
 from twisted.web.http import Request
@@ -864,7 +864,7 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 
 def _custom_sync_async_decorator(
     func: Callable[P, R],
-    wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
+    wrapping_logic: Callable[Concatenate[Callable[P, R], P], ContextManager[None]],
 ) -> Callable[P, R]:
     """
     Decorates a function that is sync or async (coroutines), or that returns a Twisted
