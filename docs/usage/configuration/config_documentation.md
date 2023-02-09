@@ -3927,6 +3927,8 @@ This setting has the following sub-options:
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
+* `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+
 
 Example configuration:
 ```yaml
@@ -3935,6 +3937,7 @@ redis:
   host: localhost
   port: 6379
   password: <secret_password>
+  dbid: <dbid>
 ```
 ---
 ## Individual worker configuration

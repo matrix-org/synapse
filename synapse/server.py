@@ -829,6 +829,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             hs=self,
             host=self.config.redis.redis_host,
             port=self.config.redis.redis_port,
+            dbid=self.config.redis.redis_dbid,
             password=self.config.redis.redis_password,
             reconnect=True,
         )
