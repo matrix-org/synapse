@@ -485,7 +485,8 @@ class DirectoryHandler:
                 )
             )
             if canonical_alias:
-                room_aliases.append(canonical_alias)
+                # Ensure we do not mutate room_aliases.
+                room_aliases = room_aliases + [canonical_alias]
 
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
