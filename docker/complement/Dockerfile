@@ -28,6 +28,10 @@ FROM $FROM
     # We also initialize the database at build time, rather than runtime, so that it's faster to spin up the image.
     RUN gosu postgres initdb --locale=C --encoding=UTF-8 --auth-host password
 
+    # Raise the number of maximum client connections to postgres.
+    # This is necessary when running Synapse in worker mode in Complement.
+    RUN echo "ALTER SYSTEM SET max_connections = '200'" | gosu postgres postgres --single
+
     # Configure a password and create a database for Synapse
     RUN echo "ALTER USER postgres PASSWORD 'somesecret'" | gosu postgres postgres --single
     RUN echo "CREATE DATABASE synapse" | gosu postgres postgres --single
