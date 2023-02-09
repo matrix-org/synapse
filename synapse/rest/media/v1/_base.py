@@ -300,6 +300,7 @@ class Responder:
         Returns:
             Resolves once the response has finished being written
         """
+        raise NotImplementedError()
 
     def __enter__(self) -> None:
         pass

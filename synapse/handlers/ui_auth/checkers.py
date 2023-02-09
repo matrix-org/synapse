@@ -39,6 +39,7 @@ class UserInteractiveAuthChecker:
         Returns:
             True if this login type is enabled.
         """
+        raise NotImplementedError()
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         """Given the authentication dict from the client, attempt to check this step
