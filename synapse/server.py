@@ -147,7 +147,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-def cache_in_self(builder: Callable[..., T]) -> Callable[..., T]:
+def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer"], T]:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -185,8 +185,6 @@ def cache_in_self(builder: Callable[..., T]) -> Callable[..., T]:
 
         return dep
 
-    # We cast here as we need to tell mypy that `_get` has the same signature as
-    # `builder`.
     return _get
 
 
