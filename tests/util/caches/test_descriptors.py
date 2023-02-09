@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Iterable, Set, Tuple, cast
+from typing import Any, Generator, Iterable, Set, Tuple, cast
 from unittest import mock
 
 from twisted.internet import defer, reactor
@@ -37,7 +37,7 @@ from tests.test_utils import get_awaitable_result
 logger = logging.getLogger(__name__)
 
 
-def run_on_reactor():
+def run_on_reactor() -> "Deferred[int]":
     d: "Deferred[int]" = defer.Deferred()
     cast(IReactorTime, reactor).callLater(0, d.callback, 0)
     return make_deferred_yieldable(d)
@@ -45,18 +45,19 @@ def run_on_reactor():
 
 class DescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
-    def test_cache(self) -> None:
+    def test_cache(self) -> Generator["Deferred[Any]", Any, None]:
         class Cls:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.mock = mock.Mock()
 
             @descriptors.cached()
-            def fn(self, arg1, arg2):
+            def fn(self, arg1: int, arg2: int) -> mock.Mock:
                 return self.mock(arg1, arg2)
 
         obj = Cls()
 
         obj.mock.return_value = "fish"
+        r: mock.Mock
         r = yield obj.fn(1, 2)
         self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, 2)
@@ -77,19 +78,20 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
-    def test_cache_num_args(self) -> None:
+    def test_cache_num_args(self) -> Generator["Deferred[Any]", Any, None]:
         """Only the first num_args arguments should matter to the cache"""
 
         class Cls:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.mock = mock.Mock()
 
             @descriptors.cached(num_args=1)
-            def fn(self, arg1, arg2):
+            def fn(self, arg1: int, arg2: int) -> mock.Mock:
                 return self.mock(arg1, arg2)
 
         obj = Cls()
         obj.mock.return_value = "fish"
+        r: mock.Mock
         r = yield obj.fn(1, 2)
         self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, 2)
@@ -111,7 +113,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
-    def test_cache_uncached_args(self) -> None:
+    def test_cache_uncached_args(self) -> Generator["Deferred[Any]", Any, None]:
         """
         Only the arguments not named in uncached_args should matter to the cache
 
@@ -123,14 +125,15 @@ class DescriptorTestCase(unittest.TestCase):
             # Note that it is important that this is not the last argument to
             # test behaviour of skipping arguments properly.
             @descriptors.cached(uncached_args=("arg2",))
-            def fn(self, arg1, arg2, arg3):
+            def fn(self, arg1: int, arg2: int, arg3: int) -> mock.Mock:
                 return self.mock(arg1, arg2, arg3)
 
-            def __init__(self):
+            def __init__(self) -> None:
                 self.mock = mock.Mock()
 
         obj = Cls()
         obj.mock.return_value = "fish"
+        r: mock.Mock
         r = yield obj.fn(1, 2, 3)
         self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, 2, 3)
@@ -152,19 +155,20 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
-    def test_cache_kwargs(self) -> None:
+    def test_cache_kwargs(self) -> Generator["Deferred[Any]", Any, None]:
         """Test that keyword arguments are treated properly"""
 
         class Cls:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.mock = mock.Mock()
 
             @descriptors.cached()
-            def fn(self, arg1, kwarg1=2):
+            def fn(self, arg1: int, kwarg1: int=2) -> mock.Mock:
                 return self.mock(arg1, kwarg1=kwarg1)
 
         obj = Cls()
         obj.mock.return_value = "fish"
+        r: mock.Mock
         r = yield obj.fn(1, kwarg1=2)
         self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, kwarg1=2)
