@@ -557,6 +557,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     There are probably duplicates of the tests in DescriptorTestCase. Ideally the
     duplicates would be removed and the two sets of classes combined.
     """
+
     # Through this class, mypy complains that the `xyz` expression in `(yield xyz)` has
     # a concrete type when it should have type `Deferred[Any]`. I think this would be
     # fixed by a better annotation for @cached.
