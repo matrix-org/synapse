@@ -45,7 +45,7 @@ def run_on_reactor():
 
 class DescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
-    def test_cache(self):
+    def test_cache(self) -> None:
         class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
@@ -77,7 +77,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
-    def test_cache_num_args(self):
+    def test_cache_num_args(self) -> None:
         """Only the first num_args arguments should matter to the cache"""
 
         class Cls:
@@ -111,7 +111,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
-    def test_cache_uncached_args(self):
+    def test_cache_uncached_args(self) -> None:
         """
         Only the arguments not named in uncached_args should matter to the cache
 
@@ -152,7 +152,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
-    def test_cache_kwargs(self):
+    def test_cache_kwargs(self) -> None:
         """Test that keyword arguments are treated properly"""
 
         class Cls:
@@ -188,7 +188,7 @@ class DescriptorTestCase(unittest.TestCase):
         self.assertEqual(r, "fish")
         obj.mock.assert_not_called()
 
-    def test_cache_with_sync_exception(self):
+    def test_cache_with_sync_exception(self) -> None:
         """If the wrapped function throws synchronously, things should continue to work"""
 
         class Cls:
@@ -209,7 +209,7 @@ class DescriptorTestCase(unittest.TestCase):
         d = obj.fn(1)
         self.failureResultOf(d, SynapseError)
 
-    def test_cache_with_async_exception(self):
+    def test_cache_with_async_exception(self) -> None:
         """The wrapped function returns a failure"""
 
         class Cls:
@@ -260,7 +260,7 @@ class DescriptorTestCase(unittest.TestCase):
         self.assertEqual(self.successResultOf(d3), 100)
         self.assertEqual(obj.call_count, 2)
 
-    def test_cache_logcontexts(self):
+    def test_cache_logcontexts(self) -> None:
         """Check that logcontexts are set and restored correctly when
         using the cache."""
 
@@ -304,7 +304,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         return defer.gatherResults([d1, d2])
 
-    def test_cache_logcontexts_with_exception(self):
+    def test_cache_logcontexts_with_exception(self) -> None:
         """Check that the cache sets and restores logcontexts correctly when
         the lookup function throws an exception"""
 
@@ -347,7 +347,7 @@ class DescriptorTestCase(unittest.TestCase):
         return d1
 
     @defer.inlineCallbacks
-    def test_cache_default_args(self):
+    def test_cache_default_args(self) -> None:
         class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
@@ -384,7 +384,7 @@ class DescriptorTestCase(unittest.TestCase):
         self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
 
-    def test_cache_iterable(self):
+    def test_cache_iterable(self) -> None:
         class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
@@ -417,7 +417,7 @@ class DescriptorTestCase(unittest.TestCase):
         self.assertEqual(r.result, ["chips"])
         obj.mock.assert_not_called()
 
-    def test_cache_iterable_with_sync_exception(self):
+    def test_cache_iterable_with_sync_exception(self) -> None:
         """If the wrapped function throws synchronously, things should continue to work"""
 
         class Cls:
@@ -438,7 +438,7 @@ class DescriptorTestCase(unittest.TestCase):
         d = obj.fn(1)
         self.failureResultOf(d, SynapseError)
 
-    def test_invalidate_cascade(self):
+    def test_invalidate_cascade(self) -> None:
         """Invalidations should cascade up through cache contexts"""
 
         class Cls:
@@ -463,7 +463,7 @@ class DescriptorTestCase(unittest.TestCase):
         obj.invalidate()
         top_invalidate.assert_called_once()
 
-    def test_cancel(self):
+    def test_cancel(self) -> None:
         """Test that cancelling a lookup does not cancel other lookups"""
         complete_lookup: "Deferred[None]" = Deferred()
 
@@ -488,7 +488,7 @@ class DescriptorTestCase(unittest.TestCase):
         self.failureResultOf(d1, CancelledError)
         self.assertEqual(d2.result, "123")
 
-    def test_cancel_logcontexts(self):
+    def test_cancel_logcontexts(self) -> None:
         """Test that cancellation does not break logcontexts.
 
         * The `CancelledError` must be raised with the correct logcontext.
@@ -542,7 +542,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
     """
 
     @defer.inlineCallbacks
-    def test_passthrough(self):
+    def test_passthrough(self) -> None:
         class A:
             @cached()
             def func(self, key):
@@ -554,7 +554,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEqual((yield a.func("bar")), "bar")
 
     @defer.inlineCallbacks
-    def test_hit(self):
+    def test_hit(self) -> None:
         callcount = [0]
 
         class A:
@@ -572,7 +572,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEqual(callcount[0], 1)
 
     @defer.inlineCallbacks
-    def test_invalidate(self):
+    def test_invalidate(self) -> None:
         callcount = [0]
 
         class A:
@@ -592,7 +592,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(callcount[0], 2)
 
-    def test_invalidate_missing(self):
+    def test_invalidate_missing(self) -> None:
         class A:
             @cached()
             def func(self, key):
@@ -601,7 +601,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         A().func.invalidate(("what",))
 
     @defer.inlineCallbacks
-    def test_max_entries(self):
+    def test_max_entries(self) -> None:
         callcount = [0]
 
         class A:
@@ -626,7 +626,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
             callcount[0] >= 14, msg="Expected callcount >= 14, got %d" % (callcount[0])
         )
 
-    def test_prefill(self):
+    def test_prefill(self) -> None:
         callcount = [0]
 
         d = defer.succeed(123)
@@ -645,7 +645,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEqual(callcount[0], 0)
 
     @defer.inlineCallbacks
-    def test_invalidate_context(self):
+    def test_invalidate_context(self) -> None:
         callcount = [0]
         callcount2 = [0]
 
@@ -678,7 +678,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEqual(callcount2[0], 2)
 
     @defer.inlineCallbacks
-    def test_eviction_context(self):
+    def test_eviction_context(self) -> None:
         callcount = [0]
         callcount2 = [0]
 
@@ -715,7 +715,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEqual(callcount2[0], 3)
 
     @defer.inlineCallbacks
-    def test_double_get(self):
+    def test_double_get(self) -> None:
         callcount = [0]
         callcount2 = [0]
 
@@ -763,7 +763,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
 class CachedListDescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
-    def test_cache(self):
+    def test_cache(self) -> None:
         class Cls:
             def __init__(self):
                 self.mock = mock.Mock()
@@ -824,7 +824,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             obj.mock.assert_called_once_with({40}, 2)
             self.assertEqual(r, {10: "fish", 40: "gravy"})
 
-    def test_concurrent_lookups(self):
+    def test_concurrent_lookups(self) -> None:
         """All concurrent lookups should get the same result"""
 
         class Cls:
@@ -867,7 +867,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         self.assertEqual(self.successResultOf(d3), {10: "peas"})
 
     @defer.inlineCallbacks
-    def test_invalidate(self):
+    def test_invalidate(self) -> None:
         """Make sure that invalidation callbacks are called."""
 
         class Cls:
@@ -908,7 +908,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         invalidate0.assert_called_once()
         invalidate1.assert_called_once()
 
-    def test_cancel(self):
+    def test_cancel(self) -> None:
         """Test that cancelling a lookup does not cancel other lookups"""
         complete_lookup: "Deferred[None]" = Deferred()
 
@@ -936,7 +936,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         self.failureResultOf(d1, CancelledError)
         self.assertEqual(d2.result, {123: "123", 456: "456", 789: "789"})
 
-    def test_cancel_logcontexts(self):
+    def test_cancel_logcontexts(self) -> None:
         """Test that cancellation does not break logcontexts.
 
         * The `CancelledError` must be raised with the correct logcontext.
@@ -983,7 +983,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         )
         self.assertEqual(current_context(), SENTINEL_CONTEXT)
 
-    def test_num_args_mismatch(self):
+    def test_num_args_mismatch(self) -> None:
         """
         Make sure someone does not accidentally use @cachedList on a method with
         a mismatch in the number args to the underlying single cache method.
