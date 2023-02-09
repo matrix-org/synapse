@@ -1444,7 +1444,9 @@ class SyncHandler:
 
         logger.debug("Fetching account data")
 
-        await self._generate_sync_entry_for_account_data(sync_result_builder)
+        # Account data is included if it is not filtered out.
+        if not sync_config.filter_collection.blocks_all_account_data():
+            await self._generate_sync_entry_for_account_data(sync_result_builder)
 
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(

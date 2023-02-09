@@ -223,7 +223,7 @@ class FilterCollection:
             hs, room_filter_json.get("account_data", {})
         )
         self._presence_filter = Filter(hs, filter_json.get("presence", {}))
-        self._account_data = Filter(hs, filter_json.get("account_data", {}))
+        self._account_data_filter = Filter(hs, filter_json.get("account_data", {}))
 
         self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
@@ -259,7 +259,7 @@ class FilterCollection:
         return await self._presence_filter.filter(presence_states)
 
     async def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
-        return await self._account_data.filter(events)
+        return await self._account_data_filter.filter(events)
 
     async def filter_room_state(self, events: Iterable[EventBase]) -> List[EventBase]:
         return await self._room_state_filter.filter(
@@ -292,6 +292,13 @@ class FilterCollection:
         return (
             self._presence_filter.filters_all_types()
             or self._presence_filter.filters_all_senders()
+        )
+
+    def blocks_all_account_data(self) -> bool:
+        """True if all global acount data will be filtered out."""
+        return (
+            self._account_data_filter.filters_all_types()
+            or self._account_data_filter.filters_all_senders()
         )
 
     def blocks_all_room_ephemeral(self) -> bool:
