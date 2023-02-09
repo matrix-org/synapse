@@ -325,15 +325,12 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
             If the event is a state event, then this is the delta of the state between
              `state_group` and `state_group_before_event`
 
-        prev_group_for_state_group_after_event:
-            If it is known, ``state_group_after_event``'s previous state group.
+        prev_group_for_state_group_before_event:
+            If it is known, ``state_group_before_event``'s previous state group.
 
-             If the event is a state event, this is normally the same as
-             ``state_group_before_event``.
-
-        delta_ids_to_state_group_after_event:
-             If ``prev_group_for_state_group_after_event`` is not None, the state delta
-             between ``prev_group_for_state_group_after_event`` and ``state_group_after_event``.
+        delta_ids_to_state_group_before_event:
+             If ``prev_group_for_state_group_before_event`` is not None, the state delta
+             between ``prev_group_for_state_group_before_event`` and ``state_group_before_event``.
 
         partial_state:
             Whether the event has partial state.
