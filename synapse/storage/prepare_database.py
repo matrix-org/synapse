@@ -113,8 +113,7 @@ def prepare_database(
         # results in a warning in Postgres' logs per query. And we'd rather like to
         # avoid doing that.
         if isinstance(database_engine, Sqlite3Engine) or (
-            isinstance(database_engine, PostgresEngine)
-            and db_conn.autocommit
+            isinstance(database_engine, PostgresEngine) and db_conn.autocommit
         ):
             cur.execute("BEGIN TRANSACTION")
 
