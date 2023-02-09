@@ -232,9 +232,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-log"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5695ccff5060c13ca1751cf8c857a12da9b0bf0378cb071c5e0326f7c7e4c1b"
+checksum = "f9c8b57fe71fb5dcf38970ebedc2b1531cf1c14b1b9b4c560a182a57e115575c"
 dependencies = [
  "arc-swap",
  "log",
