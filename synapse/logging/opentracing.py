@@ -472,7 +472,7 @@ def init_tracer(hs: "HomeServer") -> None:
     # tag the Synapse instance name so that it's an easy jumping
     # off point into the logs. Can also be used to filter for an
     # instance that is under load.
-    tags.setdefault(SynapseTags.INSTANCE_NAME, hs.get_instance_name())
+    tags[SynapseTags.INSTANCE_NAME] = hs.get_instance_name()
 
     config = JaegerConfig(
         config=jaeger_config,
