@@ -336,8 +336,6 @@ pub enum KnownCondition {
     ExactEventPropertyContains(ExactEventMatchCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
     IsUserMention,
-    #[serde(rename = "org.matrix.msc3952.is_room_mention")]
-    IsRoomMention,
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -664,17 +662,6 @@ fn test_deserialize_unstable_msc3952_user_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::IsUserMention)
-    ));
-}
-
-#[test]
-fn test_deserialize_unstable_msc3952_room_condition() {
-    let json = r#"{"kind":"org.matrix.msc3952.is_room_mention"}"#;
-
-    let condition: Condition = serde_json::from_str(json).unwrap();
-    assert!(matches!(
-        condition,
-        Condition::Known(KnownCondition::IsRoomMention)
     ));
 }
 

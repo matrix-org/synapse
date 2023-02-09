@@ -149,7 +149,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         *,
         has_mentions: bool = False,
         user_mentions: Optional[Set[str]] = None,
-        room_mention: bool = False,
         related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
@@ -170,7 +169,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             _flatten_dict(event),
             has_mentions,
             user_mentions or set(),
-            room_mention,
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
@@ -228,27 +226,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
         )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
-        # since the BulkPushRuleEvaluator is what handles data sanitisation.
-
-    def test_room_mentions(self) -> None:
-        """Check for room mentions."""
-        condition = {"kind": "org.matrix.msc3952.is_room_mention"}
-
-        # No room mention shouldn't match.
-        evaluator = self._get_evaluator({}, has_mentions=True)
-        self.assertFalse(evaluator.matches(condition, None, None))
-
-        # Room mention should match.
-        evaluator = self._get_evaluator({}, has_mentions=True, room_mention=True)
-        self.assertTrue(evaluator.matches(condition, None, None))
-
-        # A room mention and user mention is valid.
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@another:test"}, room_mention=True
-        )
-        self.assertTrue(evaluator.matches(condition, None, None))
 
         # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
         # since the BulkPushRuleEvaluator is what handles data sanitisation.
