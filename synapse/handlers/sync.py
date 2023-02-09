@@ -1850,10 +1850,17 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
         user_id = sync_result_builder.sync_config.user.to_string()
 
-        # 0. Start by fetching room account data.
-        #
-        # TODO Do not fetch room account data if it will be unused.
-        if since_token and not sync_result_builder.full_state:
+        blocks_all_rooms = (
+            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+        )
+
+        # 0. Start by fetching room account data (if required).
+        if (
+            blocks_all_rooms
+            or sync_result_builder.sync_config.filter_collection.blocks_all_room_account_data()
+        ):
+            account_data_by_room = {}
+        elif since_token and not sync_result_builder.full_state:
             account_data_by_room = (
                 await self.store.get_updated_room_account_data_for_user(
                     user_id, since_token.account_data_key
@@ -1866,7 +1873,7 @@ class SyncHandler:
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         block_all_room_ephemeral = (
-            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+            blocks_all_rooms
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
         if block_all_room_ephemeral:
