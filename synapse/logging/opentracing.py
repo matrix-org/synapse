@@ -445,7 +445,7 @@ def init_tracer(hs: "HomeServer") -> None:
         opentracing = None  # type: ignore[assignment]
         return
 
-    if not opentracing or not JaegerConfig:
+    if opentracing is None or JaegerConfig is None:
         raise ConfigError(
             "The server has been configured to use opentracing but opentracing is not "
             "installed."
