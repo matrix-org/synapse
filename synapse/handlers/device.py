@@ -859,6 +859,7 @@ class DeviceHandler(DeviceWorkerHandler):
         known_hosts_at_join = await self.store.get_partial_state_servers_at_join(
             room_id
         )
+        assert known_hosts_at_join is not None
         potentially_changed_hosts.difference_update(known_hosts_at_join)
 
         potentially_changed_hosts.discard(self.server_name)

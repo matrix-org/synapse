@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Set, Union, cast
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
 import frozendict
 
@@ -22,7 +22,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.appservice import ApplicationService
-from synapse.events import FrozenEvent
+from synapse.events import FrozenEvent, make_event_from_dict
 from synapse.push.bulk_push_rule_evaluator import _flatten_dict
 from synapse.push.httppusher import tweaks_for_actions
 from synapse.rest import admin
@@ -37,11 +37,105 @@ from tests import unittest
 from tests.test_utils.event_injection import create_event, inject_member_event
 
 
+class FlattenDictTestCase(unittest.TestCase):
+    def test_simple(self) -> None:
+        """Test a dictionary that isn't modified."""
+        input = {"foo": "abc"}
+        self.assertEqual(input, _flatten_dict(input))
+
+    def test_nested(self) -> None:
+        """Nested dictionaries become dotted paths."""
+        input = {"foo": {"bar": "abc"}}
+        self.assertEqual({"foo.bar": "abc"}, _flatten_dict(input))
+
+        # If a field has a dot in it, escape it.
+        input = {"m.foo": {"b\\ar": "abc"}}
+        self.assertEqual({"m.foo.b\\ar": "abc"}, _flatten_dict(input))
+        self.assertEqual(
+            {"m\\.foo.b\\\\ar": "abc"},
+            _flatten_dict(input, msc3783_escape_event_match_key=True),
+        )
+
+    def test_non_string(self) -> None:
+        """Non-string items are dropped."""
+        input: Dict[str, Any] = {
+            "woo": "woo",
+            "foo": True,
+            "bar": 1,
+            "baz": None,
+            "fuzz": [],
+            "boo": {},
+        }
+        self.assertEqual({"woo": "woo"}, _flatten_dict(input))
+
+    def test_event(self) -> None:
+        """Events can also be flattened."""
+        event = make_event_from_dict(
+            {
+                "room_id": "!test:test",
+                "type": "m.room.message",
+                "sender": "@alice:test",
+                "content": {
+                    "msgtype": "m.text",
+                    "body": "Hello world!",
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": "<h1>Hello world!</h1>",
+                },
+            },
+            room_version=RoomVersions.V8,
+        )
+        expected = {
+            "content.msgtype": "m.text",
+            "content.body": "hello world!",
+            "content.format": "org.matrix.custom.html",
+            "content.formatted_body": "<h1>hello world!</h1>",
+            "room_id": "!test:test",
+            "sender": "@alice:test",
+            "type": "m.room.message",
+        }
+        self.assertEqual(expected, _flatten_dict(event))
+
+    def test_extensible_events(self) -> None:
+        """Extensible events has compatibility behaviour."""
+        event_dict = {
+            "room_id": "!test:test",
+            "type": "m.room.message",
+            "sender": "@alice:test",
+            "content": {
+                "org.matrix.msc1767.markup": [
+                    {"mimetype": "text/plain", "body": "Hello world!"},
+                    {"mimetype": "text/html", "body": "<h1>Hello world!</h1>"},
+                ]
+            },
+        }
+
+        # For a current room version, there's no special behavior.
+        event = make_event_from_dict(event_dict, room_version=RoomVersions.V8)
+        expected = {
+            "room_id": "!test:test",
+            "sender": "@alice:test",
+            "type": "m.room.message",
+        }
+        self.assertEqual(expected, _flatten_dict(event))
+
+        # For a room version with extensible events, they parse out the text/plain
+        # to a content.body property.
+        event = make_event_from_dict(event_dict, room_version=RoomVersions.MSC1767v10)
+        expected = {
+            "content.body": "hello world!",
+            "room_id": "!test:test",
+            "sender": "@alice:test",
+            "type": "m.room.message",
+        }
+        self.assertEqual(expected, _flatten_dict(event))
+
+
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
         self,
         content: JsonMapping,
         *,
+        has_mentions: bool = False,
         user_mentions: Optional[Set[str]] = None,
         room_mention: bool = False,
         related_events: Optional[JsonDict] = None,
@@ -62,6 +156,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
+            has_mentions,
             user_mentions or set(),
             room_mention,
             room_member_count,
@@ -102,19 +197,21 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         condition = {"kind": "org.matrix.msc3952.is_user_mention"}
 
         # No mentions shouldn't match.
-        evaluator = self._get_evaluator({})
+        evaluator = self._get_evaluator({}, has_mentions=True)
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, user_mentions=set())
+        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions=set())
         self.assertFalse(evaluator.matches(condition, "@user:test", None))
 
         # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator({}, user_mentions={"@user:test"})
+        evaluator = self._get_evaluator(
+            {}, has_mentions=True, user_mentions={"@user:test"}
+        )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
         evaluator = self._get_evaluator(
-            {}, user_mentions={"@another:test", "@user:test"}
+            {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
         )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
 
@@ -126,16 +223,16 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         condition = {"kind": "org.matrix.msc3952.is_room_mention"}
 
         # No room mention shouldn't match.
-        evaluator = self._get_evaluator({})
+        evaluator = self._get_evaluator({}, has_mentions=True)
         self.assertFalse(evaluator.matches(condition, None, None))
 
         # Room mention should match.
-        evaluator = self._get_evaluator({}, room_mention=True)
+        evaluator = self._get_evaluator({}, has_mentions=True, room_mention=True)
         self.assertTrue(evaluator.matches(condition, None, None))
 
         # A room mention and user mention is valid.
         evaluator = self._get_evaluator(
-            {}, user_mentions={"@another:test"}, room_mention=True
+            {}, has_mentions=True, user_mentions={"@another:test"}, room_mention=True
         )
         self.assertTrue(evaluator.matches(condition, None, None))
 

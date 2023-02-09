@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.64 where boolean power levels were erroneously permitted in [v10 rooms](https://spec.matrix.org/v1.5/rooms/v10/).

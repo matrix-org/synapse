@@ -267,7 +267,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def create_appservice_txn(
         self,
         service: ApplicationService,
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         one_time_keys_count: TransactionOneTimeKeysCount,

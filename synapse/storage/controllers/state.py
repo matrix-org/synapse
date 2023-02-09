@@ -569,10 +569,11 @@ class StateStorageController:
         is arbitrary for rooms with partial state.
         """
         # We have to read this list first to mitigate races with un-partial stating.
-        # This will be empty for rooms with full state.
         hosts_at_join = await self.stores.main.get_partial_state_servers_at_join(
             room_id
         )
+        if hosts_at_join is None:
+            hosts_at_join = frozenset()
 
         hosts_from_state = await self.stores.main.get_current_hosts_in_room(room_id)
 

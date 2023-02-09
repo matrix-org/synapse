@@ -31,7 +31,7 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.server import HomeServer
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester
+from synapse.types import Requester, UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -41,10 +41,12 @@ from tests.utils import mock_getRawHeaders
 
 
 class AuthTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = Mock()
 
-        hs.datastores.main = self.store
+        # type-ignore: datastores is None until hs.setup() is called---but it'll
+        # have been called by the HomeserverTestCase machinery.
+        hs.datastores.main = self.store  # type: ignore[union-attr]
         hs.get_auth_handler().store = self.store
         self.auth = Auth(hs)
 
@@ -61,7 +63,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.insert_client_ip = simple_async_mock(None)
         self.store.is_support_user = simple_async_mock(False)
 
-    def test_get_user_by_req_user_valid_token(self):
+    def test_get_user_by_req_user_valid_token(self) -> None:
         user_info = TokenLookupResult(
             user_id=self.test_user, token_id=5, device_id="device"
         )
@@ -74,7 +76,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         requester = self.get_success(self.auth.get_user_by_req(request))
         self.assertEqual(requester.user.to_string(), self.test_user)
 
-    def test_get_user_by_req_user_bad_token(self):
+    def test_get_user_by_req_user_bad_token(self) -> None:
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         request = Mock(args={})
@@ -86,7 +88,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(f.code, 401)
         self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
-    def test_get_user_by_req_user_missing_token(self):
+    def test_get_user_by_req_user_missing_token(self) -> None:
         user_info = TokenLookupResult(user_id=self.test_user, token_id=5)
         self.store.get_user_by_access_token = simple_async_mock(user_info)
 
@@ -98,7 +100,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(f.code, 401)
         self.assertEqual(f.errcode, "M_MISSING_TOKEN")
 
-    def test_get_user_by_req_appservice_valid_token(self):
+    def test_get_user_by_req_appservice_valid_token(self) -> None:
         app_service = Mock(
             token="foobar", url="a_url", sender=self.test_user, ip_range_whitelist=None
         )
@@ -112,7 +114,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         requester = self.get_success(self.auth.get_user_by_req(request))
         self.assertEqual(requester.user.to_string(), self.test_user)
 
-    def test_get_user_by_req_appservice_valid_token_good_ip(self):
+    def test_get_user_by_req_appservice_valid_token_good_ip(self) -> None:
         from netaddr import IPSet
 
         app_service = Mock(
@@ -131,7 +133,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         requester = self.get_success(self.auth.get_user_by_req(request))
         self.assertEqual(requester.user.to_string(), self.test_user)
 
-    def test_get_user_by_req_appservice_valid_token_bad_ip(self):
+    def test_get_user_by_req_appservice_valid_token_bad_ip(self) -> None:
         from netaddr import IPSet
 
         app_service = Mock(
@@ -153,7 +155,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(f.code, 401)
         self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
-    def test_get_user_by_req_appservice_bad_token(self):
+    def test_get_user_by_req_appservice_bad_token(self) -> None:
         self.store.get_app_service_by_token = Mock(return_value=None)
         self.store.get_user_by_access_token = simple_async_mock(None)
 
@@ -166,7 +168,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(f.code, 401)
         self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
-    def test_get_user_by_req_appservice_missing_token(self):
+    def test_get_user_by_req_appservice_missing_token(self) -> None:
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         self.store.get_user_by_access_token = simple_async_mock(None)
@@ -179,7 +181,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(f.code, 401)
         self.assertEqual(f.errcode, "M_MISSING_TOKEN")
 
-    def test_get_user_by_req_appservice_valid_token_valid_user_id(self):
+    def test_get_user_by_req_appservice_valid_token_valid_user_id(self) -> None:
         masquerading_user_id = b"@doppelganger:matrix.org"
         app_service = Mock(
             token="foobar", url="a_url", sender=self.test_user, ip_range_whitelist=None
@@ -200,7 +202,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             requester.user.to_string(), masquerading_user_id.decode("utf8")
         )
 
-    def test_get_user_by_req_appservice_valid_token_bad_user_id(self):
+    def test_get_user_by_req_appservice_valid_token_bad_user_id(self) -> None:
         masquerading_user_id = b"@doppelganger:matrix.org"
         app_service = Mock(
             token="foobar", url="a_url", sender=self.test_user, ip_range_whitelist=None
@@ -217,7 +219,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.get_failure(self.auth.get_user_by_req(request), AuthError)
 
     @override_config({"experimental_features": {"msc3202_device_masquerading": True}})
-    def test_get_user_by_req_appservice_valid_token_valid_device_id(self):
+    def test_get_user_by_req_appservice_valid_token_valid_device_id(self) -> None:
         """
         Tests that when an application service passes the device_id URL parameter
         with the ID of a valid device for the user in question,
@@ -249,7 +251,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(requester.device_id, masquerading_device_id.decode("utf8"))
 
     @override_config({"experimental_features": {"msc3202_device_masquerading": True}})
-    def test_get_user_by_req_appservice_valid_token_invalid_device_id(self):
+    def test_get_user_by_req_appservice_valid_token_invalid_device_id(self) -> None:
         """
         Tests that when an application service passes the device_id URL parameter
         with an ID that is not a valid device ID for the user in question,
@@ -279,7 +281,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(failure.value.code, 400)
         self.assertEqual(failure.value.errcode, Codes.EXCLUSIVE)
 
-    def test_get_user_by_req__puppeted_token__not_tracking_puppeted_mau(self):
+    def test_get_user_by_req__puppeted_token__not_tracking_puppeted_mau(self) -> None:
         self.store.get_user_by_access_token = simple_async_mock(
             TokenLookupResult(
                 user_id="@baldrick:matrix.org",
@@ -298,7 +300,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.get_success(self.auth.get_user_by_req(request))
         self.store.insert_client_ip.assert_called_once()
 
-    def test_get_user_by_req__puppeted_token__tracking_puppeted_mau(self):
+    def test_get_user_by_req__puppeted_token__tracking_puppeted_mau(self) -> None:
         self.auth._track_puppeted_user_ips = True
         self.store.get_user_by_access_token = simple_async_mock(
             TokenLookupResult(
@@ -318,7 +320,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.get_success(self.auth.get_user_by_req(request))
         self.assertEqual(self.store.insert_client_ip.call_count, 2)
 
-    def test_get_user_from_macaroon(self):
+    def test_get_user_from_macaroon(self) -> None:
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         user_id = "@baldrick:matrix.org"
@@ -336,7 +338,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             self.auth.get_user_by_access_token(serialized), InvalidClientTokenError
         )
 
-    def test_get_guest_user_from_macaroon(self):
+    def test_get_guest_user_from_macaroon(self) -> None:
         self.store.get_user_by_id = simple_async_mock({"is_guest": True})
         self.store.get_user_by_access_token = simple_async_mock(None)
 
@@ -357,7 +359,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertTrue(user_info.is_guest)
         self.store.get_user_by_id.assert_called_with(user_id)
 
-    def test_blocking_mau(self):
+    def test_blocking_mau(self) -> None:
         self.auth_blocking._limit_usage_by_mau = False
         self.auth_blocking._max_mau_value = 50
         lots_of_users = 100
@@ -381,7 +383,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_monthly_active_count = simple_async_mock(small_number_of_users)
         self.get_success(self.auth_blocking.check_auth_blocking())
 
-    def test_blocking_mau__depending_on_user_type(self):
+    def test_blocking_mau__depending_on_user_type(self) -> None:
         self.auth_blocking._max_mau_value = 50
         self.auth_blocking._limit_usage_by_mau = True
 
@@ -400,7 +402,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # Real users not allowed
         self.get_failure(self.auth_blocking.check_auth_blocking(), ResourceLimitError)
 
-    def test_blocking_mau__appservice_requester_allowed_when_not_tracking_ips(self):
+    def test_blocking_mau__appservice_requester_allowed_when_not_tracking_ips(
+        self,
+    ) -> None:
         self.auth_blocking._max_mau_value = 50
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._track_appservice_user_ips = False
@@ -418,7 +422,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             sender="@appservice:sender",
         )
         requester = Requester(
-            user="@appservice:server",
+            user=UserID.from_string("@appservice:server"),
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
@@ -428,7 +432,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.get_success(self.auth_blocking.check_auth_blocking(requester=requester))
 
-    def test_blocking_mau__appservice_requester_disallowed_when_tracking_ips(self):
+    def test_blocking_mau__appservice_requester_disallowed_when_tracking_ips(
+        self,
+    ) -> None:
         self.auth_blocking._max_mau_value = 50
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._track_appservice_user_ips = True
@@ -446,7 +452,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             sender="@appservice:sender",
         )
         requester = Requester(
-            user="@appservice:server",
+            user=UserID.from_string("@appservice:server"),
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
@@ -459,7 +465,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             ResourceLimitError,
         )
 
-    def test_reserved_threepid(self):
+    def test_reserved_threepid(self) -> None:
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._max_mau_value = 1
         self.store.get_monthly_active_count = simple_async_mock(2)
@@ -476,7 +482,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         self.get_success(self.auth_blocking.check_auth_blocking(threepid=threepid))
 
-    def test_hs_disabled(self):
+    def test_hs_disabled(self) -> None:
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(
@@ -486,7 +492,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEqual(e.value.code, 403)
 
-    def test_hs_disabled_no_server_notices_user(self):
+    def test_hs_disabled_no_server_notices_user(self) -> None:
         """Check that 'hs_disabled_message' works correctly when there is no
         server_notices user.
         """
@@ -503,7 +509,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEqual(e.value.code, 403)
 
-    def test_server_notices_mxid_special_cased(self):
+    def test_server_notices_mxid_special_cased(self) -> None:
         self.auth_blocking._hs_disabled = True
         user = "@user:server"
         self.auth_blocking._server_notices_mxid = user

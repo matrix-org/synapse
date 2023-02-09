@@ -17,7 +17,7 @@ from tests import unittest
 
 
 class ServerNameTestCase(unittest.TestCase):
-    def test_parse_server_name(self):
+    def test_parse_server_name(self) -> None:
         test_data = {
             "localhost": ("localhost", None),
             "my-example.com:1234": ("my-example.com", 1234),
@@ -32,7 +32,7 @@ class ServerNameTestCase(unittest.TestCase):
         for i, o in test_data.items():
             self.assertEqual(parse_server_name(i), o)
 
-    def test_validate_bad_server_names(self):
+    def test_validate_bad_server_names(self) -> None:
         test_data = [
             "",  # empty
             "localhost:http",  # non-numeric port

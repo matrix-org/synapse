@@ -36,7 +36,7 @@ from synapse.api.constants import (
     Membership,
     RelationTypes,
 )
-from synapse.api.room_versions import PushRuleRoomFlag, RoomVersion
+from synapse.api.room_versions import PushRuleRoomFlag
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -119,6 +119,9 @@ class BulkPushRuleEvaluator:
         self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
+        self._intentional_mentions_enabled = (
+            self.hs.config.experimental.msc3952_intentional_mentions
+        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -139,15 +142,34 @@ class BulkPushRuleEvaluator:
         Returns:
             Mapping of user ID to their push rules.
         """
-        # We get the users who may need to be notified by first fetching the
-        # local users currently in the room, finding those that have push rules,
-        # and *then* checking which users are actually allowed to see the event.
-        #
-        # The alternative is to first fetch all users that were joined at the
-        # event, but that requires fetching the full state at the event, which
-        # may be expensive for large rooms with few local users.
+        # If this is a membership event, only calculate push rules for the target.
+        # While it's possible for users to configure push rules to respond to such an
+        # event, in practise nobody does this. At the cost of violating the spec a
+        # little, we can skip fetching a huge number of push rules in large rooms.
+        # This helps make joins and leaves faster.
+        if event.type == EventTypes.Member:
+            local_users = []
+            # We never notify a user about their own actions. This is enforced in
+            # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
+            # do the same check here to avoid unnecessary DB queries.
+            if event.sender != event.state_key and self.hs.is_mine_id(event.state_key):
+                # Check the target is in the room, to avoid notifying them of
+                # e.g. a pre-emptive ban.
+                target_already_in_room = await self.store.check_local_user_in_room(
+                    event.state_key, event.room_id
+                )
+                if target_already_in_room:
+                    local_users = [event.state_key]
+        else:
+            # We get the users who may need to be notified by first fetching the
+            # local users currently in the room, finding those that have push rules,
+            # and *then* checking which users are actually allowed to see the event.
+            #
+            # The alternative is to first fetch all users that were joined at the
+            # event, but that requires fetching the full state at the event, which
+            # may be expensive for large rooms with few local users.
 
-        local_users = await self.store.get_local_users_in_room(event.room_id)
+            local_users = await self.store.get_local_users_in_room(event.room_id)
 
         # Filter out appservice users.
         local_users = [
@@ -163,6 +185,9 @@ class BulkPushRuleEvaluator:
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
                 local_users = list(local_users)
                 local_users.append(invited)
+
+        if not local_users:
+            return {}
 
         rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
@@ -246,7 +271,10 @@ class BulkPushRuleEvaluator:
                     related_event_id, allow_none=True
                 )
                 if related_event is not None:
-                    related_events[relation_type] = _flatten_dict(related_event)
+                    related_events[relation_type] = _flatten_dict(
+                        related_event,
+                        msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                    )
 
             reply_event_id = (
                 event.content.get("m.relates_to", {})
@@ -261,7 +289,10 @@ class BulkPushRuleEvaluator:
                 )
 
                 if related_event is not None:
-                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
+                    related_events["m.in_reply_to"] = _flatten_dict(
+                        related_event,
+                        msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                    )
 
                     # indicate that this is from a fallback relation.
                     if relation_type == "m.thread" and event.content.get(
@@ -364,9 +395,12 @@ class BulkPushRuleEvaluator:
 
         # Pull out any user and room mentions.
         mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
+        has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
         user_mentions: Set[str] = set()
         room_mention = False
-        if isinstance(mentions, dict):
+        if has_mentions:
+            # mypy seems to have lost the type even though it must be a dict here.
+            assert isinstance(mentions, dict)
             # Remove out any non-string items and convert to a set.
             user_mentions_raw = mentions.get("user_ids")
             if isinstance(user_mentions_raw, list):
@@ -377,7 +411,11 @@ class BulkPushRuleEvaluator:
             room_mention = mentions.get("room") is True
 
         evaluator = PushRuleEvaluator(
-            _flatten_dict(event, room_version=event.room_version),
+            _flatten_dict(
+                event,
+                msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+            ),
+            has_mentions,
             user_mentions,
             room_mention,
             room_member_count,
@@ -462,31 +500,64 @@ StateGroup = Union[object, int]
 
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
-    room_version: Optional[RoomVersion] = None,
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
+    *,
+    msc3783_escape_event_match_key: bool = False,
 ) -> Dict[str, str]:
+    """
+    Given a JSON dictionary (or event) which might contain sub dictionaries,
+    flatten it into a single layer dictionary by combining the keys & sub-keys.
+
+    Any (non-dictionary), non-string value is dropped.
+
+    Transforms:
+
+        {"foo": {"bar": "test"}}
+
+    To:
+
+        {"foo.bar": "test"}
+
+    Args:
+        d: The event or content to continue flattening.
+        prefix: The key prefix (from outer dictionaries).
+        result: The result to mutate.
+
+    Returns:
+        The resulting dictionary.
+    """
     if prefix is None:
         prefix = []
     if result is None:
         result = {}
     for key, value in d.items():
+        if msc3783_escape_event_match_key:
+            # Escape periods in the key with a backslash (and backslashes with an
+            # extra backslash). This is since a period is used as a separator between
+            # nested fields.
+            key = key.replace("\\", "\\\\").replace(".", "\\.")
+
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
-            _flatten_dict(value, prefix=(prefix + [key]), result=result)
+            _flatten_dict(
+                value,
+                prefix=(prefix + [key]),
+                result=result,
+                msc3783_escape_event_match_key=msc3783_escape_event_match_key,
+            )
 
     # `room_version` should only ever be set when looking at the top level of an event
     if (
-        room_version is not None
-        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in room_version.msc3931_push_features
-        and isinstance(d, EventBase)
+        isinstance(d, EventBase)
+        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in d.room_version.msc3931_push_features
     ):
         # Room supports extensible events: replace `content.body` with the plain text
         # representation from `m.markup`, as per MSC1767.
         markup = d.get("content").get("m.markup")
-        if room_version.identifier.startswith("org.matrix.msc1767."):
+        if d.room_version.identifier.startswith("org.matrix.msc1767."):
             markup = d.get("content").get("org.matrix.msc1767.markup")
         if markup is not None and isinstance(markup, list):
             text = ""

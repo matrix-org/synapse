@@ -63,6 +63,23 @@ pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
 }];
 
 pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
+    // We don't want to notify on edits. Not only can this be confusing in real
+    // time (2 notifications, one message) but it's especially confusing
+    // if a bridge needs to edit a previously backfilled message.
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_edits"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
+            EventMatchCondition {
+                key: Cow::Borrowed("content.m.relates_to.rel_type"),
+                pattern: Some(Cow::Borrowed("m.replace")),
+                pattern_type: None,
+            },
+        ))]),
+        actions: Cow::Borrowed(&[]),
+        default: true,
+        default_enabled: true,
+    },
     PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
         priority_class: 5,
@@ -132,7 +149,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed(".org.matrix.msc3952.is_user_mentioned"),
+        rule_id: Cow::Borrowed(".org.matrix.msc3952.is_user_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::IsUserMention)]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
@@ -148,7 +165,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed(".org.matrix.msc3952.is_room_mentioned"),
+        rule_id: Cow::Borrowed(".org.matrix.msc3952.is_room_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::IsRoomMention),
@@ -156,7 +173,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 key: Cow::Borrowed("room"),
             }),
         ]),
-        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
+        actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION]),
         default: true,
         default_enabled: true,
     },

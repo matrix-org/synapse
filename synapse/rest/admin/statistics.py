@@ -16,8 +16,9 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.constants import Direction
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.servlet import RestServlet, parse_integer, parse_string
+from synapse.http.servlet import RestServlet, parse_enum, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.storage.databases.main.stats import UserSortOrder
@@ -102,13 +103,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        direction = parse_string(request, "dir", default="f")
-        if direction not in ("f", "b"):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
-                errcode=Codes.INVALID_PARAM,
-            )
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
         users_media, total = await self.store.get_users_media_usage_paginate(
             start, limit, from_ts, until_ts, order_by, direction, search_term
