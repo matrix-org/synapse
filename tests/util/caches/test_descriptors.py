@@ -282,7 +282,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         class Cls:
             @descriptors.cached()
-            def fn(self, arg1: int) -> Deferred[int]:
+            def fn(self, arg1: int) -> "Deferred[int]":
                 @defer.inlineCallbacks
                 def inner_fn() -> Generator["Deferred[Any]", Any, int]:
                     with PreserveLoggingContext():
