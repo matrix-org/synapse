@@ -22,7 +22,7 @@ from synapse.storage.engines._base import (
     IncorrectDatabaseSetup,
     IsolationLevel,
 )
-from synapse.storage.types import Cursor
+from synapse.storage.types import Cursor, DBAPI2Module
 
 if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
@@ -35,7 +35,9 @@ class PostgresEngine(
     BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
 ):
     def __init__(self, database_config: Mapping[str, Any]):
-        super().__init__(psycopg2, database_config)
+        # Cast: mypy 1.0.0 doesn't seem to think that the module implements the protocol.
+        # AFAICS this is a false positive.
+        super().__init__(cast(DBAPI2Module, psycopg2), database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do

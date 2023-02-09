@@ -64,7 +64,9 @@ except ImportError:
 try:
     from canonicaljson import set_json_library
 
-    set_json_library(json)
+    # type-ignore: I think there has been a regression in mypy 1.0.0 in how it checks
+    # modules against Protocols.
+    set_json_library(json)  # type: ignore[arg-type]
 except ImportError:
     pass
 

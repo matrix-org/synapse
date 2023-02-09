@@ -15,10 +15,10 @@ import platform
 import sqlite3
 import struct
 import threading
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, cast
 
 from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.types import Cursor
+from synapse.storage.types import Cursor, DBAPI2Module
 
 if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
@@ -26,7 +26,9 @@ if TYPE_CHECKING:
 
 class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
     def __init__(self, database_config: Mapping[str, Any]):
-        super().__init__(sqlite3, database_config)
+        # Cast: mypy 1.0.0 doesn't seem to think that the module implements the protocol.
+        # AFAICS this is a false positive.
+        super().__init__(cast(DBAPI2Module, sqlite3), database_config)
 
         database = database_config.get("args", {}).get("database")
         self._is_in_memory = database in (
