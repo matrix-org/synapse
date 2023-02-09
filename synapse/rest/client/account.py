@@ -770,7 +770,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         try:
-            ret = await self.auth_handler.delete_threepid(
+            ret = await self.auth_handler.delete_and_unbind_threepid(
                 user_id, body.medium, body.address, body.id_server
             )
         except Exception:

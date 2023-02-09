@@ -1595,7 +1595,7 @@ class AuthHandler:
         # has successfully been created.
         await self._third_party_rules.on_threepid_bind(user_id, medium, address)
 
-    async def delete_threepid(
+    async def delete_and_unbind_threepid(
         self, user_id: str, medium: str, address: str, id_server: Optional[str] = None
     ) -> bool:
         """Attempts to unbind the 3pid on the identity servers and deletes it

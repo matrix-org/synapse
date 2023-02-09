@@ -105,7 +105,7 @@ class DeactivateAccountHandler:
         threepids = await self.store.user_get_threepids(user_id)
         for threepid in threepids:
             try:
-                result = await self._auth_handler.delete_threepid(
+                result = await self._auth_handler.delete_and_unbind_threepid(
                     user_id, threepid["medium"], threepid["address"], id_server
                 )
             except Exception:

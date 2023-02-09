@@ -14,6 +14,7 @@
 
 #![feature(test)]
 use std::collections::BTreeSet;
+
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
 };
