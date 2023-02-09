@@ -1779,6 +1779,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1780"><a class="header" href="#upgrading-to-v1780">Upgrading to v1.78.0</a></h1>
+<h2 id="deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api"><a class="header" href="#deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api">Deprecate the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code> admin API</a></h2>
+<p>Synapse 1.78.0 replaces the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code>
+admin API with an identical endpoint at <code>/_synapse/admin/v1/media/delete</code>. Please
+update your tooling to use the new endpoint. The deprecated version will be removed
+in a future release.</p>
 <h1 id="upgrading-to-v1760"><a class="header" href="#upgrading-to-v1760">Upgrading to v1.76.0</a></h1>
 <h2 id="faster-joins-are-enabled-by-default"><a class="header" href="#faster-joins-are-enabled-by-default">Faster joins are enabled by default</a></h2>
 <p>When joining a room for the first time, Synapse 1.76.0 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.</p>
@@ -11577,13 +11583,18 @@ See also <a href="admin_api/media_admin_api.html#purge-remote-media-api">Purge R
 </ul>
 <h2 id="delete-local-media-by-date-or-size"><a class="header" href="#delete-local-media-by-date-or-size">Delete local media by date or size</a></h2>
 <p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/delete?before_ts=&lt;before_ts&gt;
+
+{}
+</code></pre>
+<p><em>Deprecated in Synapse v1.78.0:</em> This API is available at the deprecated endpoint:</p>
 <pre><code>POST /_synapse/admin/v1/media/&lt;server_name&gt;/delete?before_ts=&lt;before_ts&gt;
 
 {}
 </code></pre>
 <p>URL Parameters</p>
 <ul>
-<li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>).</li>
+<li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>). <em>Deprecated in Synapse v1.78.0.</em></li>
 <li><code>before_ts</code>: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
 last access, not the timestamp when the file was created.</li>
