@@ -188,3 +188,8 @@ class ExperimentalConfig(Config):
         self.msc3958_supress_edit_notifs = experimental.get(
             "msc3958_supress_edit_notifs", False
         )
+
+        # MSC3966: exact_event_property_contains push rule condition.
+        self.msc3966_exact_event_property_contains = experimental.get(
+            "msc3966_exact_event_property_contains", False
+        )

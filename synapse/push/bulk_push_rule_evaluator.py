@@ -43,7 +43,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
-from synapse.types import SimpleJsonValue
+from synapse.types import JsonValue
 from synapse.types.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
@@ -259,13 +259,13 @@ class BulkPushRuleEvaluator:
 
     async def _related_events(
         self, event: EventBase
-    ) -> Dict[str, Dict[str, SimpleJsonValue]]:
+    ) -> Dict[str, Dict[str, JsonValue]]:
         """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
 
         Returns:
             Mapping of relation type to flattened events.
         """
-        related_events: Dict[str, Dict[str, SimpleJsonValue]] = {}
+        related_events: Dict[str, Dict[str, JsonValue]] = {}
         if self._related_event_match_enabled:
             related_event_id = event.content.get("m.relates_to", {}).get("event_id")
             relation_type = event.content.get("m.relates_to", {}).get("rel_type")
@@ -429,6 +429,7 @@ class BulkPushRuleEvaluator:
             event.room_version.msc3931_push_features,
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
             self.hs.config.experimental.msc3758_exact_event_match,
+            self.hs.config.experimental.msc3966_exact_event_property_contains,
         )
 
         users = rules_by_user.keys()
@@ -502,18 +503,22 @@ RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
 
 
+def _is_simple_value(value: Any) -> bool:
+    return isinstance(value, (bool, str)) or type(value) is int or value is None
+
+
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
-    result: Optional[Dict[str, SimpleJsonValue]] = None,
+    result: Optional[Dict[str, JsonValue]] = None,
     *,
     msc3783_escape_event_match_key: bool = False,
-) -> Dict[str, SimpleJsonValue]:
+) -> Dict[str, JsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
     flatten it into a single layer dictionary by combining the keys & sub-keys.
 
-    String, integer, boolean, and null values are kept. All others are dropped.
+    String, integer, boolean, null or lists of those values are kept. All others are dropped.
 
     Transforms:
 
@@ -542,8 +547,10 @@ def _flatten_dict(
             # nested fields.
             key = key.replace("\\", "\\\\").replace(".", "\\.")
 
-        if isinstance(value, (bool, str)) or type(value) is int or value is None:
+        if _is_simple_value(value):
             result[".".join(prefix + [key])] = value
+        elif isinstance(value, (list, tuple)):
+            result[".".join(prefix + [key])] = [v for v in value if _is_simple_value(v)]
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
             _flatten_dict(

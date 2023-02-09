@@ -58,7 +58,7 @@ use anyhow::{Context, Error};
 use log::warn;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyLong, PyString};
+use pyo3::types::{PyBool, PyList, PyLong, PyString};
 use pythonize::{depythonize, pythonize};
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
@@ -280,6 +280,37 @@ impl<'source> FromPyObject<'source> for SimpleJsonValue {
     }
 }
 
+/// A JSON values (list, string, int, boolean, or null).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum JsonValue {
+    Array(Vec<SimpleJsonValue>),
+    Value(SimpleJsonValue),
+}
+
+impl<'source> FromPyObject<'source> for JsonValue {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        if let Ok(l) = <PyList as pyo3::PyTryFrom>::try_from(ob) {
+            if let Ok(a) = l.iter().map(SimpleJsonValue::extract).collect() {
+                Ok(JsonValue::Array(a))
+            } else {
+                // TOOD How to get a good error?
+                Err(PyTypeError::new_err(format!(
+                    "Can't convert from {} to JsonValue::Array",
+                    ob.get_type().name()?
+                )))
+            }
+        } else if let Ok(v) = SimpleJsonValue::extract(ob) {
+            Ok(JsonValue::Value(v))
+        } else {
+            Err(PyTypeError::new_err(format!(
+                "Can't convert from {} to JsonValue",
+                ob.get_type().name()?
+            )))
+        }
+    }
+}
+
 /// A condition used in push rules to match against an event.
 ///
 /// We need this split as `serde` doesn't give us the ability to have a
@@ -303,6 +334,8 @@ pub enum KnownCondition {
     ExactEventMatch(ExactEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
+    #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
+    ExactEventPropertyContains(ExactEventMatchCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
     IsUserMention,
     #[serde(rename = "org.matrix.msc3952.is_room_mention")]
