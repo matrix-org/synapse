@@ -63,7 +63,7 @@ from tests.http import (
     get_test_ca_cert_file,
 )
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
-from tests.utils import default_config, checked_cast
+from tests.utils import checked_cast, default_config
 
 logger = logging.getLogger(__name__)
 

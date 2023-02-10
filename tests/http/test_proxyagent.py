@@ -14,7 +14,7 @@
 import base64
 import logging
 import os
-from typing import List, Optional, cast
+from typing import List, Optional
 from unittest.mock import patch
 
 import treq

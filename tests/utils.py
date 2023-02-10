@@ -15,7 +15,7 @@
 
 import atexit
 import os
-from typing import Any, Callable, Dict, List, Tuple, Union, overload, TypeVar, Type
+from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union, overload
 
 import attr
 from typing_extensions import Literal, ParamSpec
