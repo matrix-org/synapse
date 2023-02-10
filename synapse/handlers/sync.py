@@ -1445,7 +1445,7 @@ class SyncHandler:
         logger.debug("Fetching account data")
 
         # Account data is included if it is not filtered out.
-        if not sync_config.filter_collection.blocks_all_account_data():
+        if not sync_config.filter_collection.blocks_all_global_account_data():
             await self._generate_sync_entry_for_account_data(sync_result_builder)
 
         # Presence data is included if the server has it enabled and not filtered out.
@@ -1763,11 +1763,13 @@ class SyncHandler:
                 sync_config.user
             )
 
-        account_data_for_user = await sync_config.filter_collection.filter_account_data(
-            [
-                {"type": account_data_type, "content": content}
-                for account_data_type, content in global_account_data.items()
-            ]
+        account_data_for_user = (
+            await sync_config.filter_collection.filter_global_account_data(
+                [
+                    {"type": account_data_type, "content": content}
+                    for account_data_type, content in global_account_data.items()
+                ]
+            )
         )
 
         sync_result_builder.account_data = account_data_for_user
