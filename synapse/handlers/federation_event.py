@@ -528,8 +528,8 @@ class FederationEventHandler:
             if partial_state:
                 # When handling a second partial state join into a partial state room,
                 # the returned state will exclude the membership from the first join. To
-                # preserve prior memberships, we try to compute the state before the
-                # event ourselves if we know about any of the prev events.
+                # preserve prior memberships, we try to compute the partial state before
+                # the event ourselves if we know about any of the prev events.
                 #
                 # When we don't know about any of the prev events, it's fine to just use
                 # the returned state, since the new join will create a new forward
