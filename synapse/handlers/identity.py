@@ -252,13 +252,13 @@ class IdentityHandler:
 
         changed = True
         for id_server in id_servers:
-            changed &= await self.try_unbind_threepid_with_id_server(
+            changed &= await self._try_unbind_threepid_with_id_server(
                 mxid, medium, address, id_server
             )
 
         return changed
 
-    async def try_unbind_threepid_with_id_server(
+    async def _try_unbind_threepid_with_id_server(
         self, mxid: str, medium: str, address: str, id_server: str
     ) -> bool:
         """Removes a binding from an identity server
