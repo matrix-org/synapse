@@ -770,8 +770,13 @@ class ThreepidDeleteRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         try:
-            ret = await self.auth_handler.delete_and_unbind_threepid(
-                user_id, body.medium, body.address, body.id_server
+            ret = await self.hs.get_identity_handler().try_unbind_threepid(
+                user_id,
+                {
+                    "medium": body.medium,
+                    "address": body.address,
+                    "id_server": body.id_server,
+                },
             )
         except Exception:
             # NB. This endpoint should succeed if there is nothing to
@@ -779,6 +784,11 @@ class ThreepidDeleteRestServlet(RestServlet):
             # that we ought to care about.
             logger.exception("Failed to remove threepid")
             raise SynapseError(500, "Failed to remove threepid")
+
+        # Remove the local threepid association
+        await self.auth_handler.delete_local_threepid(
+            user_id, body.medium, body.address
+        )
 
         if ret:
             id_server_unbind_result = "success"

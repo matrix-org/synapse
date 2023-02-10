@@ -304,8 +304,13 @@ class UserRestServletV2(RestServlet):
                 # remove old threepids
                 for medium, address in del_threepids:
                     try:
-                        await self.auth_handler.delete_and_unbind_threepid(
-                            user_id, medium, address, None
+                        await self.hs.get_identity_handler().try_unbind_threepid(
+                            user_id,
+                            {"medium": medium, "address": address, "id_server": None},
+                        )
+
+                        await self.auth_handler.delete_local_threepid(
+                            user_id, medium, address
                         )
                     except Exception:
                         logger.exception("Failed to remove threepids")

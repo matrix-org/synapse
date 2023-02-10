@@ -100,13 +100,17 @@ class DeactivateAccountHandler:
         # unbinding
         identity_server_supports_unbinding = True
 
-        # Remove any threepids associated with this account locally and attempt to
-        # unbind them from identity server(s).
-        threepids = await self.store.user_get_threepids(user_id)
-        for threepid in threepids:
+        # Delete any known bindings of this user's 3PIDs on identity servers.
+        bound_threepids = await self.store.user_get_bound_threepids(user_id)
+        for threepid in bound_threepids:
             try:
-                result = await self._auth_handler.delete_and_unbind_threepid(
-                    user_id, threepid["medium"], threepid["address"], id_server
+                result = await self.hs.get_identity_handler().try_unbind_threepid(
+                    user_id,
+                    {
+                        "medium": threepid["medium"],
+                        "address": threepid["address"],
+                        "id_server": id_server,
+                    },
                 )
             except Exception:
                 # Do we want this to be a fatal error or should we carry on?
@@ -114,6 +118,13 @@ class DeactivateAccountHandler:
                 raise SynapseError(400, "Failed to remove threepid from ID server")
 
             identity_server_supports_unbinding &= result
+
+        # Delete all threepids associated with this account.
+        local_threepids = await self.store.user_get_threepids(user_id)
+        for threepid in local_threepids:
+            await self._auth_handler.delete_local_threepid(
+                user_id, threepid["medium"], threepid["address"]
+            )
 
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
