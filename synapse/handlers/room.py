@@ -1076,7 +1076,7 @@ class RoomCreationHandler:
         state_map: MutableStateMap[str] = {}
         # current_state_group of last event created. Used for computing event context of
         # events to be batched
-        current_state_group = None
+        current_state_group: Optional[int] = None
 
         def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
