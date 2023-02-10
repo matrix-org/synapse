@@ -734,12 +734,7 @@ class ThreepidUnbindRestServlet(RestServlet):
         # Attempt to unbind the threepid from an identity server. If id_server is None, try to
         # unbind from all identity servers this threepid has been added to in the past
         result = await self.identity_handler.try_unbind_threepid(
-            requester.user.to_string(),
-            {
-                "address": body.address,
-                "medium": body.medium,
-                "id_server": body.id_server,
-            },
+            requester.user.to_string(), body.address, body.medium, body.id_server
         )
         return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
