@@ -14,7 +14,7 @@
 import base64
 import logging
 import os
-from typing import List, Optional
+from typing import List, Optional, cast
 from unittest.mock import patch
 
 import treq
@@ -43,6 +43,7 @@ from tests.http import (
 )
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
 from tests.unittest import TestCase
+from tests.utils import checked_cast
 
 logger = logging.getLogger(__name__)
 
@@ -620,7 +621,6 @@ class MatrixFederationAgentTests(TestCase):
         server_ssl_protocol = _wrap_server_factory_for_tls(
             _get_test_protocol_factory()
         ).buildProtocol(dummy_address)
-        assert isinstance(server_ssl_protocol, TLSMemoryBIOProtocol)
 
         # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
         proxy_server_transport = proxy_server.transport
@@ -757,12 +757,14 @@ class MatrixFederationAgentTests(TestCase):
         assert isinstance(proxy_server, HTTPChannel)
 
         # fish the transports back out so that we can do the old switcheroo
-        s2c_transport = proxy_server.transport
-        assert isinstance(s2c_transport, FakeTransport)
-        client_protocol = s2c_transport.other
-        assert isinstance(client_protocol, _WrappingProtocol)
-        c2s_transport = client_protocol.transport
-        assert isinstance(c2s_transport, FakeTransport)
+        # To help mypy out with the various Protocols and wrappers and mocks, we do
+        # some explicit casting. Without the casts, we hit the bug I reported at
+        # https://github.com/Shoobx/mypy-zope/issues/91 .
+        # We also double-checked these casts at runtime (test-time) because I found it
+        # quite confusing to deduce these types in the first place!
+        s2c_transport = checked_cast(FakeTransport, proxy_server.transport)
+        client_protocol = checked_cast(_WrappingProtocol, s2c_transport.other)
+        c2s_transport = checked_cast(FakeTransport, client_protocol.transport)
 
         # the FakeTransport is async, so we need to pump the reactor
         self.reactor.advance(0)
@@ -822,9 +824,9 @@ class MatrixFederationAgentTests(TestCase):
     @patch.dict(os.environ, {"http_proxy": "proxy.com:8888"})
     def test_proxy_with_no_scheme(self) -> None:
         http_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
-        assert isinstance(http_proxy_agent.http_proxy_endpoint, HostnameEndpoint)
-        self.assertEqual(http_proxy_agent.http_proxy_endpoint._hostStr, "proxy.com")
-        self.assertEqual(http_proxy_agent.http_proxy_endpoint._port, 8888)
+        proxy_ep = checked_cast(HostnameEndpoint, http_proxy_agent.http_proxy_endpoint)
+        self.assertEqual(proxy_ep._hostStr, "proxy.com")
+        self.assertEqual(proxy_ep._port, 8888)
 
     @patch.dict(os.environ, {"http_proxy": "socks://proxy.com:8888"})
     def test_proxy_with_unsupported_scheme(self) -> None:
@@ -834,25 +836,21 @@ class MatrixFederationAgentTests(TestCase):
     @patch.dict(os.environ, {"http_proxy": "http://proxy.com:8888"})
     def test_proxy_with_http_scheme(self) -> None:
         http_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
-        assert isinstance(http_proxy_agent.http_proxy_endpoint, HostnameEndpoint)
-        self.assertEqual(http_proxy_agent.http_proxy_endpoint._hostStr, "proxy.com")
-        self.assertEqual(http_proxy_agent.http_proxy_endpoint._port, 8888)
+        proxy_ep = checked_cast(HostnameEndpoint, http_proxy_agent.http_proxy_endpoint)
+        self.assertEqual(proxy_ep._hostStr, "proxy.com")
+        self.assertEqual(proxy_ep._port, 8888)
 
     @patch.dict(os.environ, {"http_proxy": "https://proxy.com:8888"})
     def test_proxy_with_https_scheme(self) -> None:
         https_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
-        assert isinstance(https_proxy_agent.http_proxy_endpoint, _WrapperEndpoint)
-        self.assertEqual(
-            https_proxy_agent.http_proxy_endpoint._wrappedEndpoint._hostStr, "proxy.com"
-        )
-        self.assertEqual(
-            https_proxy_agent.http_proxy_endpoint._wrappedEndpoint._port, 8888
-        )
+        proxy_ep = checked_cast(_WrapperEndpoint, https_proxy_agent.http_proxy_endpoint)
+        self.assertEqual(proxy_ep._wrappedEndpoint._hostStr, "proxy.com")
+        self.assertEqual(proxy_ep._wrappedEndpoint._port, 8888)
 
 
 def _wrap_server_factory_for_tls(
     factory: IProtocolFactory, sanlist: Optional[List[bytes]] = None
-) -> IProtocolFactory:
+) -> TLSMemoryBIOFactory:
     """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
 
     The resultant factory will create a TLS server which presents a certificate
