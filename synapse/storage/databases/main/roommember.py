@@ -155,14 +155,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000, iterable=True)
     async def get_users_in_room(self, room_id: str) -> Sequence[str]:
-        """
-        Returns a list of users in the room sorted by longest in the room first
-        (aka. with the lowest depth). This is done to match the sort in
-        `get_current_hosts_in_room()` and so we can re-use the cache but it's
-        not horrible to have here either.
-
-        Uses `m.room.member`s in the room state at the current forward extremities to
-        determine which users are in the room.
+        """Returns a list of users in the room.
 
         Will return inaccurate results for rooms with partial state, since the state for
         the forward extremities of those rooms will exclude most members. We may also
