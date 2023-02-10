@@ -340,6 +340,12 @@ pub enum KnownCondition {
     RelatedEventMatchType(RelatedEventMatchTypeCondition),
     #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
     ExactEventPropertyContains(ExactEventMatchCondition),
+    // Identical to exact_event_property_contains but gives predefined patterns. Cannot be added by users.
+    #[serde(
+        skip_deserializing,
+        rename = "org.matrix.msc3966.exact_event_property_contains"
+    )]
+    ExactEventPropertyContainsType(ExactEventMatchTypeCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
     IsUserMention,
     ContainsDisplayName,
@@ -396,6 +402,15 @@ pub struct EventMatchTypeCondition {
 pub struct ExactEventMatchCondition {
     pub key: Cow<'static, str>,
     pub value: Cow<'static, SimpleJsonValue>,
+}
+
+/// The body of a [`Condition::ExactEventMatch`] that uses user_id or user_localpart as a pattern.
+#[derive(Serialize, Debug, Clone)]
+pub struct ExactEventMatchTypeCondition {
+    pub key: Cow<'static, str>,
+    // During serialization, the pattern_type property gets replaced with a
+    // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
+    pub value_type: Cow<'static, EventMatchPatternType>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]

@@ -310,8 +310,30 @@ impl PushRuleEvaluator {
                     Some(Cow::Borrowed(pattern)),
                 )?
             }
-            KnownCondition::ExactEventPropertyContains(exact_event_match) => {
-                self.match_exact_event_property_contains(exact_event_match)?
+            KnownCondition::ExactEventPropertyContains(exact_event_match) => self
+                .match_exact_event_property_contains(
+                    exact_event_match.key.clone(),
+                    exact_event_match.value.clone(),
+                )?,
+            KnownCondition::ExactEventPropertyContainsType(exact_event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
+                } else {
+                    return Ok(false);
+                };
+
+                let pattern = match &*exact_event_match.value_type {
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
+                };
+
+                self.match_exact_event_property_contains(
+                    exact_event_match.key.clone(),
+                    Cow::Borrowed(&SimpleJsonValue::Str(pattern.to_string())),
+                )?
             }
             KnownCondition::IsUserMention => {
                 if let Some(uid) = user_id {
@@ -456,24 +478,21 @@ impl PushRuleEvaluator {
     /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
     fn match_exact_event_property_contains(
         &self,
-        exact_event_match: &ExactEventMatchCondition,
+        key: Cow<str>,
+        value: Cow<SimpleJsonValue>,
     ) -> Result<bool, Error> {
         // First check if the feature is enabled.
         if !self.msc3966_exact_event_property_contains {
             return Ok(false);
         }
 
-        let value = &exact_event_match.value;
-
-        let haystack = if let Some(JsonValue::Array(haystack)) =
-            self.flattened_keys.get(&*exact_event_match.key)
-        {
+        let haystack = if let Some(JsonValue::Array(haystack)) = self.flattened_keys.get(&*key) {
             haystack
         } else {
             return Ok(false);
         };
 
-        Ok(haystack.contains(&**value))
+        Ok(haystack.contains(&value))
     }
 
     /// Match the member count against an 'is' condition
