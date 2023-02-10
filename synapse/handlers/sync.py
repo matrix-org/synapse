@@ -1519,7 +1519,7 @@ class SyncHandler:
             one_time_keys_count = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
-            unused_fallback_key_types = (
+            unused_fallback_key_types = list(
                 await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
@@ -2301,7 +2301,7 @@ class SyncHandler:
         sync_result_builder: "SyncResultBuilder",
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
-        tags: Optional[Dict[str, Dict[str, Any]]],
+        tags: Optional[Mapping[str, Mapping[str, Any]]],
         account_data: Mapping[str, JsonDict],
         always_include: bool = False,
     ) -> None:

@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -149,7 +150,7 @@ class BulkPushRuleEvaluator:
         # little, we can skip fetching a huge number of push rules in large rooms.
         # This helps make joins and leaves faster.
         if event.type == EventTypes.Member:
-            local_users = []
+            local_users: Sequence[str] = []
             # We never notify a user about their own actions. This is enforced in
             # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
             # do the same check here to avoid unnecessary DB queries.
@@ -184,7 +185,6 @@ class BulkPushRuleEvaluator:
         if event.type == EventTypes.Member and event.membership == Membership.INVITE:
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
-                local_users = list(local_users)
                 local_users.append(invited)
 
         if not local_users:

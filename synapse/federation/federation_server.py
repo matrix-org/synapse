@@ -23,6 +23,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -1512,7 +1513,7 @@ class FederationHandlerRegistry:
 def _get_event_ids_for_partial_state_join(
     join_event: EventBase,
     prev_state_ids: StateMap[str],
-    summary: Dict[str, MemberSummary],
+    summary: Mapping[str, MemberSummary],
 ) -> Collection[str]:
     """Calculate state to be returned in a partial_state send_join
 

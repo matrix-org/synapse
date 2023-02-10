@@ -1928,6 +1928,6 @@ class RoomShutdownHandler:
         return {
             "kicked_users": kicked_users,
             "failed_to_kick_users": failed_to_kick_users,
-            "local_aliases": aliases_for_room,
+            "local_aliases": list(aliases_for_room),
             "new_room_id": new_room_id,
         }
