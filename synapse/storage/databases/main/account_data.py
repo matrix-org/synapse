@@ -21,6 +21,7 @@ from typing import (
     FrozenSet,
     Iterable,
     List,
+    Mapping,
     Optional,
     Tuple,
     cast,
@@ -124,9 +125,9 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached()
     async def get_global_account_data_for_user(
         self, user_id: str
-    ) -> Dict[str, JsonDict]:
+    ) -> Mapping[str, JsonDict]:
         """
-        Get all the client account_data for a user.
+        Get all the global client account_data for a user.
 
         If experimental MSC3391 support is enabled, any entries with an empty
         content body are excluded; as this means they have been deleted.
@@ -169,9 +170,9 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached()
     async def get_room_account_data_for_user(
         self, user_id: str
-    ) -> Dict[str, Dict[str, JsonDict]]:
+    ) -> Mapping[str, Mapping[str, JsonDict]]:
         """
-        Get all the client account_data for a user.
+        Get all of the per-room client account_data for a user.
 
         If experimental MSC3391 support is enabled, any entries with an empty
         content body are excluded; as this means they have been deleted.
@@ -180,7 +181,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             user_id: The user to get the account_data for.
 
         Returns:
-            A  dict mapping from room_id string to per room account_data dicts.
+            A dict mapping from room_id string to per-room account_data dicts.
         """
 
         def get_room_account_data_for_user_txn(

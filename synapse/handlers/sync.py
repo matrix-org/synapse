@@ -1444,7 +1444,7 @@ class SyncHandler:
 
         logger.debug("Fetching account data")
 
-        # Account data is included if it is not filtered out.
+        # Global account data is included if it is not filtered out.
         if not sync_config.filter_collection.blocks_all_global_account_data():
             await self._generate_sync_entry_for_account_data(sync_result_builder)
 
@@ -1716,22 +1716,18 @@ class SyncHandler:
     async def _generate_sync_entry_for_account_data(
         self, sync_result_builder: "SyncResultBuilder"
     ) -> None:
-        """Generates the account data portion of the sync response.
+        """Generates the global account data portion of the sync response.
 
         Account data (called "Client Config" in the spec) can be set either globally
         or for a specific room. Account data consists of a list of events which
         accumulate state, much like a room.
 
-        This function retrieves global and per-room account data. The former is written
-        to the given `sync_result_builder`. The latter is returned directly, to be
-        later written to the `sync_result_builder` on a room-by-room basis.
+        This function retrieves global account data and writes it to the given
+        `sync_result_builder`. See `_generate_sync_entry_for_rooms` for handling
+         of per-room account data.
 
         Args:
             sync_result_builder
-
-        Returns:
-            A dictionary whose keys (room ids) map to the per room account data for that
-            room.
         """
         sync_config = sync_result_builder.sync_config
         user_id = sync_result_builder.sync_config.user.to_string()
@@ -1754,11 +1750,11 @@ class SyncHandler:
                     sync_config.user
                 )
         else:
-            global_account_data = await self.store.get_global_account_data_for_user(
+            all_global_account_data = await self.store.get_global_account_data_for_user(
                 user_id
             )
 
-            global_account_data = dict(global_account_data)
+            global_account_data = dict(all_global_account_data)
             global_account_data["m.push_rules"] = await self.push_rules_for_user(
                 sync_config.user
             )
@@ -1865,7 +1861,7 @@ class SyncHandler:
             blocks_all_rooms
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_account_data()
         ):
-            account_data_by_room = {}
+            account_data_by_room: Mapping[str, Mapping[str, JsonDict]] = {}
         elif since_token and not sync_result_builder.full_state:
             account_data_by_room = (
                 await self.store.get_updated_room_account_data_for_user(
@@ -2306,7 +2302,7 @@ class SyncHandler:
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
         tags: Optional[Dict[str, Dict[str, Any]]],
-        account_data: Dict[str, JsonDict],
+        account_data: Mapping[str, JsonDict],
         always_include: bool = False,
     ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`
