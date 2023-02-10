@@ -1,1 +1,0 @@
-Revert update of hiredis in Poetry lockfile: revert from 2.1.0 to 2.0.0.

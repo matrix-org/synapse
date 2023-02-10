@@ -1,1 +1,0 @@
-Fix a background database update which could cause poor database performance.
