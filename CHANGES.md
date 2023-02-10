@@ -2002,7 +2002,7 @@ Internal Changes
 Synapse 1.59.1 (2022-05-18)
 ===========================
 
-This release fixes a long-standing issue which could prevent Synapse's user directory from updating properly.
+This release fixes a long-standing issue which could prevent Synapse's user directory for updating properly.
 
 Bugfixes
 ----------------
