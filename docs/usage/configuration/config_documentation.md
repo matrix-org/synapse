@@ -3928,7 +3928,8 @@ This setting has the following sub-options:
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
-   _Added in Synapse 1.78.0
+
+  _Added in Synapse 1.78.0._
 
 Example configuration:
 ```yaml
