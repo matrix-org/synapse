@@ -92,8 +92,13 @@ async def create_event(
     builder = hs.get_event_builder_factory().for_room_version(
         KNOWN_ROOM_VERSIONS[room_version], kwargs
     )
-    event, context = await hs.get_event_creation_handler().create_new_client_event(
+    (
+        event,
+        unpersisted_context,
+    ) = await hs.get_event_creation_handler().create_new_client_event(
         builder, prev_event_ids=prev_event_ids
     )
+
+    context = await unpersisted_context.persist(event)
 
     return event, context

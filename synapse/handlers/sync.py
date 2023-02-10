@@ -1749,6 +1749,7 @@ class SyncHandler:
             )
 
             if push_rules_changed:
+                global_account_data = dict(global_account_data)
                 global_account_data["m.push_rules"] = await self.push_rules_for_user(
                     sync_config.user
                 )
@@ -1757,6 +1758,7 @@ class SyncHandler:
                 user_id
             )
 
+            global_account_data = dict(global_account_data)
             global_account_data["m.push_rules"] = await self.push_rules_for_user(
                 sync_config.user
             )
