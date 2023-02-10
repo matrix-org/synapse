@@ -1753,6 +1753,7 @@ class SyncHandler:
             )
 
             if push_rules_changed:
+                global_account_data = dict(global_account_data)
                 global_account_data["m.push_rules"] = await self.push_rules_for_user(
                     sync_config.user
                 )
@@ -1763,6 +1764,7 @@ class SyncHandler:
                 account_data_by_room,
             ) = await self.store.get_account_data_for_user(sync_config.user.to_string())
 
+            global_account_data = dict(global_account_data)
             global_account_data["m.push_rules"] = await self.push_rules_for_user(
                 sync_config.user
             )
