@@ -484,7 +484,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             user_id: The user's ID.
         """
         # Retrieve user account data for predecessor room
-        user_account_data, _ = await self.store.get_account_data_for_user(user_id)
+        user_account_data = await self.store.get_global_account_data_for_user(user_id)
 
         # Copy direct message state if applicable
         direct_rooms = user_account_data.get(AccountDataTypes.DIRECT, {})
