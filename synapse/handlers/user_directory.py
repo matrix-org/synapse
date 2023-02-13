@@ -485,15 +485,15 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
-        # If the new name is an unexpected form, do not update the directory.
+        # If the new name is an unexpected form, replace with None.
         if not isinstance(new_name, str):
-            new_name = prev_name
+            new_name = None
 
         prev_avatar = prev_event.content.get("avatar_url")
         new_avatar = event.content.get("avatar_url")
-        # If the new avatar is an unexpected form, do not update the directory.
+        # If the new avatar is an unexpected form, replace with None.
         if not isinstance(new_avatar, str):
-            new_avatar = prev_avatar
+            new_avatar = None
 
         if (
             prev_name != new_name
