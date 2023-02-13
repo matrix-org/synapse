@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -139,7 +139,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
 
         # this is the point in the DAG where we make a fork
-        fork_point: List[str] = self.get_success(
+        fork_point: Sequence[str] = self.get_success(
             self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
@@ -168,7 +168,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
         pl_event = self.get_success(
             inject_event(
                 self.hs,
-                prev_event_ids=prev_events,
+                prev_event_ids=list(prev_events),
                 type=EventTypes.PowerLevels,
                 state_key="",
                 sender=self.user_id,
@@ -294,7 +294,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
 
         # this is the point in the DAG where we make a fork
-        fork_point: List[str] = self.get_success(
+        fork_point: Sequence[str] = self.get_success(
             self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
@@ -323,7 +323,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
             e = self.get_success(
                 inject_event(
                     self.hs,
-                    prev_event_ids=prev_events,
+                    prev_event_ids=list(prev_events),
                     type=EventTypes.PowerLevels,
                     state_key="",
                     sender=self.user_id,
