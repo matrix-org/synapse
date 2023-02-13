@@ -448,15 +448,12 @@ class UserDirectoryHandler(StateDeltasHandler):
         user_id: str,
         room_id: str,
         prev_event_id: Optional[str],
-        event_id: Optional[str],
+        event_id: str,
     ) -> None:
         """Check member event changes for any profile changes and update the
         database if there are. This is intended for remote users only. The caller
         is responsible for checking that the given user is remote.
         """
-
-        if not event_id:
-            return
 
         if not prev_event_id:
             # If we don't have an older event to fall back on, just fetch the same
