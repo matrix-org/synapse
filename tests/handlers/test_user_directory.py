@@ -24,7 +24,7 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import create_requester
+from synapse.types import UserProfile, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -773,7 +773,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-        async def allow_all(user_profile: ProfileInfo) -> bool:
+        async def allow_all(user_profile: UserProfile) -> bool:
             # Allow all users.
             return False
 
@@ -787,7 +787,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        async def block_all(user_profile: ProfileInfo) -> bool:
+        async def block_all(user_profile: UserProfile) -> bool:
             # All users are spammy.
             return True
 
@@ -917,10 +917,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         context = self.get_success(unpersisted_context.persist(event))
-
-        self.get_success(
-            self.hs.get_storage_controllers().persistence.persist_event(event, context)
-        )
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self.get_success(persistence.persist_event(event, context))
 
     def test_local_user_leaving_room_remains_in_user_directory(self) -> None:
         """We've chosen to simplify the user directory's implementation by
