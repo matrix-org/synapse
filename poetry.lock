@@ -2253,13 +2253,13 @@ files = [
 
 [[package]]
 name = "systemd-python"
-version = "234"
+version = "235"
 description = "Python interface for libsystemd"
 category = "main"
 optional = true
 python-versions = "*"
 files = [
-    {file = "systemd-python-234.tar.gz", hash = "sha256:fd0e44bf70eadae45aadc292cb0a7eb5b0b6372cd1b391228047d33895db83e7"},
+    {file = "systemd-python-235.tar.gz", hash = "sha256:4e57f39797fd5d9e2d22b8806a252d7c0106c936039d1e71c8c6b8008e695c0a"},
 ]
 
 [[package]]
