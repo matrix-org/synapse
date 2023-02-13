@@ -55,7 +55,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Regex pattern for detecting a bridge bot (cached here for performance)
-BOT_PATTERN = re.compile(r"^@_.*_bot\:.*")
+SYNAPSE_BOT_PATTERN = re.compile(r"^@_.*_bot\:*")
+HUNGRYSERV_BOT_PATTERN = re.compile(r"^@[a-z]+bot\:beeper.local")
 
 
 class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore):
@@ -619,7 +620,11 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             ignored_users = content.get("ignored_users", {})
             if isinstance(ignored_users, dict):
                 content["ignored_users"] = {
-                    u: v for u, v in ignored_users.items() if not BOT_PATTERN.match(u)
+                    u: v
+                    for u, v in ignored_users.items()
+                    if not (
+                        SYNAPSE_BOT_PATTERN.match(u) or HUNGRYSERV_BOT_PATTERN.match(u)
+                    )
                 }
 
         # no need to lock here as account_data has a unique constraint on
