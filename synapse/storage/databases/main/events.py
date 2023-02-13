@@ -16,7 +16,6 @@
 import itertools
 import logging
 from collections import OrderedDict
-from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -36,7 +35,7 @@ from prometheus_client import Counter
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import PartialStateConflictError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -70,24 +69,6 @@ event_counter = Counter(
     "",
     ["type", "origin_type", "origin_entity"],
 )
-
-
-class PartialStateConflictError(SynapseError):
-    """An internal error raised when attempting to persist an event with partial state
-    after the room containing the event has been un-partial stated.
-
-    This error should be handled by recomputing the event context and trying again.
-
-    This error has an HTTP status code so that it can be transported over replication.
-    It should not be exposed to clients.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(
-            HTTPStatus.CONFLICT,
-            msg="Cannot persist partial state event in un-partial stated room",
-            errcode=Codes.UNKNOWN,
-        )
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -306,7 +287,7 @@ class PersistEventsStore:
 
         # The set of event_ids to return. This includes all soft-failed events
         # and their prev events.
-        existing_prevs = set()
+        existing_prevs: Set[str] = set()
 
         def _get_prevs_before_rejected_txn(
             txn: LoggingTransaction, batch: Collection[str]
@@ -1651,7 +1632,7 @@ class PersistEventsStore:
             if self._ephemeral_messages_enabled:
                 # If there's an expiry timestamp on the event, store it.
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if isinstance(expiry_ts, int) and not event.is_state():
+                if type(expiry_ts) is int and not event.is_state():
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
@@ -2133,10 +2114,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), int)
+                and type(event.content["min_lifetime"]) is not int
             ) or (
                 "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), int)
+                and type(event.content["max_lifetime"]) is not int
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return

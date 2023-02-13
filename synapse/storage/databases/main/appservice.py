@@ -14,7 +14,17 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Pattern, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Pattern,
+    Sequence,
+    Tuple,
+    cast,
+)
 
 from synapse.appservice import (
     ApplicationService,
@@ -156,7 +166,7 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         room_id: str,
         app_service: "ApplicationService",
         cache_context: _CacheContext,
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """
         Get all users in a room that the appservice controls.
 
@@ -257,7 +267,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def create_appservice_txn(
         self,
         service: ApplicationService,
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         one_time_keys_count: TransactionOneTimeKeysCount,

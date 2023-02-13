@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import html
 import logging
 import urllib.parse
 from typing import TYPE_CHECKING, List, Optional
@@ -161,7 +162,9 @@ class OEmbedProvider:
 
         title = oembed.get("title")
         if title and isinstance(title, str):
-            open_graph_response["og:title"] = title
+            # A common WordPress plug-in seems to incorrectly escape entities
+            # in the oEmbed response.
+            open_graph_response["og:title"] = html.unescape(title)
 
         author_name = oembed.get("author_name")
         if not isinstance(author_name, str):
@@ -180,9 +183,9 @@ class OEmbedProvider:
         # Process each type separately.
         oembed_type = oembed.get("type")
         if oembed_type == "rich":
-            html = oembed.get("html")
-            if isinstance(html, str):
-                calc_description_and_urls(open_graph_response, html)
+            html_str = oembed.get("html")
+            if isinstance(html_str, str):
+                calc_description_and_urls(open_graph_response, html_str)
 
         elif oembed_type == "photo":
             # If this is a photo, use the full image, not the thumbnail.
@@ -192,12 +195,12 @@ class OEmbedProvider:
 
         elif oembed_type == "video":
             open_graph_response["og:type"] = "video.other"
-            html = oembed.get("html")
-            if html and isinstance(html, str):
+            html_str = oembed.get("html")
+            if html_str and isinstance(html_str, str):
                 calc_description_and_urls(open_graph_response, oembed["html"])
             for size in ("width", "height"):
                 val = oembed.get(size)
-                if val is not None and isinstance(val, int):
+                if type(val) is int:
                     open_graph_response[f"og:video:{size}"] = val
 
         elif oembed_type == "link":

@@ -213,7 +213,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.admin_user_tok = self.login("admin", "pass")
 
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
-        self.url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
+        self.url = "/_synapse/admin/v1/media/delete"
+        self.legacy_url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
 
         # Move clock up to somewhat realistic time
         self.reactor.advance(1000000000)
@@ -332,11 +333,13 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
-    def test_delete_media_never_accessed(self) -> None:
+    @parameterized.expand([(True,), (False,)])
+    def test_delete_media_never_accessed(self, use_legacy_url: bool) -> None:
         """
         Tests that media deleted if it is older than `before_ts` and never accessed
         `last_access_ts` is `NULL` and `created_ts` < `before_ts`
         """
+        url = self.legacy_url if use_legacy_url else self.url
 
         # upload and do not access
         server_and_media_id = self._create_media()
@@ -351,7 +354,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
-            self.url + "?before_ts=" + str(now_ms),
+            url + "?before_ts=" + str(now_ms),
             access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)

@@ -14,7 +14,7 @@
 
 import logging
 import string
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence
 
 from typing_extensions import Literal
 
@@ -485,7 +485,8 @@ class DirectoryHandler:
                 )
             )
             if canonical_alias:
-                room_aliases.append(canonical_alias)
+                # Ensure we do not mutate room_aliases.
+                room_aliases = list(room_aliases) + [canonical_alias]
 
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
@@ -528,7 +529,7 @@ class DirectoryHandler:
 
     async def get_aliases_for_room(
         self, requester: Requester, room_id: str
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """
         Get a list of the aliases that currently point to this room on this server
         """

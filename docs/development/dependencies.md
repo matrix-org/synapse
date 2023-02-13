@@ -2,6 +2,13 @@
 
 This is a quick cheat sheet for developers on how to use [`poetry`](https://python-poetry.org/).
 
+# Installing
+
+See the [contributing guide](contributing_guide.md#4-install-the-dependencies).
+
+Developers should use Poetry 1.3.2 or higher. If you encounter problems related
+to poetry, please [double-check your poetry version](#check-the-version-of-poetry-with-poetry---version).
+
 # Background
 
 Synapse uses a variety of third-party Python packages to function as a homeserver.
@@ -123,7 +130,7 @@ context of poetry's venv, without having to run `poetry shell` beforehand.
 ## ...reset my venv to the locked environment?
 
 ```shell
-poetry install --extras all --remove-untracked
+poetry install --all-extras --sync
 ```
 
 ## ...delete everything and start over from scratch?
@@ -183,7 +190,6 @@ Either:
 - manually update `pyproject.toml`; then `poetry lock --no-update`; or else
 - `poetry add packagename`. See `poetry add --help`; note the `--dev`,
   `--extras` and `--optional` flags in particular.
-  - **NB**: this specifies the new package with a version given by a "caret bound". This won't get forced to its lowest version in the old deps CI job: see [this TODO](https://github.com/matrix-org/synapse/blob/4e1374373857f2f7a911a31c50476342d9070681/.ci/scripts/test_old_deps.sh#L35-L39).
 
 Include the updated `pyproject.toml` and `poetry.lock` files in your commit.
 
@@ -196,7 +202,7 @@ poetry remove packagename
 ```
 
 ought to do the trick. Alternatively, manually update `pyproject.toml` and
-`poetry lock --no-update`. Include the updated `pyproject.toml` and poetry.lock`
+`poetry lock --no-update`. Include the updated `pyproject.toml` and `poetry.lock`
 files in your commit.
 
 ## ...update the version range for an existing dependency?
@@ -240,9 +246,6 @@ poetry export --extras all
 
 Be wary of bugs in `poetry export` and `pip install -r requirements.txt`.
 
-Note: `poetry export` will be made a plugin in Poetry 1.2. Additional config may
-be required.
-
 ## ...build a test wheel?
 
 I usually use
@@ -255,12 +258,26 @@ because [`build`](https://github.com/pypa/build) is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 `poetry build` too.
 
+## ...handle a Dependabot pull request?
+
+Synapse uses Dependabot to keep the `poetry.lock` file up-to-date. When it
+creates a pull request a GitHub Action will run to automatically create a changelog
+file. Ensure that:
+
+* the lockfile changes look reasonable;
+* the upstream changelog file (linked in the description) doesn't include any
+  breaking changes;
+* continuous integration passes (due to permissions, the GitHub Actions run on
+  the changelog commit will fail, look at the initial commit of the pull request);
+
+In particular, any updates to the type hints (usually packages which start with `types-`)
+should be safe to merge if linting passes.
 
 # Troubleshooting
 
 ## Check the version of poetry with `poetry --version`.
 
-The minimum version of poetry supported by Synapse is 1.2.
+The minimum version of poetry supported by Synapse is 1.3.2.
 
 It can also be useful to check the version of `poetry-core` in use. If you've
 installed `poetry` with `pipx`, try `pipx runpip poetry list | grep

@@ -38,7 +38,7 @@ from typing_extensions import Literal
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import Direction, EventTypes
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -108,6 +108,10 @@ event_fetch_ongoing_gauge = Gauge(
     "synapse_event_fetch_ongoing",
     "The number of event fetchers that are running",
 )
+
+
+class InvalidEventError(Exception):
+    """The event retrieved from the database is invalid and cannot be used."""
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -191,6 +195,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="events",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -200,6 +205,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._backfill_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="backfill",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -217,12 +223,14 @@ class EventsWorkerStore(SQLBaseStore):
             # SQLite).
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "events",
                 "stream_ordering",
                 is_writer=hs.get_instance_name() in hs.config.worker.writers.events,
             )
             self._backfill_id_gen = StreamIdGenerator(
                 db_conn,
+                hs.get_replication_notifier(),
                 "events",
                 "stream_ordering",
                 step=-1,
@@ -300,6 +308,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._un_partial_stated_events_stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="un_partial_stated_event_stream",
                 instance_name=hs.get_instance_name(),
                 tables=[
@@ -311,14 +320,18 @@ class EventsWorkerStore(SQLBaseStore):
             )
         else:
             self._un_partial_stated_events_stream_id_gen = StreamIdGenerator(
-                db_conn, "un_partial_stated_event_stream", "stream_id"
+                db_conn,
+                hs.get_replication_notifier(),
+                "un_partial_stated_event_stream",
+                "stream_id",
             )
 
-    def get_un_partial_stated_events_token(self) -> int:
-        # TODO(faster_joins, multiple writers): This is inappropriate if there are multiple
-        #     writers because workers that don't write often will hold all
-        #     readers up.
-        return self._un_partial_stated_events_stream_id_gen.get_current_token()
+    def get_un_partial_stated_events_token(self, instance_name: str) -> int:
+        return (
+            self._un_partial_stated_events_stream_id_gen.get_current_token_for_writer(
+                instance_name
+            )
+        )
 
     async def get_un_partial_stated_events_from_stream(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -388,11 +401,7 @@ class EventsWorkerStore(SQLBaseStore):
         token: int,
         rows: Iterable[Any],
     ) -> None:
-        if stream_name == EventsStream.NAME:
-            self._stream_id_gen.advance(instance_name, token)
-        elif stream_name == BackfillStream.NAME:
-            self._backfill_id_gen.advance(instance_name, -token)
-        elif stream_name == UnPartialStatedEventStream.NAME:
+        if stream_name == UnPartialStatedEventStream.NAME:
             for row in rows:
                 assert isinstance(row, UnPartialStatedEventStreamRow)
 
@@ -404,6 +413,17 @@ class EventsWorkerStore(SQLBaseStore):
                     self._invalidate_local_get_event_cache(row.event_id)
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == EventsStream.NAME:
+            self._stream_id_gen.advance(instance_name, token)
+        elif stream_name == BackfillStream.NAME:
+            self._backfill_id_gen.advance(instance_name, -token)
+        elif stream_name == UnPartialStatedEventStream.NAME:
+            self._un_partial_stated_events_stream_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     async def have_censored_event(self, event_id: str) -> bool:
         """Check if an event has been censored, i.e. if the content of the event has been erased
@@ -1294,7 +1314,7 @@ class EventsWorkerStore(SQLBaseStore):
                 # invites, so just accept it for all membership events.
                 #
                 if d["type"] != EventTypes.Member:
-                    raise Exception(
+                    raise InvalidEventError(
                         "Room %s for event %s is unknown" % (d["room_id"], event_id)
                     )
 
@@ -1759,7 +1779,7 @@ class EventsWorkerStore(SQLBaseStore):
             txn: LoggingTransaction,
         ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
             sql = (
-                "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
+                "SELECT out.event_stream_ordering, e.event_id, e.room_id, e.type,"
                 " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL,"
                 " e.outlier"
                 " FROM events AS e"
@@ -1771,10 +1791,10 @@ class EventsWorkerStore(SQLBaseStore):
                 " LEFT JOIN event_relations USING (event_id)"
                 " LEFT JOIN room_memberships USING (event_id)"
                 " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < event_stream_ordering"
-                " AND event_stream_ordering <= ?"
+                " WHERE ? < out.event_stream_ordering"
+                " AND out.event_stream_ordering <= ?"
                 " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering ASC"
+                " ORDER BY out.event_stream_ordering ASC"
             )
 
             txn.execute(sql, (last_id, current_id, instance_name))
@@ -2220,7 +2240,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_event_id_for_timestamp(
-        self, room_id: str, timestamp: int, direction: str
+        self, room_id: str, timestamp: int, direction: Direction
     ) -> Optional[str]:
         """Find the closest event to the given timestamp in the given direction.
 
@@ -2228,14 +2248,14 @@ class EventsWorkerStore(SQLBaseStore):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
             The closest event_id otherwise None if we can't find any event in
             the given direction.
         """
-        if direction == "b":
+        if direction == Direction.BACKWARDS:
             # Find closest event *before* a given timestamp. We use descending
             # (which gives values largest to smallest) because we want the
             # largest possible timestamp *before* the given timestamp.
@@ -2286,9 +2306,6 @@ class EventsWorkerStore(SQLBaseStore):
                 return event_id
 
             return None
-
-        if direction not in ("f", "b"):
-            raise ValueError("Unknown direction: %s" % (direction,))
 
         return await self.db_pool.runInteraction(
             "get_event_id_for_timestamp_txn",

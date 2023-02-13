@@ -28,6 +28,7 @@ from synapse.storage.background_updates import _BackgroundUpdateHandler
 from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
+from tests.server import ThreadedMemoryReactorClock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -138,7 +139,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         register.register_servlets,
     ]
 
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+    def make_homeserver(
+        self, reactor: ThreadedMemoryReactorClock, clock: Clock
+    ) -> HomeServer:
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
             id="1234",

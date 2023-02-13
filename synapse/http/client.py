@@ -44,6 +44,7 @@ from twisted.internet.interfaces import (
     IAddress,
     IDelayedCall,
     IHostResolution,
+    IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTime,
     IResolutionReceiver,
@@ -226,7 +227,9 @@ class _IPBlacklistingResolver:
         return recv
 
 
-@implementer(ISynapseReactor)
+# ISynapseReactor implies IReactorCore, but explicitly marking it this as an implementer
+# of IReactorCore seems to keep mypy-zope happier.
+@implementer(IReactorCore, ISynapseReactor)
 class BlacklistingReactorWrapper:
     """
     A Reactor wrapper which will prevent DNS resolution to blacklisted IP

@@ -94,12 +94,14 @@ allow_device_name_lookup_over_federation: true
 experimental_features:
   # Enable history backfilling support
   msc2716_enabled: true
-  # server-side support for partial state in /send_join responses
-  msc3706_enabled: true
-  {% if not workers_in_use %}
   # client-side support for partial state in /send_join responses
   faster_joins: true
-  {% endif %}
+  # Enable support for polls
+  msc3381_polls_enabled: true
+  # Enable deleting device-specific notification settings stored in account data
+  msc3890_enabled: true
+  # Enable removing account data support
+  msc3391_enabled: true
   # Filtering /messages by relation type.
   msc3874_enabled: true
 

@@ -17,6 +17,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
+from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import (
     DatabasePool,
@@ -167,7 +168,7 @@ class DataStore(
         guests: bool = True,
         deactivated: bool = False,
         order_by: str = UserSortOrder.NAME.value,
-        direction: str = "f",
+        direction: Direction = Direction.FORWARDS,
         approved: bool = True,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
@@ -197,7 +198,7 @@ class DataStore(
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"

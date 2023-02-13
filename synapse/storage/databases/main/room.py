@@ -18,6 +18,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
     Awaitable,
     Collection,
@@ -25,7 +26,7 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Sequence,
+    Set,
     Tuple,
     Union,
     cast,
@@ -34,6 +35,7 @@ from typing import (
 import attr
 
 from synapse.api.constants import (
+    Direction,
     EventContentFields,
     EventTypes,
     JoinRules,
@@ -43,6 +45,7 @@ from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
+from synapse.replication.tcp.streams.partial_state import UnPartialStatedRoomStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -58,9 +61,9 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, RetentionPolicy, ThirdPartyInstanceID
+from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyInstanceID
 from synapse.util import json_encoder
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
 
 if TYPE_CHECKING:
@@ -106,7 +109,7 @@ class RoomSortOrder(Enum):
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class PartialStateResyncInfo:
     joined_via: Optional[str]
-    servers_in_room: List[str] = attr.ib(factory=list)
+    servers_in_room: Set[str] = attr.ib(factory=set)
 
 
 class RoomWorkerStore(CacheInvalidationWorkerStore):
@@ -126,6 +129,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             self._un_partial_stated_rooms_stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="un_partial_stated_room_stream",
                 instance_name=self._instance_name,
                 tables=[
@@ -137,8 +141,18 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             )
         else:
             self._un_partial_stated_rooms_stream_id_gen = StreamIdGenerator(
-                db_conn, "un_partial_stated_room_stream", "stream_id"
+                db_conn,
+                hs.get_replication_notifier(),
+                "un_partial_stated_room_stream",
+                "stream_id",
             )
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == UnPartialStatedRoomStream.NAME:
+            self._un_partial_stated_rooms_stream_id_gen.advance(instance_name, token)
+        return super().process_replication_position(stream_name, instance_name, token)
 
     async def store_room(
         self,
@@ -1179,21 +1193,35 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
-    @cached(iterable=True)
-    async def get_partial_state_servers_at_join(self, room_id: str) -> Sequence[str]:
-        """Gets the list of servers in a partial state room at the time we joined it.
+    async def get_partial_state_servers_at_join(
+        self, room_id: str
+    ) -> Optional[AbstractSet[str]]:
+        """Gets the set of servers in a partial state room at the time we joined it.
 
         Returns:
             The `servers_in_room` list from the `/send_join` response for partial state
             rooms. May not be accurate or complete, as it comes from a remote
             homeserver.
-            An empty list for full state rooms.
+            `None` for full state rooms.
         """
-        return await self.db_pool.simple_select_onecol(
-            "partial_state_rooms_servers",
-            keyvalues={"room_id": room_id},
-            retcol="server_name",
-            desc="get_partial_state_servers_at_join",
+        servers_in_room = await self._get_partial_state_servers_at_join(room_id)
+
+        if len(servers_in_room) == 0:
+            return None
+
+        return servers_in_room
+
+    @cached(iterable=True)
+    async def _get_partial_state_servers_at_join(
+        self, room_id: str
+    ) -> AbstractSet[str]:
+        return frozenset(
+            await self.db_pool.simple_select_onecol(
+                "partial_state_rooms_servers",
+                keyvalues={"room_id": room_id},
+                retcol="server_name",
+                desc="get_partial_state_servers_at_join",
+            )
         )
 
     async def get_partial_state_room_resync_info(
@@ -1238,11 +1266,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 # partial-joined between the two SELECTs, but this is unlikely to happen
                 # in practice.)
                 continue
-            entry.servers_in_room.append(server_name)
+            entry.servers_in_room.add(server_name)
 
         return room_servers
 
-    @cached()
+    @cached(max_entries=10000)
     async def is_partial_state_room(self, room_id: str) -> bool:
         """Checks if this room has partial state.
 
@@ -1261,6 +1289,27 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         return entry is not None
 
+    @cachedList(cached_method_name="is_partial_state_room", list_name="room_ids")
+    async def is_partial_state_room_batched(
+        self, room_ids: StrCollection
+    ) -> Mapping[str, bool]:
+        """Checks if the given rooms have partial state.
+
+        Returns true for "partial-state" rooms, which means that the state
+        at events in the room, and `current_state_events`, may not yet be
+        complete.
+        """
+
+        rows: List[Dict[str, str]] = await self.db_pool.simple_select_many_batch(
+            table="partial_state_rooms",
+            column="room_id",
+            iterable=room_ids,
+            retcols=("room_id",),
+            desc="is_partial_state_room_batched",
+        )
+        partial_state_rooms = {row_dict["room_id"] for row_dict in rows}
+        return {room_id: room_id in partial_state_rooms for room_id in room_ids}
+
     async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
         self, room_id: str
     ) -> Tuple[str, int]:
@@ -1277,18 +1326,49 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
         return result["join_event_id"], result["device_lists_stream_id"]
 
-    def get_un_partial_stated_rooms_token(self) -> int:
-        # TODO(faster_joins, multiple writers): This is inappropriate if there
-        #     are multiple writers because workers that don't write often will
-        #     hold all readers up.
-        #     (See `MultiWriterIdGenerator.get_persisted_upto_position` for an
-        #      explanation.)
-        return self._un_partial_stated_rooms_stream_id_gen.get_current_token()
+    def get_un_partial_stated_rooms_token(self, instance_name: str) -> int:
+        return self._un_partial_stated_rooms_stream_id_gen.get_current_token_for_writer(
+            instance_name
+        )
+
+    async def get_un_partial_stated_rooms_between(
+        self, last_id: int, current_id: int, room_ids: Collection[str]
+    ) -> Set[str]:
+        """Get all rooms that got un partial stated between `last_id` exclusive and
+        `current_id` inclusive.
+
+        Returns:
+            The list of room ids.
+        """
+
+        if last_id == current_id:
+            return set()
+
+        def _get_un_partial_stated_rooms_between_txn(
+            txn: LoggingTransaction,
+        ) -> Set[str]:
+            sql = """
+                SELECT DISTINCT room_id FROM un_partial_stated_room_stream
+                WHERE ? < stream_id AND stream_id <= ? AND
+            """
+
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+
+            txn.execute(sql + clause, [last_id, current_id] + args)
+
+            return {r[0] for r in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_un_partial_stated_rooms_between",
+            _get_un_partial_stated_rooms_between_txn,
+        )
 
     async def get_un_partial_stated_rooms_from_stream(
         self, instance_name: str, last_id: int, current_id: int, limit: int
     ) -> Tuple[List[Tuple[int, Tuple[str]]], int, bool]:
-        """Get updates for caches replication stream.
+        """Get updates for un partial stated rooms replication stream.
 
         Args:
             instance_name: The writer we want to fetch updates from. Unused
@@ -1876,7 +1956,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
     async def store_partial_state_room(
         self,
         room_id: str,
-        servers: Collection[str],
+        servers: AbstractSet[str],
         device_lists_stream_id: int,
         joined_via: str,
     ) -> None:
@@ -1891,11 +1971,13 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
 
         Args:
             room_id: the ID of the room
-            servers: other servers known to be in the room
+            servers: other servers known to be in the room. must include `joined_via`.
             device_lists_stream_id: the device_lists stream ID at the time when we first
                 joined the room.
             joined_via: the server name we requested a partial join from.
         """
+        assert joined_via in servers
+
         await self.db_pool.runInteraction(
             "store_partial_state_room",
             self._store_partial_state_room_txn,
@@ -1909,7 +1991,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         txn: LoggingTransaction,
         room_id: str,
-        servers: Collection[str],
+        servers: AbstractSet[str],
         device_lists_stream_id: int,
         joined_via: str,
     ) -> None:
@@ -1932,7 +2014,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
         self._invalidate_cache_and_stream(
-            txn, self.get_partial_state_servers_at_join, (room_id,)
+            txn, self._get_partial_state_servers_at_join, (room_id,)
         )
 
     async def write_partial_state_rooms_join_event_id(
@@ -2139,7 +2221,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self,
         start: int,
         limit: int,
-        direction: str = "b",
+        direction: Direction = Direction.BACKWARDS,
         user_id: Optional[str] = None,
         room_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
@@ -2148,8 +2230,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         Args:
             start: event offset to begin the query from
             limit: number of rows to retrieve
-            direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`)
+            direction: Whether to fetch the most recent first (backwards) or the
+                oldest first (forwards)
             user_id: search for user_id. Ignored if user_id is None
             room_id: search for room_id. Ignored if room_id is None
         Returns:
@@ -2171,7 +2253,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 filters.append("er.room_id LIKE ?")
                 args.extend(["%" + room_id + "%"])
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -2295,16 +2377,16 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             (room_id,),
         )
 
-    async def clear_partial_state_room(self, room_id: str) -> bool:
+    async def clear_partial_state_room(self, room_id: str) -> Optional[int]:
         """Clears the partial state flag for a room.
 
         Args:
             room_id: The room whose partial state flag is to be cleared.
 
         Returns:
-            `True` if the partial state flag has been cleared successfully.
+            The corresponding stream id for the un-partial-stated rooms stream.
 
-            `False` if the partial state flag could not be cleared because the room
+            `None` if the partial state flag could not be cleared because the room
             still contains events with partial state.
         """
         try:
@@ -2315,7 +2397,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                     room_id,
                     un_partial_state_room_stream_id,
                 )
-                return True
+                return un_partial_state_room_stream_id
         except self.db_pool.engine.module.IntegrityError as e:
             # Assume that any `IntegrityError`s are due to partial state events.
             logger.info(
@@ -2323,7 +2405,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 room_id,
                 e,
             )
-            return False
+            return None
 
     def _clear_partial_state_room_txn(
         self,
@@ -2343,7 +2425,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
         self._invalidate_cache_and_stream(
-            txn, self.get_partial_state_servers_at_join, (room_id,)
+            txn, self._get_partial_state_servers_at_join, (room_id,)
         )
 
         DatabasePool.simple_insert_txn(

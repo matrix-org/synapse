@@ -403,6 +403,14 @@ class EventClientSerializer:
     clients.
     """
 
+    def __init__(self, inhibit_replacement_via_edits: bool = False):
+        """
+        Args:
+            inhibit_replacement_via_edits: If this is set to True, then events are
+               never replaced by their edits.
+        """
+        self._inhibit_replacement_via_edits = inhibit_replacement_via_edits
+
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -422,6 +430,8 @@ class EventClientSerializer:
                into the event.
             apply_edits: Whether the content of the event should be modified to reflect
                any replacement in `bundle_aggregations[<event_id>].replace`.
+               See also the `inhibit_replacement_via_edits` constructor arg: if that is
+               set to True, then this argument is ignored.
         Returns:
             The serialized event
         """
@@ -495,7 +505,8 @@ class EventClientSerializer:
                 again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
             apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `aggregations.replace`.
+               any replacement in `aggregations.replace` (subject to the
+               `inhibit_replacement_via_edits` constructor arg).
         """
 
         # We have already checked that aggregations exist for this event.
@@ -518,15 +529,21 @@ class EventClientSerializer:
         if event_aggregations.replace:
             # If there is an edit, optionally apply it to the event.
             edit = event_aggregations.replace
-            if apply_edits:
+            if apply_edits and not self._inhibit_replacement_via_edits:
                 self._apply_edit(event, serialized_event, edit)
 
             # Include information about it in the relations dict.
-            serialized_aggregations[RelationTypes.REPLACE] = {
-                "event_id": edit.event_id,
-                "origin_server_ts": edit.origin_server_ts,
-                "sender": edit.sender,
-            }
+            #
+            # Matrix spec v1.5 (https://spec.matrix.org/v1.5/client-server-api/#server-side-aggregation-of-mreplace-relationships)
+            # said that we should only include the `event_id`, `origin_server_ts` and
+            # `sender` of the edit; however MSC3925 proposes extending it to the whole
+            # of the edit, which is what we do here.
+            serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
+                edit,
+                time_now,
+                config=config,
+                apply_edits=False,
+            )
 
         # Include any threaded replies to this event.
         if event_aggregations.thread:
@@ -588,10 +605,11 @@ class EventClientSerializer:
 
 
 _PowerLevel = Union[str, int]
+PowerLevelsContent = Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
 
 
 def copy_and_fixup_power_levels_contents(
-    old_power_levels: Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
+    old_power_levels: PowerLevelsContent,
 ) -> Dict[str, Union[int, Dict[str, int]]]:
     """Copy the content of a power_levels event, unfreezing frozendicts along the way.
 
@@ -630,10 +648,10 @@ def _copy_power_level_value_as_integer(
 ) -> None:
     """Set `power_levels[key]` to the integer represented by `old_value`.
 
-    :raises TypeError: if `old_value` is not an integer, nor a base-10 string
+    :raises TypeError: if `old_value` is neither an integer nor a base-10 string
         representation of an integer.
     """
-    if isinstance(old_value, int):
+    if type(old_value) is int:
         power_levels[key] = old_value
         return
 
@@ -661,7 +679,7 @@ def validate_canonicaljson(value: Any) -> None:
     * Floats
     * NaN, Infinity, -Infinity
     """
-    if isinstance(value, int):
+    if type(value) is int:
         if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 

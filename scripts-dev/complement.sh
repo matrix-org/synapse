@@ -190,7 +190,7 @@ fi
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3787,msc3874"
+test_tags="synapse_blacklist,msc3787,msc3874,msc3890,msc3391,msc3930,faster_joins"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -223,12 +223,14 @@ else
     export PASS_SYNAPSE_COMPLEMENT_DATABASE=sqlite
   fi
 
-  # We only test faster room joins on monoliths, because they are purposefully
-  # being developed without worker support to start with.
-  #
-  # The tests for importing historical messages (MSC2716) also only pass with monoliths,
-  # currently.
-  test_tags="$test_tags,faster_joins,msc2716"
+  # The tests for importing historical messages (MSC2716)
+  # only pass with monoliths, currently.
+  test_tags="$test_tags,msc2716"
+fi
+
+if [[ -n "$ASYNCIO_REACTOR" ]]; then
+  # Enable the Twisted asyncio reactor
+  export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=true
 fi
 
 

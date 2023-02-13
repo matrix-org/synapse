@@ -690,41 +690,21 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.hs.config.registration.enable_3pid_changes = False
 
         client_secret = "foobar"
-        session_id = self._request_token(self.email, client_secret)
-
-        self.assertEqual(len(self.email_attempts), 1)
-        link = self._get_link_from_email()
-
-        self._validate_token(link)
-
         channel = self.make_request(
             "POST",
-            b"/_matrix/client/unstable/account/3pid/add",
+            b"/_matrix/client/unstable/account/3pid/email/requestToken",
             {
                 "client_secret": client_secret,
-                "sid": session_id,
-                "auth": {
-                    "type": "m.login.password",
-                    "user": self.user_id,
-                    "password": "test",
-                },
+                "email": "test@example.com",
+                "send_attempt": 1,
             },
-            access_token=self.user_id_tok,
         )
+
         self.assertEqual(
             HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
         )
+
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
-
-        # Get user
-        channel = self.make_request(
-            "GET",
-            self.url_3pid,
-            access_token=self.user_id_tok,
-        )
-
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
-        self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email(self) -> None:
         """Test deleting an email from profile"""

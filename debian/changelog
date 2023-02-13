@@ -1,3 +1,52 @@
+matrix-synapse-py3 (1.77.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.77.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 10 Feb 2023 12:44:21 +0000
+
+matrix-synapse-py3 (1.77.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.77.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 07 Feb 2023 13:45:14 +0000
+
+matrix-synapse-py3 (1.76.0) stable; urgency=medium
+
+  * New Synapse release 1.76.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 31 Jan 2023 08:21:47 -0800
+
+matrix-synapse-py3 (1.76.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.76.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 27 Jan 2023 11:17:57 +0000
+
+matrix-synapse-py3 (1.76.0~rc1) stable; urgency=medium
+
+  * Use Poetry 1.3.2 to manage the bundled virtualenv included with this package.
+  * New Synapse release 1.76.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 25 Jan 2023 16:21:16 +0000
+
+matrix-synapse-py3 (1.75.0) stable; urgency=medium
+
+  * New Synapse release 1.75.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 17 Jan 2023 11:36:02 +0000
+
+matrix-synapse-py3 (1.75.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.75.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 12 Jan 2023 10:30:15 -0800
+
+matrix-synapse-py3 (1.75.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.75.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 10 Jan 2023 12:18:27 +0000
+
 matrix-synapse-py3 (1.74.0) stable; urgency=medium
 
   * New Synapse release 1.74.0.

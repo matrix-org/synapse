@@ -26,7 +26,7 @@ from typing import (
 
 from typing_extensions import Literal
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import Direction, EduTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -234,9 +234,10 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
         room_id: str,
     ) -> Tuple[int, JsonDict]:
         timestamp = parse_integer_from_args(query, "ts", required=True)
-        direction = parse_string_from_args(
-            query, "dir", default="f", allowed_values=["f", "b"], required=True
+        direction_str = parse_string_from_args(
+            query, "dir", allowed_values=["f", "b"], required=True
         )
+        direction = Direction(direction_str)
 
         return await self.handler.on_timestamp_to_event_request(
             origin, room_id, timestamp, direction
@@ -422,7 +423,7 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self._msc3706_enabled = hs.config.experimental.msc3706_enabled
+        self._read_msc3706_query_param = hs.config.experimental.msc3706_enabled
 
     async def on_PUT(
         self,
@@ -436,10 +437,16 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         #   match those given in content
 
         partial_state = False
-        if self._msc3706_enabled:
+        # The stable query parameter wins, if it disagrees with the unstable
+        # parameter for some reason.
+        stable_param = parse_boolean_from_args(query, "omit_members", default=None)
+        if stable_param is not None:
+            partial_state = stable_param
+        elif self._read_msc3706_query_param:
             partial_state = parse_boolean_from_args(
                 query, "org.matrix.msc3706.partial_state", default=False
             )
+
         result = await self.handler.on_send_join_request(
             origin, content, room_id, caller_supports_partial_state=partial_state
         )
