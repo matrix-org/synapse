@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@25dc93b901a87e864900a8aec6c12e9aa794c0c3
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
@@ -43,7 +43,7 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@25dc93b901a87e864900a8aec6c12e9aa794c0c3
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@9cd00a88a73addc8617065438eff914dd08d0955
+        uses: dtolnay/rust-toolchain@25dc93b901a87e864900a8aec6c12e9aa794c0c3
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
