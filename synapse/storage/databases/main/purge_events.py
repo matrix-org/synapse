@@ -420,7 +420,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "event_push_actions",
             "event_search",
             "event_failed_pull_attempts",
-            # Note: the partial state tables have foreign keys admist each other, and to
+            # Note: the partial state tables have foreign keys between each other, and to
             # `events` and `rooms`. We need to be delete from them in the right order.
             "partial_state_events",
             "partial_state_rooms_servers",
