@@ -295,7 +295,9 @@ Known room versions are listed [here](https://spec.matrix.org/latest/rooms/#comp
 For example, for room version 1, `default_room_version` should be set
 to "1".
 
-Currently defaults to "9".
+Currently defaults to ["10"](https://spec.matrix.org/v1.5/rooms/v10/).
+
+_Changed in Synapse 1.76:_ the default version room version was increased from [9](https://spec.matrix.org/v1.5/rooms/v9/) to [10](https://spec.matrix.org/v1.5/rooms/v10/).
 
 Example configuration:
 ```yaml
@@ -422,6 +424,10 @@ Sub-options for each listener include:
 
 * `port`: the TCP port to bind to.
 
+* `tag`: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to `None`, is optional and only valid for listener with `type: http`.
+See the docs [request log format](../administration/request_log.md).
+
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
@@ -475,6 +481,12 @@ Valid resource names are:
 * `replication`: the HTTP replication API (/_synapse/replication). See [here](../../workers.md).
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
+
+* `health`: the [health check endpoint](../../reverse_proxy.md#health-check-endpoint). This endpoint
+  is by default active for all other resources and does not have to be activated separately.
+  This is only useful if you want to use the health endpoint explicitly on a dedicated port or
+  for [workers](../../workers.md) and containers without listener e.g.
+  [application services](../../workers.md#notifying-application-services).
 
 Example configuration #1:
 ```yaml
@@ -1321,7 +1333,7 @@ Associated sub-options:
   connection pool. For a reference to valid arguments, see:
     * for [sqlite](https://docs.python.org/3/library/sqlite3.html#sqlite3.connect)
     * for [postgres](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
-    * for [the connection pool](https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
+    * for [the connection pool](https://docs.twistedmatrix.com/en/stable/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
 
 For more information on using Synapse with Postgres,
 see [here](../../postgres.md).
@@ -2623,18 +2635,18 @@ state events are shared with users:
 - `m.room.topic`
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: boolean. Set to `true` to disable the above 
+* `disable_default_event_types`: boolean. Set to `true` to disable the above
   defaults. If this is enabled, only the event types listed in
   `additional_event_types` are shared. Defaults to `false`.
-* `additional_event_types`: A list of additional state events to include in the 
-  events to be shared. By default, this list is empty (so only the default event 
+* `additional_event_types`: A list of additional state events to include in the
+  events to be shared. By default, this list is empty (so only the default event
   types are shared).
 
   Each entry in this list should be either a single string or a list of two
-  strings. 
+  strings.
   * A standalone string `t` represents all events with type `t` (i.e.
     with no restrictions on state keys).
-  * A pair of strings `[t, s]` represents a single event with type `t` and 
+  * A pair of strings `[t, s]` represents a single event with type `t` and
     state key `s`. The same type can appear in two entries with different state
     keys: in this situation, both state keys are included in prejoin state.
 
@@ -3053,8 +3065,13 @@ Options for each entry include:
    values are `client_secret_basic` (default), `client_secret_post` and
    `none`.
 
+* `pkce_method`: Whether to use proof key for code exchange when requesting
+   and exchanging the token. Valid values are: `auto`, `always`, or `never`. Defaults
+   to `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
+   to force enable PKCE or `never` to force disable PKCE.
+
 * `scopes`: list of scopes to request. This should normally include the "openid"
-   scope. Defaults to ["openid"].
+   scope. Defaults to `["openid"]`.
 
 * `authorization_endpoint`: the oauth2 authorization endpoint. Required if
    provider discovery is disabled.
@@ -3098,16 +3115,34 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
+       * `subject_template`: Jinja2 template for a unique identifier for the user.
+         Defaults to `{{ user.sub }}`, which OpenID Connect compliant providers should provide.
+
+         This replaces and overrides `subject_claim`.
+
        * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
 
+         *Deprecated in Synapse v1.75.0.*
+
+       * `picture_template`: Jinja2 template for an url for the user's profile picture.
+         Defaults to `{{ user.picture }}`, which OpenID Connect compliant providers should
+         provide and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+
+         This replaces and overrides `picture_claim`.
+
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
+
        * `picture_claim`: name of the claim containing an url for the user's profile picture.
          Defaults to 'picture', which OpenID Connect compliant providers should provide
          and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
-         
+
          Currently only supported in monolithic (single-process) server configurations
          where the media repository runs within the Synapse process.
+
+         *Deprecated in Synapse v1.75.0.*
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
@@ -3439,8 +3474,8 @@ This setting defines options related to the user directory.
 This option has the following sub-options:
 * `enabled`:  Defines whether users can search the user directory. If false then
    empty responses are returned to all queries. Defaults to true.
-* `search_all_users`: Defines whether to search all users visible to your HS when searching
-   the user directory. If false, search results will only contain users
+* `search_all_users`: Defines whether to search all users visible to your HS at the time the search is performed. If set to true, will return all users who share a room with the user from the homeserver.
+   If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
 
@@ -3842,6 +3877,48 @@ Example configuration:
 run_background_tasks_on: worker1
 ```
 ---
+### `update_user_directory_from_worker`
+
+The [worker](../../workers.md#updating-the-user-directory) that is used to
+update the user directory. If not provided this defaults to the main process.
+
+Example configuration:
+```yaml
+update_user_directory_from_worker: worker1
+```
+
+_Added in Synapse 1.59.0._
+
+---
+### `notify_appservices_from_worker`
+
+The [worker](../../workers.md#notifying-application-services) that is used to
+send output traffic to Application Services. If not provided this defaults
+to the main process.
+
+Example configuration:
+```yaml
+notify_appservices_from_worker: worker1
+```
+
+_Added in Synapse 1.59.0._
+
+---
+### `media_instance_running_background_jobs`
+
+The [worker](../../workers.md#synapseappmedia_repository) that is used to run
+background tasks for media repository. If running multiple media repositories
+you must configure a single instance to run the background tasks. If not provided
+this defaults to the main process or your single `media_repository` worker.
+
+Example configuration:
+```yaml
+media_instance_running_background_jobs: worker1
+```
+
+_Added in Synapse 1.16.0._
+
+---
 ### `redis`
 
 Configuration for Redis when using workers. This *must* be enabled when using workers.
@@ -3955,10 +4032,31 @@ worker_listeners:
       - names: [client, federation]
 ```
 ---
+### `worker_manhole`
+
+A worker may have a listener for [`manhole`](../../manhole.md).
+It allows server administrators to access a Python shell on the worker.
+
+Example configuration:
+```yaml
+worker_manhole: 9000
+```
+
+This is a short form for:
+```yaml
+worker_listeners:
+  - port: 9000
+    bind_addresses: ['127.0.0.1']
+    type: manhole
+```
+
+It needs also an additional [`manhole_settings`](#manhole_settings) configuration.
+
+---
 ### `worker_daemonize`
 
 Specifies whether the worker should be started as a daemon process.
-If Synapse is being managed by [systemd](../../systemd-with-workers/README.md), this option
+If Synapse is being managed by [systemd](../../systemd-with-workers/), this option
 must be omitted or set to `false`.
 
 Defaults to `false`.

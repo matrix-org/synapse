@@ -338,6 +338,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if not self.hs.config.registration.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         if not self.config.email.can_verify_email:
             logger.warning(
                 "Adding emails have been disabled due to lack of an email config"
@@ -410,6 +415,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             request, MsisdnRequestTokenBody
         )
         msisdn = phone_number_to_msisdn(body.country, body.phone_number)
+        logger.info("Request #%s to verify ownership of %s", body.send_attempt, msisdn)
 
         if not await check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -439,6 +445,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
+            logger.info("MSISDN %s is already in use by %s", msisdn, existing_user_id)
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.registration.account_threepid_delegate_msisdn:
@@ -463,6 +470,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         threepid_send_requests.labels(type="msisdn", reason="add_threepid").observe(
             body.send_attempt
         )
+        logger.info("MSISDN %s: got response from identity server: %s", msisdn, ret)
 
         return 200, ret
 
@@ -729,12 +737,7 @@ class ThreepidUnbindRestServlet(RestServlet):
         # Attempt to unbind the threepid from an identity server. If id_server is None, try to
         # unbind from all identity servers this threepid has been added to in the past
         result = await self.identity_handler.try_unbind_threepid(
-            requester.user.to_string(),
-            {
-                "address": body.address,
-                "medium": body.medium,
-                "id_server": body.id_server,
-            },
+            requester.user.to_string(), body.medium, body.address, body.id_server
         )
         return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 

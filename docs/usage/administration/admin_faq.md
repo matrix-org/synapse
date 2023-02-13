@@ -2,13 +2,19 @@
 
 How do I become a server admin?
 ---
-If your server already has an admin account you should use the [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not) to promote other accounts to become admins.
+If your server already has an admin account you should use the
+[User Admin API](../../admin_api/user_admin_api.md#change-whether-a-user-is-a-server-administrator-or-not)
+to promote other accounts to become admins.
 
-If you don't have any admin accounts yet you won't be able to use the admin API, so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account: use the admin APIs to make further changes.
+If you don't have any admin accounts yet you won't be able to use the admin API,
+so you'll have to edit the database manually. Manually editing the database is
+generally not recommended so once you have an admin account: use the admin APIs
+to make further changes.
 
 ```sql
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
+
 What servers are my server talking to?
 ---
 Run this sql query on your db:
@@ -32,6 +38,44 @@ What users are registered on my server?
 SELECT NAME from users;
 ```
 
+How can I export user data?
+---
+Synapse includes a Python command to export data for a specific user. It takes the homeserver
+configuration file and the full Matrix ID of the user to export:
+
+```console
+python -m synapse.app.admin_cmd -c <config_file> export-data <user_id> --output-directory <directory_path>
+```
+
+If you uses [Poetry](../../development/dependencies.md#managing-dependencies-with-poetry)
+to run Synapse:
+
+```console
+poetry run python -m synapse.app.admin_cmd -c <config_file> export-data <user_id> --output-directory <directory_path>
+```
+
+The directory to store the export data in can be customised with the
+`--output-directory` parameter; ensure that the provided directory is
+empty. If this parameter is not provided, Synapse defaults to creating
+a temporary directory (which starts with "synapse-exfiltrate") in `/tmp`,
+`/var/tmp`, or `/usr/tmp`, in that order.
+
+The exported data has the following layout:
+
+```
+output-directory
+├───rooms
+│   └───<room_id>
+│       ├───events
+│       ├───state
+│       ├───invite_state
+│       └───knock_state
+└───user_data
+    ├───connections
+    ├───devices
+    └───profile
+```
+
 Manually resetting passwords
 ---
 Users can reset their password through their client. Alternatively, a server admin
@@ -42,21 +86,29 @@ I have a problem with my server. Can I just delete my database and start again?
 ---
 Deleting your database is unlikely to make anything better. 
 
-It's easy to make the mistake of thinking that you can start again from a clean slate by dropping your database, but things don't work like that in a federated network: lots of other servers have information about your server.
+It's easy to make the mistake of thinking that you can start again from a clean
+slate by dropping your database, but things don't work like that in a federated
+network: lots of other servers have information about your server.
 
-For example: other servers might think that you are in a room, your server will think that you are not, and you'll probably be unable to interact with that room in a sensible way ever again.
+For example: other servers might think that you are in a room, your server will
+think that you are not, and you'll probably be unable to interact with that room
+in a sensible way ever again.
 
-In general, there are better solutions to any problem than dropping the database. Come and seek help in https://matrix.to/#/#synapse:matrix.org.
+In general, there are better solutions to any problem than dropping the database.
+Come and seek help in https://matrix.to/#/#synapse:matrix.org.
 
 There are two exceptions when it might be sensible to delete your database and start again:
-* You have *never* joined any rooms which are federated with other servers. For instance, a local deployment which the outside world can't talk to. 
-* You are changing the `server_name` in the homeserver configuration. In effect this makes your server a completely new one from the point of view of the network, so in this case it makes sense to start with a clean database.
+* You have *never* joined any rooms which are federated with other servers. For
+instance, a local deployment which the outside world can't talk to. 
+* You are changing the `server_name` in the homeserver configuration. In effect
+this makes your server a completely new one from the point of view of the network,
+so in this case it makes sense to start with a clean database.
 (In both cases you probably also want to clear out the media_store.)
 
 I've stuffed up access to my room, how can I delete it to free up the alias?
 ---
 Using the following curl command:
-```
+```console
 curl -H 'Authorization: Bearer <access-token>' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/<room-alias>
 ```
 `<access-token>` - can be obtained in riot by looking in the riot settings, down the bottom is:
@@ -67,19 +119,25 @@ Access Token:\<click to reveal\>
 How can I find the lines corresponding to a given HTTP request in my homeserver log?
 ---
 
-Synapse tags each log line according to the HTTP request it is processing. When it finishes processing each request, it logs a line containing the words `Processed request: `. For example:
+Synapse tags each log line according to the HTTP request it is processing. When
+it finishes processing each request, it logs a line containing the words
+`Processed request: `. For example:
 
 ```
 2019-02-14 22:35:08,196 - synapse.access.http.8008 - 302 - INFO - GET-37 - ::1 - 8008 - {@richvdh:localhost} Processed request: 0.173sec/0.001sec (0.002sec, 0.000sec) (0.027sec/0.026sec/2) 687B 200 "GET /_matrix/client/r0/sync HTTP/1.1" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36" [0 dbevts]"
 ```
 
-Here we can see that the request has been tagged with `GET-37`. (The tag depends on the method of the HTTP request, so might start with `GET-`, `PUT-`, `POST-`, `OPTIONS-` or `DELETE-`.) So to find all lines corresponding to this request, we can do:
+Here we can see that the request has been tagged with `GET-37`. (The tag depends
+on the method of the HTTP request, so might start with `GET-`, `PUT-`, `POST-`,
+`OPTIONS-` or `DELETE-`.) So to find all lines corresponding to this request, we can do:
 
-```
+```console
 grep 'GET-37' homeserver.log
 ```
 
-If you want to paste that output into a github issue or matrix room, please remember to surround it with triple-backticks (```) to make it legible (see [quoting code](https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code)).
+If you want to paste that output into a github issue or matrix room, please
+remember to surround it with triple-backticks (```) to make it legible
+(see [quoting code](https://help.github.com/en/articles/basic-writing-and-formatting-syntax#quoting-code)).
 
 
 What do all those fields in the 'Processed' line mean?
@@ -115,11 +173,11 @@ something like the following in their logs:
 
     2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
 
-This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](docs/reverse_proxy.md) and double-check that your settings are correct.
+This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](../../reverse_proxy.md) and double-check that your settings are correct.
 
 
 Help!! Synapse is slow and eats all my RAM/CPU!
------------------------------------------------
+---
 
 First, ensure you are running the latest version of Synapse, using Python 3
 with a [PostgreSQL database](../../postgres.md).
@@ -161,7 +219,7 @@ in the Synapse config file: [see here](../configuration/config_documentation.md#
 
 
 Running out of File Handles
----------------------------
+---
 
 If Synapse runs out of file handles, it typically fails badly - live-locking
 at 100% CPU, and/or failing to accept new TCP connections (blocking the

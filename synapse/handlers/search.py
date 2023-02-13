@@ -14,7 +14,7 @@
 
 import itertools
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 from unpaddedbase64 import decode_base64, encode_base64
@@ -23,7 +23,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
-from synapse.types import JsonDict, StreamKeyType, UserID
+from synapse.types import JsonDict, StrCollection, StreamKeyType, UserID
 from synapse.types.state import StateFilter
 from synapse.visibility import filter_events_for_client
 
@@ -275,7 +275,7 @@ class SearchHandler:
         )
         room_ids = {r.room_id for r in rooms}
 
-        # If doing a subset of all rooms seearch, check if any of the rooms
+        # If doing a subset of all rooms search, check if any of the rooms
         # are from an upgraded room, and search their contents as well
         if search_filter.rooms:
             historical_room_ids: List[str] = []
@@ -418,7 +418,7 @@ class SearchHandler:
     async def _search_by_rank(
         self,
         user: UserID,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         search_term: str,
         keys: Iterable[str],
         search_filter: Filter,
@@ -491,7 +491,7 @@ class SearchHandler:
     async def _search_by_recent(
         self,
         user: UserID,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         search_term: str,
         keys: Iterable[str],
         search_filter: Filter,

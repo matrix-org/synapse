@@ -499,6 +499,7 @@ class DatabasePool:
     """
 
     _TXN_ID = 0
+    engine: BaseDatabaseEngine
 
     def __init__(
         self,
@@ -1762,7 +1763,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries.
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1791,6 +1793,10 @@ class DatabasePool:
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+
+        Returns:
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -1814,7 +1820,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
-    ) -> List[Any]:
+    ) -> List[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1898,6 +1904,19 @@ class DatabasePool:
         updatevalues: Dict[str, Any],
         desc: str,
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+            desc: description of the transaction, for logging and metrics.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         return await self.runInteraction(
             desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
@@ -1909,6 +1928,19 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            txn: The database transaction object.
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         if keyvalues:
             where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
         else:

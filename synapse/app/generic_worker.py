@@ -199,6 +199,9 @@ class GenericWorkerServer(HomeServer):
                             "A 'media' listener is configured but the media"
                             " repository is disabled. Ignoring."
                         )
+                elif name == "health":
+                    # Skip loading, health resource is always included
+                    continue
 
                 if name == "openid" and "federation" not in res.names:
                     # Only load the openid resource separately if federation resource
@@ -278,13 +281,6 @@ def start(config_options: List[str]) -> None:
         "synapse.app.synchrotron",
         "synapse.app.user_dir",
     )
-
-    if config.experimental.faster_joins_enabled:
-        raise ConfigError(
-            "You have enabled the experimental `faster_joins` config option, but it is "
-            "not compatible with worker deployments yet. Please disable `faster_joins` "
-            "or run Synapse as a single process deployment instead."
-        )
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage

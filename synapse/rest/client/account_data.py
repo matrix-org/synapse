@@ -41,6 +41,7 @@ class AccountDataServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
@@ -53,6 +54,16 @@ class AccountDataServlet(RestServlet):
             raise AuthError(403, "Cannot add account data for other users.")
 
         body = parse_json_object_from_request(request)
+
+        # If experimental support for MSC3391 is enabled, then providing an empty dict
+        # as the value for an account data type should be functionally equivalent to
+        # calling the DELETE method on the same type.
+        if self._hs.config.experimental.msc3391_enabled:
+            if body == {}:
+                await self.handler.remove_account_data_for_user(
+                    user_id, account_data_type
+                )
+                return 200, {}
 
         await self.handler.add_account_data_for_user(user_id, account_data_type, body)
 
@@ -72,7 +83,46 @@ class AccountDataServlet(RestServlet):
         if event is None:
             raise NotFoundError("Account data not found")
 
+        # If experimental support for MSC3391 is enabled, then this endpoint should
+        # return a 404 if the content for an account data type is an empty dict.
+        if self._hs.config.experimental.msc3391_enabled and event == {}:
+            raise NotFoundError("Account data not found")
+
         return 200, event
+
+
+class UnstableAccountDataServlet(RestServlet):
+    """
+    Contains an unstable endpoint for removing user account data, as specified by
+    MSC3391. If that MSC is accepted, this code should have unstable prefixes removed
+    and become incorporated into AccountDataServlet above.
+    """
+
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3391/user/(?P<user_id>[^/]*)"
+        "/account_data/(?P<account_data_type>[^/]*)",
+        unstable=True,
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.handler = hs.get_account_data_handler()
+
+    async def on_DELETE(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        account_data_type: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot delete account data for other users.")
+
+        await self.handler.remove_account_data_for_user(user_id, account_data_type)
+
+        return 200, {}
 
 
 class RoomAccountDataServlet(RestServlet):
@@ -89,6 +139,7 @@ class RoomAccountDataServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
@@ -121,6 +172,16 @@ class RoomAccountDataServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        # If experimental support for MSC3391 is enabled, then providing an empty dict
+        # as the value for an account data type should be functionally equivalent to
+        # calling the DELETE method on the same type.
+        if self._hs.config.experimental.msc3391_enabled:
+            if body == {}:
+                await self.handler.remove_account_data_for_room(
+                    user_id, room_id, account_data_type
+                )
+                return 200, {}
+
         await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
@@ -152,9 +213,63 @@ class RoomAccountDataServlet(RestServlet):
         if event is None:
             raise NotFoundError("Room account data not found")
 
+        # If experimental support for MSC3391 is enabled, then this endpoint should
+        # return a 404 if the content for an account data type is an empty dict.
+        if self._hs.config.experimental.msc3391_enabled and event == {}:
+            raise NotFoundError("Room account data not found")
+
         return 200, event
+
+
+class UnstableRoomAccountDataServlet(RestServlet):
+    """
+    Contains an unstable endpoint for removing room account data, as specified by
+    MSC3391. If that MSC is accepted, this code should have unstable prefixes removed
+    and become incorporated into RoomAccountDataServlet above.
+    """
+
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3391/user/(?P<user_id>[^/]*)"
+        "/rooms/(?P<room_id>[^/]*)"
+        "/account_data/(?P<account_data_type>[^/]*)",
+        unstable=True,
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.handler = hs.get_account_data_handler()
+
+    async def on_DELETE(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot delete account data for other users.")
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                400,
+                f"{room_id} is not a valid room ID",
+                Codes.INVALID_PARAM,
+            )
+
+        await self.handler.remove_account_data_for_room(
+            user_id, room_id, account_data_type
+        )
+
+        return 200, {}
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AccountDataServlet(hs).register(http_server)
     RoomAccountDataServlet(hs).register(http_server)
+
+    if hs.config.experimental.msc3391_enabled:
+        UnstableAccountDataServlet(hs).register(http_server)
+        UnstableRoomAccountDataServlet(hs).register(http_server)

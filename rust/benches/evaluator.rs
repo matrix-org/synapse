@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #![feature(test)]
+use std::collections::BTreeSet;
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
+    SimpleJsonValue,
 };
 use test::Bencher;
 
@@ -23,21 +25,34 @@ extern crate test;
 #[bench]
 fn bench_match_exact(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            SimpleJsonValue::Str("m.text".to_string()),
+        ),
+        (
+            "room_id".to_string(),
+            SimpleJsonValue::Str("!room:server".to_string()),
+        ),
+        (
+            "content.body".to_string(),
+            SimpleJsonValue::Str("test message".to_string()),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
     )
     .unwrap();
@@ -59,21 +74,34 @@ fn bench_match_exact(b: &mut Bencher) {
 #[bench]
 fn bench_match_word(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            SimpleJsonValue::Str("m.text".to_string()),
+        ),
+        (
+            "room_id".to_string(),
+            SimpleJsonValue::Str("!room:server".to_string()),
+        ),
+        (
+            "content.body".to_string(),
+            SimpleJsonValue::Str("test message".to_string()),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
     )
     .unwrap();
@@ -95,21 +123,34 @@ fn bench_match_word(b: &mut Bencher) {
 #[bench]
 fn bench_match_word_miss(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            SimpleJsonValue::Str("m.text".to_string()),
+        ),
+        (
+            "room_id".to_string(),
+            SimpleJsonValue::Str("!room:server".to_string()),
+        ),
+        (
+            "content.body".to_string(),
+            SimpleJsonValue::Str("test message".to_string()),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
     )
     .unwrap();
@@ -131,15 +172,27 @@ fn bench_match_word_miss(b: &mut Bencher) {
 #[bench]
 fn bench_eval_message(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            SimpleJsonValue::Str("m.text".to_string()),
+        ),
+        (
+            "room_id".to_string(),
+            SimpleJsonValue::Str("!room:server".to_string()),
+        ),
+        (
+            "content.body".to_string(),
+            SimpleJsonValue::Str("test message".to_string()),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
@@ -147,11 +200,19 @@ fn bench_eval_message(b: &mut Bencher) {
         true,
         vec![],
         false,
+        false,
     )
     .unwrap();
 
-    let rules =
-        FilteredPushRules::py_new(PushRules::new(Vec::new()), Default::default(), false, false);
+    let rules = FilteredPushRules::py_new(
+        PushRules::new(Vec::new()),
+        Default::default(),
+        false,
+        false,
+        false,
+        false,
+        false,
+    );
 
     b.iter(|| eval.run(&rules, Some("bob"), Some("person")));
 }

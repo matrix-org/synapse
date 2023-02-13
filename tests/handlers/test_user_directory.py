@@ -949,9 +949,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
+
+        context = self.get_success(unpersisted_context.persist(event))
 
         self.get_success(
             self.hs.get_storage_controllers().persistence.persist_event(event, context)

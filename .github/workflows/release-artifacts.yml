@@ -127,7 +127,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel==2.9.0 poetry==1.2.0
+        run: python -m pip install cibuildwheel==2.9.0
 
       - name: Set up QEMU to emulate aarch64
         if: matrix.arch == 'aarch64'
@@ -148,7 +148,7 @@ jobs:
         env:
           # Skip testing for platforms which various libraries don't have wheels
           # for, and so need extra build deps.
-          CIBW_TEST_SKIP: pp39-* *i686* *musl* pp37-macosx*
+          CIBW_TEST_SKIP: pp3*-* *i686* *musl*
           # Fix Rust OOM errors on emulated aarch64: https://github.com/rust-lang/cargo/issues/10583
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CIBW_ENVIRONMENT_PASS_LINUX: CARGO_NET_GIT_FETCH_WITH_CLI
