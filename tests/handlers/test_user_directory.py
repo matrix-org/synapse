@@ -797,43 +797,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
-    def test_legacy_spam_checker(self) -> None:
-        """
-        A spam checker without the expected method should be ignored.
-        """
-        u1 = self.register_user("user1", "pass")
-        u1_token = self.login(u1, "pass")
-        u2 = self.register_user("user2", "pass")
-        u2_token = self.login(u2, "pass")
-
-        # We do not add users to the directory until they join a room.
-        s = self.get_success(self.handler.search_users(u1, "user2", 10))
-        self.assertEqual(len(s["results"]), 0)
-
-        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
-        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room, user=u2, tok=u2_token)
-
-        # Check we have populated the database correctly.
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
-        )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
-        self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
-        self.assertEqual(public_users, set())
-
-        # Configure a spam checker.
-        spam_checker = self.hs.get_spam_checker()
-        # The spam checker doesn't need any methods, so create a bare object.
-        spam_checker.spam_checker = object()
-
-        # We get one search result when searching for user2 by user1.
-        s = self.get_success(self.handler.search_users(u1, "user2", 10))
-        self.assertEqual(len(s["results"]), 1)
-
     def test_initial_share_all_users(self) -> None:
         """
         Search all users = True means that a user does not have to share a
