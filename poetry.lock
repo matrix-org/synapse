@@ -3027,4 +3027,4 @@ user-search = ["pyicu"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7.1"
-content-hash = "16528ddab686d1bc3180ff37b09de35b904f68516cfdcc3942844163a126255e"
+content-hash = "95cb043fa56e1e3275ba7f74b68b2191bd5886eea3e06b8cd370d7fc9fea3c07"

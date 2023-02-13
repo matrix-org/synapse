@@ -346,6 +346,9 @@ twine = "*"
 # Towncrier min version comes from #3425. Rationale unclear.
 towncrier = ">=18.6.0rc1"
 
+# Used for checking the Poetry lockfile
+tomli = ">=1.2.3"
+
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like
 # #13849 and #14079 where we see buildtime or runtime errors caused by build
