@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Tuple
+from typing import Any, Tuple
 from unittest.mock import Mock, patch
 from urllib.parse import quote
 
@@ -32,6 +32,12 @@ from tests.storage.test_user_directory import GetUserDirectoryTables
 from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
+
+
+# A spam checker which doesn't implement anything, so create a bare object.
+class UselessSpamChecker:
+    def __init__(self, config: Any):
+        pass
 
 
 class UserDirectoryTestCase(unittest.HomeserverTestCase):
@@ -797,6 +803,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
+    @override_config(
+        {
+            "spam_checker": {
+                "module": "tests.handlers.test_user_directory.UselessSpamChecker"
+            }
+        }
+    )
     def test_legacy_spam_checker(self) -> None:
         """
         A spam checker without the expected method should be ignored.
@@ -827,8 +840,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Configure a spam checker.
         spam_checker = self.hs.get_spam_checker()
-        # The spam checker doesn't need any methods, so create a bare object.
-        spam_checker.spam_checker = object()
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
