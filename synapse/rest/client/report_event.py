@@ -39,6 +39,7 @@ class ReportEventRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
+        self._event_handler = self.hs.get_event_handler()
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, event_id: str
@@ -61,7 +62,7 @@ class ReportEventRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
-        event = await self.hs.get_event_handler().get_event(
+        event = await self._event_handler.get_event(
             requester.user, room_id, event_id, show_redacted=False
         )
         if event is None:
