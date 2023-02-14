@@ -17,7 +17,7 @@ import logging
 import os
 import sys
 import tempfile
-from typing import Dict, List, Optional
+from typing import List, Mapping, Optional
 
 from twisted.internet import defer, task
 
@@ -223,7 +223,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
                 print(json.dumps(connection), file=f)
 
     def write_account_data(
-        self, file_name: str, account_data: Dict[str, JsonDict]
+        self, file_name: str, account_data: Mapping[str, JsonDict]
     ) -> None:
         account_data_directory = os.path.join(
             self.base_directory, "user_data", "account_data"

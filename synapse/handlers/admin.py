@@ -14,7 +14,7 @@
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set
 
 from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
@@ -264,7 +264,8 @@ class AdminHandler:
         )
 
         # Get all account data the user has global and in rooms
-        global_data, by_room_data = await self._store.get_account_data_for_user(user_id)
+        global_data = await self._store.get_global_account_data_for_user(user_id)
+        by_room_data = await self._store.get_room_account_data_for_user(user_id)
         writer.write_account_data("global", global_data)
         for room_id in by_room_data:
             writer.write_account_data(room_id, by_room_data[room_id])
@@ -348,13 +349,13 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_account_data(
-        self, file_name: str, account_data: Dict[str, JsonDict]
+        self, file_name: str, account_data: Mapping[str, JsonDict]
     ) -> None:
         """Write the account data of a user.
 
         Args:
             file_name: file name to write data
-            account_data: dict of global or room account_data
+            account_data: mapping of global or room account_data
         """
         raise NotImplementedError()
 
