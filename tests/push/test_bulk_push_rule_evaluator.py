@@ -379,7 +379,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
 
         # Create & persist an event to use as the parent of the relation.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -393,6 +393,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
             self.event_creation_handler.handle_new_client_event(
                 self.requester, events_and_context=[(event, context)]

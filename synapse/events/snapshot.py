@@ -360,8 +360,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         """
         Takes a list of events and their associated unpersisted contexts and persists
         the unpersisted contexts, returning a list of events and persisted contexts.
-        Note that all the events must be in a linear chain (ie a <- b <- c)
-        and must be state events.
+        Note that all the events must be in a linear chain (ie a <- b <- c).
 
         Args:
             events_and_context: A list of events and their unpersisted contexts
@@ -375,15 +374,14 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
         events_and_persisted_context = []
         for event, unpersisted_context in amended_events_and_context:
-            assert unpersisted_context.partial_state is not None
             context = EventContext(
                 storage=unpersisted_context._storage,
                 state_group=unpersisted_context.state_group_after_event,
                 state_group_before_event=unpersisted_context.state_group_before_event,
                 state_delta_due_to_event=unpersisted_context.state_delta_due_to_event,
                 partial_state=unpersisted_context.partial_state,
-                prev_group=unpersisted_context.prev_group_for_state_group_after_event,
-                delta_ids=unpersisted_context.delta_ids_to_state_group_after_event,
+                prev_group=unpersisted_context.state_group_before_event,
+                delta_ids=unpersisted_context.state_delta_due_to_event,
             )
             events_and_persisted_context.append((event, context))
         return events_and_persisted_context
