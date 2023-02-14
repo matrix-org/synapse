@@ -366,6 +366,7 @@ A safe example would be <code>WORKER_TYPES=&quot;federation_inbound, federation_
 See the <a href="../workers.html">worker documentation</a> for additional information on workers.</li>
 </ul>
 </li>
+<li>Passing <code>ASYNCIO_REACTOR=1</code> as an environment variable to use the Twisted asyncio reactor instead of the default one.</li>
 </ul>
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>, e.g:</p>
 <pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
