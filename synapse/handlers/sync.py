@@ -1399,6 +1399,11 @@ class SyncHandler:
                 for room_id, is_partial_state in results.items()
                 if is_partial_state
             )
+            membership_change_events = [
+                event
+                for event in membership_change_events
+                if not results.get(event.room_id, False)
+            ]
 
         # Incremental eager syncs should additionally include rooms that
         # - we are joined to

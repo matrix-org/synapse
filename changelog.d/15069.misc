@@ -1,0 +1,1 @@
+Faster joins: omit device list updates originating from partial state rooms in /sync responses without lazy loading of members enabled.
