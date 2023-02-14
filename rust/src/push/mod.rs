@@ -291,14 +291,12 @@ pub enum JsonValue {
 impl<'source> FromPyObject<'source> for JsonValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         if let Ok(l) = <PyList as pyo3::PyTryFrom>::try_from(ob) {
-            if let Ok(a) = l.iter().map(SimpleJsonValue::extract).collect() {
-                Ok(JsonValue::Array(a))
-            } else {
-                // TOOD How to get a good error?
-                Err(PyTypeError::new_err(format!(
-                    "Can't convert from {} to JsonValue::Array",
-                    ob.get_type().name()?
-                )))
+            match l.iter().map(SimpleJsonValue::extract).collect() {
+                Ok(a) => Ok(JsonValue::Array(a)),
+                Err(e) => Err(PyTypeError::new_err(format!(
+                    "Can't convert to JsonValue::Array: {}",
+                    e
+                ))),
             }
         } else if let Ok(v) = SimpleJsonValue::extract(ob) {
             Ok(JsonValue::Value(v))
