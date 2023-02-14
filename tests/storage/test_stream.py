@@ -16,7 +16,7 @@ from typing import List
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.constants import Direction, EventTypes, RelationTypes
 from synapse.api.filtering import Filter
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -128,7 +128,7 @@ class PaginationTestCase(HomeserverTestCase):
                 room_id=self.room_id,
                 from_key=self.from_token.room_key,
                 to_key=None,
-                direction="f",
+                direction=Direction.FORWARDS,
                 limit=10,
                 event_filter=Filter(self.hs, filter),
             )

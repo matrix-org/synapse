@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, UserID, create_requester
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -56,7 +56,11 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Artificially raise the complexity
         store = self.hs.get_datastores().main
-        store.get_current_state_event_counts = lambda x: make_awaitable(500 * 1.23)
+
+        async def get_current_state_event_counts(room_id: str) -> int:
+            return int(500 * 1.23)
+
+        store.get_current_state_event_counts = get_current_state_event_counts  # type: ignore[assignment]
 
         # Get the room complexity again -- make sure it's our artificial value
         channel = self.make_signed_federation_request(
@@ -75,12 +79,12 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
+        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
@@ -106,12 +110,12 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
+        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
@@ -144,17 +148,18 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=make_awaitable(None))
-        handler.federation_handler.do_invite_join = Mock(
+        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(("", 1))
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastores().main.get_current_state_event_counts = (
-            lambda x: make_awaitable(600)
-        )
+        async def get_current_state_event_counts(room_id: str) -> int:
+            return 600
+
+        self.hs.get_datastores().main.get_current_state_event_counts = get_current_state_event_counts  # type: ignore[assignment]
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             room_1,
             UserID.from_string(u1),
@@ -200,12 +205,12 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
+        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
@@ -230,12 +235,12 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
+        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(("", 1))
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
