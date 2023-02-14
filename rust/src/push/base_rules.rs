@@ -76,7 +76,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern_type: None,
             },
         ))]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
+        actions: Cow::Borrowed(&[]),
         default: true,
         default_enabled: true,
     },

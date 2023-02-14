@@ -34,7 +34,9 @@ class TagListServlet(RestServlet):
     GET /user/{user_id}/rooms/{room_id}/tags HTTP/1.1
     """
 
-    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags")
+    PATTERNS = client_patterns(
+        "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags$"
+    )
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

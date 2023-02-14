@@ -1,1 +1,0 @@
-Fix a regression introduced in Synapse 1.69.0 which can result in database corruption when database migrations are interrupted on sqlite.

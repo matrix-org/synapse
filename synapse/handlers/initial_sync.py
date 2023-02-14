@@ -154,9 +154,8 @@ class InitialSyncHandler:
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
-        account_data, account_data_by_room = await self.store.get_account_data_for_user(
-            user_id
-        )
+        account_data = await self.store.get_global_account_data_for_user(user_id)
+        account_data_by_room = await self.store.get_room_account_data_for_user(user_id)
 
         public_room_ids = await self.store.get_public_room_ids()
 

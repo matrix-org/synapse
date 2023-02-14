@@ -89,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.76.0"
+version = "1.77.0rc2"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -127,7 +127,9 @@ exclude = [
     { path = "synapse/*.so", format = "sdist"}
 ]
 
-build = "build_rust.py"
+[tool.poetry.build]
+script = "build_rust.py"
+generate-setup-file = true
 
 [tool.poetry.scripts]
 synapse_homeserver = "synapse.app.homeserver:main"
@@ -309,7 +311,7 @@ all = [
 # We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-ruff = "0.0.230"
+ruff = "0.0.237"
 
 # Typechecking
 mypy = "*"
@@ -344,13 +346,16 @@ twine = "*"
 # Towncrier min version comes from #3425. Rationale unclear.
 towncrier = ">=18.6.0rc1"
 
+# Used for checking the Poetry lockfile
+tomli = ">=1.2.3"
+
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like
 # #13849 and #14079 where we see buildtime or runtime errors caused by build
 # system changes.
 # We are happy to raise these upper bounds upon request,
 # provided we check that it's safe to do so (i.e. that CI passes).
-requires = ["poetry-core>=1.0.0,<=1.3.2", "setuptools_rust>=1.3,<=1.5.2"]
+requires = ["poetry-core>=1.0.0,<=1.5.0", "setuptools_rust>=1.3,<=1.5.2"]
 build-backend = "poetry.core.masonry.api"
 
 
