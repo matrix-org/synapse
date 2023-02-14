@@ -838,9 +838,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
         self.assertEqual(public_users, set())
 
-        # Configure a spam checker.
-        spam_checker = self.hs.get_spam_checker()
-
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
