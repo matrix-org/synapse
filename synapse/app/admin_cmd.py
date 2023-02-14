@@ -222,19 +222,6 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             with open(connection_file, "a") as f:
                 print(json.dumps(connection), file=f)
 
-    def write_room_account_data(
-        self, room_id: str, account_data: Dict[str, JsonDict]
-    ) -> None:
-        account_data_directory = os.path.join(
-            self.base_directory, "user_data", "account_data"
-        )
-        os.makedirs(account_data_directory, exist_ok=True)
-
-        room_file = os.path.join(account_data_directory, room_id)
-
-        with open(room_file, "a") as f:
-            print(json.dumps(account_data), file=f)
-
     def write_account_data(
         self, file_name: str, account_data: Dict[str, JsonDict]
     ) -> None:
