@@ -1,0 +1,1 @@
+Faster joins: don't stall when another user joins during a fast join resync.

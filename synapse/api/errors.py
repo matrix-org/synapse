@@ -751,3 +751,25 @@ class ModuleFailedException(Exception):
     Raised when a module API callback fails, for example because it raised an
     exception.
     """
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg=PartialStateConflictError.message(),
+            errcode=Codes.UNKNOWN,
+        )
