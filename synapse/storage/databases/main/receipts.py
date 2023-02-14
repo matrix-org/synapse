@@ -21,7 +21,9 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
+    Sequence,
     Tuple,
     cast,
 )
@@ -288,7 +290,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     async def get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> List[dict]:
+    ) -> Sequence[JsonDict]:
         """Get receipts for a single room for sending to clients.
 
         Args:
@@ -311,7 +313,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> List[JsonDict]:
+    ) -> Sequence[JsonDict]:
         """See get_linearized_receipts_for_room"""
 
         def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
@@ -354,7 +356,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def _get_linearized_receipts_for_rooms(
         self, room_ids: Collection[str], to_key: int, from_key: Optional[int] = None
-    ) -> Dict[str, List[JsonDict]]:
+    ) -> Dict[str, Sequence[JsonDict]]:
         if not room_ids:
             return {}
 
@@ -416,7 +418,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
-    ) -> Dict[str, JsonDict]:
+    ) -> Mapping[str, JsonDict]:
         """Get receipts for all rooms between two stream_ids, up
         to a limit of the latest 100 read receipts.
 
@@ -941,10 +943,14 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
         receipts."""
 
         def _remote_duplicate_receipts_txn(txn: LoggingTransaction) -> None:
+            if isinstance(self.database_engine, PostgresEngine):
+                ROW_ID_NAME = "ctid"
+            else:
+                ROW_ID_NAME = "rowid"
+
             # Identify any duplicate receipts arising from
             # https://github.com/matrix-org/synapse/issues/14406.
-            # We expect the following query to use the per-thread receipt index and take
-            # less than a minute.
+            # The following query takes less than a minute on matrix.org.
             sql = """
                 SELECT MAX(stream_id), room_id, receipt_type, user_id
                 FROM receipts_linearized
@@ -956,19 +962,33 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             duplicate_keys = cast(List[Tuple[int, str, str, str]], list(txn))
 
             # Then remove duplicate receipts, keeping the one with the highest
-            # `stream_id`. There should only be a single receipt with any given
-            # `stream_id`.
-            for max_stream_id, room_id, receipt_type, user_id in duplicate_keys:
-                sql = """
+            # `stream_id`. Since there might be duplicate rows with the same
+            # `stream_id`, we delete by the ctid instead.
+            for stream_id, room_id, receipt_type, user_id in duplicate_keys:
+                sql = f"""
+                SELECT {ROW_ID_NAME}
+                FROM receipts_linearized
+                WHERE
+                    room_id = ? AND
+                    receipt_type = ? AND
+                    user_id = ? AND
+                    thread_id IS NULL AND
+                    stream_id = ?
+                LIMIT 1
+                """
+                txn.execute(sql, (room_id, receipt_type, user_id, stream_id))
+                row_id = cast(Tuple[str], txn.fetchone())[0]
+
+                sql = f"""
                     DELETE FROM receipts_linearized
                     WHERE
                         room_id = ? AND
                         receipt_type = ? AND
                         user_id = ? AND
                         thread_id IS NULL AND
-                        stream_id < ?
+                        {ROW_ID_NAME} != ?
                 """
-                txn.execute(sql, (room_id, receipt_type, user_id, max_stream_id))
+                txn.execute(sql, (room_id, receipt_type, user_id, row_id))
 
         await self.db_pool.runInteraction(
             self.RECEIPTS_LINEARIZED_UNIQUE_INDEX_UPDATE_NAME,

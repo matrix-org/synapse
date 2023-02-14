@@ -228,6 +228,11 @@ else
   test_tags="$test_tags,msc2716"
 fi
 
+if [[ -n "$ASYNCIO_REACTOR" ]]; then
+  # Enable the Twisted asyncio reactor
+  export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=true
+fi
+
 
 if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   # Set the log level to what is desired

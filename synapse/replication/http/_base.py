@@ -426,6 +426,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             code, response = await self.response_cache.wrap(
                 txn_id, self._handle_request, request, content, **kwargs
             )
+            # Take a copy so we don't mutate things in the cache.
+            response = dict(response)
         else:
             # The `@cancellable` decorator may be applied to `_handle_request`. But we
             # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,

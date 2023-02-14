@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import patch
 
 from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EventContentFields, RelationTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
-from synapse.types import create_requester
+from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
 from tests.test_utils import simple_async_mock
@@ -196,77 +196,144 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
         bulk_evaluator._action_for_event_by_user.assert_not_called()
 
+    def _create_and_process(
+        self, bulk_evaluator: BulkPushRuleEvaluator, content: Optional[JsonDict] = None
+    ) -> bool:
+        """Returns true iff the `mentions` trigger an event push action."""
+        # Create a new message event which should cause a notification.
+        event, context = self.get_success(
+            self.event_creation_handler.create_event(
+                self.requester,
+                {
+                    "type": "test",
+                    "room_id": self.room_id,
+                    "content": content or {},
+                    "sender": f"@bob:{self.hs.hostname}",
+                },
+            )
+        )
+
+        # Execute the push rule machinery.
+        self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
+
+        # If any actions are generated for this event, return true.
+        result = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                table="event_push_actions_staging",
+                keyvalues={"event_id": event.event_id},
+                retcols=("*",),
+                desc="get_event_push_actions_staging",
+            )
+        )
+        return len(result) > 0
+
     @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
-    def test_mentions(self) -> None:
-        """Test the behavior of an event which includes invalid mentions."""
+    def test_user_mentions(self) -> None:
+        """Test the behavior of an event which includes invalid user mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
 
-        sentinel = object()
-
-        def create_and_process(mentions: Any = sentinel) -> bool:
-            """Returns true iff the `mentions` trigger an event push action."""
-            content = {}
-            if mentions is not sentinel:
-                content[EventContentFields.MSC3952_MENTIONS] = mentions
-
-            # Create a new message event which should cause a notification.
-            event, context = self.get_success(
-                self.event_creation_handler.create_event(
-                    self.requester,
-                    {
-                        "type": "test",
-                        "room_id": self.room_id,
-                        "content": content,
-                        "sender": f"@bob:{self.hs.hostname}",
-                    },
-                )
-            )
-
-            # Ensure no actions are generated!
-            self.get_success(
-                bulk_evaluator.action_for_events_by_user([(event, context)])
-            )
-
-            # If any actions are generated for this event, return true.
-            result = self.get_success(
-                self.hs.get_datastores().main.db_pool.simple_select_list(
-                    table="event_push_actions_staging",
-                    keyvalues={"event_id": event.event_id},
-                    retcols=("*",),
-                    desc="get_event_push_actions_staging",
-                )
-            )
-            return len(result) > 0
-
         # Not including the mentions field should not notify.
-        self.assertFalse(create_and_process())
+        self.assertFalse(self._create_and_process(bulk_evaluator))
         # An empty mentions field should not notify.
-        self.assertFalse(create_and_process({}))
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {}}
+            )
+        )
 
         # Non-dict mentions should be ignored.
         mentions: Any
         for mentions in (None, True, False, 1, "foo", []):
-            self.assertFalse(create_and_process(mentions))
+            self.assertFalse(
+                self._create_and_process(
+                    bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: mentions}
+                )
+            )
 
         # A non-list should be ignored.
         for mentions in (None, True, False, 1, "foo", {}):
-            self.assertFalse(create_and_process({"user_ids": mentions}))
+            self.assertFalse(
+                self._create_and_process(
+                    bulk_evaluator,
+                    {EventContentFields.MSC3952_MENTIONS: {"user_ids": mentions}},
+                )
+            )
 
         # The Matrix ID appearing anywhere in the list should notify.
-        self.assertTrue(create_and_process({"user_ids": [self.alice]}))
-        self.assertTrue(create_and_process({"user_ids": ["@another:test", self.alice]}))
-
-        # Duplicate user IDs should notify.
-        self.assertTrue(create_and_process({"user_ids": [self.alice, self.alice]}))
-
-        # Invalid entries in the list are ignored.
-        self.assertFalse(create_and_process({"user_ids": [None, True, False, {}, []]}))
         self.assertTrue(
-            create_and_process({"user_ids": [None, True, False, {}, [], self.alice]})
+            self._create_and_process(
+                bulk_evaluator,
+                {EventContentFields.MSC3952_MENTIONS: {"user_ids": [self.alice]}},
+            )
+        )
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    EventContentFields.MSC3952_MENTIONS: {
+                        "user_ids": ["@another:test", self.alice]
+                    }
+                },
+            )
         )
 
+        # Duplicate user IDs should notify.
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    EventContentFields.MSC3952_MENTIONS: {
+                        "user_ids": [self.alice, self.alice]
+                    }
+                },
+            )
+        )
+
+        # Invalid entries in the list are ignored.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    EventContentFields.MSC3952_MENTIONS: {
+                        "user_ids": [None, True, False, {}, []]
+                    }
+                },
+            )
+        )
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    EventContentFields.MSC3952_MENTIONS: {
+                        "user_ids": [None, True, False, {}, [], self.alice]
+                    }
+                },
+            )
+        )
+
+        # The legacy push rule should not mention if the mentions field exists.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": self.alice,
+                    "msgtype": "m.text",
+                    EventContentFields.MSC3952_MENTIONS: {},
+                },
+            )
+        )
+
+    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
+    def test_room_mentions(self) -> None:
+        """Test the behavior of an event which includes invalid room mentions."""
+        bulk_evaluator = BulkPushRuleEvaluator(self.hs)
+
         # Room mentions from those without power should not notify.
-        self.assertFalse(create_and_process({"room": True}))
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {"room": True}}
+            )
+        )
 
         # Room mentions from those with power should notify.
         self.helper.send_state(
@@ -276,8 +343,70 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             self.token,
             state_key="",
         )
-        self.assertTrue(create_and_process({"room": True}))
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {"room": True}}
+            )
+        )
 
         # Invalid data should not notify.
+        mentions: Any
         for mentions in (None, False, 1, "foo", [], {}):
-            self.assertFalse(create_and_process({"room": mentions}))
+            self.assertFalse(
+                self._create_and_process(
+                    bulk_evaluator,
+                    {EventContentFields.MSC3952_MENTIONS: {"room": mentions}},
+                )
+            )
+
+        # The legacy push rule should not mention if the mentions field exists.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": "@room",
+                    "msgtype": "m.text",
+                    EventContentFields.MSC3952_MENTIONS: {},
+                },
+            )
+        )
+
+    @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
+    def test_suppress_edits(self) -> None:
+        """Under the default push rules, event edits should not generate notifications."""
+        bulk_evaluator = BulkPushRuleEvaluator(self.hs)
+
+        # Create & persist an event to use as the parent of the relation.
+        event, context = self.get_success(
+            self.event_creation_handler.create_event(
+                self.requester,
+                {
+                    "type": "m.room.message",
+                    "room_id": self.room_id,
+                    "content": {
+                        "msgtype": "m.text",
+                        "body": "helo",
+                    },
+                    "sender": self.alice,
+                },
+            )
+        )
+        self.get_success(
+            self.event_creation_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
+        )
+
+        # Room mentions from those without power should not notify.
+        self.assertFalse(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": self.alice,
+                    "m.relates_to": {
+                        "rel_type": RelationTypes.REPLACE,
+                        "event_id": event.event_id,
+                    },
+                },
+            )
+        )

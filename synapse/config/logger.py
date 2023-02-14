@@ -34,6 +34,7 @@ from twisted.logger import (
 
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
+from synapse.synapse_rust import reset_logging_config
 from synapse.types import JsonDict
 
 from ..util import SYNAPSE_VERSION
@@ -200,24 +201,6 @@ def _setup_stdlib_logging(
     """
     Set up Python standard library logging.
     """
-    if log_config_path is None:
-        log_format = (
-            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
-            " - %(message)s"
-        )
-
-        logger = logging.getLogger("")
-        logger.setLevel(logging.INFO)
-        logging.getLogger("synapse.storage.SQL").setLevel(logging.INFO)
-
-        formatter = logging.Formatter(log_format)
-
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    else:
-        # Load the logging configuration.
-        _load_logging_config(log_config_path)
 
     # We add a log record factory that runs all messages through the
     # LoggingContextFilter so that we get the context *at the time we log*
@@ -236,6 +219,26 @@ def _setup_stdlib_logging(
         return record
 
     logging.setLogRecordFactory(factory)
+
+    # Configure the logger with the initial configuration.
+    if log_config_path is None:
+        log_format = (
+            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
+            " - %(message)s"
+        )
+
+        logger = logging.getLogger("")
+        logger.setLevel(logging.INFO)
+        logging.getLogger("synapse.storage.SQL").setLevel(logging.INFO)
+
+        formatter = logging.Formatter(log_format)
+
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    else:
+        # Load the logging configuration.
+        _load_logging_config(log_config_path)
 
     # Route Twisted's native logging through to the standard library logging
     # system.
@@ -293,6 +296,9 @@ def _load_logging_config(log_config_path: str) -> None:
         raise ConfigError(STRUCTURED_ERROR)
 
     logging.config.dictConfig(log_config)
+
+    # Blow away the pyo3-log cache so that it reloads the configuration.
+    reset_logging_config()
 
 
 def _reload_logging_config(log_config_path: Optional[str]) -> None:
