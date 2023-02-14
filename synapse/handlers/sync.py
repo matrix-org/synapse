@@ -1291,6 +1291,9 @@ class SyncHandler:
         self, room_id: str, sync_config: SyncConfig
     ) -> RoomNotifCounts:
         if not self.should_calculate_push_rules:
+            # If push rules have been universally disabled then we know we won't
+            # have any unread counts in the DB, so we may as well skip asking
+            # the DB.
             return RoomNotifCounts.empty()
 
         with Measure(self.clock, "unread_notifs_for_room_id"):
