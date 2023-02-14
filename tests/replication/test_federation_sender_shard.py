@@ -27,18 +27,20 @@ logger = logging.getLogger(__name__)
 
 
 class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
+    """
+    Various tests for federation sending on workers.
+
+    Federation sending is disabled by default, it will be enabled in each test by
+    updating 'federation_sender_instances'.
+    """
+
     servlets = [
         login.register_servlets,
         register_servlets_for_client_rest_resource,
         room.register_servlets,
     ]
 
-    def default_config(self):
-        conf = super().default_config()
-        conf["send_federation"] = False
-        return conf
-
-    def test_send_event_single_sender(self):
+    def test_send_event_single_sender(self) -> None:
         """Test that using a single federation sender worker correctly sends a
         new event.
         """
@@ -46,8 +48,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client.put_json.return_value = make_awaitable({})
 
         self.make_worker_hs(
-            "synapse.app.federation_sender",
-            {"send_federation": False},
+            "synapse.app.generic_worker",
+            {
+                "worker_name": "federation_sender1",
+                "federation_sender_instances": ["federation_sender1"],
+            },
             federation_http_client=mock_client,
         )
 
@@ -66,18 +71,20 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(mock_client.put_json.call_args[0][0], "other_server")
         self.assertTrue(mock_client.put_json.call_args[1]["data"].get("pdus"))
 
-    def test_send_event_sharded(self):
+    def test_send_event_sharded(self) -> None:
         """Test that using two federation sender workers correctly sends
         new events.
         """
         mock_client1 = Mock(spec=["put_json"])
         mock_client1.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
-                "worker_name": "sender1",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender1",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client1,
         )
@@ -85,11 +92,13 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client2 = Mock(spec=["put_json"])
         mock_client2.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
-                "worker_name": "sender2",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender2",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client2,
         )
@@ -129,18 +138,20 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(sent_on_1)
         self.assertTrue(sent_on_2)
 
-    def test_send_typing_sharded(self):
+    def test_send_typing_sharded(self) -> None:
         """Test that using two federation sender workers correctly sends
         new typing EDUs.
         """
         mock_client1 = Mock(spec=["put_json"])
         mock_client1.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
-                "worker_name": "sender1",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender1",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client1,
         )
@@ -148,11 +159,13 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         mock_client2 = Mock(spec=["put_json"])
         mock_client2.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
-            "synapse.app.federation_sender",
+            "synapse.app.generic_worker",
             {
-                "send_federation": True,
-                "worker_name": "sender2",
-                "federation_sender_instances": ["sender1", "sender2"],
+                "worker_name": "federation_sender2",
+                "federation_sender_instances": [
+                    "federation_sender1",
+                    "federation_sender2",
+                ],
             },
             federation_http_client=mock_client2,
         )
@@ -202,7 +215,9 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(sent_on_1)
         self.assertTrue(sent_on_2)
 
-    def create_room_with_remote_server(self, user, token, remote_server="other_server"):
+    def create_room_with_remote_server(
+        self, user: str, token: str, remote_server: str = "other_server"
+    ) -> str:
         room = self.helper.create_room_as(user, tok=token)
         store = self.hs.get_datastores().main
         federation = self.hs.get_federation_event_handler()

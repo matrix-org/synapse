@@ -13,9 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections.abc
 import logging
 import typing
-from typing import Any, Collection, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -41,6 +53,7 @@ from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
     RoomVersion,
+    RoomVersions,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import MutableStateMap, StateMap, UserID, get_domain_from_id
@@ -134,6 +147,7 @@ def validate_event_for_room_version(event: "EventBase") -> None:
 async def check_state_independent_auth_rules(
     store: _EventSourceStore,
     event: "EventBase",
+    batched_auth_events: Optional[Mapping[str, "EventBase"]] = None,
 ) -> None:
     """Check that an event complies with auth rules that are independent of room state
 
@@ -143,6 +157,8 @@ async def check_state_independent_auth_rules(
     Args:
         store: the datastore; used to fetch the auth events for validation
         event: the event being checked.
+        batched_auth_events: if the event being authed is part of a batch, any events
+            from the same batch that may be necessary to auth the current event
 
     Raises:
         AuthError if the checks fail
@@ -162,6 +178,9 @@ async def check_state_independent_auth_rules(
         redact_behaviour=EventRedactBehaviour.as_is,
         allow_rejected=True,
     )
+    if batched_auth_events:
+        auth_events.update(batched_auth_events)
+
     room_id = event.room_id
     auth_dict: MutableStateMap[str] = {}
     expected_auth_types = auth_types_for_event(event.room_version, event)
@@ -324,19 +343,80 @@ def check_state_dependent_auth_rules(
     logger.debug("Allowing! %s", event)
 
 
+# Set of room versions where Synapse did not apply event key size limits
+# in bytes, but rather in codepoints.
+# In these room versions, we are more lenient with event size validation.
+LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS = {
+    RoomVersions.V1,
+    RoomVersions.V2,
+    RoomVersions.V3,
+    RoomVersions.V4,
+    RoomVersions.V5,
+    RoomVersions.V6,
+    RoomVersions.MSC2176,
+    RoomVersions.V7,
+    RoomVersions.V8,
+    RoomVersions.V9,
+    RoomVersions.MSC3787,
+    RoomVersions.V10,
+    RoomVersions.MSC2716v4,
+    RoomVersions.MSC1767v10,
+}
+
+
 def _check_size_limits(event: "EventBase") -> None:
-    if len(event.user_id) > 255:
-        raise EventSizeError("'user_id' too large")
-    if len(event.room_id) > 255:
-        raise EventSizeError("'room_id' too large")
-    if event.is_state() and len(event.state_key) > 255:
-        raise EventSizeError("'state_key' too large")
-    if len(event.type) > 255:
-        raise EventSizeError("'type' too large")
-    if len(event.event_id) > 255:
-        raise EventSizeError("'event_id' too large")
+    """
+    Checks the size limits in a PDU.
+
+    The entire size limit of the PDU is checked first.
+    Then the size of fields is checked, first in codepoints and then in bytes.
+
+    The codepoint size limits are only for Synapse compatibility.
+
+    Raises:
+        EventSizeError:
+            when a size limit has been violated.
+
+            unpersistable=True if Synapse never would have accepted the event and
+                the PDU must NOT be persisted.
+
+            unpersistable=False if a prior version of Synapse would have accepted the
+                event and so the PDU must be persisted as rejected to avoid
+                breaking the room.
+    """
+
+    # Whole PDU check
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
-        raise EventSizeError("event too large")
+        raise EventSizeError("event too large", unpersistable=True)
+
+    # Codepoint size check: Synapse always enforced these limits, so apply
+    # them strictly.
+    if len(event.user_id) > 255:
+        raise EventSizeError("'user_id' too large", unpersistable=True)
+    if len(event.room_id) > 255:
+        raise EventSizeError("'room_id' too large", unpersistable=True)
+    if event.is_state() and len(event.state_key) > 255:
+        raise EventSizeError("'state_key' too large", unpersistable=True)
+    if len(event.type) > 255:
+        raise EventSizeError("'type' too large", unpersistable=True)
+    if len(event.event_id) > 255:
+        raise EventSizeError("'event_id' too large", unpersistable=True)
+
+    strict_byte_limits = (
+        event.room_version not in LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS
+    )
+
+    # Byte size check: if these fail, then be lenient to avoid breaking rooms.
+    if len(event.user_id.encode("utf-8")) > 255:
+        raise EventSizeError("'user_id' too large", unpersistable=strict_byte_limits)
+    if len(event.room_id.encode("utf-8")) > 255:
+        raise EventSizeError("'room_id' too large", unpersistable=strict_byte_limits)
+    if event.is_state() and len(event.state_key.encode("utf-8")) > 255:
+        raise EventSizeError("'state_key' too large", unpersistable=strict_byte_limits)
+    if len(event.type.encode("utf-8")) > 255:
+        raise EventSizeError("'type' too large", unpersistable=strict_byte_limits)
+    if len(event.event_id.encode("utf-8")) > 255:
+        raise EventSizeError("'event_id' too large", unpersistable=strict_byte_limits)
 
 
 def _check_create(event: "EventBase") -> None:
@@ -795,11 +875,11 @@ def _check_power_levels(
                 "kick",
                 "invite",
             }:
-                if not isinstance(v, int):
+                if type(v) is not int:
                     raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
-                if not isinstance(v, dict) or not all(
-                    isinstance(v, int) for v in v.values()
+                if not isinstance(v, collections.abc.Mapping) or not all(
+                    type(v) is int for v in v.values()
                 ):
                     raise SynapseError(
                         400,

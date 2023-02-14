@@ -195,23 +195,24 @@ There are three separate aspects to this:
 
 ## `event_id` global uniqueness
 
-In room versions `1` and `2` it's possible to end up with two events with the
-same `event_id` (in the same or different rooms). After room version `3`, that
-can only happen with a hash collision, which we basically hope will never
-happen.
-
-There are several places in Synapse and even Matrix APIs like [`GET
+`event_id`'s can be considered globally unique although there has been a lot of
+debate on this topic in places like
+[MSC2779](https://github.com/matrix-org/matrix-spec-proposals/issues/2779) and
+[MSC2848](https://github.com/matrix-org/matrix-spec-proposals/pull/2848) which
+has no resolution yet (as of 2022-09-01). There are several places in Synapse
+and even in the Matrix APIs like [`GET
 /_matrix/federation/v1/event/{eventId}`](https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid)
 where we assume that event IDs are globally unique.
 
-But hash collisions are still possible, and by treating event IDs as room
-scoped, we can reduce the possibility of a hash collision. When scoping
-`event_id` in the database schema, it should be also accompanied by `room_id`
-(`PRIMARY KEY (room_id, event_id)`) and lookups should be done through the pair
-`(room_id, event_id)`.
+When scoping `event_id` in a database schema, it is often nice to accompany it
+with `room_id` (`PRIMARY KEY (room_id, event_id)` and a `FOREIGN KEY(room_id)
+REFERENCES rooms(room_id)`) which makes flexible lookups easy. For example it
+makes it very easy to find and clean up everything in a room when it needs to be
+purged (no need to use sub-`select` query or join from the `events` table).
 
-There has been a lot of debate on this in places like
-https://github.com/matrix-org/matrix-spec-proposals/issues/2779 and
-[MSC2848](https://github.com/matrix-org/matrix-spec-proposals/pull/2848) which
-has no resolution yet (as of 2022-09-01).
+A note on collisions: In room versions `1` and `2` it's possible to end up with
+two events with the same `event_id` (in the same or different rooms). After room
+version `3`, that can only happen with a hash collision, which we basically hope
+will never happen (SHA256 has a massive big key space).
+
 

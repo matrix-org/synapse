@@ -17,7 +17,7 @@ from tests import unittest
 
 
 class ServerNameTestCase(unittest.TestCase):
-    def test_parse_server_name(self):
+    def test_parse_server_name(self) -> None:
         test_data = {
             "localhost": ("localhost", None),
             "my-example.com:1234": ("my-example.com", 1234),
@@ -25,12 +25,14 @@ class ServerNameTestCase(unittest.TestCase):
             "[0abc:1def::1234]": ("[0abc:1def::1234]", None),
             "1.2.3.4:1": ("1.2.3.4", 1),
             "[0abc:1def::1234]:8080": ("[0abc:1def::1234]", 8080),
+            ":80": ("", 80),
+            "": ("", None),
         }
 
         for i, o in test_data.items():
             self.assertEqual(parse_server_name(i), o)
 
-    def test_validate_bad_server_names(self):
+    def test_validate_bad_server_names(self) -> None:
         test_data = [
             "",  # empty
             "localhost:http",  # non-numeric port
@@ -42,6 +44,7 @@ class ServerNameTestCase(unittest.TestCase):
             "newline.com\n",
             ".empty-label.com",
             "1234:5678:80",  # too many colons
+            ":80",
         ]
         for i in test_data:
             try:

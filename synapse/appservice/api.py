@@ -14,7 +14,17 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 from prometheus_client import Counter
 from typing_extensions import TypeGuard
@@ -23,7 +33,7 @@ from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.appservice import (
     ApplicationService,
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.events import EventBase
@@ -120,7 +130,11 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self.get_json(
+                uri,
+                {"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -140,7 +154,11 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self.get_json(
+                uri,
+                {"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -181,7 +199,11 @@ class ApplicationServiceApi(SimpleHttpClient):
                 **fields,
                 b"access_token": service.hs_token,
             }
-            response = await self.get_json(uri, args=args)
+            response = await self.get_json(
+                uri,
+                args=args,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
@@ -217,7 +239,11 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri, {"access_token": service.hs_token})
+                info = await self.get_json(
+                    uri,
+                    {"access_token": service.hs_token},
+                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                )
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -243,10 +269,10 @@ class ApplicationServiceApi(SimpleHttpClient):
     async def push_bulk(
         self,
         service: "ApplicationService",
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
-        one_time_key_counts: TransactionOneTimeKeyCounts,
+        one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
@@ -294,10 +320,13 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         # TODO: Update to stable prefixes once MSC3202 completes FCP merge
         if service.msc3202_transaction_extensions:
-            if one_time_key_counts:
+            if one_time_keys_count:
                 body[
                     "org.matrix.msc3202.device_one_time_key_counts"
-                ] = one_time_key_counts
+                ] = one_time_keys_count
+                body[
+                    "org.matrix.msc3202.device_one_time_keys_count"
+                ] = one_time_keys_count
             if unused_fallback_keys:
                 body[
                     "org.matrix.msc3202.device_unused_fallback_key_types"
@@ -313,6 +342,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 uri=uri,
                 json_body=body,
                 args={"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(

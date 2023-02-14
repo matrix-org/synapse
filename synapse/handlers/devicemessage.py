@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
-from synapse.api.constants import EduTypes, ToDeviceEventTypes
+from synapse.api.constants import EduTypes, EventContentFields, ToDeviceEventTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
@@ -195,7 +195,7 @@ class DeviceMessageHandler:
                 sender_user_id,
                 unknown_devices,
             )
-            await self.store.mark_remote_user_device_cache_as_stale(sender_user_id)
+            await self.store.mark_remote_users_device_caches_as_stale((sender_user_id,))
 
             # Immediately attempt a resync in the background
             run_in_background(self._user_device_resync, user_id=sender_user_id)
@@ -216,14 +216,24 @@ class DeviceMessageHandler:
         """
         sender_user_id = requester.user.to_string()
 
-        message_id = random_string(16)
-        set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
-
-        log_kv({"number_of_to_device_messages": len(messages)})
-        set_tag("sender", sender_user_id)
+        set_tag(SynapseTags.TO_DEVICE_TYPE, message_type)
+        set_tag(SynapseTags.TO_DEVICE_SENDER, sender_user_id)
         local_messages = {}
         remote_messages: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, by_device in messages.items():
+            # add an opentracing log entry for each message
+            for device_id, message_content in by_device.items():
+                log_kv(
+                    {
+                        "event": "send_to_device_message",
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        EventContentFields.TO_DEVICE_MSGID: message_content.get(
+                            EventContentFields.TO_DEVICE_MSGID
+                        ),
+                    }
+                )
+
             # Ratelimit local cross-user key requests by the sending device.
             if (
                 message_type == ToDeviceEventTypes.RoomKeyRequest
@@ -233,6 +243,7 @@ class DeviceMessageHandler:
                     requester, (sender_user_id, requester.device_id)
                 )
                 if not allowed:
+                    log_kv({"message": f"dropping key requests to {user_id}"})
                     logger.info(
                         "Dropping room_key_request from %s to %s due to rate limit",
                         sender_user_id,
@@ -247,18 +258,11 @@ class DeviceMessageHandler:
                         "content": message_content,
                         "type": message_type,
                         "sender": sender_user_id,
-                        "message_id": message_id,
                     }
                     for device_id, message_content in by_device.items()
                 }
                 if messages_by_device:
                     local_messages[user_id] = messages_by_device
-                    log_kv(
-                        {
-                            "user_id": user_id,
-                            "device_id": list(messages_by_device),
-                        }
-                    )
             else:
                 destination = get_domain_from_id(user_id)
                 remote_messages.setdefault(destination, {})[user_id] = by_device
@@ -267,7 +271,11 @@ class DeviceMessageHandler:
 
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
-            log_kv({"destination": destination})
+            # The EDU contains a "message_id" property which is used for
+            # idempotence. Make up a random one.
+            message_id = random_string(16)
+            log_kv({"destination": destination, "message_id": message_id})
+
             remote_edu_contents[destination] = {
                 "messages": messages,
                 "sender": sender_user_id,

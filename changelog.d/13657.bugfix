@@ -1,1 +1,0 @@
-Fix a long-standing bug that downloaded media for URL previews was not deleted while database background updates were running.

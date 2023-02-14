@@ -75,6 +75,7 @@ from synapse.util.httpresourcetree import create_resource_tree
 from tests.server import (
     CustomHeaderType,
     FakeChannel,
+    ThreadedMemoryReactorClock,
     get_clock,
     make_request,
     setup_test_homeserver,
@@ -300,47 +301,31 @@ class HomeserverTestCase(TestCase):
         if hasattr(self, "user_id"):
             if self.hijack_auth:
                 assert self.helper.auth_user_id is not None
+                token = "some_fake_token"
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
                     self.hs.get_datastores().main.add_access_token_to_user(
                         self.helper.auth_user_id,
-                        "some_fake_token",
+                        token,
                         None,
                         None,
                     )
                 )
 
-                async def get_user_by_access_token(
-                    token: Optional[str] = None, allow_guest: bool = False
-                ) -> JsonDict:
-                    assert self.helper.auth_user_id is not None
-                    return {
-                        "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": token_id,
-                        "is_guest": False,
-                    }
-
-                async def get_user_by_req(
-                    request: SynapseRequest,
-                    allow_guest: bool = False,
-                    allow_expired: bool = False,
-                ) -> Requester:
+                # This has to be a function and not just a Mock, because
+                # `self.helper.auth_user_id` is temporarily reassigned in some tests
+                async def get_requester(*args: Any, **kwargs: Any) -> Requester:
                     assert self.helper.auth_user_id is not None
                     return create_requester(
-                        UserID.from_string(self.helper.auth_user_id),
-                        token_id,
-                        False,
-                        False,
-                        None,
+                        user_id=UserID.from_string(self.helper.auth_user_id),
+                        access_token_id=token_id,
                     )
 
                 # Type ignore: mypy doesn't like us assigning to methods.
-                self.hs.get_auth().get_user_by_req = get_user_by_req  # type: ignore[assignment]
-                self.hs.get_auth().get_user_by_access_token = get_user_by_access_token  # type: ignore[assignment]
-                self.hs.get_auth().get_access_token_from_request = Mock(  # type: ignore[assignment]
-                    return_value="1234"
-                )
+                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[assignment]
+                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[assignment]
+                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[assignment]
 
         if self.needs_threadpool:
             self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
@@ -376,13 +361,13 @@ class HomeserverTestCase(TestCase):
                 store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: ThreadedMemoryReactorClock, clock: Clock):
         """
         Make and return a homeserver.
 
         Args:
             reactor: A Twisted Reactor, or something that pretends to be one.
-            clock (synapse.util.Clock): The Clock, associated with the reactor.
+            clock: The Clock, associated with the reactor.
 
         Returns:
             A homeserver suitable for testing.
@@ -442,9 +427,8 @@ class HomeserverTestCase(TestCase):
 
         Args:
             reactor: A Twisted Reactor, or something that pretends to be one.
-            clock (synapse.util.Clock): The Clock, associated with the reactor.
-            homeserver (synapse.server.HomeServer): The HomeServer to test
-            against.
+            clock: The Clock, associated with the reactor.
+            homeserver: The HomeServer to test against.
 
         Function to optionally be overridden in subclasses.
         """
@@ -468,11 +452,10 @@ class HomeserverTestCase(TestCase):
         given content.
 
         Args:
-            method (bytes/unicode): The HTTP request method ("verb").
-            path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
-            escaped UTF-8 & spaces and such).
-            content (bytes or dict): The body of the request. JSON-encoded, if
-            a dict.
+            method: The HTTP request method ("verb").
+            path: The HTTP path, suitably URL encoded (e.g. escaped UTF-8 & spaces
+                and such). content (bytes or dict): The body of the request.
+                JSON-encoded, if a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
             federation_auth_origin: if set to not-None, we will add a fake
@@ -750,7 +733,9 @@ class HomeserverTestCase(TestCase):
             event.internal_metadata.soft_failed = True
 
         self.get_success(
-            event_creator.handle_new_client_event(requester, event, context)
+            event_creator.handle_new_client_event(
+                requester, events_and_context=[(event, context)]
+            )
         )
 
         return event.event_id

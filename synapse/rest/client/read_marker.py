@@ -83,6 +83,8 @@ class ReadMarkerRestServlet(RestServlet):
                     receipt_type,
                     user_id=requester.user.to_string(),
                     event_id=event_id,
+                    # Setting the thread ID is not possible with the /read_markers endpoint.
+                    thread_id=None,
                 )
 
         return 200, {}

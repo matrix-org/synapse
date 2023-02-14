@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
 import attr
 from canonicaljson import encode_canonical_json
 
+from synapse.api.constants import Direction
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import db_to_json
 from synapse.storage.database import (
@@ -221,25 +222,15 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             retry_interval: how long until next retry in ms
         """
 
-        if self.database_engine.can_native_upsert:
-            await self.db_pool.runInteraction(
-                "set_destination_retry_timings",
-                self._set_destination_retry_timings_native,
-                destination,
-                failure_ts,
-                retry_last_ts,
-                retry_interval,
-                db_autocommit=True,  # Safe as its a single upsert
-            )
-        else:
-            await self.db_pool.runInteraction(
-                "set_destination_retry_timings",
-                self._set_destination_retry_timings_emulated,
-                destination,
-                failure_ts,
-                retry_last_ts,
-                retry_interval,
-            )
+        await self.db_pool.runInteraction(
+            "set_destination_retry_timings",
+            self._set_destination_retry_timings_native,
+            destination,
+            failure_ts,
+            retry_last_ts,
+            retry_interval,
+            db_autocommit=True,  # Safe as it's a single upsert
+        )
 
     def _set_destination_retry_timings_native(
         self,
@@ -249,8 +240,6 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         retry_last_ts: int,
         retry_interval: int,
     ) -> None:
-        assert self.database_engine.can_native_upsert
-
         # Upsert retry time interval if retry_interval is zero (i.e. we're
         # resetting it) or greater than the existing retry interval.
         #
@@ -508,7 +497,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         limit: int,
         destination: Optional[str] = None,
         order_by: str = DestinationSortOrder.DESTINATION.value,
-        direction: str = "f",
+        direction: Direction = Direction.FORWARDS,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of destinations.
         This will return a json list of destinations and the
@@ -530,7 +519,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         ) -> Tuple[List[JsonDict], int]:
             order_by_column = DestinationSortOrder(order_by).value
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -562,7 +551,11 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def get_destination_rooms_paginate(
-        self, destination: str, start: int, limit: int, direction: str = "f"
+        self,
+        destination: str,
+        start: int,
+        limit: int,
+        direction: Direction = Direction.FORWARDS,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of destination's rooms.
         This will return a json list of rooms and the
@@ -581,7 +574,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"

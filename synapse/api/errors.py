@@ -100,6 +100,14 @@ class Codes(str, Enum):
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
 
+    # Returned for federation requests where we can't process a request as we
+    # can't ensure the sending server is in a room which is partial-stated on
+    # our side.
+    # Part of MSC3895.
+    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
+
+    USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
@@ -147,7 +155,13 @@ class RedirectException(CodeMessageException):
 
 class SynapseError(CodeMessageException):
     """A base exception type for matrix errors which have an errcode and error
-    message (as well as an HTTP status code).
+    message (as well as an HTTP status code). These often bubble all the way up to the
+    client API response so the error code and status often reach the client directly as
+    defined here. If the error doesn't make sense to present to a client, then it
+    probably shouldn't be a `SynapseError`. For example, if we contact another
+    homeserver over federation, we shouldn't automatically ferry response errors back to
+    the client on our end (a 500 from a remote server does not make sense to a client
+    when our server did not experience a 500).
 
     Attributes:
         errcode: Matrix error code e.g 'M_FORBIDDEN'
@@ -286,10 +300,8 @@ class InteractiveAuthIncompleteError(Exception):
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
-    def __init__(
-        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
-    ):
-        super().__init__(400, msg, errcode)
+    def __init__(self, msg: str = "Unrecognized request", code: int = 400):
+        super().__init__(code, msg, Codes.UNRECOGNIZED)
 
 
 class NotFoundError(SynapseError):
@@ -412,8 +424,17 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, msg: str):
+    def __init__(self, msg: str, unpersistable: bool):
+        """
+        unpersistable:
+            if True, the PDU must not be persisted, not even as a rejected PDU
+            when received over federation.
+            This is notably true when the entire PDU exceeds the size limit for a PDU,
+            (as opposed to an individual key's size limit being exceeded).
+        """
+
         super().__init__(413, msg, Codes.TOO_LARGE)
+        self.unpersistable = unpersistable
 
 
 class LoginError(SynapseError):
@@ -560,6 +581,20 @@ class UnredactedContentDeletedError(SynapseError):
         return cs_error(self.msg, self.errcode, **extra)
 
 
+class NotApprovedError(SynapseError):
+    def __init__(
+        self,
+        msg: str,
+        approval_notice_medium: str,
+    ):
+        super().__init__(
+            code=403,
+            msg=msg,
+            errcode=Codes.USER_AWAITING_APPROVAL,
+            additional_fields={"approval_notice_medium": approval_notice_medium},
+        )
+
+
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
     """Utility method for constructing an error response for client-server
     interactions.
@@ -578,8 +613,20 @@ def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
 
 
 class FederationError(RuntimeError):
-    """This class is used to inform remote homeservers about erroneous
-    PDUs they sent us.
+    """
+    Raised when we process an erroneous PDU.
+
+    There are two kinds of scenarios where this exception can be raised:
+
+    1. We may pull an invalid PDU from a remote homeserver (e.g. during backfill). We
+       raise this exception to signal an error to the rest of the application.
+    2. We may be pushed an invalid PDU as part of a `/send` transaction from a remote
+       homeserver. We raise so that we can respond to the transaction and include the
+       error string in the "PDU Processing Result". The message which will likely be
+       ignored by the remote homeserver and is not machine parse-able since it's just a
+       string.
+
+    TODO: In the future, we should split these usage scenarios into their own error types.
 
     FATAL: The remote server could not interpret the source event.
         (e.g., it was missing a required field)
@@ -618,6 +665,27 @@ class FederationError(RuntimeError):
         }
 
 
+class FederationPullAttemptBackoffError(RuntimeError):
+    """
+    Raised to indicate that we are are deliberately not attempting to pull the given
+    event over federation because we've already done so recently and are backing off.
+
+    Attributes:
+        event_id: The event_id which we are refusing to pull
+        message: A custom error message that gives more context
+    """
+
+    def __init__(self, event_ids: List[str], message: Optional[str]):
+        self.event_ids = event_ids
+
+        if message:
+            error_message = message
+        else:
+            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+
+        super().__init__(error_message)
+
+
 class HttpResponseException(CodeMessageException):
     """
     Represents an HTTP-level failure of an outbound request
@@ -652,7 +720,7 @@ class HttpResponseException(CodeMessageException):
         set to the reason code from the HTTP response.
 
         Returns:
-            SynapseError:
+            The error converted to a SynapseError.
         """
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
@@ -683,3 +751,25 @@ class ModuleFailedException(Exception):
     Raised when a module API callback fails, for example because it raised an
     exception.
     """
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg=PartialStateConflictError.message(),
+            errcode=Codes.UNKNOWN,
+        )

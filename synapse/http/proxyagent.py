@@ -34,10 +34,10 @@ from twisted.web.client import (
 )
 from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS
+from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
+from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
-from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class ProxyAgent(_AgentBase):
     def __init__(
         self,
         reactor: IReactorCore,
-        proxy_reactor: Optional[ISynapseReactor] = None,
+        proxy_reactor: Optional[IReactorCore] = None,
         contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout: Optional[float] = None,
         bindAddress: Optional[bytes] = None,
@@ -133,7 +133,7 @@ class ProxyAgent(_AgentBase):
         uri: bytes,
         headers: Optional[Headers] = None,
         bodyProducer: Optional[IBodyProducer] = None,
-    ) -> defer.Deferred:
+    ) -> "defer.Deferred[IResponse]":
         """
         Issue a request to the server indicated by the given uri.
 
@@ -156,17 +156,17 @@ class ProxyAgent(_AgentBase):
                 a file upload). Or, None if the request is to have no body.
 
         Returns:
-            Deferred[IResponse]: completes when the header of the response has
-                 been received (regardless of the response status code).
+            A deferred which completes when the header of the response has
+            been received (regardless of the response status code).
 
-                 Can fail with:
-                    SchemeNotSupported: if the uri is not http or https
+            Can fail with:
+                SchemeNotSupported: if the uri is not http or https
 
-                    twisted.internet.error.TimeoutError if the server we are connecting
-                        to (proxy or destination) does not accept a connection before
-                        connectTimeout.
+                twisted.internet.error.TimeoutError if the server we are connecting
+                    to (proxy or destination) does not accept a connection before
+                    connectTimeout.
 
-                    ... other things too.
+                ... other things too.
         """
         uri = uri.strip()
         if not _VALID_URI.match(uri):
@@ -220,7 +220,11 @@ class ProxyAgent(_AgentBase):
                 self._reactor, parsed_uri.host, parsed_uri.port, **self._endpoint_kwargs
             )
 
-        logger.debug("Requesting %s via %s", uri, endpoint)
+        logger.debug(
+            "Requesting %s via %s",
+            redact_uri(uri.decode("ascii", errors="replace")),
+            endpoint,
+        )
 
         if parsed_uri.scheme == b"https":
             tls_connection_creator = self._policy_for_https.creatorForNetloc(

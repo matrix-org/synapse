@@ -21,10 +21,10 @@ from . import unittest
 
 
 class DistributorTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.dist = Distributor()
 
-    def test_signal_dispatch(self):
+    def test_signal_dispatch(self) -> None:
         self.dist.declare("alert")
 
         observer = Mock()
@@ -33,7 +33,7 @@ class DistributorTestCase(unittest.TestCase):
         self.dist.fire("alert", 1, 2, 3)
         observer.assert_called_with(1, 2, 3)
 
-    def test_signal_catch(self):
+    def test_signal_catch(self) -> None:
         self.dist.declare("alarm")
 
         observers = [Mock() for i in (1, 2)]
@@ -51,7 +51,7 @@ class DistributorTestCase(unittest.TestCase):
             self.assertEqual(mock_logger.warning.call_count, 1)
             self.assertIsInstance(mock_logger.warning.call_args[0][0], str)
 
-    def test_signal_prereg(self):
+    def test_signal_prereg(self) -> None:
         observer = Mock()
         self.dist.observe("flare", observer)
 
@@ -60,8 +60,8 @@ class DistributorTestCase(unittest.TestCase):
 
         observer.assert_called_with(4, 5)
 
-    def test_signal_undeclared(self):
-        def code():
+    def test_signal_undeclared(self) -> None:
+        def code() -> None:
             self.dist.fire("notification")
 
         self.assertRaises(KeyError, code)

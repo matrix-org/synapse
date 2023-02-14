@@ -891,6 +891,12 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             new_callable=mock.MagicMock,
             return_value=make_awaitable(["some_room_id"]),
         )
+        mock_get_users = mock.patch.object(
+            self.store,
+            "get_users_server_still_shares_room_with",
+            new_callable=mock.MagicMock,
+            return_value=make_awaitable({remote_user_id}),
+        )
         mock_request = mock.patch.object(
             self.hs.get_federation_client(),
             "query_user_devices",
@@ -898,7 +904,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             return_value=make_awaitable(response_body),
         )
 
-        with mock_get_rooms, mock_request as mocked_federation_request:
+        with mock_get_rooms, mock_get_users, mock_request as mocked_federation_request:
             # Make the first query and sanity check it succeeds.
             response_1 = self.get_success(
                 e2e_handler.query_devices(

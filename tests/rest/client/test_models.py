@@ -11,14 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import unittest
+import unittest as stdlib_unittest
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
+from typing_extensions import Literal
 
 from synapse.rest.client.models import EmailRequestTokenBody
 
 
-class EmailRequestTokenBodyTestCase(unittest.TestCase):
+class ThreepidMediumEnumTestCase(stdlib_unittest.TestCase):
+    class Model(BaseModel):
+        medium: Literal["email", "msisdn"]
+
+    def test_accepts_valid_medium_string(self) -> None:
+        """Sanity check that Pydantic behaves sensibly with an enum-of-str
+
+        This is arguably more of a test of a class that inherits from str and Enum
+        simultaneously.
+        """
+        model = self.Model.parse_obj({"medium": "email"})
+        self.assertEqual(model.medium, "email")
+
+    def test_rejects_invalid_medium_value(self) -> None:
+        with self.assertRaises(ValidationError):
+            self.Model.parse_obj({"medium": "interpretive_dance"})
+
+    def test_rejects_invalid_medium_type(self) -> None:
+        with self.assertRaises(ValidationError):
+            self.Model.parse_obj({"medium": 123})
+
+
+class EmailRequestTokenBodyTestCase(stdlib_unittest.TestCase):
     base_request = {
         "client_secret": "hunter2",
         "email": "alice@wonderland.com",

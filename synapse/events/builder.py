@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Tuple, Union
 
 import attr
 from signedjson.types import SigningKey
@@ -28,8 +28,8 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
 from synapse.state import StateHandler
 from synapse.storage.databases.main import DataStore
-from synapse.storage.state import StateFilter
 from synapse.types import EventID, JsonDict
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -103,7 +103,7 @@ class EventBuilder:
 
     async def build(
         self,
-        prev_event_ids: List[str],
+        prev_event_ids: Collection[str],
         auth_event_ids: Optional[List[str]],
         depth: Optional[int] = None,
     ) -> EventBase:
@@ -128,6 +128,7 @@ class EventBuilder:
                 state_filter=StateFilter.from_types(
                     auth_types_for_event(self.room_version, self)
                 ),
+                await_full_state=False,
             )
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 self, state_ids
@@ -135,7 +136,7 @@ class EventBuilder:
 
         format_version = self.room_version.event_format
         # The types of auth/prev events changes between event versions.
-        prev_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+        prev_events: Union[Collection[str], List[Tuple[str, Dict[str, str]]]]
         auth_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         if format_version == EventFormatVersions.ROOM_V1_V2:
             auth_events = await self._store.add_event_hashes(auth_event_ids)
@@ -167,7 +168,6 @@ class EventBuilder:
             "content": self.content,
             "unsigned": self.unsigned,
             "depth": depth,
-            "prev_state": [],
         }
 
         if self.is_state():

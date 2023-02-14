@@ -42,6 +42,7 @@ class PushersRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self._msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -51,9 +52,16 @@ class PushersRestServlet(RestServlet):
             user.to_string()
         )
 
-        filtered_pushers = [p.as_dict() for p in pushers]
+        pusher_dicts = [p.as_dict() for p in pushers]
 
-        return 200, {"pushers": filtered_pushers}
+        for pusher in pusher_dicts:
+            if self._msc3881_enabled:
+                pusher["org.matrix.msc3881.enabled"] = pusher["enabled"]
+                pusher["org.matrix.msc3881.device_id"] = pusher["device_id"]
+            del pusher["enabled"]
+            del pusher["device_id"]
+
+        return 200, {"pushers": pusher_dicts}
 
 
 class PushersSetRestServlet(RestServlet):
@@ -65,6 +73,7 @@ class PushersSetRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
+        self._msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -103,6 +112,10 @@ class PushersSetRestServlet(RestServlet):
         if "append" in content:
             append = content["append"]
 
+        enabled = True
+        if self._msc3881_enabled and "org.matrix.msc3881.enabled" in content:
+            enabled = content["org.matrix.msc3881.enabled"]
+
         if not append:
             await self.pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
                 app_id=content["app_id"],
@@ -111,7 +124,7 @@ class PushersSetRestServlet(RestServlet):
             )
 
         try:
-            await self.pusher_pool.add_pusher(
+            await self.pusher_pool.add_or_update_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
                 kind=content["kind"],
@@ -122,6 +135,8 @@ class PushersSetRestServlet(RestServlet):
                 lang=content["lang"],
                 data=content["data"],
                 profile_tag=content.get("profile_tag", ""),
+                enabled=enabled,
+                device_id=requester.device_id,
             )
         except PusherConfigException as pce:
             raise SynapseError(

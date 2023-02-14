@@ -56,7 +56,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["update_user_directory"] = True
+        # Re-enables updating the user directory, as that function is needed below.
+        config["update_user_directory_from_worker"] = None
 
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
@@ -948,9 +949,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
+
+        context = self.get_success(unpersisted_context.persist(event))
 
         self.get_success(
             self.hs.get_storage_controllers().persistence.persist_event(event, context)
@@ -1045,7 +1048,9 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["update_user_directory"] = True
+        # Re-enables updating the user directory, as that function is needed below. It
+        # will be force disabled later
+        config["update_user_directory_from_worker"] = None
         hs = self.setup_test_homeserver(config=config)
 
         self.config = hs.config

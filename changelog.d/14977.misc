@@ -1,0 +1,1 @@
+Limit concurrent event creation for a room to avoid state resolution when sending bursts of events to a local room.

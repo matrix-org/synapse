@@ -452,15 +452,6 @@ class Auth:
             )
             raise InvalidClientTokenError("Invalid access token passed.")
 
-    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
-        token = self.get_access_token_from_request(request)
-        service = self.store.get_app_service_by_token(token)
-        if not service:
-            logger.warning("Unrecognised appservice access token.")
-            raise InvalidClientTokenError()
-        request.requester = create_requester(service.sender, app_service=service)
-        return service
-
     async def is_server_admin(self, requester: Requester) -> bool:
         """Check if the given user is a local server admin.
 

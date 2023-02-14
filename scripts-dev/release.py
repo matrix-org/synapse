@@ -27,7 +27,7 @@ import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional
 
 import attr
 import click
@@ -174,9 +174,7 @@ def _prepare() -> None:
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    # Cast safety: parse() won't return a version.LegacyVersion from our
-    # version string format.
-    parsed_new_version = cast(version.Version, version.parse(new_version))
+    parsed_new_version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
@@ -219,9 +217,7 @@ def _prepare() -> None:
                 update_branch(repo)
 
             # Create the new release branch
-            # Type ignore will no longer be needed after GitPython 3.1.28.
-            # See https://github.com/gitpython-developers/GitPython/pull/1419
-            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            repo.create_head(release_branch_name, commit=base_branch)
 
         # Special-case SyTest: we don't actually prepare any files so we may
         # as well push it now (and only when we create a release branch;
@@ -427,11 +423,12 @@ def _publish(gh_token: str) -> None:
 
 
 @cli.command()
-def upload() -> None:
-    _upload()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def upload(gh_token: Optional[str]) -> None:
+    _upload(gh_token)
 
 
-def _upload() -> None:
+def _upload(gh_token: Optional[str]) -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -441,21 +438,43 @@ def _upload() -> None:
     repo = get_repo_and_check_clean_checkout()
     tag = repo.tag(f"refs/tags/{tag_name}")
     if repo.head.commit != tag.commit:
-        click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
+        click.echo(f"Tag {tag_name} ({tag.commit}) is not currently checked out!")
         click.get_current_context().abort()
 
-    pypi_asset_names = [
-        f"matrix_synapse-{current_version}-py3-none-any.whl",
-        f"matrix-synapse-{current_version}.tar.gz",
-    ]
+    # Query all the assets corresponding to this release.
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_release = gh_repo.get_release(tag_name)
+
+    all_assets = set(gh_release.get_assets())
+
+    # Only accept the wheels and sdist.
+    # Notably: we don't care about debs.tar.xz.
+    asset_names_and_urls = sorted(
+        (asset.name, asset.browser_download_url)
+        for asset in all_assets
+        if asset.name.endswith((".whl", ".tar.gz"))
+    )
+
+    # Print out what we've determined.
+    print("Found relevant assets:")
+    for asset_name, _ in asset_names_and_urls:
+        print(f" - {asset_name}")
+
+    ignored_asset_names = sorted(
+        {asset.name for asset in all_assets}
+        - {asset_name for asset_name, _ in asset_names_and_urls}
+    )
+    print("\nIgnoring irrelevant assets:")
+    for asset_name in ignored_asset_names:
+        print(f" - {asset_name}")
 
     with TemporaryDirectory(prefix=f"synapse_upload_{tag_name}_") as tmpdir:
-        for name in pypi_asset_names:
+        for name, asset_download_url in asset_names_and_urls:
             filename = path.join(tmpdir, name)
-            url = f"https://github.com/matrix-org/synapse/releases/download/{tag_name}/{name}"
 
             click.echo(f"Downloading {name} into {filename}")
-            urllib.request.urlretrieve(url, filename=filename)
+            urllib.request.urlretrieve(asset_download_url, filename=filename)
 
         if click.confirm("Upload to PyPI?", default=True):
             subprocess.run("twine upload *", shell=True, cwd=tmpdir)
@@ -672,7 +691,7 @@ def full(gh_token: str) -> None:
     _publish(gh_token)
 
     click.echo("\n*** upload ***")
-    _upload()
+    _upload(gh_token)
 
     click.echo("\n*** merge back ***")
     _merge_back()
