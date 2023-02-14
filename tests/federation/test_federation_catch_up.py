@@ -6,9 +6,9 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.federation.sender import (
+    FederationSender,
     PerDestinationQueue,
     TransactionManager,
-    FederationSender,
 )
 from synapse.federation.units import Edu, Transaction
 from synapse.rest import admin
