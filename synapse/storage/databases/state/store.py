@@ -567,7 +567,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             txn: LoggingTransaction, prev_group: int, delta_ids: StateMap[str]
         ) -> Optional[int]:
             """Try and persist the new group as a delta.
+
             Requires that we have the state as a delta from a previous state group.
+
             Returns:
                 The state group if successfully created, or None if the state
                 needs to be persisted as a full state.
