@@ -124,10 +124,7 @@ include = [
     { path = "rust/src/**", format = "sdist" },
 ]
 exclude = [
-    { path = "synapse/*.so", format = "sdist" },
-    # This contains dev-only symlinks to the latest schema dumps. We don't want people
-    # to use it when installing.
-    { path = "synapse/storage/schema/latest_schema" },
+    { path = "synapse/*.so", format = "sdist"}
 ]
 
 build = "build_rust.py"
