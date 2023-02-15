@@ -2,7 +2,7 @@
 
 This directory contains symlinks to the latest dump of the postgres full schema. This is useful to have, as it allows IDEs to understand our schema and provide autocomplete, linters, inspections, etc.
 
-I (dmr) use the DataGrip functionality in IntelliJ's paid-for products. It seems to only consider files called `*.sql` when defining a schema from DDL; `*.sql.postgres` wasn't detected for me.
+In particular, the DataGrip functionality in IntelliJ's products seems to only consider files called `*.sql` when defining a schema from DDL; `*.sql.postgres` will be ignored. To get around this we symlink those files to ones ending in `.sql`. We've chosen to ignore the `.sql.sqlite` schema dumps here, as they're not intended for production use (and are much quicker to test against).
 
 ## Example
 ![](datagrip-aware-of-schema.png)
