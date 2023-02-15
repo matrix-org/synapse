@@ -918,11 +918,11 @@ def _parse_query_postgres(search_term: str) -> Tuple[str, str, str]:
     We use this so that we can add prefix matching, which isn't something
     that is supported by default.
     """
-    results = _parse_words(search_term)
+    words = _parse_words(search_term)
 
-    both = " & ".join("(%s:* | %s)" % (result, result) for result in results)
-    exact = " & ".join("%s" % (result,) for result in results)
-    prefix = " & ".join("%s:*" % (result,) for result in results)
+    both = " & ".join("(%s:* | %s)" % (word, word) for word in words)
+    exact = " & ".join("%s" % (word,) for word in words)
+    prefix = " & ".join("%s:*" % (word,) for word in words)
 
     return both, exact, prefix
 
