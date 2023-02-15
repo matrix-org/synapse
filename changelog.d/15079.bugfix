@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse v1.74.0 where searching with colons when using ICU for search term tokenisation would fail with an error.
