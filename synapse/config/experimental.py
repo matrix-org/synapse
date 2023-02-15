@@ -173,3 +173,6 @@ class ExperimentalConfig(Config):
         self.msc3952_intentional_mentions = experimental.get(
             "msc3952_intentional_mentions", False
         )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)
