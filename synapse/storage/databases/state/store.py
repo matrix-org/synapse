@@ -448,10 +448,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     % (prev_group,)
                 )
 
-            num_state_groups = 0
-            for event, _ in events_and_context:
-                if event.is_state():
-                    num_state_groups += 1
+            num_state_groups = sum(
+                1 for event, _ in events_and_context if event.is_state()
+            )
 
             state_groups = self._state_group_seq_gen.get_next_mult_txn(
                 txn, num_state_groups
@@ -467,9 +466,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 sg_after = state_groups[index]
                 context.state_group_after_event = sg_after
                 context.state_group_before_event = sg_before
-                context.delta_ids_to_state_group_before_event = {
-                    (event.type, event.state_key): event.event_id
-                }
                 context.state_delta_due_to_event = {
                     (event.type, event.state_key): event.event_id
                 }
@@ -500,11 +496,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             values = []
             for _, context in events_and_context:
-                assert context.delta_ids_to_state_group_before_event is not None
+                assert context.state_delta_due_to_event is not None
                 for (
                     key,
                     state_id,
-                ) in context.delta_ids_to_state_group_before_event.items():
+                ) in context.state_delta_due_to_event.items():
                     values.append(
                         (
                             context.state_group_after_event,

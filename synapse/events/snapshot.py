@@ -374,15 +374,26 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
         events_and_persisted_context = []
         for event, unpersisted_context in amended_events_and_context:
-            context = EventContext(
-                storage=unpersisted_context._storage,
-                state_group=unpersisted_context.state_group_after_event,
-                state_group_before_event=unpersisted_context.state_group_before_event,
-                state_delta_due_to_event=unpersisted_context.state_delta_due_to_event,
-                partial_state=unpersisted_context.partial_state,
-                prev_group=unpersisted_context.state_group_before_event,
-                delta_ids=unpersisted_context.state_delta_due_to_event,
-            )
+            if event.is_state():
+                context = EventContext(
+                    storage=unpersisted_context._storage,
+                    state_group=unpersisted_context.state_group_after_event,
+                    state_group_before_event=unpersisted_context.state_group_before_event,
+                    state_delta_due_to_event=unpersisted_context.state_delta_due_to_event,
+                    partial_state=unpersisted_context.partial_state,
+                    prev_group=unpersisted_context.state_group_before_event,
+                    delta_ids=unpersisted_context.state_delta_due_to_event,
+                )
+            else:
+                context = EventContext(
+                    storage=unpersisted_context._storage,
+                    state_group=unpersisted_context.state_group_after_event,
+                    state_group_before_event=unpersisted_context.state_group_before_event,
+                    state_delta_due_to_event=unpersisted_context.state_delta_due_to_event,
+                    partial_state=unpersisted_context.partial_state,
+                    prev_group=unpersisted_context.prev_group_for_state_group_before_event,
+                    delta_ids=unpersisted_context.delta_ids_to_state_group_before_event,
+                )
             events_and_persisted_context.append((event, context))
         return events_and_persisted_context
 
