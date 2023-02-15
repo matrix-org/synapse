@@ -192,6 +192,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
         self._check_only_one_user_in_directory(user, room)
 
+    def test_search_term_with_colon_in_it(self) -> None:
+        """
+        Regression test: Test that search terms with colons in them are acceptable.
+        """
+        u1 = self.register_user("user1", "pass")
+        self.get_success(self.handler.search_users(u1, "haha:paamayim-nekudotayim", 10))
+
     def test_user_not_in_users_table(self) -> None:
         """Unclear how it happens, but on matrix.org we've seen join events
         for users who aren't in the users table. Test that we don't fall over
