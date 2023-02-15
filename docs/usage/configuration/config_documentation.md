@@ -2232,7 +2232,7 @@ key on startup and store it in this file.
 
 Example configuration:
 ```yaml
-registration_shared_secret_file: /path/to/secrets/file
+registration_shared_secret_path: /path/to/secrets/file
 ```
 
 _Added in Synapse 1.67.0._
