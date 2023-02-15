@@ -205,8 +205,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             typ = delta["type"]
             state_key = delta["state_key"]
             room_id = delta["room_id"]
-            event_id = delta["event_id"]
-            prev_event_id = delta["prev_event_id"]
+            event_id: Optional[str] = delta["event_id"]
+            prev_event_id: Optional[str] = delta["prev_event_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
@@ -302,8 +302,8 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _handle_room_membership_event(
         self,
         room_id: str,
-        prev_event_id: str,
-        event_id: str,
+        prev_event_id: Optional[str],
+        event_id: Optional[str],
         state_key: str,
     ) -> None:
         """Process a single room membershp event.
@@ -353,7 +353,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             # Handle any profile changes for remote users.
             # (For local users the rest of the application calls
             # `handle_local_profile_change`.)
-            if is_remote:
+            # Only process if there is an event_id.
+            if is_remote and event_id is not None:
                 await self._handle_possible_remote_profile_change(
                     state_key, room_id, prev_event_id, event_id
                 )
@@ -361,7 +362,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             # This may be the first time we've seen a remote user. If
             # so, ensure we have a directory entry for them. (For local users,
             # the rest of the application calls `handle_local_profile_change`.)
-            if is_remote:
+            # Only process if there is an event_id.
+            if is_remote and event_id is not None:
                 await self._handle_possible_remote_profile_change(
                     state_key, room_id, None, event_id
                 )
