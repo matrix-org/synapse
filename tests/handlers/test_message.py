@@ -41,20 +41,21 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = self.hs.get_event_creation_handler()
-        self._persist_event_storage_controller = (
-            self.hs.get_storage_controllers().persistence
-        )
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self._persist_event_storage_controller = persistence
 
         self.user_id = self.register_user("tester", "foobar")
         self.access_token = self.login("tester", "foobar")
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
-        self.info = self.get_success(
+        info = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(
                 self.access_token,
             )
         )
-        self.token_id = self.info.token_id
+        assert info is not None
+        self.token_id = info.token_id
 
         self.requester = create_requester(self.user_id, access_token_id=self.token_id)
 

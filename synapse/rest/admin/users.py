@@ -1192,7 +1192,8 @@ class AccountDataRestServlet(RestServlet):
         if not await self._store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
-        global_data, by_room_data = await self._store.get_account_data_for_user(user_id)
+        global_data = await self._store.get_global_account_data_for_user(user_id)
+        by_room_data = await self._store.get_room_account_data_for_user(user_id)
         return HTTPStatus.OK, {
             "account_data": {
                 "global": global_data,

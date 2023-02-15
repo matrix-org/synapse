@@ -343,10 +343,12 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
                 }
             )
 
-        (
-            account_data,
-            room_account_data,
-        ) = await self.store.get_updated_account_data_for_user(user_id, last_stream_id)
+        account_data = await self.store.get_updated_global_account_data_for_user(
+            user_id, last_stream_id
+        )
+        room_account_data = await self.store.get_updated_room_account_data_for_user(
+            user_id, last_stream_id
+        )
 
         for account_data_type, content in account_data.items():
             results.append({"type": account_data_type, "content": content})

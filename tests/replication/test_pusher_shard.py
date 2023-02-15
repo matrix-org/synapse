@@ -50,6 +50,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         user_dict = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_dict is not None
         token_id = user_dict.token_id
 
         self.get_success(

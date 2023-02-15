@@ -43,6 +43,7 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     NotFoundError,
+    PartialStateConflictError,
     StoreError,
     SynapseError,
 )
@@ -55,7 +56,6 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -1935,6 +1935,6 @@ class RoomShutdownHandler:
         return {
             "kicked_users": kicked_users,
             "failed_to_kick_users": failed_to_kick_users,
-            "local_aliases": aliases_for_room,
+            "local_aliases": list(aliases_for_room),
             "new_room_id": new_room_id,
         }

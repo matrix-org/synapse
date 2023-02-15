@@ -15,7 +15,8 @@
 #![feature(test)]
 use std::collections::BTreeSet;
 use synapse::push::{
-    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
+    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, JsonValue,
+    PushRules, SimpleJsonValue,
 };
 use test::Bencher;
 
@@ -24,9 +25,18 @@ extern crate test;
 #[bench]
 fn bench_match_exact(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+        ),
     ]
     .into_iter()
     .collect();
@@ -42,6 +52,8 @@ fn bench_match_exact(b: &mut Bencher) {
         Default::default(),
         true,
         vec![],
+        false,
+        false,
         false,
     )
     .unwrap();
@@ -63,9 +75,18 @@ fn bench_match_exact(b: &mut Bencher) {
 #[bench]
 fn bench_match_word(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+        ),
     ]
     .into_iter()
     .collect();
@@ -81,6 +102,8 @@ fn bench_match_word(b: &mut Bencher) {
         Default::default(),
         true,
         vec![],
+        false,
+        false,
         false,
     )
     .unwrap();
@@ -102,9 +125,18 @@ fn bench_match_word(b: &mut Bencher) {
 #[bench]
 fn bench_match_word_miss(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+        ),
     ]
     .into_iter()
     .collect();
@@ -120,6 +152,8 @@ fn bench_match_word_miss(b: &mut Bencher) {
         Default::default(),
         true,
         vec![],
+        false,
+        false,
         false,
     )
     .unwrap();
@@ -141,9 +175,18 @@ fn bench_match_word_miss(b: &mut Bencher) {
 #[bench]
 fn bench_eval_message(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+        ),
     ]
     .into_iter()
     .collect();
@@ -159,6 +202,8 @@ fn bench_eval_message(b: &mut Bencher) {
         Default::default(),
         true,
         vec![],
+        false,
+        false,
         false,
     )
     .unwrap();

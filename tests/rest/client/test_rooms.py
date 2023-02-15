@@ -3382,8 +3382,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
-        self.hs.get_identity_handler().lookup_3pid = Mock(
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[assignment]
+        self.hs.get_identity_handler().lookup_3pid = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(None),
         )
 
@@ -3443,8 +3443,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
-        self.hs.get_identity_handler().lookup_3pid = Mock(
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[assignment]
+        self.hs.get_identity_handler().lookup_3pid = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(None),
         )
 
@@ -3563,8 +3563,10 @@ class TimestampLookupTestCase(unittest.HomeserverTestCase):
         )
 
         event.internal_metadata.outlier = True
+        persistence = self._storage_controllers.persistence
+        assert persistence is not None
         self.get_success(
-            self._storage_controllers.persistence.persist_event(
+            persistence.persist_event(
                 event, EventContext.for_outlier(self._storage_controllers)
             )
         )

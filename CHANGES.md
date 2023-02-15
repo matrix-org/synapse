@@ -1,3 +1,24 @@
+Synapse 1.77.0 (2023-02-14)
+===========================
+
+No significant changes since 1.77.0rc2.
+
+
+Synapse 1.77.0rc2 (2023-02-10)
+==============================
+
+Bugfixes
+--------
+
+- Fix bug where retried replication requests would return a failure. Introduced in v1.76.0. ([\#15024](https://github.com/matrix-org/synapse/issues/15024))
+
+
+Internal Changes
+----------------
+
+- Prepare for future database schema changes. ([\#15036](https://github.com/matrix-org/synapse/issues/15036))
+
+
 Synapse 1.77.0rc1 (2023-02-07)
 ==============================
 

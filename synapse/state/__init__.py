@@ -226,7 +226,7 @@ class StateHandler:
         return await ret.get_state(self._state_storage_controller, state_filter)
 
     async def get_current_user_ids_in_room(
-        self, room_id: str, latest_event_ids: List[str]
+        self, room_id: str, latest_event_ids: Collection[str]
     ) -> Set[str]:
         """
         Get the users IDs who are currently in a room.

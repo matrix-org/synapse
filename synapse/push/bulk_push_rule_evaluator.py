@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -43,6 +44,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
+from synapse.types import JsonValue
 from synapse.types.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
@@ -148,7 +150,7 @@ class BulkPushRuleEvaluator:
         # little, we can skip fetching a huge number of push rules in large rooms.
         # This helps make joins and leaves faster.
         if event.type == EventTypes.Member:
-            local_users = []
+            local_users: Sequence[str] = []
             # We never notify a user about their own actions. This is enforced in
             # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
             # do the same check here to avoid unnecessary DB queries.
@@ -183,7 +185,6 @@ class BulkPushRuleEvaluator:
         if event.type == EventTypes.Member and event.membership == Membership.INVITE:
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
-                local_users = list(local_users)
                 local_users.append(invited)
 
         if not local_users:
@@ -256,13 +257,15 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _related_events(self, event: EventBase) -> Dict[str, Dict[str, str]]:
+    async def _related_events(
+        self, event: EventBase
+    ) -> Dict[str, Dict[str, JsonValue]]:
         """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
 
         Returns:
             Mapping of relation type to flattened events.
         """
-        related_events: Dict[str, Dict[str, str]] = {}
+        related_events: Dict[str, Dict[str, JsonValue]] = {}
         if self._related_event_match_enabled:
             related_event_id = event.content.get("m.relates_to", {}).get("event_id")
             relation_type = event.content.get("m.relates_to", {}).get("rel_type")
@@ -425,6 +428,8 @@ class BulkPushRuleEvaluator:
             self._related_event_match_enabled,
             event.room_version.msc3931_push_features,
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
+            self.hs.config.experimental.msc3758_exact_event_match,
+            self.hs.config.experimental.msc3966_exact_event_property_contains,
         )
 
         users = rules_by_user.keys()
@@ -498,18 +503,22 @@ RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
 
 
+def _is_simple_value(value: Any) -> bool:
+    return isinstance(value, (bool, str)) or type(value) is int or value is None
+
+
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
-    result: Optional[Dict[str, str]] = None,
+    result: Optional[Dict[str, JsonValue]] = None,
     *,
     msc3783_escape_event_match_key: bool = False,
-) -> Dict[str, str]:
+) -> Dict[str, JsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
     flatten it into a single layer dictionary by combining the keys & sub-keys.
 
-    Any (non-dictionary), non-string value is dropped.
+    String, integer, boolean, null or lists of those values are kept. All others are dropped.
 
     Transforms:
 
@@ -538,8 +547,10 @@ def _flatten_dict(
             # nested fields.
             key = key.replace("\\", "\\\\").replace(".", "\\.")
 
-        if isinstance(value, str):
-            result[".".join(prefix + [key])] = value.lower()
+        if _is_simple_value(value):
+            result[".".join(prefix + [key])] = value
+        elif isinstance(value, (list, tuple)):
+            result[".".join(prefix + [key])] = [v for v in value if _is_simple_value(v)]
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
             _flatten_dict(

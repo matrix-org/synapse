@@ -203,7 +203,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     @override_config({"limit_usage_by_mau": True})
     def test_get_or_create_user_mau_not_blocked(self) -> None:
-        self.store.count_monthly_users = Mock(
+        self.store.count_monthly_users = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(self.hs.config.server.max_mau_value - 1)
         )
         # Ensure does not throw exception
@@ -304,7 +304,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self) -> None:
         room_alias_str = "#room:test"
 
-        self.store.count_real_users = Mock(return_value=make_awaitable(1))
+        self.store.count_real_users = Mock(return_value=make_awaitable(1))  # type: ignore[assignment]
         self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
@@ -319,7 +319,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(
         self,
     ) -> None:
-        self.store.count_real_users = Mock(return_value=make_awaitable(2))
+        self.store.count_real_users = Mock(return_value=make_awaitable(2))  # type: ignore[assignment]
         self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
@@ -346,6 +346,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Ensure the room is properly not federated.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        assert room is not None
         self.assertFalse(room["federatable"])
         self.assertFalse(room["public"])
         self.assertEqual(room["join_rules"], "public")
@@ -375,6 +376,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Ensure the room is properly a public room.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        assert room is not None
         self.assertEqual(room["join_rules"], "public")
 
         # Both users should be in the room.
@@ -413,6 +415,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Ensure the room is properly a private room.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        assert room is not None
         self.assertFalse(room["public"])
         self.assertEqual(room["join_rules"], "invite")
         self.assertEqual(room["guest_access"], "can_join")
@@ -456,6 +459,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Ensure the room is properly a private room.
         room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        assert room is not None
         self.assertFalse(room["public"])
         self.assertEqual(room["join_rules"], "invite")
         self.assertEqual(room["guest_access"], "can_join")

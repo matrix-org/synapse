@@ -49,6 +49,7 @@ from synapse.api.errors import (
     FederationPullAttemptBackoffError,
     HttpResponseException,
     NotFoundError,
+    PartialStateConflictError,
     RequestSendFailed,
     SynapseError,
 )
@@ -68,7 +69,6 @@ from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, StrCollection, get_domain_from_id
 from synapse.types.state import StateFilter
@@ -1880,6 +1880,11 @@ class FederationHandler:
                 logger.info("Updating current state for %s", room_id)
                 # TODO(faster_joins): notify workers in notify_room_un_partial_stated
                 #   https://github.com/matrix-org/synapse/issues/12994
+                #
+                # NB: there's a potential race here. If room is purged just before we
+                # call this, we _might_ end up inserting rows into current_state_events.
+                # (The logic is hard to chase through.) We think this is fine, but if
+                # not the HS admin should purge the room again.
                 await self.state_handler.update_current_state(room_id)
 
                 logger.info("Handling any pending device list updates")

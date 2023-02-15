@@ -14,6 +14,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::push::JsonValue;
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -22,8 +23,8 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, EventMatchCondition, FilteredPushRules, KnownCondition,
-    RelatedEventMatchCondition,
+    Action, Condition, EventMatchCondition, ExactEventMatchCondition, FilteredPushRules,
+    KnownCondition, RelatedEventMatchCondition, SimpleJsonValue,
 };
 
 lazy_static! {
@@ -61,9 +62,9 @@ impl RoomVersionFeatures {
 /// Allows running a set of push rules against a particular event.
 #[pyclass]
 pub struct PushRuleEvaluator {
-    /// A mapping of "flattened" keys to string values in the event, e.g.
+    /// A mapping of "flattened" keys to simple JSON values in the event, e.g.
     /// includes things like "type" and "content.msgtype".
-    flattened_keys: BTreeMap<String, String>,
+    flattened_keys: BTreeMap<String, JsonValue>,
 
     /// The "content.body", if any.
     body: String,
@@ -87,7 +88,7 @@ pub struct PushRuleEvaluator {
 
     /// The related events, indexed by relation type. Flattened in the same manner as
     /// `flattened_keys`.
-    related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
+    related_events_flattened: BTreeMap<String, BTreeMap<String, JsonValue>>,
 
     /// If msc3664, push rules for related events, is enabled.
     related_event_match_enabled: bool,
@@ -98,6 +99,12 @@ pub struct PushRuleEvaluator {
     /// If MSC3931 (room version feature flags) is enabled. Usually controlled by the same
     /// flag as MSC1767 (extensible events core).
     msc3931_enabled: bool,
+
+    /// If MSC3758 (exact_event_match push rule condition) is enabled.
+    msc3758_exact_event_match: bool,
+
+    /// If MSC3966 (exact_event_property_contains push rule condition) is enabled.
+    msc3966_exact_event_property_contains: bool,
 }
 
 #[pymethods]
@@ -106,22 +113,24 @@ impl PushRuleEvaluator {
     #[allow(clippy::too_many_arguments)]
     #[new]
     pub fn py_new(
-        flattened_keys: BTreeMap<String, String>,
+        flattened_keys: BTreeMap<String, JsonValue>,
         has_mentions: bool,
         user_mentions: BTreeSet<String>,
         room_mention: bool,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
-        related_events_flattened: BTreeMap<String, BTreeMap<String, String>>,
+        related_events_flattened: BTreeMap<String, BTreeMap<String, JsonValue>>,
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
+        msc3758_exact_event_match: bool,
+        msc3966_exact_event_property_contains: bool,
     ) -> Result<Self, Error> {
-        let body = flattened_keys
-            .get("content.body")
-            .cloned()
-            .unwrap_or_default();
+        let body = match flattened_keys.get("content.body") {
+            Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone(),
+            _ => String::new(),
+        };
 
         Ok(PushRuleEvaluator {
             flattened_keys,
@@ -136,6 +145,8 @@ impl PushRuleEvaluator {
             related_event_match_enabled,
             room_version_feature_flags,
             msc3931_enabled,
+            msc3758_exact_event_match,
+            msc3966_exact_event_property_contains,
         })
     }
 
@@ -252,8 +263,14 @@ impl PushRuleEvaluator {
             KnownCondition::EventMatch(event_match) => {
                 self.match_event_match(event_match, user_id)?
             }
+            KnownCondition::ExactEventMatch(exact_event_match) => {
+                self.match_exact_event_match(exact_event_match)?
+            }
             KnownCondition::RelatedEventMatch(event_match) => {
                 self.match_related_event_match(event_match, user_id)?
+            }
+            KnownCondition::ExactEventPropertyContains(exact_event_match) => {
+                self.match_exact_event_property_contains(exact_event_match)?
             }
             KnownCondition::IsUserMention => {
                 if let Some(uid) = user_id {
@@ -337,7 +354,9 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        let haystack = if let Some(haystack) = self.flattened_keys.get(&*event_match.key) {
+        let haystack = if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) =
+            self.flattened_keys.get(&*event_match.key)
+        {
             haystack
         } else {
             return Ok(false);
@@ -353,6 +372,29 @@ impl PushRuleEvaluator {
 
         let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
         compiled_pattern.is_match(haystack)
+    }
+
+    /// Evaluates a `exact_event_match` condition. (MSC3758)
+    fn match_exact_event_match(
+        &self,
+        exact_event_match: &ExactEventMatchCondition,
+    ) -> Result<bool, Error> {
+        // First check if the feature is enabled.
+        if !self.msc3758_exact_event_match {
+            return Ok(false);
+        }
+
+        let value = &exact_event_match.value;
+
+        let haystack = if let Some(JsonValue::Value(haystack)) =
+            self.flattened_keys.get(&*exact_event_match.key)
+        {
+            haystack
+        } else {
+            return Ok(false);
+        };
+
+        Ok(haystack == &**value)
     }
 
     /// Evaluates a `related_event_match` condition. (MSC3664)
@@ -410,11 +452,12 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        let haystack = if let Some(haystack) = event.get(&**key) {
-            haystack
-        } else {
-            return Ok(false);
-        };
+        let haystack =
+            if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) = event.get(&**key) {
+                haystack
+            } else {
+                return Ok(false);
+            };
 
         // For the content.body we match against "words", but for everything
         // else we match against the entire value.
@@ -426,6 +469,29 @@ impl PushRuleEvaluator {
 
         let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
         compiled_pattern.is_match(haystack)
+    }
+
+    /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
+    fn match_exact_event_property_contains(
+        &self,
+        exact_event_match: &ExactEventMatchCondition,
+    ) -> Result<bool, Error> {
+        // First check if the feature is enabled.
+        if !self.msc3966_exact_event_property_contains {
+            return Ok(false);
+        }
+
+        let value = &exact_event_match.value;
+
+        let haystack = if let Some(JsonValue::Array(haystack)) =
+            self.flattened_keys.get(&*exact_event_match.key)
+        {
+            haystack
+        } else {
+            return Ok(false);
+        };
+
+        Ok(haystack.contains(&**value))
     }
 
     /// Match the member count against an 'is' condition
@@ -455,7 +521,10 @@ impl PushRuleEvaluator {
 #[test]
 fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
-    flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
+    flattened_keys.insert(
+        "content.body".to_string(),
+        JsonValue::Value(SimpleJsonValue::Str("foo bar bob hello".to_string())),
+    );
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
@@ -467,6 +536,8 @@ fn push_rule_evaluator() {
         BTreeMap::new(),
         true,
         vec![],
+        true,
+        true,
         true,
     )
     .unwrap();
@@ -482,7 +553,10 @@ fn test_requires_room_version_supports_condition() {
     use crate::push::{PushRule, PushRules};
 
     let mut flattened_keys = BTreeMap::new();
-    flattened_keys.insert("content.body".to_string(), "foo bar bob hello".to_string());
+    flattened_keys.insert(
+        "content.body".to_string(),
+        JsonValue::Value(SimpleJsonValue::Str("foo bar bob hello".to_string())),
+    );
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
@@ -495,6 +569,8 @@ fn test_requires_room_version_supports_condition() {
         BTreeMap::new(),
         false,
         flags,
+        true,
+        true,
         true,
     )
     .unwrap();

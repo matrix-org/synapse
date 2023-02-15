@@ -361,7 +361,9 @@ class HomeserverTestCase(TestCase):
                 store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
-    def make_homeserver(self, reactor: ThreadedMemoryReactorClock, clock: Clock):
+    def make_homeserver(
+        self, reactor: ThreadedMemoryReactorClock, clock: Clock
+    ) -> HomeServer:
         """
         Make and return a homeserver.
 
