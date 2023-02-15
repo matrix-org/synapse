@@ -46,7 +46,7 @@ ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
 # The localpart isn't 'Bela' on purpose so we can test looking up display names.
-BELA = "@somenickname:a"
+BELA = "@somenickname:example.org"
 
 
 class GetUserDirectoryTables:
@@ -475,6 +475,19 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         usually be ignored in full text searches.
         """
         r = self.get_success(self.store.search_user_dir(ALICE, "be", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_start_of_user_id(self) -> None:
+        """Tests that a user can look up another user by searching for the start
+        of their user ID.
+        """
+        r = self.get_success(self.store.search_user_dir(ALICE, "somenickname:exa", 10))
         self.assertFalse(r["limited"])
         self.assertEqual(1, len(r["results"]))
         self.assertDictEqual(
