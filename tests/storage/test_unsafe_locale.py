@@ -14,6 +14,7 @@
 from unittest.mock import MagicMock, patch
 
 from synapse.storage.database import make_conn
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines._base import IncorrectDatabaseSetup
 
 from tests.unittest import HomeserverTestCase
@@ -38,6 +39,7 @@ class UnsafeLocaleTest(HomeserverTestCase):
 
     def test_safe_locale(self) -> None:
         database = self.hs.get_datastores().databases[0]
+        assert isinstance(database.engine, PostgresEngine)
 
         db_conn = make_conn(database._database_config, database.engine, "test_unsafe")
         with db_conn.cursor() as txn:

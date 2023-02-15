@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
+
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
@@ -33,9 +35,14 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        async def check_username(username: str) -> bool:
-            if username == "allowed":
-                return True
+        async def check_username(
+            localpart: str,
+            guest_access_token: Optional[str] = None,
+            assigned_user_id: Optional[str] = None,
+            inhibit_user_in_use_error: bool = False,
+        ) -> None:
+            if localpart == "allowed":
+                return
             raise SynapseError(
                 400,
                 "User ID already taken.",
@@ -43,7 +50,7 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
             )
 
         handler = self.hs.get_registration_handler()
-        handler.check_username = check_username
+        handler.check_username = check_username  # type: ignore[assignment]
 
     def test_username_available(self) -> None:
         """

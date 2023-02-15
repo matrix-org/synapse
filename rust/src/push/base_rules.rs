@@ -63,6 +63,23 @@ pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
 }];
 
 pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
+    // We don't want to notify on edits. Not only can this be confusing in real
+    // time (2 notifications, one message) but it's especially confusing
+    // if a bridge needs to edit a previously backfilled message.
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_edits"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
+            EventMatchCondition {
+                key: Cow::Borrowed("content.m.relates_to.rel_type"),
+                pattern: Some(Cow::Borrowed("m.replace")),
+                pattern_type: None,
+            },
+        ))]),
+        actions: Cow::Borrowed(&[]),
+        default: true,
+        default_enabled: true,
+    },
     PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
         priority_class: 5,
@@ -206,7 +223,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern_type: None,
             },
         ))]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
+        actions: Cow::Borrowed(&[]),
         default: true,
         default_enabled: true,
     },
