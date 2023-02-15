@@ -301,9 +301,9 @@ pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owne
 
 if [[ "$OUTPUT_DIR" == *synapse/storage/schema ]]; then
   echo "Updating contrib/datagrip symlinks..."
-  ln -sf "synapse/storage/schema/common/full_schemas/$SCHEMA_NUMBER/full.sql.postgres" "contrib/datagrip/common.sql"
-  ln -sf "synapse/storage/schema/main/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"   "contrib/datagrip/main.sql"
-  ln -sf "synapse/storage/schema/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"  "contrib/datagrip/state.sql"
+  ln -sf "../../synapse/storage/schema/common/full_schemas/$SCHEMA_NUMBER/full.sql.postgres" "contrib/datagrip/common.sql"
+  ln -sf "../../synapse/storage/schema/main/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"   "contrib/datagrip/main.sql"
+  ln -sf "../../synapse/storage/schema/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"  "contrib/datagrip/state.sql"
 else
   echo "Not updating contrib/datagrip symlinks (unknown output directory)"
 fi
