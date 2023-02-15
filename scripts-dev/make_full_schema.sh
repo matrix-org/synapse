@@ -28,6 +28,11 @@ usage() {
   echo "-h"
   echo "  Display this help text."
   echo ""
+  echo ""
+  echo "You probably want to invoke this with something like"
+  echo "  docker run --rm -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=synapse -p 5432:5432 postgres:11-alpine"
+  echo "  echo postgres | scripts-dev/make_full_schema.sh -p postgres -n MY_SCHEMA_NUMBER -o synapse/storage/schema"
+  echo ""
   echo "  NB: make sure to run this against the *oldest* supported version of postgres,"
   echo "  or else pg_dump might output non-backwards-compatible syntax."
 }
