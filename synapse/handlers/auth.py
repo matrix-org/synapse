@@ -199,7 +199,10 @@ class AuthHandler:
         self.clock = hs.get_clock()
         self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
-            inst = auth_checker_class(hs)
+            # mypy sees that the expression `auth_checker_class(hs)` is an instance of
+            # `UserInteractiveAuthChecker`, but cannot see that it is an instance of
+            # a non-abstract subclass.
+            inst = auth_checker_class(hs)  # type: ignore[abstract]
             if inst.is_enabled():
                 self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
 

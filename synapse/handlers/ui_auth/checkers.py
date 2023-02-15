@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 from twisted.web.client import PartialDownloadError
@@ -27,12 +28,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UserInteractiveAuthChecker:
+class UserInteractiveAuthChecker(ABC):
     """Abstract base class for an interactive auth checker"""
 
-    def __init__(self, hs: "HomeServer"):
+    def __init__(self, hs: "HomeServer"):  # noqa: B027
         pass
 
+    @abstractmethod
     def is_enabled(self) -> bool:
         """Check if the configuration of the homeserver allows this checker to work
 
@@ -41,6 +43,7 @@ class UserInteractiveAuthChecker:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         """Given the authentication dict from the client, attempt to check this step
 
