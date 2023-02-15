@@ -19,7 +19,8 @@ usage() {
   echo "-c"
   echo "  CI mode. Prints every command that the script runs."
   echo "-o <path>"
-  echo "  Directory to output full schema files to."
+  echo "  Directory to output full schema files to. You probably want to use"
+  echo "  '-o synapse/storage/schema'"
   echo "-n <schema number>"
   echo "  Schema number for the new snapshot. Used to set the location of files within "
   echo "  the output directory, mimicking that of synapse/storage/schemas."
@@ -293,4 +294,12 @@ pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owne
 pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema  > "$OUTPUT_DIR/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"
 pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema >> "$OUTPUT_DIR/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"
 
+if [ "$OUTPUT_DIR" == *synapse/storage/schema ]; then
+  echo "Updating contrib/datagrip symlinks..."
+  ln -sf "synapse/storage/schema/common/full_schemas/$SCHEMA_NUMBER/full.sql.postgres" "contrib/datagrip/common.sql"
+  ln -sf "synapse/storage/schema/main/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"   "contrib/datagrip/main.sql"
+  ln -sf "synapse/storage/schema/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"  "contrib/datagrip/state.sql"
+else
+  echo "Not updating contrib/datagrip symlinks (unknown output directory)"
+fi
 echo "Done! Files dumped to: $OUTPUT_DIR"
