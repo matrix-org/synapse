@@ -68,11 +68,11 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
-        fed_transport_client = Mock(spec=["send_transaction"])
-        fed_transport_client.send_transaction = simple_async_mock({})
+        self.fed_transport_client = Mock(spec=["send_transaction"])
+        self.fed_transport_client.send_transaction = simple_async_mock({})
 
         return self.setup_test_homeserver(
-            federation_transport_client=fed_transport_client,
+            federation_transport_client=self.fed_transport_client,
         )
 
     def test_can_register_user(self) -> None:
@@ -417,7 +417,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         #
         # Thus we reset the mock, and try sending online local user
         # presence again
-        self.hs.get_federation_transport_client().send_transaction.reset_mock()
+        self.fed_transport_client.send_transaction.reset_mock()
 
         # Broadcast local user online presence
         self.get_success(
@@ -429,9 +429,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
 
         # Check that a presence update was sent as part of a federation transaction
         found_update = False
-        calls = (
-            self.hs.get_federation_transport_client().send_transaction.call_args_list
-        )
+        calls = self.fed_transport_client.send_transaction.call_args_list
         for call in calls:
             call_args = call[0]
             federation_transaction: Transaction = call_args[0]
@@ -581,7 +579,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         mocked_remote_join = simple_async_mock(
             return_value=("fake-event-id", fake_stream_id)
         )
-        self.hs.get_room_member_handler()._remote_join = mocked_remote_join
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[assignment]
         fake_remote_host = f"{self.module_api.server_name}-remote"
 
         # Given that the join is to be faked, we expect the relevant join event not to

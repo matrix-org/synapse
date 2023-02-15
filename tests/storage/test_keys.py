@@ -16,8 +16,6 @@ import signedjson.key
 import signedjson.types
 import unpaddedbase64
 
-from twisted.internet.defer import Deferred
-
 from synapse.storage.keys import FetchKeyResult
 
 import tests.unittest
@@ -44,20 +42,26 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
 
         key_id_1 = "ed25519:key1"
         key_id_2 = "ed25519:KEY_ID_2"
-        d = store.store_server_verify_keys(
-            "from_server",
-            10,
-            [
-                ("server1", key_id_1, FetchKeyResult(KEY_1, 100)),
-                ("server1", key_id_2, FetchKeyResult(KEY_2, 200)),
-            ],
+        self.get_success(
+            store.store_server_verify_keys(
+                "from_server",
+                10,
+                [
+                    ("server1", key_id_1, FetchKeyResult(KEY_1, 100)),
+                    ("server1", key_id_2, FetchKeyResult(KEY_2, 200)),
+                ],
+            )
         )
-        self.get_success(d)
 
-        d = store.get_server_verify_keys(
-            [("server1", key_id_1), ("server1", key_id_2), ("server1", "ed25519:key3")]
+        res = self.get_success(
+            store.get_server_verify_keys(
+                [
+                    ("server1", key_id_1),
+                    ("server1", key_id_2),
+                    ("server1", "ed25519:key3"),
+                ]
+            )
         )
-        res = self.get_success(d)
 
         self.assertEqual(len(res.keys()), 3)
         res1 = res[("server1", key_id_1)]
@@ -82,18 +86,20 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         key_id_1 = "ed25519:key1"
         key_id_2 = "ed25519:key2"
 
-        d = store.store_server_verify_keys(
-            "from_server",
-            0,
-            [
-                ("srv1", key_id_1, FetchKeyResult(KEY_1, 100)),
-                ("srv1", key_id_2, FetchKeyResult(KEY_2, 200)),
-            ],
+        self.get_success(
+            store.store_server_verify_keys(
+                "from_server",
+                0,
+                [
+                    ("srv1", key_id_1, FetchKeyResult(KEY_1, 100)),
+                    ("srv1", key_id_2, FetchKeyResult(KEY_2, 200)),
+                ],
+            )
         )
-        self.get_success(d)
 
-        d = store.get_server_verify_keys([("srv1", key_id_1), ("srv1", key_id_2)])
-        res = self.get_success(d)
+        res = self.get_success(
+            store.get_server_verify_keys([("srv1", key_id_1), ("srv1", key_id_2)])
+        )
         self.assertEqual(len(res.keys()), 2)
 
         res1 = res[("srv1", key_id_1)]
@@ -105,9 +111,7 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertEqual(res2.valid_until_ts, 200)
 
         # we should be able to look up the same thing again without a db hit
-        res = store.get_server_verify_keys([("srv1", key_id_1)])
-        if isinstance(res, Deferred):
-            res = self.successResultOf(res)
+        res = self.get_success(store.get_server_verify_keys([("srv1", key_id_1)]))
         self.assertEqual(len(res.keys()), 1)
         self.assertEqual(res[("srv1", key_id_1)].verify_key, KEY_1)
 
@@ -119,8 +123,9 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.get_success(d)
 
-        d = store.get_server_verify_keys([("srv1", key_id_1), ("srv1", key_id_2)])
-        res = self.get_success(d)
+        res = self.get_success(
+            store.get_server_verify_keys([("srv1", key_id_1), ("srv1", key_id_2)])
+        )
         self.assertEqual(len(res.keys()), 2)
 
         res1 = res[("srv1", key_id_1)]

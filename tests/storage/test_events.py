@@ -40,7 +40,9 @@ class ExtremPruneTestCase(HomeserverTestCase):
         self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
     ) -> None:
         self.state = self.hs.get_state_handler()
-        self._persistence = self.hs.get_storage_controllers().persistence
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self._persistence = persistence
         self._state_storage_controller = self.hs.get_storage_controllers().state
         self.store = self.hs.get_datastores().main
 
@@ -374,7 +376,9 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
     ) -> None:
         self.state = self.hs.get_state_handler()
-        self._persistence = self.hs.get_storage_controllers().persistence
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self._persistence = persistence
         self.store = self.hs.get_datastores().main
 
     def test_remote_user_rooms_cache_invalidated(self) -> None:
