@@ -299,7 +299,7 @@ pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owne
 pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema  > "$OUTPUT_DIR/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"
 pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema >> "$OUTPUT_DIR/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"
 
-if [ "$OUTPUT_DIR" == *synapse/storage/schema ]; then
+if [[ "$OUTPUT_DIR" == *synapse/storage/schema ]]; then
   echo "Updating contrib/datagrip symlinks..."
   ln -sf "synapse/storage/schema/common/full_schemas/$SCHEMA_NUMBER/full.sql.postgres" "contrib/datagrip/common.sql"
   ln -sf "synapse/storage/schema/main/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"   "contrib/datagrip/main.sql"
