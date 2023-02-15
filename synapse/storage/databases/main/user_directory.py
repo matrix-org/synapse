@@ -944,6 +944,14 @@ def _parse_words(search_term: str) -> List[str]:
     if USE_ICU:
         return _parse_words_with_icu(search_term)
 
+    return _parse_words_with_regex(search_term)
+
+
+def _parse_words_with_regex(search_term: str) -> List[str]:
+    """
+    Break down search term into words, when we don't have ICU available.
+    See: `_parse_words`
+    """
     return re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
 

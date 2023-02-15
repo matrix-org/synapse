@@ -25,6 +25,10 @@ from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.background_updates import _BackgroundUpdateHandler
+from synapse.storage.databases.main.user_directory import (
+    _parse_words_with_icu,
+    _parse_words_with_regex,
+)
 from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
@@ -512,4 +516,22 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
         self.assertDictEqual(
             r["results"][0],
             {"user_id": ALICE, "display_name": display_name, "avatar_url": None},
+        )
+
+    def test_icu_word_boundary_punctuation(self) -> None:
+        """
+        Tests the behaviour of punctuation with the ICU tokeniser
+        """
+        self.assertEqual(
+            _parse_words_with_icu("lazy'fox jumped:over the.dog"),
+            ["lazy'fox", "jumped:over", "the.dog"],
+        )
+
+    def test_regex_word_boundary_punctuation(self) -> None:
+        """
+        Tests the behaviour of punctuation with the non-ICU tokeniser
+        """
+        self.assertEqual(
+            _parse_words_with_regex("lazy'fox jumped:over the.dog"),
+            ["lazy", "fox", "jumped", "over", "the", "dog"],
         )
