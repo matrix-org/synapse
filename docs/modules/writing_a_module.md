@@ -132,3 +132,5 @@ class MyModule:
         # them in the cache is out of date, so we want to invalidate it.
         await self.api.invalidate_cache(self.get_user_from_id, (user_id,))
 ```
+
+See the [`cached` docstring](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L190) for more details.
