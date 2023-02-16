@@ -20,7 +20,6 @@ from signedjson.key import (
     get_verify_key,
 )
 from signedjson.sign import sign_json
-from signedjson.types import SigningKey
 
 from synapse.api.errors import Codes
 from synapse.rest import admin
