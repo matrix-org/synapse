@@ -39,7 +39,7 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
-from typing_extensions import Deque
+from typing_extensions import Deque, ParamSpec
 from zope.interface import implementer, providedBy
 
 from twisted.internet import address, threads, udp
@@ -97,6 +97,7 @@ from tests.utils import (
 logger = logging.getLogger(__name__)
 
 R = TypeVar("R")
+P = ParamSpec("P")
 
 # the type of thing that can be passed into `make_request` in the headers list
 CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
@@ -558,25 +559,33 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 class ThreadPool:
     """
     Threadless thread pool.
+
+    See twisted.python.threadpool.ThreadPool
     """
 
-    def __init__(self, reactor):
+    def __init__(self, reactor: IReactorTime):
         self._reactor = reactor
 
-    def start(self):
+    def start(self) -> None:
         pass
 
-    def stop(self):
+    def stop(self) -> None:
         pass
 
-    def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
-        def _(res):
+    def callInThreadWithCallback(
+        self,
+        onResult: Callable[[bool, Union[Failure, R]], None],
+        function: Callable[P, R],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> "Deferred[None]":
+        def _(res: Any) -> None:
             if isinstance(res, Failure):
                 onResult(False, res)
             else:
                 onResult(True, res)
 
-        d = Deferred()
+        d: "Deferred[None]" = Deferred()
         d.addCallback(lambda x: function(*args, **kwargs))
         d.addBoth(_)
         self._reactor.callLater(0, d.callback, True)
