@@ -894,10 +894,14 @@ def _custom_sync_async_decorator(
     """
 
     if inspect.iscoroutinefunction(func):
-
+        # In this branch, R = Awaitable[RInner], for some other type RInner
         @wraps(func)
-        async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        async def _wrapper(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> Any:  # Return type is RInner
             with wrapping_logic(func, *args, **kwargs):
+                # type-ignore: func() returns R, but mypy doesn't know that R is
+                # Awaitable here.
                 return await func(*args, **kwargs)  # type: ignore[misc]
 
     else:
@@ -965,6 +969,7 @@ def trace_with_opname(
             return func
 
         # type-ignore: mypy seems to be confused by the ParamSpecs here.
+        # I think the problem is https://github.com/python/mypy/issues/12909
         return _custom_sync_async_decorator(
             func, _wrapping_logic  # type: ignore[arg-type]
         )
@@ -1014,6 +1019,7 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         yield
 
     # type-ignore: mypy seems to be confused by the ParamSpecs here.
+    # I think the problem is https://github.com/python/mypy/issues/12909
     return _custom_sync_async_decorator(func, _wrapping_logic)  # type: ignore[arg-type]
 
 
