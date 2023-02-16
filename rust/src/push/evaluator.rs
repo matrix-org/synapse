@@ -256,9 +256,11 @@ impl PushRuleEvaluator {
         };
 
         let result = match known_condition {
-            KnownCondition::EventMatch(event_match) => {
-                self.match_event_match(&event_match.key.clone(), &event_match.pattern.clone())?
-            }
+            KnownCondition::EventMatch(event_match) => self.match_event_match(
+                &self.flattened_keys,
+                &event_match.key.clone(),
+                &event_match.pattern.clone(),
+            )?,
             KnownCondition::EventMatchType(event_match) => {
                 // The `pattern_type` can either be "user_id" or "user_localpart",
                 // either way if we don't have a `user_id` then the condition can't
@@ -275,7 +277,7 @@ impl PushRuleEvaluator {
                     _ => return Ok(false),
                 };
 
-                self.match_event_match(&event_match.key.clone(), pattern)?
+                self.match_event_match(&self.flattened_keys, &event_match.key.clone(), pattern)?
             }
             KnownCondition::ExactEventMatch(exact_event_match) => {
                 self.match_exact_event_match(exact_event_match)?
@@ -341,9 +343,14 @@ impl PushRuleEvaluator {
     }
 
     /// Evaluates a `event_match` condition.
-    fn match_event_match(&self, key: &str, pattern: &str) -> Result<bool, Error> {
+    fn match_event_match(
+        &self,
+        flattened_event: &BTreeMap<String, JsonValue>,
+        key: &str,
+        pattern: &str,
+    ) -> Result<bool, Error> {
         let haystack = if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) =
-            self.flattened_keys.get(&*key)
+            flattened_event.get(key)
         {
             haystack
         } else {
@@ -440,23 +447,7 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        let haystack =
-            if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) = event.get(&**key) {
-                haystack
-            } else {
-                return Ok(false);
-            };
-
-        // For the content.body we match against "words", but for everything
-        // else we match against the entire value.
-        let match_type = if key == "content.body" {
-            GlobMatchType::Word
-        } else {
-            GlobMatchType::Whole
-        };
-
-        let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
-        compiled_pattern.is_match(haystack)
+        self.match_event_match(event, key, pattern)
     }
 
     /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
