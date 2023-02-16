@@ -86,6 +86,8 @@ Callbacks for each category can be found on their respective page of the
 
 ## Caching
 
+_Added in Synapse 1.74.0._
+
 Modules can leverage Synapse's caching tools to manage their own cached functions. This
 can be helpful for modules that need to repeatedly request the same data from the database
 or a remote service.
