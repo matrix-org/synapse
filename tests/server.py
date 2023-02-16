@@ -32,12 +32,13 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 from unittest.mock import Mock
 
 import attr
 from typing_extensions import Deque
-from zope.interface import implementer
+from zope.interface import implementer, providedBy
 
 from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
@@ -47,6 +48,7 @@ from twisted.internet.interfaces import (
     IAddress,
     IConsumer,
     IHostnameResolver,
+    IProducer,
     IProtocol,
     IPullProducer,
     IPushProducer,
@@ -99,12 +101,14 @@ class TimedOutException(Exception):
     """
 
 
-@implementer(IConsumer)
+@implementer(ITransport, IPushProducer, IConsumer)
 @attr.s(auto_attribs=True)
 class FakeChannel:
     """
     A fake Twisted Web Channel (the part that interfaces with the
     wire).
+
+    See twisted.web.http.HTTPChannel.
     """
 
     site: Union[Site, "FakeSite"]
@@ -143,7 +147,7 @@ class FakeChannel:
 
         Raises an exception if the request has not yet completed.
         """
-        if not self.is_finished:
+        if not self.is_finished():
             raise Exception("Request not yet completed")
         return self.result["body"].decode("utf8")
 
@@ -166,27 +170,35 @@ class FakeChannel:
             h.addRawHeader(*i)
         return h
 
-    def writeHeaders(self, version, code, reason, headers):
+    def writeHeaders(
+        self, version: bytes, code: bytes, reason: bytes, headers: Headers
+    ) -> None:
         self.result["version"] = version
         self.result["code"] = code
         self.result["reason"] = reason
         self.result["headers"] = headers
 
-    def write(self, content: bytes) -> None:
-        assert isinstance(content, bytes), "Should be bytes! " + repr(content)
+    def write(self, data: bytes) -> None:
+        assert isinstance(data, bytes), "Should be bytes! " + repr(data)
 
         if "body" not in self.result:
             self.result["body"] = b""
 
-        self.result["body"] += content
+        self.result["body"] += data
+
+    def writeSequence(self, data: Iterable[bytes]) -> None:
+        for x in data:
+            self.write(x)
+
+    def loseConnection(self) -> None:
+        self.unregisterProducer()
+        self.transport.loseConnection()
 
     # Type ignore: mypy doesn't like the fact that producer isn't an IProducer.
-    def registerProducer(  # type: ignore[override]
-        self,
-        producer: Union[IPullProducer, IPushProducer],
-        streaming: bool,
-    ) -> None:
-        self._producer = producer
+    def registerProducer(self, producer: IProducer, streaming: bool) -> None:
+        # Ensure that the producer implements one or more of IPushProducer and IPullProducer.
+        assert not set(providedBy(producer)).isdisjoint({IPushProducer, IPullProducer})
+        self._producer = cast(Union[IPushProducer, IPullProducer], producer)
         self.producerStreaming = streaming
 
         def _produce() -> None:
@@ -202,6 +214,16 @@ class FakeChannel:
             return
 
         self._producer = None
+
+    def stopProducing(self) -> None:
+        if self._producer is not None:
+            self._producer.stopProducing()
+
+    def pauseProducing(self) -> None:
+        raise NotImplementedError()
+
+    def resumeProducing(self) -> None:
+        raise NotImplementedError()
 
     def requestDone(self, _self: Request) -> None:
         self.result["done"] = True
@@ -282,7 +304,7 @@ class FakeSite:
         self.reactor = reactor
         self.experimental_cors_msc3886 = experimental_cors_msc3886
 
-    def getResourceFor(self, request):
+    def getResourceFor(self, request: Request) -> IResource:
         return self._resource
 
 
