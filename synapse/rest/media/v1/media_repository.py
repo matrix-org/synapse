@@ -351,6 +351,8 @@ class MediaRepository:
         Returns:
             A tuple of responder and the media info of the file.
         """
+
+        file_info = None
         media_info = await self.store.get_cached_remote_media(server_name, media_id)
 
         # file_id is the ID we use to track the file locally. If we've already
@@ -379,6 +381,7 @@ class MediaRepository:
             media_info = await self._download_remote_file(
                 server_name,
                 media_id,
+                file_info,
             )
         except SynapseError:
             raise
@@ -386,8 +389,22 @@ class MediaRepository:
             # An exception may be because we downloaded media in another
             # process, so let's check if we magically have the media.
             media_info = await self.store.get_cached_remote_media(server_name, media_id)
-            if not media_info:
+
+            is_cached = False
+
+            if media_info is not None:
+                try:
+                    await self.media_storage.ensure_media_is_in_local_cache(
+                        FileInfo(server_name, media_info["filesystem_id"])
+                    )
+                    is_cached = True
+                except NotFoundError:
+                    pass
+
+            if not media_info or (media_info and not is_cached):
                 raise e
+            else:
+                logger.warning("Ignoring _download_remote_file exception", exc_info=e)
 
         file_id = media_info["filesystem_id"]
         if not media_info["media_type"]:
@@ -408,9 +425,7 @@ class MediaRepository:
         return responder, media_info
 
     async def _download_remote_file(
-        self,
-        server_name: str,
-        media_id: str,
+        self, server_name: str, media_id: str, file_info: Optional[FileInfo]
     ) -> dict:
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
@@ -420,15 +435,22 @@ class MediaRepository:
             media_id: The media ID of the content (as defined by the
                 remote server). This is different than the file_id, which is
                 locally generated.
-            file_id: Local file ID
+            file_info: A previously-existing file_info
 
         Returns:
             The media info of the file.
         """
 
-        file_id = random_string(24)
+        # Only update the store if we have a pre-existing file somewhere.
+        update_store = file_info is not None
 
-        file_info = FileInfo(server_name=server_name, file_id=file_id)
+        if not file_info:
+            file_id = random_string(24)
+
+            file_info = FileInfo(server_name=server_name, file_id=file_id)
+
+        assert file_info.thumbnail is None
+        assert not file_info.url_cache
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             request_path = "/".join(
@@ -507,7 +529,8 @@ class MediaRepository:
                 time_now_ms=self.clock.time_msec(),
                 upload_name=upload_name,
                 media_length=length,
-                filesystem_id=file_id,
+                filesystem_id=file_info.file_id,
+                update=update_store,
             )
 
         logger.info("Stored remote media in file %r", fname)
@@ -517,7 +540,7 @@ class MediaRepository:
             "media_length": length,
             "upload_name": upload_name,
             "created_ts": time_now_ms,
-            "filesystem_id": file_id,
+            "filesystem_id": file_info.file_id,
         }
 
         return media_info
