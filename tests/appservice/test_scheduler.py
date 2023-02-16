@@ -17,6 +17,7 @@ from unittest.mock import Mock
 from typing_extensions import TypeAlias
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.appservice import (
     ApplicationService,
@@ -39,9 +40,6 @@ from tests import unittest
 from tests.test_utils import simple_async_mock
 
 from ..utils import MockClock
-
-if TYPE_CHECKING:
-    from twisted.internet.testing import MemoryReactor
 
 
 class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
