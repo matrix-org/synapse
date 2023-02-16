@@ -21,13 +21,13 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use super::KnownCondition;
-use crate::push::Action;
 use crate::push::Condition;
 use crate::push::EventMatchCondition;
 use crate::push::PushRule;
 use crate::push::RelatedEventMatchCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
+use crate::push::{Action, ExactEventMatchCondition, SimpleJsonValue};
 
 const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
@@ -168,7 +168,10 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         rule_id: Cow::Borrowed(".org.matrix.msc3952.is_room_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::IsRoomMention),
+            Condition::Known(KnownCondition::ExactEventMatch(ExactEventMatchCondition {
+                key: Cow::Borrowed("content.org.matrix.msc3952.mentions.room"),
+                value: Cow::Borrowed(&SimpleJsonValue::Bool(true)),
+            })),
             Condition::Known(KnownCondition::SenderNotificationPermission {
                 key: Cow::Borrowed("room"),
             }),

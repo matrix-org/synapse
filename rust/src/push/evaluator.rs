@@ -73,8 +73,6 @@ pub struct PushRuleEvaluator {
     has_mentions: bool,
     /// The user mentions that were part of the message.
     user_mentions: BTreeSet<String>,
-    /// True if the message is a room message.
-    room_mention: bool,
 
     /// The number of users in the room.
     room_member_count: u64,
@@ -116,7 +114,6 @@ impl PushRuleEvaluator {
         flattened_keys: BTreeMap<String, JsonValue>,
         has_mentions: bool,
         user_mentions: BTreeSet<String>,
-        room_mention: bool,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
@@ -137,7 +134,6 @@ impl PushRuleEvaluator {
             body,
             has_mentions,
             user_mentions,
-            room_mention,
             room_member_count,
             notification_power_levels,
             sender_power_level,
@@ -279,7 +275,6 @@ impl PushRuleEvaluator {
                     false
                 }
             }
-            KnownCondition::IsRoomMention => self.room_mention,
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
                     if !dn.is_empty() {
@@ -529,7 +524,6 @@ fn push_rule_evaluator() {
         flattened_keys,
         false,
         BTreeSet::new(),
-        false,
         10,
         Some(0),
         BTreeMap::new(),
@@ -562,7 +556,6 @@ fn test_requires_room_version_supports_condition() {
         flattened_keys,
         false,
         BTreeSet::new(),
-        false,
         10,
         Some(0),
         BTreeMap::new(),

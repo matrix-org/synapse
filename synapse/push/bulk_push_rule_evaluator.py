@@ -400,7 +400,6 @@ class BulkPushRuleEvaluator:
         mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
         has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
         user_mentions: Set[str] = set()
-        room_mention = False
         if has_mentions:
             # mypy seems to have lost the type even though it must be a dict here.
             assert isinstance(mentions, dict)
@@ -410,8 +409,6 @@ class BulkPushRuleEvaluator:
                 user_mentions = set(
                     filter(lambda item: isinstance(item, str), user_mentions_raw)
                 )
-            # Room mention is only true if the value is exactly true.
-            room_mention = mentions.get("room") is True
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(
@@ -420,7 +417,6 @@ class BulkPushRuleEvaluator:
             ),
             has_mentions,
             user_mentions,
-            room_mention,
             room_member_count,
             sender_power_level,
             notification_levels,
