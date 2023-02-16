@@ -92,9 +92,9 @@ or a remote service.
 
 Functions that need to be wrapped with a cache need to be decorated with a `@cached()`
 decorator (which can be imported from `synapse.module_api`) and registered with the
-[`ModuleApi.register_cached_function`](https://github.com/matrix-org/synapse/blob/1cc2ca81badb9c5161d219dfc9a273a338adedd2/synapse/module_api/__init__.py#L839-L850)
+[`ModuleApi.register_cached_function`](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L888)
 API when initialising the module. If the module needs to invalidate an entry in a cache,
-it needs to use the [`ModuleApi.invalidate_cache`](https://github.com/matrix-org/synapse/blob/1cc2ca81badb9c5161d219dfc9a273a338adedd2/synapse/module_api/__init__.py#L855-L872)
+it needs to use the [`ModuleApi.invalidate_cache`](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L904)
 API, with the function to invalidate the cache of and the key(s) of the entry to
 invalidate.
 
