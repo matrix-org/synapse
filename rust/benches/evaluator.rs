@@ -60,8 +60,7 @@ fn bench_match_exact(b: &mut Bencher) {
     let condition = Condition::Known(synapse::push::KnownCondition::EventMatch(
         EventMatchCondition {
             key: "room_id".into(),
-            pattern: Some("!room:server".into()),
-            pattern_type: None,
+            pattern: "!room:server".into(),
         },
     ));
 
@@ -109,8 +108,7 @@ fn bench_match_word(b: &mut Bencher) {
     let condition = Condition::Known(synapse::push::KnownCondition::EventMatch(
         EventMatchCondition {
             key: "content.body".into(),
-            pattern: Some("test".into()),
-            pattern_type: None,
+            pattern: "test".into(),
         },
     ));
 
@@ -158,8 +156,7 @@ fn bench_match_word_miss(b: &mut Bencher) {
     let condition = Condition::Known(synapse::push::KnownCondition::EventMatch(
         EventMatchCondition {
             key: "content.body".into(),
-            pattern: Some("foobar".into()),
-            pattern_type: None,
+            pattern: "foobar".into(),
         },
     ));
 

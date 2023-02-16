@@ -23,8 +23,8 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, EventMatchCondition, ExactEventMatchCondition, FilteredPushRules,
-    KnownCondition, RelatedEventMatchCondition, SimpleJsonValue,
+    Action, Condition, ExactEventMatchCondition, FilteredPushRules, KnownCondition,
+    RelatedEventMatchCondition, SimpleJsonValue,
 };
 
 lazy_static! {
@@ -257,7 +257,25 @@ impl PushRuleEvaluator {
 
         let result = match known_condition {
             KnownCondition::EventMatch(event_match) => {
-                self.match_event_match(event_match, user_id)?
+                self.match_event_match(&event_match.key.clone(), &event_match.pattern.clone())?
+            }
+            KnownCondition::EventMatchType(event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
+                } else {
+                    return Ok(false);
+                };
+
+                let pattern = match &*event_match.pattern_type {
+                    "user_id" => user_id,
+                    "user_localpart" => get_localpart_from_id(user_id)?,
+                    _ => return Ok(false),
+                };
+
+                self.match_event_match(&event_match.key.clone(), pattern)?
             }
             KnownCondition::ExactEventMatch(exact_event_match) => {
                 self.match_exact_event_match(exact_event_match)?
@@ -323,34 +341,9 @@ impl PushRuleEvaluator {
     }
 
     /// Evaluates a `event_match` condition.
-    fn match_event_match(
-        &self,
-        event_match: &EventMatchCondition,
-        user_id: Option<&str>,
-    ) -> Result<bool, Error> {
-        let pattern = if let Some(pattern) = &event_match.pattern {
-            pattern
-        } else if let Some(pattern_type) = &event_match.pattern_type {
-            // The `pattern_type` can either be "user_id" or "user_localpart",
-            // either way if we don't have a `user_id` then the condition can't
-            // match.
-            let user_id = if let Some(user_id) = user_id {
-                user_id
-            } else {
-                return Ok(false);
-            };
-
-            match &**pattern_type {
-                "user_id" => user_id,
-                "user_localpart" => get_localpart_from_id(user_id)?,
-                _ => return Ok(false),
-            }
-        } else {
-            return Ok(false);
-        };
-
+    fn match_event_match(&self, key: &str, pattern: &str) -> Result<bool, Error> {
         let haystack = if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) =
-            self.flattened_keys.get(&*event_match.key)
+            self.flattened_keys.get(&*key)
         {
             haystack
         } else {
@@ -359,7 +352,7 @@ impl PushRuleEvaluator {
 
         // For the content.body we match against "words", but for everything
         // else we match against the entire value.
-        let match_type = if event_match.key == "content.body" {
+        let match_type = if key == "content.body" {
             GlobMatchType::Word
         } else {
             GlobMatchType::Whole

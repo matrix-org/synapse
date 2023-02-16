@@ -416,6 +416,18 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "should not be possible to pass a pattern_type in",
         )
 
+        # This is an internal-only condition which shouldn't get deserialized.
+        condition = {
+            "kind": "event_match_type",
+            "key": "content.value",
+            "pattern_type": "user_id",
+        }
+        self._assert_not_matches(
+            condition,
+            {"value": "@user:test"},
+            "should not be possible to pass a pattern_type in",
+        )
+
     def test_exact_event_match_string(self) -> None:
         """Check that exact_event_match conditions work as expected for strings."""
 

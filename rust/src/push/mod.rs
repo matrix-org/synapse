@@ -328,6 +328,9 @@ pub enum Condition {
 #[serde(tag = "kind")]
 pub enum KnownCondition {
     EventMatch(EventMatchCondition),
+    // Identical to event_match but gives predefined patterns. Cannot be added by users.
+    #[serde(skip_deserializing, rename = "event_match")]
+    EventMatchType(EventMatchTypeCondition),
     #[serde(rename = "com.beeper.msc3758.exact_event_match")]
     ExactEventMatch(ExactEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
@@ -362,14 +365,20 @@ impl<'source> FromPyObject<'source> for Condition {
     }
 }
 
-/// The body of a [`Condition::EventMatch`]
+/// The body of a [`Condition::EventMatch`] with a pattern.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventMatchCondition {
     pub key: Cow<'static, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern: Option<Cow<'static, str>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern_type: Option<Cow<'static, str>>,
+    pub pattern: Cow<'static, str>,
+}
+
+/// The body of a [`Condition::EventMatch`] that uses user_id or user_localpart as a pattern.
+#[derive(Serialize, Debug, Clone)]
+pub struct EventMatchTypeCondition {
+    pub key: Cow<'static, str>,
+    // During serialization, the pattern_type property gets replaced with a
+    // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
+    pub pattern_type: Cow<'static, str>,
 }
 
 /// The body of a [`Condition::ExactEventMatch`]
@@ -571,8 +580,7 @@ impl FilteredPushRules {
 fn test_serialize_condition() {
     let condition = Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
         key: "content.body".into(),
-        pattern: Some("coffee".into()),
-        pattern_type: None,
+        pattern: "coffee".into(),
     }));
 
     let json = serde_json::to_string(&condition).unwrap();
