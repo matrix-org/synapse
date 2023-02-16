@@ -284,6 +284,14 @@ recommend the use of <code>systemd</code> where available: for information on se
 <code>systemd</code> to start synapse workers, see
 <a href="systemd-with-workers/">Systemd with Workers</a>. To use <code>synctl</code>, see
 <a href="synctl_workers.html">Using synctl with Workers</a>.</p>
+<h2 id="start-synapse-with-poetry"><a class="header" href="#start-synapse-with-poetry">Start Synapse with Poetry</a></h2>
+<p>The following applies to Synapse installations that have been installed from source using <code>poetry</code>.</p>
+<p>You can start the main Synapse process with Poetry by running the following command:</p>
+<pre><code class="language-console">poetry run synapse_homeserver -c [your homeserver.yaml]
+</code></pre>
+<p>For worker setups, you can run the following command</p>
+<pre><code class="language-console">poetry run synapse_worker -c [your worker.yaml]
+</code></pre>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
 <p>This worker can handle API requests matching the following regular expressions.
