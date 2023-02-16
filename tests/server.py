@@ -691,10 +691,14 @@ class FakeTransport:
     will get called back for connectionLost() notifications etc.
     """
 
-    _peer_address: Optional[IAddress] = None
+    _peer_address: IAddress = attr.Factory(
+        lambda: address.IPv4Address("TCP", "127.0.0.1", 5678)
+    )
     """The value to be returned by getPeer"""
 
-    _host_address: Optional[IAddress] = None
+    _host_address: IAddress = attr.Factory(
+        lambda: address.IPv4Address("TCP", "127.0.0.1", 1234)
+    )
     """The value to be returned by getHost"""
 
     disconnecting = False
@@ -704,10 +708,10 @@ class FakeTransport:
     producer: Optional[IPushProducer] = None
     autoflush: bool = True
 
-    def getPeer(self) -> Optional[IAddress]:
+    def getPeer(self) -> IAddress:
         return self._peer_address
 
-    def getHost(self) -> Optional[IAddress]:
+    def getHost(self) -> IAddress:
         return self._host_address
 
     def loseConnection(self, reason: Optional[Failure] = None) -> None:
