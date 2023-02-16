@@ -87,7 +87,7 @@ Callbacks for each category can be found on their respective page of the
 ## Caching
 
 Modules can leverage Synapse's caching tools to manage their own cached functions. This
-canbe helpful for modules that need to repeatedly request the same data from the database
+can be helpful for modules that need to repeatedly request the same data from the database
 or a remote service.
 
 Functions that need to be wrapped with a cache need to be decorated with a `@cached()`
