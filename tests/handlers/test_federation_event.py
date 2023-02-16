@@ -29,6 +29,7 @@ from synapse.logging.context import LoggingContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.state import StateResolutionStore
 from synapse.state.v2 import _mainline_sort, _reverse_topological_power_sort
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -161,6 +162,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         if prev_exists_as_outlier:
             prev_event.internal_metadata.outlier = True
             persistence = self.hs.get_storage_controllers().persistence
+            assert persistence is not None
             self.get_success(
                 persistence.persist_event(
                     prev_event,
@@ -861,7 +863,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                         bert_member_event.event_id: bert_member_event,
                         rejected_kick_event.event_id: rejected_kick_event,
                     },
-                    state_res_store=main_store,
+                    state_res_store=StateResolutionStore(main_store),
                 )
             ),
             [bert_member_event.event_id, rejected_kick_event.event_id],
@@ -906,7 +908,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                         rejected_power_levels_event.event_id,
                     ],
                     event_map={},
-                    state_res_store=main_store,
+                    state_res_store=StateResolutionStore(main_store),
                     full_conflicted_set=set(),
                 )
             ),

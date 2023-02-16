@@ -1,0 +1,1 @@
+Fix a long-standing bug where federated joins would fail if the first server in the list of servers to try is not in the room.

@@ -16,6 +16,7 @@ from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
+from synapse.handlers.typing import TypingWriterHandler
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client import login, room
 from synapse.types import UserID, create_requester
@@ -174,6 +175,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         token = self.login("user3", "pass")
 
         typing_handler = self.hs.get_typing_handler()
+        assert isinstance(typing_handler, TypingWriterHandler)
 
         sent_on_1 = False
         sent_on_2 = False

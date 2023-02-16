@@ -35,6 +35,8 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self._storage_controllers = self.hs.get_storage_controllers()
+        assert self._storage_controllers.persistence is not None
+        self._persistence = self._storage_controllers.persistence
 
         self.get_success(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
@@ -179,9 +181,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
         context = self.get_success(unpersisted_context.persist(event))
-        self.get_success(
-            self._storage_controllers.persistence.persist_event(event, context)
-        )
+        self.get_success(self._persistence.persist_event(event, context))
         return event
 
     def _inject_room_member(
@@ -208,9 +208,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
         context = self.get_success(unpersisted_context.persist(event))
 
-        self.get_success(
-            self._storage_controllers.persistence.persist_event(event, context)
-        )
+        self.get_success(self._persistence.persist_event(event, context))
         return event
 
     def _inject_message(
@@ -233,9 +231,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
         context = self.get_success(unpersisted_context.persist(event))
 
-        self.get_success(
-            self._storage_controllers.persistence.persist_event(event, context)
-        )
+        self.get_success(self._persistence.persist_event(event, context))
         return event
 
     def _inject_outlier(self) -> EventBase:
@@ -253,7 +249,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         event = self.get_success(builder.build(prev_event_ids=[], auth_event_ids=[]))
         event.internal_metadata.outlier = True
         self.get_success(
-            self._storage_controllers.persistence.persist_event(
+            self._persistence.persist_event(
                 event, EventContext.for_outlier(self._storage_controllers)
             )
         )

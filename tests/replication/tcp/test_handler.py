@@ -127,6 +127,7 @@ class ChannelsTestCase(BaseMultiWorkerStreamTestCase):
 
         # ... updating the cache ID gen on the master still shouldn't cause the
         # deferred to wake up.
+        assert store._cache_id_gen is not None
         ctx = store._cache_id_gen.get_next()
         self.get_success(ctx.__aenter__())
         self.get_success(ctx.__aexit__(None, None, None))

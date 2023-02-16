@@ -2232,7 +2232,7 @@ key on startup and store it in this file.
 
 Example configuration:
 ```yaml
-registration_shared_secret_file: /path/to/secrets/file
+registration_shared_secret_path: /path/to/secrets/file
 ```
 
 _Added in Synapse 1.67.0._
@@ -3927,6 +3927,9 @@ This setting has the following sub-options:
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
+* `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+
+  _Added in Synapse 1.78.0._
 
 Example configuration:
 ```yaml
@@ -3935,6 +3938,7 @@ redis:
   host: localhost
   port: 6379
   password: <secret_password>
+  dbid: <dbid>
 ```
 ---
 ## Individual worker configuration

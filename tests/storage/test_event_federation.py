@@ -54,6 +54,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
+        persist_events = hs.get_datastores().persist_events
+        assert persist_events is not None
+        self.persist_events = persist_events
 
     def test_get_prev_events_for_room(self) -> None:
         room_id = "@ROOM:local"
@@ -226,7 +229,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                     },
                 )
 
-            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
+            self.persist_events._persist_event_auth_chain_txn(
                 txn,
                 [
                     cast(EventBase, FakeEvent(event_id, room_id, auth_graph[event_id]))
@@ -445,7 +448,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 )
 
             # Insert all events apart from 'B'
-            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
+            self.persist_events._persist_event_auth_chain_txn(
                 txn,
                 [
                     cast(EventBase, FakeEvent(event_id, room_id, auth_graph[event_id]))
@@ -464,7 +467,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 updatevalues={"has_auth_chain_index": False},
             )
 
-            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
+            self.persist_events._persist_event_auth_chain_txn(
                 txn,
                 [cast(EventBase, FakeEvent("b", room_id, auth_graph["b"]))],
             )
