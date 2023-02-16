@@ -533,11 +533,21 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
 
     def test_icu_word_boundary_punctuation(self) -> None:
         """
-        Tests the behaviour of punctuation with the ICU tokeniser
+        Tests the behaviour of punctuation with the ICU tokeniser.
+
+        Seems to depend on underlying version of ICU.
         """
-        self.assertEqual(
+
+        # Note: either tokenisation is fine, because Postgres actually splits
+        # words itself afterwards.
+        self.assertIn(
             _parse_words_with_icu("lazy'fox jumped:over the.dog"),
-            ["lazy'fox", "jumped:over", "the.dog"],
+            (
+                # ICU 66 on Ubuntu 20.04
+                ["lazy'fox", "jumped", "over", "the", "dog"],
+                # ICU 70 on Ubuntu 22.04
+                ["lazy'fox", "jumped:over", "the.dog"],
+            ),
         )
 
     def test_regex_word_boundary_punctuation(self) -> None:
