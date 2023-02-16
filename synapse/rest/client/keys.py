@@ -313,7 +313,11 @@ class SigningKeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         if self.hs.config.experimental.msc3967_enabled:
-            existing_master_key = await self.e2e_keys_handler.store.get_e2e_cross_signing_key(user_id, "master")
+            existing_master_key = (
+                await self.e2e_keys_handler.store.get_e2e_cross_signing_key(
+                    user_id, "master"
+                )
+            )
             if existing_master_key:
                 # If we already have a master key then cross signing is set up and we require UIA to reset
                 await self.auth_handler.validate_user_via_ui_auth(
