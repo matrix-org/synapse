@@ -14,7 +14,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Sequence, Type
+from typing import TYPE_CHECKING, Any, ClassVar, Sequence, Type
 
 from twisted.web.client import PartialDownloadError
 
@@ -30,6 +30,12 @@ logger = logging.getLogger(__name__)
 
 class UserInteractiveAuthChecker(ABC):
     """Abstract base class for an interactive auth checker"""
+
+    # This should really be an "abstract class property", i.e. it should
+    # be an error to instantiate a subclass that doesn't specify an AUTH_TYPE.
+    # But calling this a `ClassVar` is simpler than a decorator stack of
+    # @property @abstractmethod and @classmethod (if that's even the right order).
+    AUTH_TYPE: ClassVar[str]
 
     def __init__(self, hs: "HomeServer"):  # noqa: B027
         pass
