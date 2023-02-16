@@ -16,6 +16,7 @@ from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
+from synapse.handlers.typing import TypingWriterHandler
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client import login, room
 from synapse.types import UserID, create_requester
@@ -40,7 +41,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         room.register_servlets,
     ]
 
-    def test_send_event_single_sender(self):
+    def test_send_event_single_sender(self) -> None:
         """Test that using a single federation sender worker correctly sends a
         new event.
         """
@@ -71,7 +72,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(mock_client.put_json.call_args[0][0], "other_server")
         self.assertTrue(mock_client.put_json.call_args[1]["data"].get("pdus"))
 
-    def test_send_event_sharded(self):
+    def test_send_event_sharded(self) -> None:
         """Test that using two federation sender workers correctly sends
         new events.
         """
@@ -138,7 +139,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(sent_on_1)
         self.assertTrue(sent_on_2)
 
-    def test_send_typing_sharded(self):
+    def test_send_typing_sharded(self) -> None:
         """Test that using two federation sender workers correctly sends
         new typing EDUs.
         """
@@ -174,6 +175,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         token = self.login("user3", "pass")
 
         typing_handler = self.hs.get_typing_handler()
+        assert isinstance(typing_handler, TypingWriterHandler)
 
         sent_on_1 = False
         sent_on_2 = False
@@ -215,7 +217,9 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(sent_on_1)
         self.assertTrue(sent_on_2)
 
-    def create_room_with_remote_server(self, user, token, remote_server="other_server"):
+    def create_room_with_remote_server(
+        self, user: str, token: str, remote_server: str = "other_server"
+    ) -> str:
         room = self.helper.create_room_as(user, tok=token)
         store = self.hs.get_datastores().main
         federation = self.hs.get_federation_event_handler()

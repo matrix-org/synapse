@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Optional, Tuple
+from typing import Any, List, Tuple
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -22,7 +22,6 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.push import PusherConfig, PusherConfigException
 from synapse.rest.client import login, push_rule, pusher, receipts, room
 from synapse.server import HomeServer
-from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -67,9 +66,10 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
-        def test_data(data: Optional[JsonDict]) -> None:
+        def test_data(data: Any) -> None:
             self.get_failure(
                 self.hs.get_pusherpool().add_or_update_pusher(
                     user_id=user_id,
@@ -113,6 +113,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -140,10 +141,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.helper.send(room, body="There!", tok=other_access_token)
 
         # Get the stream ordering before it gets sent
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         last_stream_ordering = pushers[0].last_stream_ordering
 
@@ -151,10 +153,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.pump()
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual(last_stream_ordering, pushers[0].last_stream_ordering)
 
@@ -172,10 +175,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.pump()
 
         # The stream ordering has increased
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
         last_stream_ordering = pushers[0].last_stream_ordering
@@ -194,10 +198,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.pump()
 
         # The stream ordering has increased, again
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 
@@ -229,6 +234,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -349,6 +355,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -435,6 +442,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -512,6 +520,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -618,6 +627,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -753,6 +763,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -895,6 +906,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
         device_id = user_tuple.device_id
 
@@ -941,9 +953,10 @@ class HTTPPusherTests(HomeserverTestCase):
         )
 
         # Look up the user info for the access token so we can compare the device ID.
-        lookup_result: TokenLookupResult = self.get_success(
+        lookup_result = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
+        assert lookup_result is not None
 
         # Get the user's devices and check it has the correct device ID.
         channel = self.make_request("GET", "/pushers", access_token=access_token)

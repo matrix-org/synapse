@@ -15,7 +15,7 @@
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import Direction
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -285,7 +285,12 @@ class DeleteMediaByDateSize(RestServlet):
     timestamp and size.
     """
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/delete$")
+    PATTERNS = [
+        *admin_patterns("/media/delete$"),
+        # This URL kept around for legacy reasons, it is undesirable since it
+        # overlaps with the DeleteMediaByID servlet.
+        *admin_patterns("/media/(?P<server_name>[^/]*)/delete$"),
+    ]
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
@@ -294,7 +299,7 @@ class DeleteMediaByDateSize(RestServlet):
         self.media_repository = hs.get_media_repository()
 
     async def on_POST(
-        self, request: SynapseRequest, server_name: str
+        self, request: SynapseRequest, server_name: Optional[str] = None
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
@@ -322,7 +327,8 @@ class DeleteMediaByDateSize(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if self.server_name != server_name:
+        # This check is useless, we keep it for the legacy endpoint only.
+        if server_name is not None and self.server_name != server_name:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
 
         logging.info(
@@ -489,6 +495,8 @@ def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) 
     ProtectMediaByID(hs).register(http_server)
     UnprotectMediaByID(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
-    DeleteMediaByID(hs).register(http_server)
+    # XXX DeleteMediaByDateSize must be registered before DeleteMediaByID as
+    #     their URL routes overlap.
     DeleteMediaByDateSize(hs).register(http_server)
+    DeleteMediaByID(hs).register(http_server)
     UserMediaRestServlet(hs).register(http_server)

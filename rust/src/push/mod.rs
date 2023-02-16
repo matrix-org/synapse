@@ -56,7 +56,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::{Context, Error};
 use log::warn;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
+use pyo3::types::{PyBool, PyList, PyLong, PyString};
 use pythonize::{depythonize, pythonize};
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
@@ -248,6 +250,65 @@ impl<'de> Deserialize<'de> for Action {
     }
 }
 
+/// A simple JSON values (string, int, boolean, or null).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum SimpleJsonValue {
+    Str(String),
+    Int(i64),
+    Bool(bool),
+    Null,
+}
+
+impl<'source> FromPyObject<'source> for SimpleJsonValue {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        if let Ok(s) = <PyString as pyo3::PyTryFrom>::try_from(ob) {
+            Ok(SimpleJsonValue::Str(s.to_string()))
+        // A bool *is* an int, ensure we try bool first.
+        } else if let Ok(b) = <PyBool as pyo3::PyTryFrom>::try_from(ob) {
+            Ok(SimpleJsonValue::Bool(b.extract()?))
+        } else if let Ok(i) = <PyLong as pyo3::PyTryFrom>::try_from(ob) {
+            Ok(SimpleJsonValue::Int(i.extract()?))
+        } else if ob.is_none() {
+            Ok(SimpleJsonValue::Null)
+        } else {
+            Err(PyTypeError::new_err(format!(
+                "Can't convert from {} to SimpleJsonValue",
+                ob.get_type().name()?
+            )))
+        }
+    }
+}
+
+/// A JSON values (list, string, int, boolean, or null).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum JsonValue {
+    Array(Vec<SimpleJsonValue>),
+    Value(SimpleJsonValue),
+}
+
+impl<'source> FromPyObject<'source> for JsonValue {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        if let Ok(l) = <PyList as pyo3::PyTryFrom>::try_from(ob) {
+            match l.iter().map(SimpleJsonValue::extract).collect() {
+                Ok(a) => Ok(JsonValue::Array(a)),
+                Err(e) => Err(PyTypeError::new_err(format!(
+                    "Can't convert to JsonValue::Array: {}",
+                    e
+                ))),
+            }
+        } else if let Ok(v) = SimpleJsonValue::extract(ob) {
+            Ok(JsonValue::Value(v))
+        } else {
+            Err(PyTypeError::new_err(format!(
+                "Can't convert from {} to JsonValue",
+                ob.get_type().name()?
+            )))
+        }
+    }
+}
+
 /// A condition used in push rules to match against an event.
 ///
 /// We need this split as `serde` doesn't give us the ability to have a
@@ -267,8 +328,12 @@ pub enum Condition {
 #[serde(tag = "kind")]
 pub enum KnownCondition {
     EventMatch(EventMatchCondition),
+    #[serde(rename = "com.beeper.msc3758.exact_event_match")]
+    ExactEventMatch(ExactEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
+    #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
+    ExactEventPropertyContains(ExactEventMatchCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
     IsUserMention,
     #[serde(rename = "org.matrix.msc3952.is_room_mention")]
@@ -307,6 +372,13 @@ pub struct EventMatchCondition {
     pub pattern: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_type: Option<Cow<'static, str>>,
+}
+
+/// The body of a [`Condition::ExactEventMatch`]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExactEventMatchCondition {
+    pub key: Cow<'static, str>,
+    pub value: Cow<'static, SimpleJsonValue>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]
@@ -419,6 +491,7 @@ pub struct FilteredPushRules {
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
     msc3952_intentional_mentions: bool,
+    msc3958_suppress_edits_enabled: bool,
 }
 
 #[pymethods]
@@ -431,6 +504,7 @@ impl FilteredPushRules {
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
         msc3952_intentional_mentions: bool,
+        msc3958_suppress_edits_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -439,6 +513,7 @@ impl FilteredPushRules {
             msc3381_polls_enabled,
             msc3664_enabled,
             msc3952_intentional_mentions,
+            msc3958_suppress_edits_enabled,
         }
     }
 
@@ -473,6 +548,11 @@ impl FilteredPushRules {
                 }
 
                 if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
+                {
+                    return false;
+                }
+                if !self.msc3958_suppress_edits_enabled
+                    && rule.rule_id == "global/override/.com.beeper.suppress_edits"
                 {
                     return false;
                 }
@@ -531,6 +611,48 @@ fn test_deserialize_unstable_msc3931_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RoomVersionSupports { feature: _ })
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3758_condition() {
+    // A string condition should work.
+    let json =
+        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":"foo"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
+    ));
+
+    // A boolean condition should work.
+    let json =
+        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":true}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
+    ));
+
+    // An integer condition should work.
+    let json = r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":1}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
+    ));
+
+    // A null condition should work
+    let json =
+        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":null}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::ExactEventMatch(_))
     ));
 }
 

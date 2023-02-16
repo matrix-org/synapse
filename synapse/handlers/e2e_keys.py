@@ -159,19 +159,22 @@ class E2eKeysHandler:
             # A map of destination -> user ID -> device IDs.
             remote_queries_not_in_cache: Dict[str, Dict[str, Iterable[str]]] = {}
             if remote_queries:
-                query_list: List[Tuple[str, Optional[str]]] = []
+                user_ids = set()
+                user_and_device_ids: List[Tuple[str, str]] = []
                 for user_id, device_ids in remote_queries.items():
                     if device_ids:
-                        query_list.extend(
+                        user_and_device_ids.extend(
                             (user_id, device_id) for device_id in device_ids
                         )
                     else:
-                        query_list.append((user_id, None))
+                        user_ids.add(user_id)
 
                 (
                     user_ids_not_in_cache,
                     remote_results,
-                ) = await self.store.get_user_devices_from_cache(query_list)
+                ) = await self.store.get_user_devices_from_cache(
+                    user_ids, user_and_device_ids
+                )
 
                 # Check that the homeserver still shares a room with all cached users.
                 # Note that this check may be slightly racy when a remote user leaves a
