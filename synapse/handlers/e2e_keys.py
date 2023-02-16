@@ -1310,7 +1310,9 @@ class E2eKeysHandler:
         Returns:
             True if the user has cross-signing set up, False otherwise
         """
-        existing_master_key = await self.store.get_e2e_cross_signing_key(user_id, "master")
+        existing_master_key = await self.store.get_e2e_cross_signing_key(
+            user_id, "master"
+        )
         return existing_master_key is not None
 
 
