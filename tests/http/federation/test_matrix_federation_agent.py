@@ -30,7 +30,7 @@ from twisted.internet.interfaces import (
     IOpenSSLClientConnectionCreator,
     IProtocolFactory,
 )
-from twisted.internet.protocol import Factory
+from twisted.internet.protocol import Factory, Protocol
 from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web._newclient import ResponseNeverReceived
 from twisted.web.client import Agent
@@ -466,7 +466,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         else:
             assert isinstance(proxy_server_transport, FakeTransport)
             client_protocol = proxy_server_transport.other
+            assert isinstance(client_protocol, Protocol)
             c2s_transport = client_protocol.transport
+            assert c2s_transport is not None
+            assert isinstance(c2s_transport, FakeTransport)
             c2s_transport.other = server_ssl_protocol
 
         self.reactor.advance(0)
