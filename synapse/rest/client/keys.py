@@ -313,12 +313,7 @@ class SigningKeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         if self.hs.config.experimental.msc3967_enabled:
-            existing_master_key = (
-                await self.e2e_keys_handler.store.get_e2e_cross_signing_key(
-                    user_id, "master"
-                )
-            )
-            if existing_master_key:
+            if await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id):
                 # If we already have a master key then cross signing is set up and we require UIA to reset
                 await self.auth_handler.validate_user_via_ui_auth(
                     requester,
@@ -328,6 +323,7 @@ class SigningKeyUploadServlet(RestServlet):
                     # Do not allow skipping of UIA auth.
                     can_skip_ui_auth=False,
                 )
+            # Otherwise we don't require UIA since we are setting up cross signing for first time
         else:
             # Previous behaviour is to always require UIA but allow it to be skipped
             await self.auth_handler.validate_user_via_ui_auth(
