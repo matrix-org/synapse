@@ -20,7 +20,9 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
@@ -33,7 +35,7 @@ from typing_extensions import Literal
 
 from synapse.api.constants import DeviceKeyAlgorithms
 from synapse.appservice import (
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
@@ -139,11 +141,15 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @trace
     @cancellable
     async def get_e2e_device_keys_for_cs_api(
-        self, query_list: List[Tuple[str, Optional[str]]]
+        self,
+        query_list: Collection[Tuple[str, Optional[str]]],
+        include_displaynames: bool = True,
     ) -> Dict[str, Dict[str, JsonDict]]:
         """Fetch a list of device keys, formatted suitably for the C/S API.
         Args:
-            query_list(list): List of pairs of user_ids and device_ids.
+            query_list: List of pairs of user_ids and device_ids.
+            include_displaynames: Whether to include the displayname of returned devices
+                (if one exists).
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             key data.  The key data will be a dict in the same format as the
@@ -166,9 +172,12 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                     continue
 
                 r["unsigned"] = {}
-                display_name = device_info.display_name
-                if display_name is not None:
-                    r["unsigned"]["device_display_name"] = display_name
+                if include_displaynames:
+                    # Include the device's display name in the "unsigned" dictionary
+                    display_name = device_info.display_name
+                    if display_name is not None:
+                        r["unsigned"]["device_display_name"] = display_name
+
                 rv[user_id][device_id] = r
 
         return rv
@@ -253,7 +262,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         for batch in batch_iter(signature_query, 50):
             cross_sigs_result = await self.db_pool.runInteraction(
-                "get_e2e_cross_signing_signatures",
+                "get_e2e_cross_signing_signatures_for_devices",
                 self._get_e2e_cross_signing_signatures_for_devices_txn,
                 batch,
             )
@@ -405,10 +414,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         """Retrieve a number of one-time keys for a user
 
         Args:
-            user_id(str): id of user to get keys for
-            device_id(str): id of device to get keys for
-            key_ids(list[str]): list of key ids (excluding algorithm) to
-                retrieve
+            user_id: id of user to get keys for
+            device_id: id of device to get keys for
+            key_ids: list of key ids (excluding algorithm) to retrieve
 
         Returns:
             A map from (algorithm, key_id) to json string for key
@@ -508,7 +516,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
     async def count_bulk_e2e_one_time_keys_for_as(
         self, user_ids: Collection[str]
-    ) -> TransactionOneTimeKeyCounts:
+    ) -> TransactionOneTimeKeysCount:
         """
         Counts, in bulk, the one-time keys for all the users specified.
         Intended to be used by application services for populating OTK counts in
@@ -522,7 +530,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         def _count_bulk_e2e_one_time_keys_txn(
             txn: LoggingTransaction,
-        ) -> TransactionOneTimeKeyCounts:
+        ) -> TransactionOneTimeKeysCount:
             user_in_where_clause, user_parameters = make_in_list_sql_clause(
                 self.database_engine, "user_id", user_ids
             )
@@ -535,7 +543,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             """
             txn.execute(sql, user_parameters)
 
-            result: TransactionOneTimeKeyCounts = {}
+            result: TransactionOneTimeKeysCount = {}
 
             for user_id, device_id, algorithm, count in txn:
                 # We deliberately construct empty dictionaries for
@@ -685,7 +693,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cached(max_entries=10000)
     async def get_e2e_unused_fallback_key_types(
         self, user_id: str, device_id: str
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """Returns the fallback key types that have an unused key.
 
         Args:
@@ -725,7 +733,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         return user_keys.get(key_type)
 
     @cached(num_args=1)
-    def _get_bare_e2e_cross_signing_keys(self, user_id: str) -> Dict[str, JsonDict]:
+    def _get_bare_e2e_cross_signing_keys(self, user_id: str) -> Mapping[str, JsonDict]:
         """Dummy function.  Only used to make a cache for
         _get_bare_e2e_cross_signing_keys_bulk.
         """
@@ -738,7 +746,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     )
     async def _get_bare_e2e_cross_signing_keys_bulk(
         self, user_ids: Iterable[str]
-    ) -> Dict[str, Optional[Dict[str, JsonDict]]]:
+    ) -> Dict[str, Optional[Mapping[str, JsonDict]]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
         the signatures for the calling user need to be fetched.
@@ -759,7 +767,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         )
 
         # The `Optional` comes from the `@cachedList` decorator.
-        return cast(Dict[str, Optional[Dict[str, JsonDict]]], result)
+        return cast(Dict[str, Optional[Mapping[str, JsonDict]]], result)
 
     def _get_bare_e2e_cross_signing_keys_bulk_txn(
         self,
@@ -918,7 +926,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cancellable
     async def get_e2e_cross_signing_keys_bulk(
         self, user_ids: List[str], from_user_id: Optional[str] = None
-    ) -> Dict[str, Optional[Dict[str, JsonDict]]]:
+    ) -> Dict[str, Optional[Mapping[str, JsonDict]]]:
         """Returns the cross-signing keys for a set of users.
 
         Args:
@@ -934,11 +942,14 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         result = await self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
 
         if from_user_id:
-            result = await self.db_pool.runInteraction(
-                "get_e2e_cross_signing_signatures",
-                self._get_e2e_cross_signing_signatures_txn,
-                result,
-                from_user_id,
+            result = cast(
+                Dict[str, Optional[Mapping[str, JsonDict]]],
+                await self.db_pool.runInteraction(
+                    "get_e2e_cross_signing_signatures",
+                    self._get_e2e_cross_signing_signatures_txn,
+                    result,
+                    from_user_id,
+                ),
             )
 
         return result
@@ -1175,7 +1186,10 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         super().__init__(database, db_conn, hs)
 
         self._cross_signing_id_gen = StreamIdGenerator(
-            db_conn, "e2e_cross_signing_keys", "stream_id"
+            db_conn,
+            hs.get_replication_notifier(),
+            "e2e_cross_signing_keys",
+            "stream_id",
         )
 
     async def set_e2e_device_keys(

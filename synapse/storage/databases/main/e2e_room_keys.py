@@ -391,10 +391,10 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Returns:
             A dict giving the info metadata for this backup version, with
             fields including:
-                version(str)
-                algorithm(str)
-                auth_data(object): opaque dict supplied by the client
-                etag(int): tag of the keys in the backup
+                version (str)
+                algorithm (str)
+                auth_data (object): opaque dict supplied by the client
+                etag (int): tag of the keys in the backup
         """
 
         def _get_e2e_room_keys_version_info_txn(txn: LoggingTransaction) -> JsonDict:

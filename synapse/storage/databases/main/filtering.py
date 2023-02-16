@@ -24,7 +24,7 @@ from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
 
-class FilteringStore(SQLBaseStore):
+class FilteringWorkerStore(SQLBaseStore):
     @cached(num_args=2)
     async def get_user_filter(
         self, user_localpart: str, filter_id: Union[int, str]
@@ -46,6 +46,8 @@ class FilteringStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
+
+class FilteringStore(FilteringWorkerStore):
     async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> int:
         def_json = encode_canonical_json(user_filter)
 

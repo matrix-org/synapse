@@ -75,6 +75,7 @@ from synapse.util.httpresourcetree import create_resource_tree
 from tests.server import (
     CustomHeaderType,
     FakeChannel,
+    ThreadedMemoryReactorClock,
     get_clock,
     make_request,
     setup_test_homeserver,
@@ -314,7 +315,7 @@ class HomeserverTestCase(TestCase):
 
                 # This has to be a function and not just a Mock, because
                 # `self.helper.auth_user_id` is temporarily reassigned in some tests
-                async def get_requester(*args, **kwargs) -> Requester:
+                async def get_requester(*args: Any, **kwargs: Any) -> Requester:
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         user_id=UserID.from_string(self.helper.auth_user_id),
@@ -360,13 +361,15 @@ class HomeserverTestCase(TestCase):
                 store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(
+        self, reactor: ThreadedMemoryReactorClock, clock: Clock
+    ) -> HomeServer:
         """
         Make and return a homeserver.
 
         Args:
             reactor: A Twisted Reactor, or something that pretends to be one.
-            clock (synapse.util.Clock): The Clock, associated with the reactor.
+            clock: The Clock, associated with the reactor.
 
         Returns:
             A homeserver suitable for testing.
@@ -426,9 +429,8 @@ class HomeserverTestCase(TestCase):
 
         Args:
             reactor: A Twisted Reactor, or something that pretends to be one.
-            clock (synapse.util.Clock): The Clock, associated with the reactor.
-            homeserver (synapse.server.HomeServer): The HomeServer to test
-            against.
+            clock: The Clock, associated with the reactor.
+            homeserver: The HomeServer to test against.
 
         Function to optionally be overridden in subclasses.
         """
@@ -452,11 +454,10 @@ class HomeserverTestCase(TestCase):
         given content.
 
         Args:
-            method (bytes/unicode): The HTTP request method ("verb").
-            path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
-            escaped UTF-8 & spaces and such).
-            content (bytes or dict): The body of the request. JSON-encoded, if
-            a dict.
+            method: The HTTP request method ("verb").
+            path: The HTTP path, suitably URL encoded (e.g. escaped UTF-8 & spaces
+                and such). content (bytes or dict): The body of the request.
+                JSON-encoded, if a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
             federation_auth_origin: if set to not-None, we will add a fake

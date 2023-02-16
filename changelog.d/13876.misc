@@ -1,1 +1,0 @@
-Add comments to the Prometheus recording rules to make it clear which set of rules you need for Grafana or Prometheus Console.

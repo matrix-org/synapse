@@ -21,14 +21,14 @@ from tests.config.utils import ConfigFileTestCase
 
 
 class ConfigLoadingFileTestCase(ConfigFileTestCase):
-    def test_load_fails_if_server_name_missing(self):
+    def test_load_fails_if_server_name_missing(self) -> None:
         self.generate_config_and_remove_lines_containing("server_name")
         with self.assertRaises(ConfigError):
             HomeServerConfig.load_config("", ["-c", self.config_file])
         with self.assertRaises(ConfigError):
             HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
 
-    def test_generates_and_loads_macaroon_secret_key(self):
+    def test_generates_and_loads_macaroon_secret_key(self) -> None:
         self.generate_config()
 
         with open(self.config_file) as f:
@@ -58,7 +58,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
                 "was: %r" % (config2.key.macaroon_secret_key,)
             )
 
-    def test_load_succeeds_if_macaroon_secret_key_missing(self):
+    def test_load_succeeds_if_macaroon_secret_key_missing(self) -> None:
         self.generate_config_and_remove_lines_containing("macaroon")
         config1 = HomeServerConfig.load_config("", ["-c", self.config_file])
         config2 = HomeServerConfig.load_config("", ["-c", self.config_file])
@@ -73,7 +73,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
             config1.key.macaroon_secret_key, config3.key.macaroon_secret_key
         )
 
-    def test_disable_registration(self):
+    def test_disable_registration(self) -> None:
         self.generate_config()
         self.add_lines_to_config(
             ["enable_registration: true", "disable_registration: true"]
@@ -93,7 +93,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         assert config3 is not None
         self.assertTrue(config3.registration.enable_registration)
 
-    def test_stats_enabled(self):
+    def test_stats_enabled(self) -> None:
         self.generate_config_and_remove_lines_containing("enable_metrics")
         self.add_lines_to_config(["enable_metrics: true"])
 
@@ -101,7 +101,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertFalse(config.metrics.metrics_flags.known_servers)
 
-    def test_depreciated_identity_server_flag_throws_error(self):
+    def test_depreciated_identity_server_flag_throws_error(self) -> None:
         self.generate_config()
         # Needed to ensure that actual key/value pair added below don't end up on a line with a comment
         self.add_lines_to_config([" "])

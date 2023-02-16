@@ -26,10 +26,7 @@ def format_push_rules_for_user(
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
-    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
-        "global": {},
-        "device": {},
-    }
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {"global": {}}
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
@@ -43,6 +40,12 @@ def format_push_rules_for_user(
             continue
 
         rulearray.append(template_rule)
+
+        pattern_type = template_rule.pop("pattern_type", None)
+        if pattern_type == "user_id":
+            template_rule["pattern"] = user.to_string()
+        elif pattern_type == "user_localpart":
+            template_rule["pattern"] = user.localpart
 
         template_rule["enabled"] = enabled
 
@@ -93,10 +96,14 @@ def _rule_to_template(rule: PushRule) -> Optional[Dict[str, Any]]:
         if len(rule.conditions) != 1:
             return None
         thecond = rule.conditions[0]
-        if "pattern" not in thecond:
-            return None
+
         templaterule = {"actions": rule.actions}
-        templaterule["pattern"] = thecond["pattern"]
+        if "pattern" in thecond:
+            templaterule["pattern"] = thecond["pattern"]
+        elif "pattern_type" in thecond:
+            templaterule["pattern_type"] = thecond["pattern_type"]
+        else:
+            return None
     else:
         # This should not be reached unless this function is not kept in sync
         # with PRIORITY_CLASS_INVERSE_MAP.

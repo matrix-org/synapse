@@ -36,6 +36,7 @@ __pycache__/
 
 # For direnv users
 /.envrc
+.direnv/
 
 # IDEs
 /.idea/
@@ -68,3 +69,6 @@ book/
 
 # Poetry will create a setup.py, which we don't want to include.
 /setup.py
+
+# Don't include users' poetry configs
+/poetry.toml

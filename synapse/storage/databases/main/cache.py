@@ -75,6 +75,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._cache_id_gen = MultiWriterIdGenerator(
                 db_conn,
                 database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="caches",
                 instance_name=hs.get_instance_name(),
                 tables=[
@@ -164,9 +165,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     backfilled=True,
                 )
         elif stream_name == CachesStream.NAME:
-            if self._cache_id_gen:
-                self._cache_id_gen.advance(instance_name, token)
-
             for row in rows:
                 if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     if row.keys is None:
@@ -181,6 +179,14 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == CachesStream.NAME:
+            if self._cache_id_gen:
+                self._cache_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def _process_event_stream_row(self, token: int, row: EventsStreamRow) -> None:
         data = row.data
@@ -244,24 +250,29 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             # redacted.
             self._attempt_to_invalidate_cache("get_relations_for_event", (redacts,))
             self._attempt_to_invalidate_cache("get_applicable_edit", (redacts,))
+            self._attempt_to_invalidate_cache("get_thread_id", (redacts,))
+            self._attempt_to_invalidate_cache("get_thread_id_for_receipts", (redacts,))
 
         if etype == EventTypes.Member:
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
             self._attempt_to_invalidate_cache(
                 "get_invited_rooms_for_local_user", (state_key,)
             )
+            self._attempt_to_invalidate_cache(
+                "get_rooms_for_user_with_stream_ordering", (state_key,)
+            )
+            self._attempt_to_invalidate_cache("get_rooms_for_user", (state_key,))
 
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
+            self._attempt_to_invalidate_cache("get_references_for_event", (relates_to,))
             self._attempt_to_invalidate_cache(
                 "get_aggregation_groups_for_event", (relates_to,)
             )
             self._attempt_to_invalidate_cache("get_applicable_edit", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
-            self._attempt_to_invalidate_cache(
-                "get_mutual_event_relations_for_rel_type", (relates_to,)
-            )
+            self._attempt_to_invalidate_cache("get_threads", (room_id,))
 
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]

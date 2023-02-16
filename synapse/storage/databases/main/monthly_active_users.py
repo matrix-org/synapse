@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, cast
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage.database import (
@@ -95,7 +95,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         return await self.db_pool.runInteraction("count_users", _count_users)
 
     @cached(num_args=0)
-    async def get_monthly_active_count_by_service(self) -> Dict[str, int]:
+    async def get_monthly_active_count_by_service(self) -> Mapping[str, int]:
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
@@ -217,7 +217,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         def _reap_users(txn: LoggingTransaction, reserved_users: List[str]) -> None:
             """
             Args:
-                reserved_users (tuple): reserved users to preserve
+                reserved_users: reserved users to preserve
             """
 
             thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
@@ -370,8 +370,8 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         should not appear in the MAU stats).
 
         Args:
-            txn (cursor):
-            user_id (str): user to add/update
+            txn:
+            user_id: user to add/update
         """
         assert (
             self._update_on_this_worker
@@ -401,7 +401,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         add the user to the monthly active tables
 
         Args:
-            user_id(str): the user_id to query
+            user_id: the user_id to query
         """
         assert (
             self._update_on_this_worker

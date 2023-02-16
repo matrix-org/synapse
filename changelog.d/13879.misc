@@ -1,1 +1,0 @@
-Only pull relevant backfill points from the database based on the current depth and limit (instead of all) every time we want to `/backfill`.

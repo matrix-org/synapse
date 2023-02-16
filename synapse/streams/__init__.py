@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Collection, Generic, List, Optional, Tuple, TypeVar
+from typing import Generic, List, Optional, Tuple, TypeVar
 
-from synapse.types import UserID
+from synapse.types import StrCollection, UserID
 
 # The key, this is either a stream token or int.
 K = TypeVar("K")
@@ -27,8 +27,8 @@ class EventSource(Generic[K, R]):
         self,
         user: UserID,
         from_key: K,
-        limit: Optional[int],
-        room_ids: Collection[str],
+        limit: int,
+        room_ids: StrCollection,
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[R], K]:

@@ -77,12 +77,12 @@ class PostgresEngine(
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
-        self._version = cast(int, db_conn.server_version)
+        self._version = db_conn.server_version
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
-        if not allow_outdated_version and self._version < 100000:
-            raise RuntimeError("Synapse requires PostgreSQL 10 or above.")
+        if not allow_outdated_version and self._version < 110000:
+            raise RuntimeError("Synapse requires PostgreSQL 11 or above.")
 
         with db_conn.cursor() as txn:
             txn.execute("SHOW SERVER_ENCODING")
@@ -220,5 +220,9 @@ class PostgresEngine(
         """Execute a chunk of SQL containing multiple semicolon-delimited statements.
 
         Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+
+        For consistency with SQLite, any ongoing transaction is committed before
+        executing the script in its own transaction. The script transaction is
+        left open and it is the responsibility of the caller to commit it.
         """
-        cursor.execute(script)
+        cursor.execute(f"COMMIT; BEGIN TRANSACTION; {script}")

@@ -224,10 +224,10 @@ class BaseFederationServlet:
 
         With arguments:
 
-            origin (unicode|None): The authenticated server_name of the calling server,
+            origin (str|None): The authenticated server_name of the calling server,
                 unless REQUIRE_AUTH is set to False and authentication failed.
 
-            content (unicode|None): decoded json body of the request. None if the
+            content (str|None): decoded json body of the request. None if the
                 request was a GET.
 
             query (dict[bytes, list[bytes]]): Query params from the request. url-decoded

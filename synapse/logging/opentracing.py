@@ -292,8 +292,15 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseTags:
-    # The message ID of any to_device message processed
-    TO_DEVICE_MESSAGE_ID = "to_device.message_id"
+    # The message ID of any to_device EDU processed
+    TO_DEVICE_EDU_ID = "to_device.edu_id"
+
+    # Details about to-device messages
+    TO_DEVICE_TYPE = "to_device.type"
+    TO_DEVICE_SENDER = "to_device.sender"
+    TO_DEVICE_RECIPIENT = "to_device.recipient"
+    TO_DEVICE_RECIPIENT_DEVICE = "to_device.recipient_device"
+    TO_DEVICE_MSGID = "to_device.msgid"  # client-generated ID
 
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
@@ -314,6 +321,11 @@ class SynapseTags:
 
     # The name of the external cache
     CACHE_NAME = "cache.name"
+
+    # Boolean. Present on /v2/send_join requests, omitted from all others.
+    # True iff partial state was requested and we provided (or intended to provide)
+    # partial state in the response.
+    SEND_JOIN_RESPONSE_IS_PARTIAL_STATE = "send_join.partial_state_response"
 
     # Used to tag function arguments
     #
@@ -454,8 +466,16 @@ def init_tracer(hs: "HomeServer") -> None:
         STRIP_INSTANCE_NUMBER_SUFFIX_REGEX, "", hs.get_instance_name()
     )
 
+    jaeger_config = hs.config.tracing.jaeger_config
+    tags = jaeger_config.setdefault("tags", {})
+
+    # tag the Synapse instance name so that it's an easy jumping
+    # off point into the logs. Can also be used to filter for an
+    # instance that is under load.
+    tags[SynapseTags.INSTANCE_NAME] = hs.get_instance_name()
+
     config = JaegerConfig(
-        config=hs.config.tracing.jaeger_config,
+        config=jaeger_config,
         service_name=f"{hs.config.server.server_name} {instance_name_by_type}",
         scope_manager=LogContextScopeManager(),
         metrics_factory=PrometheusMetricsFactory(),
@@ -721,7 +741,7 @@ def inject_header_dict(
         destination: address of entity receiving the span context. Must be given unless
             check_destination is False. The context will only be injected if the
             destination matches the opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
+        check_destination: If false, destination will be ignored and the context
             will always be injected.
 
     Note:
@@ -780,7 +800,7 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
         destination: the name of the remote server.
 
     Returns:
-        dict: the active span's context if opentracing is enabled, otherwise empty.
+        the active span's context if opentracing is enabled, otherwise empty.
     """
 
     if destination and not whitelisted_homeserver(destination):

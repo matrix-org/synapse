@@ -21,7 +21,7 @@
 import abc
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -107,7 +107,7 @@ from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpC
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
-from synapse.notifier import Notifier
+from synapse.notifier import Notifier, ReplicationNotifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -144,10 +144,10 @@ if TYPE_CHECKING:
     from synapse.handlers.saml import SamlHandler
 
 
-T = TypeVar("T", bound=Callable[..., Any])
+T = TypeVar("T")
 
 
-def cache_in_self(builder: T) -> T:
+def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer"], T]:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -166,7 +166,7 @@ def cache_in_self(builder: T) -> T:
     building = [False]
 
     @functools.wraps(builder)
-    def _get(self):
+    def _get(self: "HomeServer") -> T:
         try:
             return getattr(self, depname)
         except AttributeError:
@@ -185,9 +185,7 @@ def cache_in_self(builder: T) -> T:
 
         return dep
 
-    # We cast here as we need to tell mypy that `_get` has the same signature as
-    # `builder`.
-    return cast(T, _get)
+    return _get
 
 
 class HomeServer(metaclass=abc.ABCMeta):
@@ -220,8 +218,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
-
-    tls_server_context_factory: Optional[IOpenSSLContextFactory]
 
     def __init__(
         self,
@@ -257,6 +253,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
+
+        # This attribute is set by the free function `refresh_certificate`.
+        self.tls_server_context_factory: Optional[IOpenSSLContextFactory] = None
 
     def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
@@ -315,7 +314,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
-    def start_listening(self) -> None:
+    def start_listening(self) -> None:  # noqa: B027 (no-op by design)
         """Start the HTTP, manhole, metrics, etc listeners
 
         Does nothing in this base class; overridden in derived classes to start the
@@ -387,6 +386,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_notifier(self) -> Notifier:
         return Notifier(self)
+
+    @cache_in_self
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
     @cache_in_self
     def get_auth(self) -> Auth:
@@ -509,7 +512,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_device_handler(self):
+    def get_device_handler(self) -> DeviceWorkerHandler:
         if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
@@ -742,7 +745,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self.config.experimental.msc3925_inhibit_edit)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -824,6 +827,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             hs=self,
             host=self.config.redis.redis_host,
             port=self.config.redis.redis_port,
+            dbid=self.config.redis.redis_dbid,
             password=self.config.redis.redis_password,
             reconnect=True,
         )

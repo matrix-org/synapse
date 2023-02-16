@@ -25,7 +25,6 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Sequence,
     Tuple,
     Union,
 )
@@ -45,6 +44,7 @@ from twisted.internet.interfaces import (
     IAddress,
     IDelayedCall,
     IHostResolution,
+    IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTime,
     IResolutionReceiver,
@@ -90,14 +90,29 @@ incoming_responses_counter = Counter(
     "synapse_http_client_responses", "", ["method", "code"]
 )
 
-# the type of the headers list, to be passed to the t.w.h.Headers.
-# Actually we can mix str and bytes keys, but Mapping treats 'key' as invariant so
-# we simplify.
+# the type of the headers map, to be passed to the t.w.h.Headers.
+#
+# The actual type accepted by Twisted is
+#   Mapping[Union[str, bytes], Sequence[Union[str, bytes]] ,
+# allowing us to mix and match str and bytes freely. However: any str is also a
+# Sequence[str]; passing a header string value which is a
+# standalone str is interpreted as a sequence of 1-codepoint strings. This is a disastrous footgun.
+# We use a narrower value type (RawHeaderValue) to avoid this footgun.
+#
+# We also simplify the keys to be either all str or all bytes. This helps because
+# Dict[K, V] is invariant in K (and indeed V).
 RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValue"]]
 
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
-RawHeaderValue = Sequence[Union[str, bytes]]
+RawHeaderValue = Union[
+    List[str],
+    List[bytes],
+    List[Union[str, bytes]],
+    Tuple[str, ...],
+    Tuple[bytes, ...],
+    Tuple[Union[str, bytes], ...],
+]
 
 
 def check_against_blacklist(
@@ -212,7 +227,9 @@ class _IPBlacklistingResolver:
         return recv
 
 
-@implementer(ISynapseReactor)
+# ISynapseReactor implies IReactorCore, but explicitly marking it this as an implementer
+# of IReactorCore seems to keep mypy-zope happier.
+@implementer(IReactorCore, ISynapseReactor)
 class BlacklistingReactorWrapper:
     """
     A Reactor wrapper which will prevent DNS resolution to blacklisted IP

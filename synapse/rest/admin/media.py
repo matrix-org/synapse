@@ -15,11 +15,18 @@
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
+from synapse.api.constants import Direction
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
+from synapse.http.servlet import (
+    RestServlet,
+    parse_boolean,
+    parse_enum,
+    parse_integer,
+    parse_string,
+)
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
     admin_patterns,
@@ -278,7 +285,12 @@ class DeleteMediaByDateSize(RestServlet):
     timestamp and size.
     """
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/delete$")
+    PATTERNS = [
+        *admin_patterns("/media/delete$"),
+        # This URL kept around for legacy reasons, it is undesirable since it
+        # overlaps with the DeleteMediaByID servlet.
+        *admin_patterns("/media/(?P<server_name>[^/]*)/delete$"),
+    ]
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
@@ -287,7 +299,7 @@ class DeleteMediaByDateSize(RestServlet):
         self.media_repository = hs.get_media_repository()
 
     async def on_POST(
-        self, request: SynapseRequest, server_name: str
+        self, request: SynapseRequest, server_name: Optional[str] = None
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
@@ -315,7 +327,8 @@ class DeleteMediaByDateSize(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if self.server_name != server_name:
+        # This check is useless, we keep it for the legacy endpoint only.
+        if server_name is not None and self.server_name != server_name:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
 
         logging.info(
@@ -389,7 +402,7 @@ class UserMediaRestServlet(RestServlet):
         # to newest media is on top for backward compatibility.
         if b"order_by" not in request.args and b"dir" not in request.args:
             order_by = MediaSortOrder.CREATED_TS.value
-            direction = "b"
+            direction = Direction.BACKWARDS
         else:
             order_by = parse_string(
                 request,
@@ -397,8 +410,8 @@ class UserMediaRestServlet(RestServlet):
                 default=MediaSortOrder.CREATED_TS.value,
                 allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
-            direction = parse_string(
-                request, "dir", default="f", allowed_values=("f", "b")
+            direction = parse_enum(
+                request, "dir", Direction, default=Direction.FORWARDS
             )
 
         media, total = await self.store.get_local_media_by_user_paginate(
@@ -447,7 +460,7 @@ class UserMediaRestServlet(RestServlet):
         # to newest media is on top for backward compatibility.
         if b"order_by" not in request.args and b"dir" not in request.args:
             order_by = MediaSortOrder.CREATED_TS.value
-            direction = "b"
+            direction = Direction.BACKWARDS
         else:
             order_by = parse_string(
                 request,
@@ -455,8 +468,8 @@ class UserMediaRestServlet(RestServlet):
                 default=MediaSortOrder.CREATED_TS.value,
                 allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
-            direction = parse_string(
-                request, "dir", default="f", allowed_values=("f", "b")
+            direction = parse_enum(
+                request, "dir", Direction, default=Direction.FORWARDS
             )
 
         media, _ = await self.store.get_local_media_by_user_paginate(
@@ -482,6 +495,8 @@ def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) 
     ProtectMediaByID(hs).register(http_server)
     UnprotectMediaByID(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
-    DeleteMediaByID(hs).register(http_server)
+    # XXX DeleteMediaByDateSize must be registered before DeleteMediaByID as
+    #     their URL routes overlap.
     DeleteMediaByDateSize(hs).register(http_server)
+    DeleteMediaByID(hs).register(http_server)
     UserMediaRestServlet(hs).register(http_server)

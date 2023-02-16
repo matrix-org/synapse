@@ -1,1 +1,0 @@
-Fix a performance regression in the `get_users_in_room` database query. Introduced in v1.67.0.

@@ -1,1 +1,0 @@
-Fix bug where Rust extension wasn't built in `release` mode when using `poetry install`.

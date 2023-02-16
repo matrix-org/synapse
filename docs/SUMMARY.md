@@ -9,6 +9,8 @@
   - [Configuring a Reverse Proxy](reverse_proxy.md)
   - [Configuring a Forward/Outbound Proxy](setup/forward_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
+    - [coturn TURN server](setup/turn/coturn.md)
+    - [eturnal TURN server](setup/turn/eturnal.md)
   - [Delegation](delegate.md)
 
 # Upgrading
@@ -95,6 +97,7 @@
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
     - [TCP Replication](tcp_replication.md)
+    - [Faster remote joins](development/synapse_architecture/faster_joins.md)
   - [Internal Documentation](development/internal_documentation/README.md)
     - [Single Sign-On]()
       - [SAML](development/saml.md)

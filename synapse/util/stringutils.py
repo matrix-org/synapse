@@ -86,7 +86,7 @@ def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
         ValueError if the server name could not be parsed.
     """
     try:
-        if server_name[-1] == "]":
+        if server_name and server_name[-1] == "]":
             # ipv6 literal, hopefully
             return server_name, None
 
@@ -123,7 +123,7 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     # that nobody is sneaking IP literals in that look like hostnames, etc.
 
     # look for ipv6 literals
-    if host[0] == "[":
+    if host and host[0] == "[":
         if host[-1] != "]":
             raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
 

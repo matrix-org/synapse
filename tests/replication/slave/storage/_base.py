@@ -13,35 +13,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Iterable, Optional
 from unittest.mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.replication._base import BaseStreamTestCase
 
 
 class BaseSlavedStoreTestCase(BaseStreamTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        return self.setup_test_homeserver(federation_client=Mock())
 
-        hs = self.setup_test_homeserver(federation_client=Mock())
-
-        return hs
-
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         super().prepare(reactor, clock, hs)
 
         self.reconnect()
 
         self.master_store = hs.get_datastores().main
         self.slaved_store = self.worker_hs.get_datastores().main
-        self._storage_controllers = hs.get_storage_controllers()
+        persistence = hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self.persistance = persistence
 
-    def replicate(self):
+    def replicate(self) -> None:
         """Tell the master side of replication that something has happened, and then
         wait for the replication to occur.
         """
         self.streamer.on_notifier_poke()
         self.pump(0.1)
 
-    def check(self, method, args, expected_result=None):
+    def check(
+        self, method: str, args: Iterable[Any], expected_result: Optional[Any] = None
+    ) -> None:
         master_result = self.get_success(getattr(self.master_store, method)(*args))
         slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
         if expected_result is not None:

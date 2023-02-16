@@ -1,1 +1,0 @@
-Use dedicated `get_local_users_in_room(room_id)` function to find local users when calculating users to copy over during a room upgrade.

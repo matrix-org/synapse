@@ -14,7 +14,9 @@
 from typing import Optional
 from unittest import mock
 
-from synapse.api.errors import AuthError
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.api.errors import AuthError, StoreError
 from synapse.api.room_versions import RoomVersion
 from synapse.event_auth import (
     check_state_dependent_auth_rules,
@@ -26,8 +28,11 @@ from synapse.federation.transport.client import StateRequestResponse
 from synapse.logging.context import LoggingContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.state import StateResolutionStore
 from synapse.state.v2 import _mainline_sort, _reverse_topological_power_sort
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import event_injection, make_awaitable
@@ -40,10 +45,10 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # mock out the federation transport client
         self.mock_federation_transport_client = mock.Mock(
-            spec=["get_room_state_ids", "get_room_state", "get_event"]
+            spec=["get_room_state_ids", "get_room_state", "get_event", "backfill"]
         )
         return super().setup_test_homeserver(
             federation_transport_client=self.mock_federation_transport_client
@@ -157,6 +162,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         if prev_exists_as_outlier:
             prev_event.internal_metadata.outlier = True
             persistence = self.hs.get_storage_controllers().persistence
+            assert persistence is not None
             self.get_success(
                 persistence.persist_event(
                     prev_event,
@@ -165,7 +171,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             )
         else:
 
-            async def get_event(destination: str, event_id: str, timeout=None):
+            async def get_event(
+                destination: str, event_id: str, timeout: Optional[int] = None
+            ) -> JsonDict:
                 self.assertEqual(destination, self.OTHER_SERVER_NAME)
                 self.assertEqual(event_id, prev_event.event_id)
                 return {"pdus": [prev_event.get_pdu_json()]}
@@ -459,6 +467,203 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertIsNotNone(persisted, "pulled event was not persisted at all")
 
+    def test_backfill_signature_failure_does_not_fetch_same_prev_event_later(
+        self,
+    ) -> None:
+        """
+        Test to make sure we backoff and don't try to fetch a missing prev_event when we
+        already know it has a invalid signature from checking the signatures of all of
+        the events in the backfill response.
+        """
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
+
+        # Create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(main_store.get_room_version(room_id))
+
+        # Allow the remote user to send state events
+        self.helper.send_state(
+            room_id,
+            "m.room.power_levels",
+            {"events_default": 0, "state_default": 0},
+            tok=tok,
+        )
+
+        # Add the remote user to the room
+        member_event = self.get_success(
+            event_injection.inject_member_event(self.hs, room_id, OTHER_USER, "join")
+        )
+
+        initial_state_map = self.get_success(
+            main_store.get_partial_current_state_ids(room_id)
+        )
+
+        auth_event_ids = [
+            initial_state_map[("m.room.create", "")],
+            initial_state_map[("m.room.power_levels", "")],
+            member_event.event_id,
+        ]
+
+        # We purposely don't run `add_hashes_and_signatures_from_other_server`
+        # over this because we want the signature check to fail.
+        pulled_event_without_signatures = make_event_from_dict(
+            {
+                "type": "test_regular_type",
+                "room_id": room_id,
+                "sender": OTHER_USER,
+                "prev_events": [member_event.event_id],
+                "auth_events": auth_event_ids,
+                "origin_server_ts": 1,
+                "depth": 12,
+                "content": {"body": "pulled_event_without_signatures"},
+            },
+            room_version,
+        )
+
+        # Create a regular event that should pass except for the
+        # `pulled_event_without_signatures` in the `prev_event`.
+        pulled_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "test_regular_type",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [
+                        member_event.event_id,
+                        pulled_event_without_signatures.event_id,
+                    ],
+                    "auth_events": auth_event_ids,
+                    "origin_server_ts": 1,
+                    "depth": 12,
+                    "content": {"body": "pulled_event"},
+                }
+            ),
+            room_version,
+        )
+
+        # We expect an outbound request to /backfill, so stub that out
+        self.mock_federation_transport_client.backfill.return_value = make_awaitable(
+            {
+                "origin": self.OTHER_SERVER_NAME,
+                "origin_server_ts": 123,
+                "pdus": [
+                    # This is one of the important aspects of this test: we include
+                    # `pulled_event_without_signatures` so it fails the signature check
+                    # when we filter down the backfill response down to events which
+                    # have valid signatures in
+                    # `_check_sigs_and_hash_for_pulled_events_and_fetch`
+                    pulled_event_without_signatures.get_pdu_json(),
+                    # Then later when we process this valid signature event, when we
+                    # fetch the missing `prev_event`s, we want to make sure that we
+                    # backoff and don't try and fetch `pulled_event_without_signatures`
+                    # again since we know it just had an invalid signature.
+                    pulled_event.get_pdu_json(),
+                ],
+            }
+        )
+
+        # Keep track of the count and make sure we don't make any of these requests
+        event_endpoint_requested_count = 0
+        room_state_ids_endpoint_requested_count = 0
+        room_state_endpoint_requested_count = 0
+
+        async def get_event(
+            destination: str, event_id: str, timeout: Optional[int] = None
+        ) -> None:
+            nonlocal event_endpoint_requested_count
+            event_endpoint_requested_count += 1
+
+        async def get_room_state_ids(
+            destination: str, room_id: str, event_id: str
+        ) -> None:
+            nonlocal room_state_ids_endpoint_requested_count
+            room_state_ids_endpoint_requested_count += 1
+
+        async def get_room_state(
+            room_version: RoomVersion, destination: str, room_id: str, event_id: str
+        ) -> None:
+            nonlocal room_state_endpoint_requested_count
+            room_state_endpoint_requested_count += 1
+
+        # We don't expect an outbound request to `/event`, `/state_ids`, or `/state` in
+        # the happy path but if the logic is sneaking around what we expect, stub that
+        # out so we can detect that failure
+        self.mock_federation_transport_client.get_event.side_effect = get_event
+        self.mock_federation_transport_client.get_room_state_ids.side_effect = (
+            get_room_state_ids
+        )
+        self.mock_federation_transport_client.get_room_state.side_effect = (
+            get_room_state
+        )
+
+        # The function under test: try to backfill and process the pulled event
+        with LoggingContext("test"):
+            self.get_success(
+                self.hs.get_federation_event_handler().backfill(
+                    self.OTHER_SERVER_NAME,
+                    room_id,
+                    limit=1,
+                    extremities=["$some_extremity"],
+                )
+            )
+
+        if event_endpoint_requested_count > 0:
+            self.fail(
+                "We don't expect an outbound request to /event in the happy path but if "
+                "the logic is sneaking around what we expect, make sure to fail the test. "
+                "We don't expect it because the signature failure should cause us to backoff "
+                "and not asking about pulled_event_without_signatures="
+                f"{pulled_event_without_signatures.event_id} again"
+            )
+
+        if room_state_ids_endpoint_requested_count > 0:
+            self.fail(
+                "We don't expect an outbound request to /state_ids in the happy path but if "
+                "the logic is sneaking around what we expect, make sure to fail the test. "
+                "We don't expect it because the signature failure should cause us to backoff "
+                "and not asking about pulled_event_without_signatures="
+                f"{pulled_event_without_signatures.event_id} again"
+            )
+
+        if room_state_endpoint_requested_count > 0:
+            self.fail(
+                "We don't expect an outbound request to /state in the happy path but if "
+                "the logic is sneaking around what we expect, make sure to fail the test. "
+                "We don't expect it because the signature failure should cause us to backoff "
+                "and not asking about pulled_event_without_signatures="
+                f"{pulled_event_without_signatures.event_id} again"
+            )
+
+        # Make sure we only recorded a single failure which corresponds to the signature
+        # failure initially in `_check_sigs_and_hash_for_pulled_events_and_fetch` before
+        # we process all of the pulled events.
+        backfill_num_attempts_for_event_without_signatures = self.get_success(
+            main_store.db_pool.simple_select_one_onecol(
+                table="event_failed_pull_attempts",
+                keyvalues={"event_id": pulled_event_without_signatures.event_id},
+                retcol="num_attempts",
+            )
+        )
+        self.assertEqual(backfill_num_attempts_for_event_without_signatures, 1)
+
+        # And make sure we didn't record a failure for the event that has the missing
+        # prev_event because we don't want to cause a cascade of failures. Not being
+        # able to fetch the `prev_events` just means we won't be able to de-outlier the
+        # pulled event. But we can still use an `outlier` in the state/auth chain for
+        # another event. So we shouldn't stop a downstream event from trying to pull it.
+        self.get_failure(
+            main_store.db_pool.simple_select_one_onecol(
+                table="event_failed_pull_attempts",
+                keyvalues={"event_id": pulled_event.event_id},
+                retcol="num_attempts",
+            ),
+            # StoreError: 404: No row found
+            StoreError,
+        )
+
     def test_process_pulled_event_with_rejected_missing_state(self) -> None:
         """Ensure that we correctly handle pulled events with missing state containing a
         rejected state event
@@ -658,7 +863,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                         bert_member_event.event_id: bert_member_event,
                         rejected_kick_event.event_id: rejected_kick_event,
                     },
-                    state_res_store=main_store,
+                    state_res_store=StateResolutionStore(main_store),
                 )
             ),
             [bert_member_event.event_id, rejected_kick_event.event_id],
@@ -703,7 +908,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
                         rejected_power_levels_event.event_id,
                     ],
                     event_map={},
-                    state_res_store=main_store,
+                    state_res_store=StateResolutionStore(main_store),
                     full_conflicted_set=set(),
                 )
             ),

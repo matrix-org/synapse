@@ -50,7 +50,9 @@ class EventStreamRestServlet(RestServlet):
                 raise SynapseError(400, "Guest users must specify room_id param")
         room_id = parse_string(request, "room_id")
 
-        pagin_config = await PaginationConfig.from_request(self.store, request)
+        pagin_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
         if b"timeout" in args:
             try:

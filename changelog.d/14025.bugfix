@@ -1,1 +1,0 @@
-Do not return an unspecified `original_event` field when using the stable `/relations` endpoint. Introduced in Synapse v1.57.0.

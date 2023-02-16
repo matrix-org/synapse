@@ -39,7 +39,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StrCollection
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -413,7 +413,7 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self._dict["prev_events"]]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -558,7 +558,7 @@ class FrozenEventV2(EventBase):
         """
         return self._dict["prev_events"]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -597,8 +597,7 @@ def _event_type_from_format_version(
         format_version: The event format version
 
     Returns:
-        type: A type that can be initialized as per the initializer of
-        `FrozenEvent`
+        A type that can be initialized as per the initializer of `FrozenEvent`
     """
 
     if format_version == EventFormatVersions.ROOM_V1_V2:
