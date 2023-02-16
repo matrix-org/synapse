@@ -162,7 +162,9 @@ recommend the use of `systemd` where available: for information on setting up
 
 ## Start Synapse with Poetry
 
-You can start Synapse with Poetry by running the following command:
+The following applies to Synapse installations that have been installed from source using `poetry`.
+
+You can start the main Synapse process with Poetry by running the following command:
 ```console
 poetry run synapse_homeserver -c [your homeserver.yaml]
 ```
