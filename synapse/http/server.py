@@ -19,6 +19,7 @@ import logging
 import types
 import urllib
 from http import HTTPStatus
+from http.client import FOUND
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
@@ -29,7 +30,6 @@ from typing import (
     Iterable,
     Iterator,
     List,
-    NoReturn,
     Optional,
     Pattern,
     Tuple,
@@ -266,7 +266,7 @@ class HttpServer(Protocol):
                 request. The first argument will be the request object and
                 subsequent arguments will be any matched groups from the regex.
                 This should return either tuple of (code, response), or None.
-            servlet_classname (str): The name of the handler to be used in prometheus
+            servlet_classname: The name of the handler to be used in prometheus
                 and opentracing logs.
         """
 
@@ -339,7 +339,8 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
             return callback_return
 
-        _unrecognised_request_handler(request)
+        # A request with an unknown method (for a known endpoint) was received.
+        raise UnrecognizedRequestError(code=405)
 
     @abc.abstractmethod
     def _send_response(
@@ -395,7 +396,6 @@ class DirectServeJsonResource(_AsyncResource):
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _PathEntry:
-    pattern: Pattern
     callback: ServletCallback
     servlet_classname: str
 
@@ -424,13 +424,14 @@ class JsonResource(DirectServeJsonResource):
     ):
         super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
-        self.path_regexs: Dict[bytes, List[_PathEntry]] = {}
+        # Map of path regex -> method -> callback.
+        self._routes: Dict[Pattern[str], Dict[bytes, _PathEntry]] = {}
         self.hs = hs
 
     def register_paths(
         self,
         method: str,
-        path_patterns: Iterable[Pattern],
+        path_patterns: Iterable[Pattern[str]],
         callback: ServletCallback,
         servlet_classname: str,
     ) -> None:
@@ -454,8 +455,8 @@ class JsonResource(DirectServeJsonResource):
 
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
-            self.path_regexs.setdefault(method_bytes, []).append(
-                _PathEntry(path_pattern, callback, servlet_classname)
+            self._routes.setdefault(path_pattern, {})[method_bytes] = _PathEntry(
+                callback, servlet_classname
             )
 
     def _get_handler_for_request(
@@ -477,14 +478,17 @@ class JsonResource(DirectServeJsonResource):
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request_method, []):
-            m = path_entry.pattern.match(request_path)
+        for path_pattern, methods in self._routes.items():
+            m = path_pattern.match(request_path)
             if m:
-                # We found a match!
+                # We found a matching path!
+                path_entry = methods.get(request_method)
+                if not path_entry:
+                    raise UnrecognizedRequestError(code=405)
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
-        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, "unrecognised_request_handler", {}
+        # Huh. No one wanted to handle that? Fiiiiiine.
+        raise UnrecognizedRequestError(code=404)
 
     async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
@@ -566,17 +570,21 @@ class StaticResource(File):
         return super().render_GET(request)
 
 
-def _unrecognised_request_handler(request: Request) -> NoReturn:
-    """Request handler for unrecognised requests
-
-    This is a request handler suitable for return from
-    _get_handler_for_request. It actually just raises an
-    UnrecognizedRequestError.
-
-    Args:
-        request: Unused, but passed in to match the signature of ServletCallback.
+class UnrecognizedRequestResource(resource.Resource):
     """
-    raise UnrecognizedRequestError()
+    Similar to twisted.web.resource.NoResource, but returns a JSON 404 with an
+    errcode of M_UNRECOGNIZED.
+    """
+
+    def render(self, request: SynapseRequest) -> int:
+        f = failure.Failure(UnrecognizedRequestError(code=404))
+        return_json_error(f, request, None)
+        # A response has already been sent but Twisted requires either NOT_DONE_YET
+        # or the response bytes as a return value.
+        return NOT_DONE_YET
+
+    def getChild(self, name: str, request: Request) -> resource.Resource:
+        return self
 
 
 class RootRedirect(resource.Resource):
@@ -598,7 +606,7 @@ class RootRedirect(resource.Resource):
 class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
-    def render_OPTIONS(self, request: Request) -> bytes:
+    def render_OPTIONS(self, request: SynapseRequest) -> bytes:
         request.setResponseCode(204)
         request.setHeader(b"Content-Length", b"0")
 
@@ -763,7 +771,7 @@ def respond_with_json(
 
 
 def respond_with_json_bytes(
-    request: Request,
+    request: SynapseRequest,
     code: int,
     json_bytes: bytes,
     send_cors: bool = False,
@@ -859,7 +867,7 @@ def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
     _ByteProducer(request, bytes_generator)
 
 
-def set_cors_headers(request: Request) -> None:
+def set_cors_headers(request: SynapseRequest) -> None:
     """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
@@ -870,10 +878,20 @@ def set_cors_headers(request: Request) -> None:
     request.setHeader(
         b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
-    request.setHeader(
-        b"Access-Control-Allow-Headers",
-        b"X-Requested-With, Content-Type, Authorization, Date",
-    )
+    if request.experimental_cors_msc3886:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"ETag, Location, X-Max-Bytes",
+        )
+    else:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date",
+        )
 
 
 def set_corp_headers(request: Request) -> None:
@@ -942,10 +960,25 @@ def set_clickjacking_protection_headers(request: Request) -> None:
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def respond_with_redirect(request: Request, url: bytes) -> None:
-    """Write a 302 response to the request, if it is still alive."""
+def respond_with_redirect(
+    request: SynapseRequest, url: bytes, statusCode: int = FOUND, cors: bool = False
+) -> None:
+    """
+    Write a 302 (or other specified status code) response to the request, if it is still alive.
+
+    Args:
+        request: The http request to respond to.
+        url: The URL to redirect to.
+        statusCode: The HTTP status code to use for the redirect (defaults to 302).
+        cors: Whether to set CORS headers on the response.
+    """
     logger.debug("Redirect to %s", url.decode("utf-8"))
-    request.redirect(url)
+
+    if cors:
+        set_cors_headers(request)
+
+    request.setResponseCode(statusCode)
+    request.setHeader(b"location", url)
     finish_request(request)
 
 

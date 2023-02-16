@@ -73,6 +73,18 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
         data = {"reason": None, "score": None}
         self._assert_status(400, data)
 
+    def test_cannot_report_nonexistent_event(self) -> None:
+        """
+        Tests that we don't accept event reports for events which do not exist.
+        """
+        channel = self.make_request(
+            "POST",
+            f"rooms/{self.room_id}/report/$nonsenseeventid:test",
+            {"reason": "i am very sad"},
+            access_token=self.other_user_tok,
+        )
+        self.assertEqual(404, channel.code, msg=channel.result["body"])
+
     def _assert_status(self, response_status: int, data: JsonDict) -> None:
         channel = self.make_request(
             "POST", self.report_path, data, access_token=self.other_user_tok

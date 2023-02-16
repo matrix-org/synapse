@@ -84,7 +84,9 @@ file when you upgrade the Debian package to a later version.
 
 ##### Downstream Debian packages
 
-Andrej Shadura maintains a `matrix-synapse` package in the Debian repositories.
+Andrej Shadura maintains a
+[`matrix-synapse`](https://packages.debian.org/sid/matrix-synapse) package in
+the Debian repositories.
 For `bookworm` and `sid`, it can be installed simply with:
 
 ```sh
@@ -100,23 +102,27 @@ for information on how to use backports.
 ##### Downstream Ubuntu packages
 
 We do not recommend using the packages in the default Ubuntu repository
-at this time, as they are old and suffer from known security vulnerabilities.
+at this time, as they are [old and suffer from known security vulnerabilities](
+    https://bugs.launchpad.net/ubuntu/+source/matrix-synapse/+bug/1848709
+).
 The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
 #### Fedora
 
-Synapse is in the Fedora repositories as `matrix-synapse`:
+Synapse is in the Fedora repositories as
+[`matrix-synapse`](https://src.fedoraproject.org/rpms/matrix-synapse):
 
 ```sh
 sudo dnf install matrix-synapse
 ```
 
-Oleg Girko provides Fedora RPMs at
+Additionally, Oleg Girko provides Fedora RPMs at
 <https://obs.infoserver.lv/project/monitor/matrix-synapse>
 
 #### OpenSUSE
 
-Synapse is in the OpenSUSE repositories as `matrix-synapse`:
+Synapse is in the OpenSUSE repositories as
+[`matrix-synapse`](https://software.opensuse.org/package/matrix-synapse):
 
 ```sh
 sudo zypper install matrix-synapse
@@ -130,7 +136,7 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 #### ArchLinux
 
 The quickest way to get up and running with ArchLinux is probably with the community package
-<https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
+<https://archlinux.org/packages/community/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
@@ -151,7 +157,8 @@ sudo pip install py-bcrypt
 
 #### Void Linux
 
-Synapse can be found in the void repositories as 'synapse':
+Synapse can be found in the void repositories as
+['synapse'](https://github.com/void-linux/void-packages/tree/master/srcpkgs/synapse):
 
 ```sh
 xbps-install -Su
@@ -193,7 +200,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.10.
+- Python 3.7 or later, up to Python 3.11.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 If building on an uncommon architecture for which pre-built wheels are
@@ -271,7 +278,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```sh
 sudo apt install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev
 ```
 
 ##### ArchLinux
@@ -280,7 +287,7 @@ Installing prerequisites on ArchLinux:
 
 ```sh
 sudo pacman -S base-devel python python-pip \
-               python-setuptools python-virtualenv sqlite3
+               python-setuptools python-virtualenv sqlite3 icu
 ```
 
 ##### CentOS/Fedora
@@ -290,7 +297,8 @@ Installing prerequisites on CentOS or Fedora Linux:
 ```sh
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel libxml2-devel libxslt-devel libpq-devel \
-                 python3-virtualenv libffi-devel openssl-devel python3-devel
+                 python3-virtualenv libffi-devel openssl-devel python3-devel \
+                 libicu-devel
 sudo dnf groupinstall "Development Tools"
 ```
 
@@ -303,8 +311,12 @@ You may need to install the latest Xcode developer tools:
 xcode-select --install
 ```
 
-On ARM-based Macs you may need to install libjpeg and libpq. 
-You can use Homebrew (https://brew.sh):
+Some extra dependencies may be needed. You can use Homebrew (https://brew.sh) for them.
+
+You may need to install icu, and make the icu binaries and libraries accessible.
+Please follow [the official instructions of PyICU](https://pypi.org/project/PyICU/) to do so.
+
+On ARM-based Macs you may also need to install libjpeg and libpq:
 ```sh
  brew install jpeg libpq
  ```
@@ -325,7 +337,8 @@ Installing prerequisites on openSUSE:
 ```sh
 sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
-               python-devel libffi-devel libopenssl-devel libjpeg62-devel
+               python-devel libffi-devel libopenssl-devel libjpeg62-devel \
+               libicu-devel
 ```
 
 ##### OpenBSD

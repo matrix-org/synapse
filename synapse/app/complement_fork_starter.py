@@ -55,13 +55,13 @@ import os
 import signal
 import sys
 from types import FrameType
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from twisted.internet.main import installReactor
 
 # a list of the original signal handlers, before we installed our custom ones.
 # We restore these in our child processes.
-_original_signal_handlers: dict[int, Any] = {}
+_original_signal_handlers: Dict[int, Any] = {}
 
 
 class ProxiedReactor:
@@ -110,6 +110,8 @@ def _worker_entrypoint(
     and then kick off the worker's main() function.
     """
 
+    from synapse.util.stringutils import strtobool
+
     sys.argv = args
 
     # reset the custom signal handlers that we installed, so that the children start
@@ -117,9 +119,24 @@ def _worker_entrypoint(
     for sig, handler in _original_signal_handlers.items():
         signal.signal(sig, handler)
 
-    from twisted.internet.epollreactor import EPollReactor
+    # Install the asyncio reactor if the
+    # SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR is set to 1. The
+    # SYNAPSE_ASYNC_IO_REACTOR variable would be used, but then causes
+    # synapse/__init__.py to also try to install an asyncio reactor.
+    if strtobool(
+        os.environ.get("SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR", "0")
+    ):
+        import asyncio
 
-    proxy_reactor._install_real_reactor(EPollReactor())
+        from twisted.internet.asyncioreactor import AsyncioSelectorReactor
+
+        reactor = AsyncioSelectorReactor(asyncio.get_event_loop())
+        proxy_reactor._install_real_reactor(reactor)
+    else:
+        from twisted.internet.epollreactor import EPollReactor
+
+        proxy_reactor._install_real_reactor(EPollReactor())
+
     func()
 
 

@@ -23,6 +23,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -187,37 +188,37 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         # we should now have an unused alg1 key
-        res = self.get_success(
+        fallback_res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
-        self.assertEqual(res, ["alg1"])
+        self.assertEqual(fallback_res, ["alg1"])
 
         # claiming an OTK when no OTKs are available should return the fallback
         # key
-        res = self.get_success(
+        claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
         )
         self.assertEqual(
-            res,
+            claim_res,
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
         # we shouldn't have any unused fallback keys again
-        res = self.get_success(
+        unused_res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
-        self.assertEqual(res, [])
+        self.assertEqual(unused_res, [])
 
         # claiming an OTK again should return the same fallback key
-        res = self.get_success(
+        claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
         )
         self.assertEqual(
-            res,
+            claim_res,
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
@@ -231,10 +232,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        res = self.get_success(
+        unused_res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
-        self.assertEqual(res, [])
+        self.assertEqual(unused_res, [])
 
         # uploading a new fallback key should result in an unused fallback key
         self.get_success(
@@ -245,10 +246,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        res = self.get_success(
+        unused_res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
-        self.assertEqual(res, ["alg1"])
+        self.assertEqual(unused_res, ["alg1"])
 
         # if the user uploads a one-time key, the next claim should fetch the
         # one-time key, and then go back to the fallback
@@ -258,23 +259,23 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        res = self.get_success(
+        claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
         )
         self.assertEqual(
-            res,
+            claim_res,
             {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
         )
 
-        res = self.get_success(
+        claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
         )
         self.assertEqual(
-            res,
+            claim_res,
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key2}}},
         )
 
@@ -287,13 +288,13 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        res = self.get_success(
+        claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
         )
         self.assertEqual(
-            res,
+            claim_res,
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key3}}},
         )
 
@@ -366,7 +367,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys1))
 
         # upload two device keys, which will be signed later by the self-signing key
-        device_key_1 = {
+        device_key_1: JsonDict = {
             "user_id": local_user,
             "device_id": "abc",
             "algorithms": [
@@ -379,7 +380,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
             "signatures": {local_user: {"ed25519:abc": "base64+signature"}},
         }
-        device_key_2 = {
+        device_key_2: JsonDict = {
             "user_id": local_user,
             "device_id": "def",
             "algorithms": [
@@ -451,8 +452,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         }
         self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys1))
 
+        device_handler = self.hs.get_device_handler()
+        assert isinstance(device_handler, DeviceHandler)
         e = self.get_failure(
-            self.hs.get_device_handler().check_device_registered(
+            device_handler.check_device_registered(
                 user_id=local_user,
                 device_id="nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
                 initial_device_display_name="new display name",
@@ -475,7 +478,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         device_id = "xyz"
         # private key: OMkooTr76ega06xNvXIGPbgvvxAOzmQncN8VObS7aBA
         device_pubkey = "NnHhnqiMFQkq969szYkooLaBAXW244ZOxgukCvm2ZeY"
-        device_key = {
+        device_key: JsonDict = {
             "user_id": local_user,
             "device_id": device_id,
             "algorithms": [
@@ -497,7 +500,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         # private key: 2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0
         master_pubkey = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
-        master_key = {
+        master_key: JsonDict = {
             "user_id": local_user,
             "usage": ["master"],
             "keys": {"ed25519:" + master_pubkey: master_pubkey},
@@ -540,7 +543,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # the first user
         other_user = "@otherboris:" + self.hs.hostname
         other_master_pubkey = "fHZ3NPiKxoLQm5OoZbKa99SYxprOjNs4TwJUKP+twCM"
-        other_master_key = {
+        other_master_key: JsonDict = {
             # private key: oyw2ZUx0O4GifbfFYM0nQvj9CL0b8B7cyN4FprtK8OI
             "user_id": other_user,
             "usage": ["master"],
@@ -702,7 +705,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
-        self.hs.get_federation_client().query_client_keys = mock.Mock(
+        self.hs.get_federation_client().query_client_keys = mock.Mock(  # type: ignore[assignment]
             return_value=make_awaitable(
                 {
                     "device_keys": {remote_user_id: {}},
@@ -782,7 +785,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
-        self.hs.get_federation_client().query_user_devices = mock.Mock(
+        self.hs.get_federation_client().query_user_devices = mock.Mock(  # type: ignore[assignment]
             return_value=make_awaitable(
                 {
                     "user_id": remote_user_id,

@@ -24,6 +24,8 @@ The code of Synapse is written in Python 3. To do pretty much anything, you'll n
 
 Synapse can connect to PostgreSQL via the [psycopg2](https://pypi.org/project/psycopg2/) Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with `sudo apt install libpq-dev`.
 
+Synapse has an optional, improved user search with better Unicode support. For that you need the development package of `libicu`. On Debian or Ubuntu Linux, this can be installed with `sudo apt install libicu-dev`.
+
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
@@ -65,7 +67,7 @@ pipx install poetry
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
 for other installation methods.
 
-Synapse requires Poetry version 1.2.0 or later.
+Developing Synapse requires Poetry version 1.3.2 or later.
 
 Next, open a terminal and install dependencies as follows:
 
@@ -76,6 +78,19 @@ poetry install --extras all
 
 This will install the runtime and developer dependencies for the project.
 
+## Running Synapse via poetry
+
+To start a local instance of Synapse in the locked poetry environment, create a config file:
+
+```sh
+cp docs/sample_config.yaml homeserver.yaml
+```
+
+Now edit homeserver.yaml, and run Synapse with:
+
+```sh
+poetry run python -m synapse.app.homeserver -c homeserver.yaml
+```
 
 # 5. Get in touch.
 
@@ -104,8 +119,8 @@ regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
 Synapse's code style is documented [here](../code_style.md). Please follow
-it, including the conventions for the [sample configuration
-file](../code_style.md#configuration-file-format).
+it, including the conventions for [configuration
+options and documentation](../code_style.md#configuration-code-and-documentation-format).
 
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please
@@ -124,7 +139,7 @@ changes to the Rust code.
 
 
 # 8. Test, test, test!
-<a name="test-test-test"></a>
+<a name="test-test-test" id="test-test-test"></a>
 
 While you're developing and before submitting a patch, you'll
 want to test your code.
@@ -324,6 +339,13 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 
 - Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+  - If setting `WORKERS=1`, optionally set `WORKER_TYPES=` to declare which worker
+    types you wish to test. A simple comma-delimited string containing the worker types
+    defined from the `WORKERS_CONFIG` template in
+    [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
+    A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
+    See the [worker documentation](../workers.md) for additional information on workers.
+- Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
@@ -333,7 +355,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/compleme
 ### Prettier formatting with `gotestfmt`
 
 If you want to format the output of the tests the same way as it looks in CI,
-install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+install [gotestfmt](https://github.com/GoTestTools/gotestfmt).
 
 You can then use this incantation to format the tests appropriately:
 
@@ -374,7 +396,7 @@ To prepare a Pull Request, please:
 ## Changelog
 
 All changes, even minor ones, need a corresponding changelog / newsfragment
-entry. These are managed by [Towncrier](https://github.com/hawkowl/towncrier).
+entry. These are managed by [Towncrier](https://github.com/twisted/towncrier).
 
 To create a changelog entry, make a new file in the `changelog.d` directory named
 in the format of `PRnumber.type`. The type can be one of the following:
@@ -416,8 +438,7 @@ chicken-and-egg problem.
 There are two options for solving this:
 
 1. Open the PR without a changelog file, see what number you got, and *then*
-   add the changelog file to your branch (see [Updating your pull
-   request](#updating-your-pull-request)), or:
+   add the changelog file to your branch, or:
 
 1. Look at the [list of all
    issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the

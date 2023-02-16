@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
+import enum
 import logging
 from http import HTTPStatus
 from typing import (
@@ -35,6 +36,7 @@ from typing_extensions import Literal
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http import redact_uri
 from synapse.http.server import HttpServer
 from synapse.types import JsonDict, RoomAlias, RoomID
 from synapse.util import json_decoder
@@ -361,6 +363,7 @@ def parse_string(
     request: Request,
     name: str,
     *,
+    default: Optional[str] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
@@ -410,6 +413,74 @@ def parse_string(
         allowed_values=allowed_values,
         encoding=encoding,
     )
+
+
+EnumT = TypeVar("EnumT", bound=enum.Enum)
+
+
+@overload
+def parse_enum(
+    request: Request,
+    name: str,
+    E: Type[EnumT],
+    default: EnumT,
+) -> EnumT:
+    ...
+
+
+@overload
+def parse_enum(
+    request: Request,
+    name: str,
+    E: Type[EnumT],
+    *,
+    required: Literal[True],
+) -> EnumT:
+    ...
+
+
+def parse_enum(
+    request: Request,
+    name: str,
+    E: Type[EnumT],
+    default: Optional[EnumT] = None,
+    required: bool = False,
+) -> Optional[EnumT]:
+    """
+    Parse an enum parameter from the request query string.
+
+    Note that the enum *must only have string values*.
+
+    Args:
+        request: the twisted HTTP request.
+        name: the name of the query parameter.
+        E: the enum which represents valid values
+        default: enum value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+
+    Returns:
+        An enum value.
+
+    Raises:
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present, must be one of a list of allowed values and
+            is not one of those allowed values.
+    """
+    # Assert the enum values are strings.
+    assert all(
+        isinstance(e.value, str) for e in E
+    ), "parse_enum only works with string values"
+    str_value = parse_string(
+        request,
+        name,
+        default=default.value if default is not None else None,
+        required=required,
+        allowed_values=[e.value for e in E],
+    )
+    if str_value is None:
+        return None
+    return E(str_value)
 
 
 def _parse_string_value(
@@ -664,7 +735,13 @@ def parse_json_value_from_request(
     try:
         content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warning("Unable to parse JSON: %s (%s)", e, content_bytes)
+        logger.warning(
+            "Unable to parse JSON from %s %s response: %s (%s)",
+            request.method.decode("ascii", errors="replace"),
+            redact_uri(request.uri.decode("ascii", errors="replace")),
+            e,
+            content_bytes,
+        )
         raise SynapseError(
             HTTPStatus.BAD_REQUEST, "Content not JSON.", errcode=Codes.NOT_JSON
         )

@@ -88,6 +88,10 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
 
         db_conn.create_function("rank", 1, _rank)
         db_conn.execute("PRAGMA foreign_keys = ON;")
+
+        # Enable WAL.
+        # see https://www.sqlite.org/wal.html
+        db_conn.execute("PRAGMA journal_mode = WAL;")
         db_conn.commit()
 
     def is_deadlock(self, error: Exception) -> bool:
@@ -131,13 +135,16 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
         > than one statement with it, it will raise a Warning. Use executescript() if
         > you want to execute multiple SQL statements with one call.
 
-        Though the docs for `executescript` warn:
+        The script is prefixed with a `BEGIN TRANSACTION`, since the docs for
+        `executescript` warn:
 
         > If there is a pending transaction, an implicit COMMIT statement is executed
         > first. No other implicit transaction control is performed; any transaction
         > control must be added to sql_script.
         """
-        cursor.executescript(script)
+        # The implementation of `executescript` can be found at
+        # https://github.com/python/cpython/blob/3.11/Modules/_sqlite/cursor.c#L1035.
+        cursor.executescript(f"BEGIN TRANSACTION; {script}")
 
 
 # Following functions taken from: https://github.com/coleifer/peewee

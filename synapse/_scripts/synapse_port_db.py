@@ -51,6 +51,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.notifier import ReplicationNotifier
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
 from synapse.storage.databases.main import PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
@@ -72,6 +73,7 @@ from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
 )
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomBackgroundUpdateStore
 from synapse.storage.databases.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.databases.main.search import SearchBackgroundUpdateStore
@@ -206,6 +208,7 @@ class Store(
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     ReceiptsBackgroundUpdateStore,
+    RelationsWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -257,6 +260,9 @@ class MockHomeserver:
 
     def should_send_federation(self) -> bool:
         return False
+
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
 
 class Porter:
@@ -1305,7 +1311,7 @@ def main() -> None:
     sqlite_config = {
         "name": "sqlite3",
         "args": {
-            "database": args.sqlite_database,
+            "database": "file:{}?mode=rw".format(args.sqlite_database),
             "cp_min": 1,
             "cp_max": 1,
             "check_same_thread": False,

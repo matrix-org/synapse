@@ -45,16 +45,23 @@ class _EventSourcesInner:
 class EventSources:
     def __init__(self, hs: "HomeServer"):
         self.sources = _EventSourcesInner(
-            # mypy thinks attribute.type is `Optional`, but we know it's never `None` here since
-            # all the attributes of `_EventSourcesInner` are annotated.
-            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))  # type: ignore[misc]
+            # mypy previously warned that attribute.type is `Optional`, but we know it's
+            # never `None` here since all the attributes of `_EventSourcesInner` are
+            # annotated.
+            # As of the stubs in attrs 22.1.0, `attr.fields()` now returns Any,
+            # so the call to `attribute.type` is not checked.
+            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))
         )
         self.store = hs.get_datastores().main
+        self._instance_name = hs.get_instance_name()
 
     def get_current_token(self) -> StreamToken:
         push_rules_key = self.store.get_max_push_rules_stream_id()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
+        un_partial_stated_rooms_key = self.store.get_un_partial_stated_rooms_token(
+            self._instance_name
+        )
 
         token = StreamToken(
             room_key=self.sources.room.get_current_key(),
@@ -67,8 +74,22 @@ class EventSources:
             device_list_key=device_list_key,
             # Groups key is unused.
             groups_key=0,
+            un_partial_stated_rooms_key=un_partial_stated_rooms_key,
         )
         return token
+
+    @trace
+    async def get_start_token_for_pagination(self, room_id: str) -> StreamToken:
+        """Get the start token for a given room to be used to paginate
+        events.
+
+        The returned token does not have the current values for fields other
+        than `room`, since they are not used during pagination.
+
+        Returns:
+            The start token for pagination.
+        """
+        return StreamToken.START
 
     @trace
     async def get_current_token_for_pagination(self, room_id: str) -> StreamToken:
@@ -91,5 +112,6 @@ class EventSources:
             to_device_key=0,
             device_list_key=0,
             groups_key=0,
+            un_partial_stated_rooms_key=0,
         )
         return token

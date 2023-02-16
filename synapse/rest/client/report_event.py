@@ -16,7 +16,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -39,6 +39,7 @@ class ReportEventRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
+        self._event_handler = self.hs.get_event_handler()
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, event_id: str
@@ -54,11 +55,19 @@ class ReportEventRestServlet(RestServlet):
                 "Param 'reason' must be a string",
                 Codes.BAD_JSON,
             )
-        if not isinstance(body.get("score", 0), int):
+        if type(body.get("score", 0)) is not int:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Param 'score' must be an integer",
                 Codes.BAD_JSON,
+            )
+
+        event = await self._event_handler.get_event(
+            requester.user, room_id, event_id, show_redacted=False
+        )
+        if event is None:
+            raise NotFoundError(
+                "Unable to report event: it does not exist or you aren't able to see it."
             )
 
         await self.store.add_event_report(

@@ -13,10 +13,15 @@
 # limitations under the License.
 
 import json
+from typing import List, Optional
 from unittest.mock import Mock
+
+import ijson.common
 
 from synapse.api.room_versions import RoomVersions
 from synapse.federation.transport.client import SendJoinParser
+from synapse.types import JsonDict
+from synapse.util import ExceptionBundle
 
 from tests.unittest import TestCase
 
@@ -63,38 +68,73 @@ class SendJoinParserTestCase(TestCase):
         self.assertEqual(len(parsed_response.state), 1, parsed_response)
         self.assertEqual(parsed_response.event_dict, {}, parsed_response)
         self.assertIsNone(parsed_response.event, parsed_response)
-        self.assertFalse(parsed_response.partial_state, parsed_response)
+        self.assertFalse(parsed_response.members_omitted, parsed_response)
         self.assertEqual(parsed_response.servers_in_room, None, parsed_response)
 
     def test_partial_state(self) -> None:
-        """Check that the partial_state flag is correctly parsed"""
-        parser = SendJoinParser(RoomVersions.V1, False)
-        response = {
-            "org.matrix.msc3706.partial_state": True,
-        }
+        """Check that the members_omitted flag is correctly parsed"""
 
-        serialised_response = json.dumps(response).encode()
+        def parse(response: JsonDict) -> bool:
+            parser = SendJoinParser(RoomVersions.V1, False)
+            serialised_response = json.dumps(response).encode()
 
-        # Send data to the parser
-        parser.write(serialised_response)
+            # Send data to the parser
+            parser.write(serialised_response)
 
-        # Retrieve and check the parsed SendJoinResponse
-        parsed_response = parser.finish()
-        self.assertTrue(parsed_response.partial_state)
+            # Retrieve and check the parsed SendJoinResponse
+            parsed_response = parser.finish()
+            return parsed_response.members_omitted
+
+        self.assertTrue(parse({"members_omitted": True}))
+        self.assertTrue(parse({"org.matrix.msc3706.partial_state": True}))
+
+        self.assertFalse(parse({"members_omitted": False}))
+        self.assertFalse(parse({"org.matrix.msc3706.partial_state": False}))
+
+        # If there's a conflict, the stable field wins.
+        self.assertTrue(
+            parse({"members_omitted": True, "org.matrix.msc3706.partial_state": False})
+        )
+        self.assertFalse(
+            parse({"members_omitted": False, "org.matrix.msc3706.partial_state": True})
+        )
 
     def test_servers_in_room(self) -> None:
         """Check that the servers_in_room field is correctly parsed"""
-        parser = SendJoinParser(RoomVersions.V1, False)
-        response = {"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}
 
-        serialised_response = json.dumps(response).encode()
+        def parse(response: JsonDict) -> Optional[List[str]]:
+            parser = SendJoinParser(RoomVersions.V1, False)
+            serialised_response = json.dumps(response).encode()
 
-        # Send data to the parser
-        parser.write(serialised_response)
+            # Send data to the parser
+            parser.write(serialised_response)
 
-        # Retrieve and check the parsed SendJoinResponse
-        parsed_response = parser.finish()
-        self.assertEqual(parsed_response.servers_in_room, ["hs1", "hs2"])
+            # Retrieve and check the parsed SendJoinResponse
+            parsed_response = parser.finish()
+            return parsed_response.servers_in_room
+
+        self.assertEqual(
+            parse({"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}),
+            ["hs1", "hs2"],
+        )
+        self.assertEqual(parse({"servers_in_room": ["example.com"]}), ["example.com"])
+
+        # If both are provided, the stable identifier should win
+        self.assertEqual(
+            parse(
+                {
+                    "org.matrix.msc3706.servers_in_room": ["old"],
+                    "servers_in_room": ["new"],
+                }
+            ),
+            ["new"],
+        )
+
+        # And lastly, we should be able to tell if neither field was present.
+        self.assertEqual(
+            parse({}),
+            None,
+        )
 
     def test_errors_closing_coroutines(self) -> None:
         """Check we close all coroutines, even if closing the first raises an Exception.
@@ -116,15 +156,22 @@ class SendJoinParserTestCase(TestCase):
         coro_3 = Mock()
         coro_3.close = Mock(side_effect=RuntimeError("Couldn't close coro 3"))
 
+        original_coros = parser._coros
         parser._coros = [coro_1, coro_2, coro_3]
+
+        # Close the original coroutines. If we don't, when we garbage collect them
+        # they will throw, failing the test. (Oddly, this only started in CPython 3.11).
+        for coro in original_coros:
+            try:
+                coro.close()
+            except ijson.common.IncompleteJSONError:
+                pass
 
         # Send half of the data to the parser
         parser.write(serialisation[: len(serialisation) // 2])
 
-        # Close the parser. There should be _some_ kind of exception, but it need not
-        # be that RuntimeError directly. E.g. we might want to raise a wrapper
-        # encompassing multiple errors from multiple coroutines.
-        with self.assertRaises(Exception):
+        # Close the parser. There should be _some_ kind of exception.
+        with self.assertRaises(ExceptionBundle):
             parser.finish()
 
         # In any case, we should have tried to close both coros.

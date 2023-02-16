@@ -23,7 +23,7 @@ class TestException(Exception):
 
 
 class LogFormatterTestCase(unittest.TestCase):
-    def test_formatter(self):
+    def test_formatter(self) -> None:
         formatter = LogFormatter()
 
         try:

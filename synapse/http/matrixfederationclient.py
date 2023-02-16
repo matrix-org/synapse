@@ -951,8 +951,7 @@ class MatrixFederationHttpClient:
 
             args: query params
         Returns:
-            dict|list: Succeeds when we get a 2xx HTTP response. The
-            result will be the decoded JSON body.
+            Succeeds when we get a 2xx HTTP response. The result will be the decoded JSON body.
 
         Raises:
             HttpResponseException: If we get an HTTP response code >= 300
@@ -1268,7 +1267,7 @@ class MatrixFederationHttpClient:
 def _flatten_response_never_received(e: BaseException) -> str:
     if hasattr(e, "reasons"):
         reasons = ", ".join(
-            _flatten_response_never_received(f.value) for f in e.reasons  # type: ignore[attr-defined]
+            _flatten_response_never_received(f.value) for f in e.reasons
         )
 
         return "%s:[%s]" % (type(e).__name__, reasons)

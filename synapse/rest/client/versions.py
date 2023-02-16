@@ -76,6 +76,8 @@ class VersionsRestServlet(RestServlet):
                     "v1.1",
                     "v1.2",
                     "v1.3",
+                    "v1.4",
+                    "v1.5",
                 ],
                 # as per MSC1497:
                 "unstable_features": {
@@ -100,12 +102,10 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3827.stable": True,
                     # Adds support for importing historical messages as per MSC2716
                     "org.matrix.msc2716": self.config.experimental.msc2716_enabled,
-                    # Adds support for jump to date endpoints (/timestamp_to_event) as per MSC3030
-                    "org.matrix.msc3030": self.config.experimental.msc3030_enabled,
                     # Adds support for thread relations, per MSC3440.
                     "org.matrix.msc3440.stable": True,  # TODO: remove when "v1.3" is added above
                     # Support for thread read receipts & notification counts.
-                    "org.matrix.msc3771": self.config.experimental.msc3771_enabled,
+                    "org.matrix.msc3771": True,
                     "org.matrix.msc3773": self.config.experimental.msc3773_enabled,
                     # Allows moderators to fetch redacted event content as described in MSC2815
                     "fi.mau.msc2815": self.config.experimental.msc2815_enabled,
@@ -113,6 +113,13 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3882": self.config.experimental.msc3882_enabled,
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
                     "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
+                    # Adds support for filtering /messages by event relation.
+                    "org.matrix.msc3874": self.config.experimental.msc3874_enabled,
+                    # Adds support for simple HTTP rendezvous as per MSC3886
+                    "org.matrix.msc3886": self.config.experimental.msc3886_endpoint
+                    is not None,
+                    # Adds support for relation-based redactions as per MSC3912.
+                    "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
                 },
             },
         )

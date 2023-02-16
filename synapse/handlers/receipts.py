@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Tuple
 
 from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.appservice import ApplicationService
@@ -63,8 +63,6 @@ class ReceiptsHandler:
         self.clock = self.hs.get_clock()
         self.state = hs.get_state_handler()
 
-        self._msc3771_enabled = hs.config.experimental.msc3771_enabled
-
     async def _received_remote_receipt(self, origin: str, content: JsonDict) -> None:
         """Called when we receive an EDU of type m.receipt from a remote HS."""
         receipts = []
@@ -94,13 +92,11 @@ class ReceiptsHandler:
                         continue
 
                     # Check if these receipts apply to a thread.
-                    thread_id = None
                     data = user_values.get("data", {})
-                    if self._msc3771_enabled and isinstance(data, dict):
-                        thread_id = data.get("thread_id")
-                        # If the thread ID is invalid, consider it missing.
-                        if not isinstance(thread_id, str):
-                            thread_id = None
+                    thread_id = data.get("thread_id")
+                    # If the thread ID is invalid, consider it missing.
+                    if not isinstance(thread_id, str):
+                        thread_id = None
 
                     receipts.append(
                         ReadReceipt(
@@ -193,7 +189,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     @staticmethod
     def filter_out_private_receipts(
-        rooms: List[JsonDict], user_id: str
+        rooms: Sequence[JsonDict], user_id: str
     ) -> List[JsonDict]:
         """
         Filters a list of serialized receipts (as returned by /sync and /initialSync)
@@ -260,7 +256,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self,
         user: UserID,
         from_key: int,
-        limit: Optional[int],
+        limit: int,
         room_ids: Iterable[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
@@ -319,5 +315,5 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         return events, to_key
 
-    def get_current_key(self, direction: str = "f") -> int:
+    def get_current_key(self) -> int:
         return self.store.get_max_receipt_stream_id()
