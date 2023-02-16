@@ -43,6 +43,9 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
         super().__init__(hs)
         self.recaptcha_attempts: List[Tuple[dict, str]] = []
 
+    def is_enabled(self) -> bool:
+        return True
+
     def check_auth(self, authdict: dict, clientip: str) -> Any:
         self.recaptcha_attempts.append((authdict, clientip))
         return succeed(True)

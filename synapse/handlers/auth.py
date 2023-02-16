@@ -201,7 +201,7 @@ class AuthHandler:
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
-                self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
+                self.checkers[inst.AUTH_TYPE] = inst
 
         self.bcrypt_rounds = hs.config.registration.bcrypt_rounds
 

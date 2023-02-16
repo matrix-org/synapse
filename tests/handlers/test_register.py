@@ -62,7 +62,7 @@ class TestSpamChecker:
         request_info: Collection[Tuple[str, str]],
         auth_provider_id: Optional[str],
     ) -> RegistrationBehaviour:
-        pass
+        return RegistrationBehaviour.ALLOW
 
 
 class DenyAll(TestSpamChecker):
@@ -111,7 +111,7 @@ class TestLegacyRegistrationSpamChecker:
         username: Optional[str],
         request_info: Collection[Tuple[str, str]],
     ) -> RegistrationBehaviour:
-        pass
+        return RegistrationBehaviour.ALLOW
 
 
 class LegacyAllowAll(TestLegacyRegistrationSpamChecker):
