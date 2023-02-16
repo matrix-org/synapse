@@ -335,6 +335,9 @@ pub enum KnownCondition {
     ExactEventMatch(ExactEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
+    // Identical to related_event_match but gives predefined patterns. Cannot be added by users.
+    #[serde(skip_deserializing, rename = "im.nheko.msc3664.related_event_match")]
+    RelatedEventMatchType(RelatedEventMatchTypeCondition),
     #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
     ExactEventPropertyContains(ExactEventMatchCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
@@ -395,8 +398,18 @@ pub struct RelatedEventMatchCondition {
     pub key: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern: Option<Cow<'static, str>>,
+    pub rel_type: Cow<'static, str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern_type: Option<Cow<'static, str>>,
+    pub include_fallbacks: Option<bool>,
+}
+
+/// The body of a [`Condition::RelatedEventMatch`] that uses user_id or user_localpart as a pattern.
+#[derive(Serialize, Debug, Clone)]
+pub struct RelatedEventMatchTypeCondition {
+    // This is only used if pattern_type exists (and thus key must exist), so is
+    // a bit simpler than RelatedEventMatchCondition.
+    pub key: Cow<'static, str>,
+    pub pattern_type: Cow<'static, str>,
     pub rel_type: Cow<'static, str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_fallbacks: Option<bool>,

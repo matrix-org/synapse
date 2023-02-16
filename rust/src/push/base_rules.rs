@@ -23,7 +23,7 @@ use serde_json::Value;
 use super::KnownCondition;
 use crate::push::EventMatchCondition;
 use crate::push::PushRule;
-use crate::push::RelatedEventMatchCondition;
+use crate::push::RelatedEventMatchTypeCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 use crate::push::{Action, ExactEventMatchCondition, SimpleJsonValue};
@@ -129,11 +129,10 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed("global/override/.im.nheko.msc3664.reply"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatch(
-            RelatedEventMatchCondition {
-                key: Some(Cow::Borrowed("sender")),
-                pattern: None,
-                pattern_type: Some(Cow::Borrowed("user_id")),
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatchType(
+            RelatedEventMatchTypeCondition {
+                key: Cow::Borrowed("sender"),
+                pattern_type: Cow::Borrowed("user_id"),
                 rel_type: Cow::Borrowed("m.in_reply_to"),
                 include_fallbacks: None,
             },

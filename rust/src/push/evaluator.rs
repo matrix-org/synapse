@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::push::JsonValue;
@@ -24,7 +25,7 @@ use regex::Regex;
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
     Action, Condition, ExactEventMatchCondition, FilteredPushRules, KnownCondition,
-    RelatedEventMatchCondition, SimpleJsonValue,
+    SimpleJsonValue,
 };
 
 lazy_static! {
@@ -282,8 +283,34 @@ impl PushRuleEvaluator {
             KnownCondition::ExactEventMatch(exact_event_match) => {
                 self.match_exact_event_match(exact_event_match)?
             }
-            KnownCondition::RelatedEventMatch(event_match) => {
-                self.match_related_event_match(event_match, user_id)?
+            KnownCondition::RelatedEventMatch(event_match) => self.match_related_event_match(
+                &event_match.rel_type.clone(),
+                event_match.include_fallbacks,
+                event_match.key.clone(),
+                event_match.pattern.clone(),
+            )?,
+            KnownCondition::RelatedEventMatchType(event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
+                } else {
+                    return Ok(false);
+                };
+
+                let pattern = match &*event_match.pattern_type {
+                    "user_id" => user_id,
+                    "user_localpart" => get_localpart_from_id(user_id)?,
+                    _ => return Ok(false),
+                };
+
+                self.match_related_event_match(
+                    &event_match.rel_type.clone(),
+                    event_match.include_fallbacks,
+                    Some(event_match.key.clone()),
+                    Some(Cow::Borrowed(pattern)),
+                )?
             }
             KnownCondition::ExactEventPropertyContains(exact_event_match) => {
                 self.match_exact_event_property_contains(exact_event_match)?
@@ -395,8 +422,10 @@ impl PushRuleEvaluator {
     /// Evaluates a `related_event_match` condition. (MSC3664)
     fn match_related_event_match(
         &self,
-        event_match: &RelatedEventMatchCondition,
-        user_id: Option<&str>,
+        rel_type: &str,
+        include_fallbacks: Option<bool>,
+        key: Option<Cow<str>>,
+        pattern: Option<Cow<str>>,
     ) -> Result<bool, Error> {
         // First check if related event matching is enabled...
         if !self.related_event_match_enabled {
@@ -404,7 +433,7 @@ impl PushRuleEvaluator {
         }
 
         // get the related event, fail if there is none.
-        let event = if let Some(event) = self.related_events_flattened.get(&*event_match.rel_type) {
+        let event = if let Some(event) = self.related_events_flattened.get(rel_type) {
             event
         } else {
             return Ok(false);
@@ -412,42 +441,26 @@ impl PushRuleEvaluator {
 
         // If we are not matching fallbacks, don't match if our special key indicating this is a
         // fallback relation is not present.
-        if !event_match.include_fallbacks.unwrap_or(false)
-            && event.contains_key("im.vector.is_falling_back")
-        {
+        if !include_fallbacks.unwrap_or(false) && event.contains_key("im.vector.is_falling_back") {
             return Ok(false);
         }
 
         // if we have no key, accept the event as matching, if it existed without matching any
         // fields.
-        let key = if let Some(key) = &event_match.key {
+        let key = if let Some(key) = key {
             key
         } else {
             return Ok(true);
         };
 
-        let pattern = if let Some(pattern) = &event_match.pattern {
+        // There was a key, so we *must* have a pattern to go with it.
+        let pattern = if let Some(pattern) = pattern {
             pattern
-        } else if let Some(pattern_type) = &event_match.pattern_type {
-            // The `pattern_type` can either be "user_id" or "user_localpart",
-            // either way if we don't have a `user_id` then the condition can't
-            // match.
-            let user_id = if let Some(user_id) = user_id {
-                user_id
-            } else {
-                return Ok(false);
-            };
-
-            match &**pattern_type {
-                "user_id" => user_id,
-                "user_localpart" => get_localpart_from_id(user_id)?,
-                _ => return Ok(false),
-            }
         } else {
             return Ok(false);
         };
 
-        self.match_event_match(event, key, pattern)
+        self.match_event_match(event, &key, &pattern)
     }
 
     /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
