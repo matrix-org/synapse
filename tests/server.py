@@ -602,30 +602,48 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
     for database in server.get_datastores().databases:
         pool = database._db_pool
 
-        def runWithConnection(func, *args, **kwargs):
-            return threads.deferToThreadPool(
+        async def runWithConnection(
+            func: Callable[..., R],
+            *args: Any,
+            db_autocommit: bool = False,
+            isolation_level: Optional[int] = None,
+            **kwargs: Any,
+        ) -> R:
+            return await threads.deferToThreadPool(
                 pool._reactor,
                 pool.threadpool,
                 pool._runWithConnection,
                 func,
                 *args,
+                db_autocommit,
+                isolation_level,
                 **kwargs,
             )
 
-        def runInteraction(interaction, *args, **kwargs):
-            return threads.deferToThreadPool(
+        async def runInteraction(
+            desc: str,
+            func: Callable[..., R],
+            *args: Any,
+            db_autocommit: bool = False,
+            isolation_level: Optional[int] = None,
+            **kwargs: Any,
+        ) -> R:
+            return await threads.deferToThreadPool(
                 pool._reactor,
                 pool.threadpool,
                 pool._runInteraction,
-                interaction,
+                desc,
+                func,
                 *args,
+                db_autocommit,
+                isolation_level,
                 **kwargs,
             )
 
-        pool.runWithConnection = runWithConnection
-        pool.runInteraction = runInteraction
+        pool.runWithConnection = runWithConnection  # type: ignore[assignment]
+        pool.runInteraction = runInteraction  # type: ignore[assignment]
         # Replace the thread pool with a threadless 'thread' pool
-        pool.threadpool = ThreadPool(clock._reactor)
+        pool.threadpool = ThreadPool(clock._reactor)  # type: ignore[assignment]
         pool.running = True
 
     # We've just changed the Databases to run DB transactions on the same
