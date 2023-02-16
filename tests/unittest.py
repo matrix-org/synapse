@@ -34,6 +34,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 from unittest.mock import Mock, patch
 
@@ -45,7 +46,7 @@ from typing_extensions import Concatenate, ParamSpec, Protocol
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
-from twisted.test.proto_helpers import MemoryReactor
+from twisted.test.proto_helpers import MemoryReactor, MemoryReactorClock
 from twisted.trial import unittest
 from twisted.web.resource import Resource
 from twisted.web.server import Request
@@ -296,7 +297,19 @@ class HomeserverTestCase(TestCase):
 
         from tests.rest.client.utils import RestHelper
 
-        self.helper = RestHelper(self.hs, self.site, getattr(self, "user_id", None))
+        # HomeServer's reactor is ISynapseReactor, but for tests it should be
+        # MemoryReactorClock, which some of the internal mechanisms of tests
+        # depend on.
+        #
+        # Attempting to assert that here causes mypy to think the rest the code
+        # below the assertion to be unreachable, so just cast it. Hopefully this
+        # is true!
+        self.helper = RestHelper(
+            self.hs,
+            cast(MemoryReactorClock, self.hs.get_reactor()),
+            self.site,
+            getattr(self, "user_id", None),
+        )
 
         if hasattr(self, "user_id"):
             if self.hijack_auth:

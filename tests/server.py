@@ -318,7 +318,7 @@ class FakeSite:
 
 
 def make_request(
-    reactor,
+    reactor: MemoryReactorClock,
     site: Union[Site, FakeSite],
     method: Union[bytes, str],
     path: Union[bytes, str],
