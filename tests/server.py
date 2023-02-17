@@ -676,14 +676,10 @@ class FakeTransport:
 
     other: IProtocol
     """The Protocol object which will receive any data written to this transport.
-
-    :type: twisted.internet.interfaces.IProtocol
     """
 
     _reactor: IReactorTime
     """Test reactor
-
-    :type: twisted.internet.interfaces.IReactorTime
     """
 
     _protocol: Optional[IProtocol] = None
