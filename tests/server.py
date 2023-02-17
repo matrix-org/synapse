@@ -41,7 +41,7 @@ from unittest.mock import Mock
 
 import attr
 from typing_extensions import Deque, ParamSpec
-from zope.interface import implementer, providedBy
+from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
@@ -206,8 +206,9 @@ class FakeChannel:
 
     # Type ignore: mypy doesn't like the fact that producer isn't an IProducer.
     def registerProducer(self, producer: IProducer, streaming: bool) -> None:
-        # Ensure that the producer implements one or more of IPushProducer and IPullProducer.
-        assert not set(providedBy(producer)).isdisjoint({IPushProducer, IPullProducer})
+        # TODO This should ensure that the IProducer is an IPushProducer or
+        # IPullProducer, unfortunately twisted.protocols.basic.FileSender does
+        # implement those, but doesn't declare it.
         self._producer = cast(Union[IPushProducer, IPullProducer], producer)
         self.producerStreaming = streaming
 
