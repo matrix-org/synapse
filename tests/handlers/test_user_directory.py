@@ -192,7 +192,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
         self._check_only_one_user_in_directory(user, room)
 
-    def test_search_term_with_colon_in_it(self) -> None:
+    def test_search_term_with_colon_in_it_does_not_raise(self) -> None:
         """
         Regression test: Test that search terms with colons in them are acceptable.
         """
