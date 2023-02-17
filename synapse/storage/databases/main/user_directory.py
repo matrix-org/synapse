@@ -27,6 +27,10 @@ from typing import (
     cast,
 )
 
+from synapse.replication.tcp.commands import (
+    ReadyToRefreshStaleUserDirectoryProfilesCommand,
+)
+
 try:
     # Figure out if ICU support is available for searching users.
     import icu
@@ -535,6 +539,16 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             await self.db_pool.updates._end_background_update(
                 "populate_user_directory_process_remote_users"
             )
+
+            # Now kick off querying remote homeservers for profile information.
+            if self.hs.config.worker.should_update_user_directory:
+                self.hs.get_user_directory_handler().kick_off_remote_profile_refresh_process()
+            else:
+                command_handler = self.hs.get_replication_command_handler()
+                command_handler.send_command(
+                    ReadyToRefreshStaleUserDirectoryProfilesCommand("")
+                )
+
             return 1
 
         await self.db_pool.runInteraction(
