@@ -43,7 +43,6 @@ import attr
 from typing_extensions import Deque, ParamSpec
 from zope.interface import implementer
 
-
 from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
