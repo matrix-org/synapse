@@ -23,6 +23,7 @@ from collections import deque
 from io import SEEK_END, BytesIO
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -603,41 +604,28 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
     for database in server.get_datastores().databases:
         pool = database._db_pool
 
-        async def runWithConnection(
-            func: Callable[..., R],
-            *args: Any,
-            db_autocommit: bool = False,
-            isolation_level: Optional[int] = None,
-            **kwargs: Any,
-        ) -> R:
-            return await threads.deferToThreadPool(
+        def runWithConnection(
+            func: Callable[..., R], *args: Any, **kwargs: Any
+        ) -> Awaitable[R]:
+            return threads.deferToThreadPool(
                 pool._reactor,
                 pool.threadpool,
                 pool._runWithConnection,
                 func,
                 *args,
-                db_autocommit,
-                isolation_level,
                 **kwargs,
             )
 
-        async def runInteraction(
-            desc: str,
-            func: Callable[..., R],
-            *args: Any,
-            db_autocommit: bool = False,
-            isolation_level: Optional[int] = None,
-            **kwargs: Any,
-        ) -> R:
-            return await threads.deferToThreadPool(
+        def runInteraction(
+            desc: str, func: Callable[..., R], *args: Any, **kwargs: Any
+        ) -> Awaitable[R]:
+            return threads.deferToThreadPool(
                 pool._reactor,
                 pool.threadpool,
                 pool._runInteraction,
                 desc,
                 func,
                 *args,
-                db_autocommit,
-                isolation_level,
                 **kwargs,
             )
 
