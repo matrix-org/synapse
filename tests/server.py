@@ -43,6 +43,7 @@ import attr
 from typing_extensions import Deque, ParamSpec
 from zope.interface import implementer
 
+
 from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
@@ -704,7 +705,9 @@ class FakeTransport:
             logger.info("FakeTransport: loseConnection()")
             self.disconnecting = True
             if self._protocol:
-                self._protocol.connectionLost(Failure())
+                self._protocol.connectionLost(
+                    Failure(RuntimeError("FakeTransport.loseConnection()"))
+                )
 
             # if we still have data to write, delay until that is done
             if self.buffer:
