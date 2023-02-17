@@ -704,7 +704,7 @@ class FakeTransport:
     disconnecting = False
     disconnected = False
     connected = True
-    buffer: bytes = attr.Factory(bytes)
+    buffer: bytes = b""
     producer: Optional[IPushProducer] = None
     autoflush: bool = True
 
