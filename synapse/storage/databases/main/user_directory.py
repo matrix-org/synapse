@@ -142,6 +142,18 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 txn, TEMP_TABLE + "_users", keys=("user_id",), values=users
             )
 
+            # A table for storing a list of remote users that *may* need a remote
+            # lookup in order to obtain a public profile.
+            # The list should be compared against the user directory's cache
+            # to see whether any queries can be skipped because the remote user
+            # also appeared in a public room.
+            sql = (
+                "CREATE TABLE IF NOT EXISTS "
+                + TEMP_TABLE
+                + "_remote_users_needing_lookup(user_id TEXT PRIMARY KEY NOT NULL)"
+            )
+            txn.execute(sql)
+
         new_pos = await self.get_max_stream_id_in_current_state_deltas()
         await self.db_pool.runInteraction(
             "populate_user_directory_temp_build", _make_staging_area
@@ -171,6 +183,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         def _delete_staging_area(txn: LoggingTransaction) -> None:
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_rooms")
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_users")
+            txn.execute(
+                "DROP TABLE IF EXISTS " + TEMP_TABLE + "_remote_users_needing_lookup"
+            )
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_position")
 
         await self.db_pool.runInteraction(
