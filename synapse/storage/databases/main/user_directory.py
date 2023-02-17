@@ -91,7 +91,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
         self.db_pool.updates.register_background_update_handler(
             "populate_user_directory_process_users",
-            self._populate_user_directory_process_users,
+            self._populate_user_directory_process_local_users,
         )
         self.db_pool.updates.register_background_update_handler(
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
@@ -265,7 +265,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 # Upsert a user_directory record for each remote user we see.
                 for user_id, profile in users_with_profile.items():
                     # Local users are processed separately in
-                    # `_populate_user_directory_users`; there we can read from
+                    # `_populate_user_directory_local_users`; there we can read from
                     # the `profiles` table to ensure we don't leak their per-room
                     # profiles. It also means we write local users to this table
                     # exactly once, rather than once for every room they're in.
@@ -336,7 +336,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return processed_event_count
 
-    async def _populate_user_directory_process_users(
+    async def _populate_user_directory_process_local_users(
         self, progress: JsonDict, batch_size: int
     ) -> int:
         """
