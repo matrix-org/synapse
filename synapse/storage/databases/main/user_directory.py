@@ -277,6 +277,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     or await self.should_include_local_user_in_dir(user_id)
                 }
 
+                # Determine whether the room is public
+                is_public = await self.is_room_world_readable_or_publicly_joinable(
+                    room_id
+                )
+
+                remote_users_to_query_later = set()
+
                 # Upsert a user_directory record for each remote user we see.
                 for user_id, profile in users_with_profile.items():
                     # Local users are processed separately in
@@ -289,14 +296,29 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     # TODO `users_with_profile` above reads from the `user_directory`
                     #   table, meaning that `profile` is bespoke to this room.
                     #   and this leaks remote users' per-room profiles to the user directory.
-                    await self.update_profile_in_user_dir(
-                        user_id, profile.display_name, profile.avatar_url
-                    )
+                    if is_public:
+                        # If this is a public room, it's acceptable to add the profile
+                        # into the user directory.
+                        await self.update_profile_in_user_dir(
+                            user_id, profile.display_name, profile.avatar_url
+                        )
+                    else:
+                        # Otherwise query the user at a later time
+                        remote_users_to_query_later.add(user_id)
+
+                # (insert the remote users needing a query in batch;
+                # use upsert with no values for 'INSERT OR IGNORE' semantics)
+                await self.db_pool.simple_upsert_many(
+                    f"{TEMP_TABLE}_remote_users_needing_lookup",
+                    ("user_id",),
+                    [(u,) for u in remote_users_to_query_later],
+                    (),
+                    (),
+                    desc="populate_user_directory_queue_remote_needing_lookup",
+                )
+                del remote_users_to_query_later
 
                 # Now update the room sharing tables to include this room.
-                is_public = await self.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
                 if is_public:
                     if users_with_profile:
                         await self.add_users_in_public_rooms(
