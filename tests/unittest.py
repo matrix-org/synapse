@@ -34,7 +34,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 from unittest.mock import Mock, patch
 
@@ -83,7 +82,7 @@ from tests.server import (
 )
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
-from tests.utils import default_config, setupdb
+from tests.utils import checked_cast, default_config, setupdb
 
 setupdb()
 setup_logging()
@@ -297,16 +296,9 @@ class HomeserverTestCase(TestCase):
 
         from tests.rest.client.utils import RestHelper
 
-        # HomeServer's reactor is ISynapseReactor, but for tests it should be
-        # MemoryReactorClock, which some of the internal mechanisms of tests
-        # depend on.
-        #
-        # Attempting to assert that here causes mypy to think the rest the code
-        # below the assertion to be unreachable, so just cast it. Hopefully this
-        # is true!
         self.helper = RestHelper(
             self.hs,
-            cast(MemoryReactorClock, self.hs.get_reactor()),
+            checked_cast(MemoryReactorClock, self.hs.get_reactor()),
             self.site,
             getattr(self, "user_id", None),
         )
