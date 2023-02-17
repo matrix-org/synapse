@@ -105,11 +105,22 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
         )
 
+    @staticmethod
+    def _delete_staging_area(txn: LoggingTransaction) -> None:
+        txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_rooms")
+        txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_users")
+        txn.execute(
+            "DROP TABLE IF EXISTS " + TEMP_TABLE + "_remote_users_needing_lookup"
+        )
+        txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_position")
+
     async def _populate_user_directory_createtables(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        # Get all the rooms that we want to process.
         def _make_staging_area(txn: LoggingTransaction) -> None:
+            # Clear out any tables if they already exist beforehand.
+            UserDirectoryBackgroundUpdateStore._delete_staging_area(txn)
+
             sql = (
                 "CREATE TABLE IF NOT EXISTS "
                 + TEMP_TABLE
@@ -188,16 +199,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
         await self.update_user_directory_stream_pos(position)
 
-        def _delete_staging_area(txn: LoggingTransaction) -> None:
-            txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_rooms")
-            txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_users")
-            txn.execute(
-                "DROP TABLE IF EXISTS " + TEMP_TABLE + "_remote_users_needing_lookup"
-            )
-            txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_position")
-
         await self.db_pool.runInteraction(
-            "populate_user_directory_cleanup", _delete_staging_area
+            "populate_user_directory_cleanup",
+            UserDirectoryBackgroundUpdateStore._delete_staging_area,
         )
 
         await self.db_pool.updates._end_background_update(
