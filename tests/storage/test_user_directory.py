@@ -25,6 +25,7 @@ from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.background_updates import _BackgroundUpdateHandler
+from synapse.storage.databases.main import user_directory
 from synapse.storage.databases.main.user_directory import (
     _parse_words_with_icu,
     _parse_words_with_regex,
@@ -427,6 +428,8 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
+    use_icu = False
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
@@ -437,6 +440,12 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         self.get_success(self.store.update_profile_in_user_dir(BOBBY, "bobby", None))
         self.get_success(self.store.update_profile_in_user_dir(BELA, "Bela", None))
         self.get_success(self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB)))
+
+        self._restore_use_icu = user_directory.USE_ICU
+        user_directory.USE_ICU = self.use_icu
+
+    def tearDown(self) -> None:
+        user_directory.USE_ICU = self._restore_use_icu
 
     def test_search_user_dir(self) -> None:
         # normally when alice searches the directory she should just find
@@ -494,6 +503,13 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
             r["results"][0],
             {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
         )
+
+
+class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
+    use_icu = True
+
+    if not icu:
+        skip = "Requires PyICU"
 
 
 class UserDirectoryICUTestCase(HomeserverTestCase):
