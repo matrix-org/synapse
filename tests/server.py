@@ -698,12 +698,12 @@ class FakeTransport:
     def getHost(self) -> IAddress:
         return self._host_address
 
-    def loseConnection(self, reason: Optional[Failure] = None) -> None:
+    def loseConnection(self) -> None:
         if not self.disconnecting:
-            logger.info("FakeTransport: loseConnection(%s)", reason)
+            logger.info("FakeTransport: loseConnection()")
             self.disconnecting = True
             if self._protocol:
-                self._protocol.connectionLost(reason)  # type: ignore[arg-type]
+                self._protocol.connectionLost(Failure())
 
             # if we still have data to write, delay until that is done
             if self.buffer:
