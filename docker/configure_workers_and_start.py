@@ -665,13 +665,19 @@ def generate_worker_files(
                 )
             # if there was no name given, this will still be an empty string
             requested_worker_name = worker_type_split[0]
-            # Uncommon mistake that will cause problems. Name string containing spaces.
-            if " " or '"' or "'" in requested_worker_name:
+            # Uncommon mistake that will cause problems. Name string containing quotes
+            # or spaces.
+            if (
+                (" " in requested_worker_name)
+                or ('"' in requested_worker_name)
+                or ("'" in requested_worker_name)
+            ):
                 error(
-                    "Requesting a worker name containing a space is not allowed, "
-                    "as it would raise a FileNotFoundError. Please use an "
-                    "underscore instead."
+                    "Requesting a worker name containing a quote mark or a space is "
+                    "not allowed, as it would raise a FileNotFoundError. Please fix: "
+                    f"{requested_worker_name }"
                 )
+
             # Check the last character of a requested name is not a number. This only
             # seems to occur when requesting more than 10 of a given worker_type. The
             # error comes across as an exception in 'startListening' and ends with
