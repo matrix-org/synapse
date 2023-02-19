@@ -19,13 +19,19 @@ usage() {
   echo "-c"
   echo "  CI mode. Prints every command that the script runs."
   echo "-o <path>"
-  echo "  Directory to output full schema files to."
+  echo "  Directory to output full schema files to. You probably want to use"
+  echo "  '-o synapse/storage/schema'"
   echo "-n <schema number>"
   echo "  Schema number for the new snapshot. Used to set the location of files within "
   echo "  the output directory, mimicking that of synapse/storage/schemas."
   echo "  Defaults to 9999."
   echo "-h"
   echo "  Display this help text."
+  echo ""
+  echo ""
+  echo "You probably want to invoke this with something like"
+  echo "  docker run --rm -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=synapse -p 5432:5432 postgres:11-alpine"
+  echo "  echo postgres | scripts-dev/make_full_schema.sh -p postgres -n MY_SCHEMA_NUMBER -o synapse/storage/schema"
   echo ""
   echo "  NB: make sure to run this against the *oldest* supported version of postgres,"
   echo "  or else pg_dump might output non-backwards-compatible syntax."
@@ -189,7 +195,7 @@ python -m synapse.app.homeserver --generate-keys -c "$SQLITE_CONFIG"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 echo "Running db background jobs..."
-synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" --run-background-updates
+poetry run python synapse/_scripts/update_synapse_database.py --database-config "$SQLITE_CONFIG" --run-background-updates
 
 # Create the PostgreSQL database.
 echo "Creating postgres databases..."
@@ -198,7 +204,7 @@ createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_MAIN_DB_NAM
 createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_STATE_DB_NAME"
 
 echo "Running db background jobs..."
-synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
+poetry run python synapse/_scripts/update_synapse_database.py --database-config "$POSTGRES_CONFIG" --run-background-updates
 
 
 echo "Dropping unwanted db tables..."
@@ -293,4 +299,12 @@ pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owne
 pg_dump --format=plain --schema-only         --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema  > "$OUTPUT_DIR/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"
 pg_dump --format=plain --data-only --inserts --no-tablespaces --no-acl --no-owner "$POSTGRES_STATE_DB_NAME"  | cleanup_pg_schema >> "$OUTPUT_DIR/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"
 
+if [[ "$OUTPUT_DIR" == *synapse/storage/schema ]]; then
+  echo "Updating contrib/datagrip symlinks..."
+  ln -sf "../../synapse/storage/schema/common/full_schemas/$SCHEMA_NUMBER/full.sql.postgres" "contrib/datagrip/common.sql"
+  ln -sf "../../synapse/storage/schema/main/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"   "contrib/datagrip/main.sql"
+  ln -sf "../../synapse/storage/schema/state/full_schemas/$SCHEMA_NUMBER/full.sql.postgres"  "contrib/datagrip/state.sql"
+else
+  echo "Not updating contrib/datagrip symlinks (unknown output directory)"
+fi
 echo "Done! Files dumped to: $OUTPUT_DIR"

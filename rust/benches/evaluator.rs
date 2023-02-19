@@ -15,8 +15,8 @@
 #![feature(test)]
 use std::collections::BTreeSet;
 use synapse::push::{
-    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
-    SimpleJsonValue,
+    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, JsonValue,
+    PushRules, SimpleJsonValue,
 };
 use test::Bencher;
 
@@ -27,15 +27,15 @@ fn bench_match_exact(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            SimpleJsonValue::Str("m.text".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
         ),
         (
             "room_id".to_string(),
-            SimpleJsonValue::Str("!room:server".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
         ),
         (
             "content.body".to_string(),
-            SimpleJsonValue::Str("test message".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
         ),
     ]
     .into_iter()
@@ -45,13 +45,13 @@ fn bench_match_exact(b: &mut Bencher) {
         flattened_keys,
         false,
         BTreeSet::new(),
-        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
         false,
     )
@@ -76,15 +76,15 @@ fn bench_match_word(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            SimpleJsonValue::Str("m.text".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
         ),
         (
             "room_id".to_string(),
-            SimpleJsonValue::Str("!room:server".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
         ),
         (
             "content.body".to_string(),
-            SimpleJsonValue::Str("test message".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
         ),
     ]
     .into_iter()
@@ -94,13 +94,13 @@ fn bench_match_word(b: &mut Bencher) {
         flattened_keys,
         false,
         BTreeSet::new(),
-        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
         false,
     )
@@ -125,15 +125,15 @@ fn bench_match_word_miss(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            SimpleJsonValue::Str("m.text".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
         ),
         (
             "room_id".to_string(),
-            SimpleJsonValue::Str("!room:server".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
         ),
         (
             "content.body".to_string(),
-            SimpleJsonValue::Str("test message".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
         ),
     ]
     .into_iter()
@@ -143,13 +143,13 @@ fn bench_match_word_miss(b: &mut Bencher) {
         flattened_keys,
         false,
         BTreeSet::new(),
-        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
         false,
     )
@@ -174,15 +174,15 @@ fn bench_eval_message(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            SimpleJsonValue::Str("m.text".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
         ),
         (
             "room_id".to_string(),
-            SimpleJsonValue::Str("!room:server".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
         ),
         (
             "content.body".to_string(),
-            SimpleJsonValue::Str("test message".to_string()),
+            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
         ),
     ]
     .into_iter()
@@ -192,13 +192,13 @@ fn bench_eval_message(b: &mut Bencher) {
         flattened_keys,
         false,
         BTreeSet::new(),
-        false,
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
+        false,
         false,
         false,
     )

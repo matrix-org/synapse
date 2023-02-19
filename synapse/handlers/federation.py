@@ -952,7 +952,20 @@ class FederationHandler:
         #
         # Note that this requires the /send_join request to come back to the
         # same server.
+        prev_event_ids = None
         if room_version.msc3083_join_rules:
+            # Note that the room's state can change out from under us and render our
+            # nice join rules-conformant event non-conformant by the time we build the
+            # event. When this happens, our validation at the end fails and we respond
+            # to the requesting server with a 403, which is misleading — it indicates
+            # that the user is not allowed to join the room and the joining server
+            # should not bother retrying via this homeserver or any others, when
+            # in fact we've just messed up with building the event.
+            #
+            # To reduce the likelihood of this race, we capture the forward extremities
+            # of the room (prev_event_ids) just before fetching the current state, and
+            # hope that the state we fetch corresponds to the prev events we chose.
+            prev_event_ids = await self.store.get_prev_events_for_room(room_id)
             state_ids = await self._state_storage_controller.get_current_state_ids(
                 room_id
             )
@@ -994,7 +1007,8 @@ class FederationHandler:
                 event,
                 unpersisted_context,
             ) = await self.event_creation_handler.create_new_client_event(
-                builder=builder
+                builder=builder,
+                prev_event_ids=prev_event_ids,
             )
         except SynapseError as e:
             logger.warning("Failed to create join to %s because %s", room_id, e)
@@ -1880,6 +1894,11 @@ class FederationHandler:
                 logger.info("Updating current state for %s", room_id)
                 # TODO(faster_joins): notify workers in notify_room_un_partial_stated
                 #   https://github.com/matrix-org/synapse/issues/12994
+                #
+                # NB: there's a potential race here. If room is purged just before we
+                # call this, we _might_ end up inserting rows into current_state_events.
+                # (The logic is hard to chase through.) We think this is fine, but if
+                # not the HS admin should purge the room again.
                 await self.state_handler.update_current_state(room_id)
 
                 logger.info("Handling any pending device list updates")

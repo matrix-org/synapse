@@ -1337,7 +1337,11 @@ class EventCreationHandler:
                 relation.parent_id, event.type, aggregation_key, event.sender
             )
             if already_exists:
-                raise SynapseError(400, "Can't send same reaction twice")
+                raise SynapseError(
+                    400,
+                    "Can't send same reaction twice",
+                    errcode=Codes.DUPLICATE_ANNOTATION,
+                )
 
         # Don't attempt to start a thread if the parent event is a relation.
         elif relation.rel_type == RelationTypes.THREAD:

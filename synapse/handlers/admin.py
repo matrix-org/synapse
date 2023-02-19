@@ -14,7 +14,7 @@
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set
 
 from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastores().main
+        self._store = hs.get_datastores().main
         self._device_handler = hs.get_device_handler()
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
@@ -38,7 +38,7 @@ class AdminHandler:
     async def get_whois(self, user: UserID) -> JsonDict:
         connections = []
 
-        sessions = await self.store.get_user_ip_and_agents(user)
+        sessions = await self._store.get_user_ip_and_agents(user)
         for session in sessions:
             connections.append(
                 {
@@ -57,7 +57,7 @@ class AdminHandler:
 
     async def get_user(self, user: UserID) -> Optional[JsonDict]:
         """Function to get user details"""
-        user_info_dict = await self.store.get_user_by_id(user.to_string())
+        user_info_dict = await self._store.get_user_by_id(user.to_string())
         if user_info_dict is None:
             return None
 
@@ -89,11 +89,11 @@ class AdminHandler:
         }
 
         # Add additional user metadata
-        profile = await self.store.get_profileinfo(user.localpart)
-        threepids = await self.store.user_get_threepids(user.to_string())
+        profile = await self._store.get_profileinfo(user.localpart)
+        threepids = await self._store.user_get_threepids(user.to_string())
         external_ids = [
             ({"auth_provider": auth_provider, "external_id": external_id})
-            for auth_provider, external_id in await self.store.get_external_ids_by_user(
+            for auth_provider, external_id in await self._store.get_external_ids_by_user(
                 user.to_string()
             )
         ]
@@ -101,7 +101,7 @@ class AdminHandler:
         user_info_dict["avatar_url"] = profile.avatar_url
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
-        user_info_dict["erased"] = await self.store.is_user_erased(user.to_string())
+        user_info_dict["erased"] = await self._store.is_user_erased(user.to_string())
 
         return user_info_dict
 
@@ -117,7 +117,7 @@ class AdminHandler:
             The returned value is that returned by `writer.finished()`.
         """
         # Get all rooms the user is in or has been in
-        rooms = await self.store.get_rooms_for_local_user_where_membership_is(
+        rooms = await self._store.get_rooms_for_local_user_where_membership_is(
             user_id,
             membership_list=(
                 Membership.JOIN,
@@ -131,7 +131,7 @@ class AdminHandler:
         # We only try and fetch events for rooms the user has been in. If
         # they've been e.g. invited to a room without joining then we handle
         # those separately.
-        rooms_user_has_been_in = await self.store.get_rooms_user_has_been_in(user_id)
+        rooms_user_has_been_in = await self._store.get_rooms_user_has_been_in(user_id)
 
         for index, room in enumerate(rooms):
             room_id = room.room_id
@@ -140,7 +140,7 @@ class AdminHandler:
                 "[%s] Handling room %s, %d/%d", user_id, room_id, index + 1, len(rooms)
             )
 
-            forgotten = await self.store.did_forget(user_id, room_id)
+            forgotten = await self._store.did_forget(user_id, room_id)
             if forgotten:
                 logger.info("[%s] User forgot room %d, ignoring", user_id, room_id)
                 continue
@@ -152,14 +152,14 @@ class AdminHandler:
 
                 if room.membership == Membership.INVITE:
                     event_id = room.event_id
-                    invite = await self.store.get_event(event_id, allow_none=True)
+                    invite = await self._store.get_event(event_id, allow_none=True)
                     if invite:
                         invited_state = invite.unsigned["invite_room_state"]
                         writer.write_invite(room_id, invite, invited_state)
 
                 if room.membership == Membership.KNOCK:
                     event_id = room.event_id
-                    knock = await self.store.get_event(event_id, allow_none=True)
+                    knock = await self._store.get_event(event_id, allow_none=True)
                     if knock:
                         knock_state = knock.unsigned["knock_room_state"]
                         writer.write_knock(room_id, knock, knock_state)
@@ -170,7 +170,7 @@ class AdminHandler:
             # were joined. We estimate that point by looking at the
             # stream_ordering of the last membership if it wasn't a join.
             if room.membership == Membership.JOIN:
-                stream_ordering = self.store.get_room_max_stream_ordering()
+                stream_ordering = self._store.get_room_max_stream_ordering()
             else:
                 stream_ordering = room.stream_ordering
 
@@ -197,7 +197,7 @@ class AdminHandler:
             # events that we have and then filtering, this isn't the most
             # efficient method perhaps but it does guarantee we get everything.
             while True:
-                events, _ = await self.store.paginate_room_events(
+                events, _ = await self._store.paginate_room_events(
                     room_id, from_key, to_key, limit=100, direction=Direction.FORWARDS
                 )
                 if not events:
@@ -262,6 +262,13 @@ class AdminHandler:
         writer.write_connections(
             connections["devices"][""]["sessions"][0]["connections"]
         )
+
+        # Get all account data the user has global and in rooms
+        global_data = await self._store.get_global_account_data_for_user(user_id)
+        by_room_data = await self._store.get_room_account_data_for_user(user_id)
+        writer.write_account_data("global", global_data)
+        for room_id in by_room_data:
+            writer.write_account_data(room_id, by_room_data[room_id])
 
         return writer.finished()
 
@@ -337,6 +344,18 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
         Args:
             connections: The list of connections / sessions.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_account_data(
+        self, file_name: str, account_data: Mapping[str, JsonDict]
+    ) -> None:
+        """Write the account data of a user.
+
+        Args:
+            file_name: file name to write data
+            account_data: mapping of global or room account_data
         """
         raise NotImplementedError()
 

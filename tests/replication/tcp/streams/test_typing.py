@@ -13,7 +13,7 @@
 # limitations under the License.
 from unittest.mock import Mock
 
-from synapse.handlers.typing import RoomMember
+from synapse.handlers.typing import RoomMember, TypingWriterHandler
 from synapse.replication.tcp.streams import TypingStream
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -33,6 +33,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
     def test_typing(self) -> None:
         typing = self.hs.get_typing_handler()
+        assert isinstance(typing, TypingWriterHandler)
 
         self.reconnect()
 
@@ -88,6 +89,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         sends the proper position and RDATA).
         """
         typing = self.hs.get_typing_handler()
+        assert isinstance(typing, TypingWriterHandler)
 
         self.reconnect()
 

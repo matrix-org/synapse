@@ -188,7 +188,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
 from twisted.web.http import Request
@@ -445,7 +445,7 @@ def init_tracer(hs: "HomeServer") -> None:
         opentracing = None  # type: ignore[assignment]
         return
 
-    if not opentracing or not JaegerConfig:
+    if opentracing is None or JaegerConfig is None:
         raise ConfigError(
             "The server has been configured to use opentracing but opentracing is not "
             "installed."
@@ -872,7 +872,7 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 
 def _custom_sync_async_decorator(
     func: Callable[P, R],
-    wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
+    wrapping_logic: Callable[Concatenate[Callable[P, R], P], ContextManager[None]],
 ) -> Callable[P, R]:
     """
     Decorates a function that is sync or async (coroutines), or that returns a Twisted
@@ -902,10 +902,14 @@ def _custom_sync_async_decorator(
     """
 
     if inspect.iscoroutinefunction(func):
-
+        # In this branch, R = Awaitable[RInner], for some other type RInner
         @wraps(func)
-        async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        async def _wrapper(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> Any:  # Return type is RInner
             with wrapping_logic(func, *args, **kwargs):
+                # type-ignore: func() returns R, but mypy doesn't know that R is
+                # Awaitable here.
                 return await func(*args, **kwargs)  # type: ignore[misc]
 
     else:
@@ -972,7 +976,11 @@ def trace_with_opname(
         if not opentracing:
             return func
 
-        return _custom_sync_async_decorator(func, _wrapping_logic)
+        # type-ignore: mypy seems to be confused by the ParamSpecs here.
+        # I think the problem is https://github.com/python/mypy/issues/12909
+        return _custom_sync_async_decorator(
+            func, _wrapping_logic  # type: ignore[arg-type]
+        )
 
     return _decorator
 
@@ -1018,7 +1026,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         set_tag(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
-    return _custom_sync_async_decorator(func, _wrapping_logic)
+    # type-ignore: mypy seems to be confused by the ParamSpecs here.
+    # I think the problem is https://github.com/python/mypy/issues/12909
+    return _custom_sync_async_decorator(func, _wrapping_logic)  # type: ignore[arg-type]
 
 
 @contextlib.contextmanager

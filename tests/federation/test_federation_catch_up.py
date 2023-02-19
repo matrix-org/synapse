@@ -5,7 +5,11 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.federation.sender import PerDestinationQueue, TransactionManager
+from synapse.federation.sender import (
+    FederationSender,
+    PerDestinationQueue,
+    TransactionManager,
+)
 from synapse.federation.units import Edu, Transaction
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -33,8 +37,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        self.federation_transport_client = Mock(spec=["send_transaction"])
         return self.setup_test_homeserver(
-            federation_transport_client=Mock(spec=["send_transaction"]),
+            federation_transport_client=self.federation_transport_client,
         )
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -52,9 +57,13 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.pdus: List[JsonDict] = []
         self.failed_pdus: List[JsonDict] = []
         self.is_online = True
-        self.hs.get_federation_transport_client().send_transaction.side_effect = (
+        self.federation_transport_client.send_transaction.side_effect = (
             self.record_transaction
         )
+
+        federation_sender = hs.get_federation_sender()
+        assert isinstance(federation_sender, FederationSender)
+        self.federation_sender = federation_sender
 
     def default_config(self) -> JsonDict:
         config = super().default_config()
@@ -229,11 +238,11 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # let's delete the federation transmission queue
         # (this pretends we are starting up fresh.)
         self.assertFalse(
-            self.hs.get_federation_sender()
-            ._per_destination_queues["host2"]
-            .transmission_loop_running
+            self.federation_sender._per_destination_queues[
+                "host2"
+            ].transmission_loop_running
         )
-        del self.hs.get_federation_sender()._per_destination_queues["host2"]
+        del self.federation_sender._per_destination_queues["host2"]
 
         # let's also clear any backoffs
         self.get_success(
@@ -322,6 +331,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # also fetch event 5 so we know its last_successful_stream_ordering later
         event_5 = self.get_success(self.hs.get_datastores().main.get_event(event_id_5))
 
+        assert event_2.internal_metadata.stream_ordering is not None
         self.get_success(
             self.hs.get_datastores().main.set_destination_last_successful_stream_ordering(
                 "host2", event_2.internal_metadata.stream_ordering
@@ -425,15 +435,16 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         def wake_destination_track(destination: str) -> None:
             woken.append(destination)
 
-        self.hs.get_federation_sender().wake_destination = wake_destination_track
+        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
 
         # cancel the pre-existing timer for _wake_destinations_needing_catchup
         # this is because we are calling it manually rather than waiting for it
         # to be called automatically
-        self.hs.get_federation_sender()._catchup_after_startup_timer.cancel()
+        assert self.federation_sender._catchup_after_startup_timer is not None
+        self.federation_sender._catchup_after_startup_timer.cancel()
 
         self.get_success(
-            self.hs.get_federation_sender()._wake_destinations_needing_catchup(), by=5.0
+            self.federation_sender._wake_destinations_needing_catchup(), by=5.0
         )
 
         # ASSERT (_wake_destinations_needing_catchup):
@@ -475,6 +486,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             )
         )
 
+        assert event_1.internal_metadata.stream_ordering is not None
         self.get_success(
             self.hs.get_datastores().main.set_destination_last_successful_stream_ordering(
                 "host2", event_1.internal_metadata.stream_ordering

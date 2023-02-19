@@ -16,6 +16,7 @@
 import logging
 import os
 import urllib
+from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Awaitable, Dict, Generator, List, Optional, Tuple, Type
 
@@ -284,13 +285,14 @@ async def respond_with_responder(
     finish_request(request)
 
 
-class Responder:
+class Responder(ABC):
     """Represents a response that can be streamed to the requester.
 
     Responder is a context manager which *must* be used, so that any resources
     held can be cleaned up.
     """
 
+    @abstractmethod
     def write_to_consumer(self, consumer: IConsumer) -> Awaitable:
         """Stream response into consumer
 
@@ -300,11 +302,12 @@ class Responder:
         Returns:
             Resolves once the response has finished being written
         """
+        raise NotImplementedError()
 
-    def __enter__(self) -> None:
+    def __enter__(self) -> None:  # noqa: B027
         pass
 
-    def __exit__(
+    def __exit__(  # noqa: B027
         self,
         exc_type: Optional[Type[BaseException]],
         exc_val: Optional[BaseException],

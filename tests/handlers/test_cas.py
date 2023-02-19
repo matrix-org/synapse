@@ -61,7 +61,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         cas_response = CasResponse("test_user", {})
         request = _mock_request()
@@ -89,7 +89,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # Map a user via SSO.
         cas_response = CasResponse("test_user", {})
@@ -129,7 +129,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         cas_response = CasResponse("föö", {})
         request = _mock_request()
@@ -160,7 +160,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # The response doesn't have the proper userGroup or department.
         cas_response = CasResponse("test_user", {})

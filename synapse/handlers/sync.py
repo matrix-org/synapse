@@ -269,6 +269,8 @@ class SyncHandler:
         self._state_storage_controller = self._storage_controllers.state
         self._device_handler = hs.get_device_handler()
 
+        self.should_calculate_push_rules = hs.config.push.enable_push
+
         # TODO: flush cache entries on subsequent sync request.
         #    Once we get the next /sync request (ie, one with the same access token
         #    that sets 'since' to 'next_batch'), we know that device won't need a
@@ -1288,6 +1290,12 @@ class SyncHandler:
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
     ) -> RoomNotifCounts:
+        if not self.should_calculate_push_rules:
+            # If push rules have been universally disabled then we know we won't
+            # have any unread counts in the DB, so we may as well skip asking
+            # the DB.
+            return RoomNotifCounts.empty()
+
         with Measure(self.clock, "unread_notifs_for_room_id"):
 
             return await self.store.get_unread_event_push_actions_by_room_for_user(
@@ -1391,6 +1399,11 @@ class SyncHandler:
                 for room_id, is_partial_state in results.items()
                 if is_partial_state
             )
+            membership_change_events = [
+                event
+                for event in membership_change_events
+                if not results.get(event.room_id, False)
+            ]
 
         # Incremental eager syncs should additionally include rooms that
         # - we are joined to
