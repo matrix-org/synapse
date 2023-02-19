@@ -49,13 +49,28 @@ import os
 import platform
 import subprocess
 import sys
+from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Optional, Set
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    MutableMapping,
+    NoReturn,
+    Optional,
+    Set,
+    SupportsIndex,
+)
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
+
+# A simple name used as a placeholder in the WORKERS_CONFIG below. This will be replaced
+# during processing with the name of the worker.
+WORKER_PLACEHOLDER_NAME = "placeholder_name"
 
 # Workers with exposed endpoints needs either "client", "federation", or "media" listener_resources
 # Watching /_matrix/client needs a "client" listener
@@ -77,7 +92,9 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
-        "shared_extra_conf": {"update_user_directory_from_worker": "placeholder_name"},
+        "shared_extra_conf": {
+            "update_user_directory_from_worker": WORKER_PLACEHOLDER_NAME
+        },
         "worker_extra_conf": "",
     },
     "media_repository": {
@@ -94,7 +111,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         # The first configured media worker will run the media background jobs
         "shared_extra_conf": {
             "enable_media_repo": False,
-            "media_instance_running_background_jobs": "placeholder_name",
+            "media_instance_running_background_jobs": WORKER_PLACEHOLDER_NAME,
         },
         "worker_extra_conf": "enable_media_repo: true",
     },
@@ -102,7 +119,9 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices_from_worker": "placeholder_name"},
+        "shared_extra_conf": {
+            "notify_appservices_from_worker": WORKER_PLACEHOLDER_NAME
+        },
         "worker_extra_conf": "",
     },
     "federation_sender": {
@@ -200,7 +219,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "endpoint_patterns": [],
         # This worker cannot be sharded. Therefore, there should only ever be one
         # background worker. This is enforced for the safety of your database.
-        "shared_extra_conf": {"run_background_tasks_on": "placeholder_name"},
+        "shared_extra_conf": {"run_background_tasks_on": WORKER_PLACEHOLDER_NAME},
         "worker_extra_conf": "",
     },
     "event_creator": {
@@ -280,7 +299,7 @@ NGINX_LOCATION_CONFIG_BLOCK = """
 """
 
 NGINX_UPSTREAM_CONFIG_BLOCK = """
-upstream {upstream_worker_type} {{
+upstream {upstream_worker_base_name} {{
 {body}
 }}
 """
@@ -331,7 +350,7 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
 
 def add_worker_roles_to_shared_config(
     shared_config: dict,
-    worker_type_list: list,
+    worker_type_list: List[str],
     worker_name: str,
     worker_port: int,
 ) -> None:
@@ -442,12 +461,9 @@ def insert_worker_name_for_worker_config(
     """
     dict_to_edit = existing_dict.copy()
     for k, v in dict_to_edit["shared_extra_conf"].items():
-        # Only proceed if it's a string as some values are boolean
-        if isinstance(dict_to_edit["shared_extra_conf"][k], str):
-            # This will be ignored if the text isn't the placeholder.
-            dict_to_edit["shared_extra_conf"][k] = v.replace(
-                "placeholder_name", worker_name
-            )
+        # Only proceed if it's the placeholder name string
+        if v == WORKER_PLACEHOLDER_NAME:
+            dict_to_edit["shared_extra_conf"][k] = worker_name
     return dict_to_edit
 
 
@@ -458,59 +474,22 @@ def is_sharding_allowed_for_worker_type(worker_type: str) -> bool:
         worker_type: The type of worker to check against.
     Returns: True if allowed, False if not
     """
-    if worker_type in [
+    return worker_type not in [
         "background_worker",
         "account_data",
         "presence",
         "receipts",
         "typing",
         "to_device",
-    ]:
-        return False
-    else:
-        return True
+    ]
 
 
-def increment_counter(worker_type_counter: Dict[str, int], worker_type: str) -> int:
-    """Given a dict of worker_type:int, increment int
-
-    Args:
-        worker_type_counter: dict to increment
-        worker_type: str of worker_type
-    Returns: int of new value of counter
-    """
-    new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
-    worker_type_counter[worker_type] = new_worker_count
-    return new_worker_count
-
-
-def is_name_allowed_for_worker(
-    worker_type_counter: Dict[str, str], worker_base_name: str, worker_type: str
-) -> bool:
-    """Given a dict of worker_base_name:worker_type, check if this worker_base_name has
-        been seen before.
-
-    Args:
-        worker_type_counter: dict of worker_base_name:worker_type.
-        worker_base_name: str of the base worker name, no appended number.
-        worker_type: str of the worker_type, including combo workers.
-    Returns: True if allowed, False if not
-    """
-    counter_to_check = worker_type_counter.get(worker_base_name)
-    if counter_to_check is not None:
-        if counter_to_check == worker_type:
-            # Key exists, and they match so it should be ok.
-            return True
-        else:
-            return False
-    else:
-        # Key doesn't exist, it's ok to use.
-        return True
-
-
-def split_and_strip_string(given_string: str, split_char: str) -> List:
-    # Removes whitespace from ends of result strings before adding to list.
-    return [x.strip() for x in given_string.split(split_char)]
+def split_and_strip_string(
+    given_string: str, split_char: str, max_split: SupportsIndex = -1
+) -> List:
+    # Removes whitespace from ends of result strings before adding to list. Allow for
+    # overriding 'maxsplit' kwarg, default being -1 to signify no maximum.
+    return [x.strip() for x in given_string.split(split_char, maxsplit=max_split)]
 
 
 def generate_base_homeserver_config() -> None:
@@ -608,16 +587,21 @@ def generate_worker_files(
     # A counter of worker_type -> int. Used for determining the name for a given
     # worker type when generating its config file, as each worker's name is just
     # worker_type(s) + instance #
-    worker_type_counter: Dict[str, int] = {}
+    worker_type_counter: Dict[str, int] = defaultdict(int)
 
     # Similar to above, but more finely grained. This is used to determine we don't have
     # more than a single worker for cases where multiples would be bad(e.g. presence).
-    worker_type_shard_counter: Dict[str, int] = {}
+    worker_type_shard_counter: Dict[str, int] = defaultdict(int)
 
-    # Similar to above, but for worker name's. This is used to check that worker names
-    # for different worker types or combinations of types is not used, as it will error
-    # with 'Address in use'(e.g. "to_device, to_device=typing" would error).
-    worker_name_type_counter: Dict[str, str] = {}
+    # Similar to above, but for worker name's. This has two uses:
+    # 1. Can be used to check that worker names for different worker types or
+    #       combinations of types is not used, as it will error with 'Address in
+    #       use'(e.g. "to_device, to_device=typing" would not work).
+    # 2. Convenient way to get the combination of worker types from worker_name after
+    #       processing and merging.
+    # Follows the pattern:
+    # ["worker_name": "worker_type(s)"]
+    worker_name_type_list: Dict[str, str] = {}
 
     # A list of internal endpoints to healthcheck, starting with the main process
     # which exists even if no workers do.
@@ -635,25 +619,22 @@ def generate_worker_files(
     new_worker_types = []
     for worker_type in worker_types:
         if ":" in worker_type:
-            worker_type_components = split_and_strip_string(worker_type, ":")
-            count = 0
+            worker_type_components = split_and_strip_string(worker_type, ":", 1)
+            worker_count = 0
             # Should only be 2 components, a type of worker(s) and an integer as a
             # string. Cast the number as an int then it can be used as a counter.
-            if (
-                len(worker_type_components) == 2
-                and worker_type_components[-1].isdigit()
-            ):
-                count = int(worker_type_components[1])
-            else:
+            try:
+                worker_count = int(worker_type_components[1])
+            except ValueError:
                 error(
-                    "Multiplier signal(:) for worker found, but incorrect components: "
-                    + worker_type
-                    + ". Please fix."
+                    f"Bad number in worker count for '{worker_type}': "
+                    "'{worker_type_components[1]}' is not an integer"
                 )
+
             # As long as there are more than 0, we add one to the list to make below.
-            while count > 0:
+            for _ in range(worker_count):
                 new_worker_types.append(worker_type_components[0])
-                count -= 1
+
         else:
             # If it's not a real worker, it will error out below
             new_worker_types.append(worker_type)
@@ -685,12 +666,25 @@ def generate_worker_files(
             # if there was no name given, this will still be an empty string
             requested_worker_name = worker_type_split[0]
             # Uncommon mistake that will cause problems. Name string containing spaces.
-            if len(requested_worker_name.split(" ")) > 1:
+            if " " or '"' or "'" in requested_worker_name:
                 error(
                     "Requesting a worker name containing a space is not allowed, "
                     "as it would raise a FileNotFoundError. Please use an "
                     "underscore instead."
                 )
+            # Check the last character of a requested name is not a number. This only
+            # seems to occur when requesting more than 10 of a given worker_type. The
+            # error comes across as an exception in 'startListening' and ends with
+            # 'Address already in use' for the port
+            if requested_worker_name[-1].isdigit():
+                error(
+                    "Found a number at the end of the requested worker name: "
+                    + requested_worker_name
+                    + ". This is not allowed as it will cause exceptions with "
+                    "'Address already in use'. Recommend appending an underscore "
+                    "after the number if this what you really want to do."
+                )
+
             # Reassign the worker_type string with no name on it.
             worker_type = worker_type_split[1]
 
@@ -734,11 +728,12 @@ def generate_worker_files(
                         + worker
                         + " type. Please recount and remove."
                     )
-            # Not in shard counter, add it. Don't need return value
-            increment_counter(worker_type_shard_counter, worker)
+            # Not in shard counter, add it.
+            worker_type_shard_counter[worker] += 1
 
         # Name workers by their type or requested name concatenated with an
         # incrementing number. e.g. federation_reader1 or event_creator+event_persister1
+        worker_base_name: str
         if requested_worker_name:
             worker_base_name = requested_worker_name
             # It'll be useful to have this in the log in case it's a complex of many
@@ -766,18 +761,15 @@ def generate_worker_files(
             else:
                 worker_base_name = worker_type
         # This counter is used for names with broader worker type definitions.
-        new_worker_count = increment_counter(worker_type_counter, worker_type)
-        worker_name = worker_base_name + str(new_worker_count)
+        worker_type_counter[worker_type] += 1
+        worker_name = worker_base_name + str(worker_type_counter[worker_type])
 
         # Now that the worker name is settled, check this name isn't used for a
         # different worker_type. If it's not allowed, will error and stop. If no issues,
         # it will be added to the counter.
-        if is_name_allowed_for_worker(
-            worker_name_type_counter,
-            worker_base_name,
-            worker_type,
-        ):
-            worker_name_type_counter.setdefault(worker_base_name, worker_type)
+        check_worker_type = worker_name_type_list.get(worker_base_name)
+        if (check_worker_type is None) or (check_worker_type == worker_type):
+            worker_name_type_list.setdefault(worker_base_name, worker_type)
 
         else:
             error(
@@ -787,7 +779,7 @@ def generate_worker_files(
                 + worker_type
                 + ". It is already in use by "
                 # This is cast as a str because mypy thinks it could be None
-                + str(worker_name_type_counter.get(worker_base_name))
+                + str(check_worker_type)
             )
 
         # Replace placeholder names in the config template with the actual worker name.
@@ -820,10 +812,10 @@ def generate_worker_files(
             # Determine whether we need to load-balance this worker
             if worker_type_total_count > 1:
                 # Create or add to a load-balanced upstream for this worker
-                nginx_upstreams.setdefault(worker_type, set()).add(worker_port)
+                nginx_upstreams.setdefault(worker_base_name, set()).add(worker_port)
 
-                # Upstreams are named after the worker_type
-                upstream = "http://" + worker_type
+                # Upstreams are named after the worker_base_name
+                upstream = "http://" + worker_base_name
             else:
                 upstream = "http://localhost:%d" % (worker_port,)
 
@@ -831,7 +823,6 @@ def generate_worker_files(
             nginx_locations[pattern] = upstream
 
         # Write out the worker's logging config file
-
         log_config_filepath = generate_worker_log_config(environ, worker_name, data_dir)
 
         # Then a worker config file
@@ -855,14 +846,14 @@ def generate_worker_files(
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
 
-    for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
+    for upstream_worker_base_name, upstream_worker_ports in nginx_upstreams.items():
         body = ""
         for port in upstream_worker_ports:
             body += "    server localhost:%d;\n" % (port,)
 
         # Add to the list of configured upstreams
         nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
-            upstream_worker_type=upstream_worker_type,
+            upstream_worker_base_name=upstream_worker_base_name,
             body=body,
         )
 
