@@ -699,6 +699,18 @@ files = [
 ]
 
 [[package]]
+name = "immutabledict"
+version = "2.2.3"
+description = "Immutable wrapper around dictionaries (a fork of frozendict)"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "immutabledict-2.2.3-py3-none-any.whl", hash = "sha256:a7b078ebcc4a58ddc73b55f808b26e7c8c2d5183fad325615112689e1a63e714"},
+    {file = "immutabledict-2.2.3.tar.gz", hash = "sha256:0e1e8a3f2b3ff062daa19795f947e9ec7a58add269d44e34d3ab4319e1343853"},
+]
+
+[[package]]
 name = "importlib-metadata"
 version = "6.0.0"
 description = "Read metadata from Python packages"
@@ -2985,4 +2997,4 @@ user-search = ["pyicu"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7.1"
-content-hash = "47f84486661cef654765ed0bfec53fd83fd5ec379dc47195fee847f9e5365f5c"
+content-hash = "d80e0a2a645cb4e461adacfded57400394d95acc464793eee4439023651fd30b"
